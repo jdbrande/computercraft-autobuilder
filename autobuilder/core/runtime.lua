@@ -205,13 +205,24 @@ function M.run(config,e)
   local app=M.new(config,e)
   local function main()
     app:tick(); app:draw()
+    local nextTick=e.os.epoch('utc')/1000+1
     local timer=e.os.startTimer(1)
     while true do
       local name,a,b,c=e.os.pullEvent()
       if name=='timer' and a==timer then
-        app:tick(); timer=e.os.startTimer(1)
+        app:tick(); nextTick=e.os.epoch('utc')/1000+1
       elseif not app:event(name,a,b,c) then return end
       if app.quitRequested and not app.busy then app:save(); return end
+      -- CraftOS peripheral calls can yield with a task_complete filter and
+      -- consume our one-shot timer while handling a command or network event.
+      -- Check elapsed time and always rearm after the handler returns, even
+      -- when that timer event never reached this loop. Keep all control work
+      -- in this coroutine rather than racing another scheduler against it.
+      if e.os.epoch('utc')/1000>=nextTick then
+        app:tick(); nextTick=e.os.epoch('utc')/1000+1
+      end
+      if e.os.cancelTimer then e.os.cancelTimer(timer) end
+      timer=e.os.startTimer(math.max(0.05,nextTick-e.os.epoch('utc')/1000))
       app:draw()
     end
   end

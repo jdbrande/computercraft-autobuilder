@@ -3,7 +3,7 @@
 Use **one of your seven online workers** for this first test: a small, 28-block
 cathedral detail. Leave the other six parked outside the work area. You do not
 need to reinstall them. These steps update the controller and chosen worker to
-**release 0.10.4 or later**. The controller can choose and clear the small test
+**release 0.10.5 or later**. The controller can choose and clear the small test
 site automatically; you do not need to enter a build-corner coordinate.
 
 ## 1. Place the hardware

@@ -1,4 +1,4 @@
-# Autobuilder 0.10.4
+# Autobuilder 0.10.5
 
 **First time using this? [Start here](docs/start-here.md).** The guide shows the
 hardware drawing and exactly what to place, click, and type. The controller now
@@ -6,6 +6,10 @@ has a numbered menu: `1` checks setup and `2` clears an automatic site, then run
 the bundled 28-block cathedral test. In controller `setup`, press Enter or type
 `auto` at **Build corner**; manual `x y z` corners remain available. Configure the
 chosen worker's actual coordinates and heading in its own `setup` (GPS is optional).
+
+Release 0.10.5 fixes a scheduler stall where a yielding chest/modem call could
+leave the test stuck at preparing with an empty job queue. Updating and rebooting
+resumes the saved request; do not erase checkpoints or repeat setup.
 
 A CC:Tweaked controller and Turtle system for Minecraft Java **1.20.1**. It plans
 materials, acquires supported resources, runs crafting and furnaces, converts and
@@ -66,7 +70,7 @@ The project is hosted at [jdbrande/computercraft-autobuilder](https://github.com
 The commands below use that repository. To prepare a fork, change the raw URL with:
 
 ```sh
-python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.4
+python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.5
 ```
 
 Publish `installer.lua`, `update.lua`, `startup.lua`, `manifest.json`, and

@@ -123,3 +123,47 @@ test('backup pose requires explicit heading confirmation before any movement',fu
   assert(recovered:confirmPose({x=0,y=64,z=0},'east'))
   eq(recovered.state.position.heading,'east'); eq(recovered.state.status,'idle')
 end)
+
+test('controller scheduling survives its timer being consumed by a yielding peripheral call',function()
+  local R=require('autobuilder.core.runtime'); local e=env(1)
+  local timers,latest=0,nil; local pending=false
+  e.os.startTimer=function() timers=timers+1; latest=timers; return timers end
+  e.os.cancelTimer=function() end
+  e.os.pullEvent=function(filter)
+    while true do
+      local event={coroutine.yield(filter)}
+      if not filter or filter==event[1] then return table.unpack(event) end
+    end
+  end
+  e.sleep=function() e.os.pullEvent('sleep') end
+  e.peripheral.call=function()
+    if pending then pending=false; e.os.pullEvent('task_complete') end
+    return true
+  end
+  e.parallel={waitForAny=function(...)
+    local threads,filters={},{}
+    for i,fn in ipairs({...}) do
+      threads[i]=coroutine.create(fn)
+      local ok,f=coroutine.resume(threads[i]); assert(ok,f); filters[i]=f
+    end
+    local function broadcast(event)
+      for i,co in ipairs(threads) do
+        if not filters[i] or filters[i]==event[1] then
+          local ok,f=coroutine.resume(co,table.unpack(event)); assert(ok,f); filters[i]=f
+          if coroutine.status(co)=='dead' then return true end
+        end
+      end
+    end
+    local telemetry={label='Builder',status='idle',position={known=false},fuel=1600,inventory={used=1,slots=16},capabilities={telemetry=true}}
+    pending=true
+    broadcast({'rednet_message',2,{version=1,id='2:1:1',sender=2,boot=1,sequence=1,type='register',payload=telemetry},'autobuilder.v1'})
+    eq(filters[1],'task_complete')
+    e.now=102; broadcast({'timer',latest}) -- discarded by peripheral's event filter
+    broadcast({'task_complete'})
+    assert(timers>1,'scheduler timer was lost forever while the peripheral yielded')
+    e.now=140; broadcast({'timer',latest})
+    assert(broadcast({'char','q'}))
+  end}
+  local app=R.run(cfg('controller'),e)
+  eq(app.state.workers['2'].online,false) -- periodic expiration still runs
+end)
