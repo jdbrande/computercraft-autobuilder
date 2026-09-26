@@ -7,7 +7,25 @@ function M.draw(term,state,agent,page,input)
   local width,height=term.getSize(); local lines={}
   local function line(s) lines[#lines+1]=tostring(s) end
   line('AUTOBUILDER | '..state.role..' '..state.id)
-  if state.role=='controller' and state.view=='project' then
+  if state.role=='controller' and state.view=='guide' then
+    line('Type a number below, then press Enter:')
+    line('1 Check setup    2 Start small test')
+    line('3 Pause test     4 Continue test')
+    line('5 Workers        6 Jobs       7 Setup')
+    line('-----------------------------------')
+    local details={}
+    for _,text in ipairs(state.guideLines or {'Type 1 to check your setup.'}) do
+      local remaining=text
+      while #remaining>width do
+        local cut=remaining:sub(1,width):match('^.*()%s') or width
+        details[#details+1]=remaining:sub(1,cut); remaining=remaining:sub(cut+1)
+      end
+      details[#details+1]=remaining
+    end
+    local perPage=math.max(1,height-10); local pages=math.max(1,math.ceil(#details/perPage)); page=(page or 0)%pages
+    for i=page*perPage+1,math.min(#details,(page+1)*perPage) do line(details[i]) end
+    if pages>1 then line('Help '..(page+1)..'/'..pages..' - Shift N: next page') end
+  elseif state.role=='controller' and state.view=='project' then
     local a=state.automation or {}; local p=a.projects and a.projects[a.currentProject]
     if p then
       line(p.name..' | '..p.phase..(p.paused and ' [PAUSED]' or ''))
@@ -73,12 +91,12 @@ function M.draw(term,state,agent,page,input)
     if task then
       line(task.id); line((task.item or task.type or 'task')..' progress '..(tonumber(task.progress) or task.delivered or 0)..'/'..(task.quantity or #(task.blocks or {})))
       line(task.error or ('Phase: '..tostring(task.phase)))
-    else line('No active job') end
+    else line('No active job'); line('First time? Type setup, then press Enter.') end
     line('Last error: '..(state.lastError or 'none'))
   end
   term.clear()
   for y=1,math.min(#lines,math.max(1,height-3)) do term.setCursorPos(1,y); term.write(lines[y]:sub(1,width)) end
-  local footer={state.commandResult or 'build status | request <item> <count>','Q save/quit | Shift N/P pages | Enter command','> '..(input or '')}
+  local footer={state.commandResult or 'Type help for instructions.','Q: shell | Shift N/P: pages | Enter: run','> '..(input or '')}
   for i=1,3 do if height-3+i>=1 then term.setCursorPos(1,height-3+i); term.write(footer[i]:sub(1,width)) end end
 end
 return M

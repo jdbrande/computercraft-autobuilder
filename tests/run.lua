@@ -99,6 +99,7 @@ dofile('tests/coordination_test.lua')
 dofile('tests/cooperate_test.lua')
 dofile('tests/infrastructure_test.lua')
 dofile('tests/setup_test.lua')
+dofile('tests/first_build_test.lua')
 
 if failed>0 then error(failed..' / '..total..' tests failed') end
 print(total..' tests passed')

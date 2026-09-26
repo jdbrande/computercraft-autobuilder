@@ -1,4 +1,9 @@
-# Autobuilder 0.10.2
+# Autobuilder 0.10.3
+
+**First time using this? [Start here](docs/start-here.md).** The guide shows the
+hardware drawing and exactly what to place, click, and type. The controller now
+has a numbered menu: `1` checks setup and `2` runs the bundled small cathedral
+test. Type `setup` inside Autobuilder to configure it without editing Lua.
 
 A CC:Tweaked controller and Turtle system for Minecraft Java **1.20.1**. It plans
 materials, acquires supported resources, runs crafting and furnaces, converts and
@@ -13,6 +18,7 @@ cells, unavailable resources and uncertain recovery remain visible blocked work.
 | Setup or workflow | Guide |
 | --- | --- |
 | Install, offline folders, update and rollback | [Installation](docs/installation.md) |
+| First test: every placement, click and command, with drawing | [Start here](docs/start-here.md) |
 | Guided controller/builder setup without editing Lua | [Quick setup](docs/quick-setup.md) |
 | Miner hardware, bounded excavation and fuel | [Mining setup](docs/milestone-2.md) |
 | Concurrent miners and durable area ownership | [Parallel mining](docs/parallel-mining.md) |
@@ -58,7 +64,7 @@ The project is hosted at [jdbrande/computercraft-autobuilder](https://github.com
 The commands below use that repository. To prepare a fork, change the raw URL with:
 
 ```sh
-python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.2
+python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.3
 ```
 
 Publish `installer.lua`, `update.lua`, `startup.lua`, `manifest.json`, and
@@ -81,10 +87,11 @@ require explicit capability/hardware settings. **Mining remains opt-in for every
 profile.** Installation itself does not move a Turtle.
 
 The installer creates `/startup.lua`, `/update.lua` and managed `/autobuilder/`
-files. For controller/builders, use the [guided setup](docs/quick-setup.md): run
-`/autobuilder/setup.lua` on the controller, reboot it, then run the wizard on one
-registered worker. The wizard detects inventories/GPS, retrieves supply settings
-from the controller, and enables building. Other roles use
+files. For controller/builders, follow [Start here](docs/start-here.md). After
+updating and rebooting, type `setup` inside the running controller app, then do
+the same on one registered worker. Each wizard returns to the app automatically.
+The wizard detects inventories/GPS, retrieves supply settings from the controller,
+loads the builder's slot-15 fuel after confirmation, and enables building. Other roles use
 `/autobuilder/settings.lua`. Updates preserve settings byte-for-byte; older
 logger/courier installations must enable their capability explicitly. Do not put
 local values in `config.lua`.

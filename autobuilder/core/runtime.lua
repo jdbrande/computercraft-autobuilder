@@ -74,6 +74,10 @@ function M.new(config,e)
   local gps=require('autobuilder.core.gps').new(e.gps,config.gps)
   self.mining=require('autobuilder.core.mining_service').new(self,config,e,network,clock)
   self.automation=require('autobuilder.core.automation_service').new(self,config,e,network,clock)
+  if config.role=='controller' then
+    self.firstBuild=require('autobuilder.core.first_build').new(self,config,e)
+    state.view='guide'
+  end
   function self:confirmPose(fix,heading)
     if not self.navigation or not U.heading(heading) then return false,'worker and explicit heading required' end
     local ok,err=self.navigation:reconcile(fix,heading); if not ok then return false,err end
@@ -113,6 +117,7 @@ function M.new(config,e)
     end
     self.mining:tick()
     self.automation:tick()
+    if self.firstBuild then self.firstBuild:tick() end
     if clock()-lastSave>=config.checkpointInterval then self:save() end
     return true
   end
@@ -159,7 +164,18 @@ function M.new(config,e)
     return result,err
   end
   function self:command(line)
+    line=line:match('^%s*(.-)%s*$')
     local called,ok,result=pcall(function()
+      if line=='setup' or line=='7' then
+        if self.busy then return false,'Wait for the current turtle step to finish, then type setup again.' end
+        self.nextProgram='setup'; self.quitRequested=true; return true,'Opening setup. Current progress stays saved.'
+      end
+      if self.firstBuild then local a,b=self.firstBuild:command(line); if a~=nil then return a,b end end
+      line=({['5']='workers',['6']='jobs'})[line] or line
+      if line=='help' or line=='guide' or line=='1' then
+        return true,'On this turtle: type setup. On the controller: type 1 to check, then 2 to start.'
+      end
+      if config.role=='worker' then return false,'Use controller '..config.controllerId..' to start/pause jobs. On this turtle, type setup or press Q for the shell.' end
       if self.automation.command then local a,b=self.automation:command(line); if a~=nil then return a,b end end
       return self.mining:command(line)
     end)
@@ -171,7 +187,7 @@ function M.new(config,e)
   function self:event(name,a,b,c)
     if self.quitRequested and not self.busy then self:save(); return false end
     if name=='rednet_message' then self:receive(a,b,c)
-    elseif name=='char' and a=='q' and self.input=='' then
+    elseif name=='char' and (a=='q' or a=='Q') and self.input=='' then
       if self.busy then self.quitRequested=true; return true end
       self:save(); return false
     elseif name=='char' and a=='N' and self.input=='' then self.page=self.page+1
@@ -195,6 +211,7 @@ function M.run(config,e)
       if name=='timer' and a==timer then
         app:tick(); timer=e.os.startTimer(1)
       elseif not app:event(name,a,b,c) then return end
+      if app.quitRequested and not app.busy then app:save(); return end
       app:draw()
     end
   end

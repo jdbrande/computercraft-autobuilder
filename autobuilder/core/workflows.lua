@@ -103,6 +103,7 @@ function M.new(state,save,clock,id)
           for wid,w in pairs(workers) do
             local t=w.telemetry
             if w.online and t and t.status=='idle' and not t.task and t.capabilities and t.capabilities[j.requiredCapability]
+              and (not j.preferredWorker or j.preferredWorker==w.id)
               and not M.workerBusy(state,w.id,j.id) then ids[#ids+1]=tonumber(wid) end
           end
           table.sort(ids)
@@ -148,7 +149,8 @@ function M.new(state,save,clock,id)
   end
   function self:recoverOwner(owner,p,workers)
     local j=s.jobs[p.jobId]; local w=workers[tostring(owner)]
-    if not j or j.workerId or j.status~='queued' or not w or not w.online or w.telemetry.task~=j.id then return false,'no registered task ownership evidence' end
+    if not j or j.workerId or j.status~='queued' or not w or not w.online or w.telemetry.task~=j.id
+      or j.preferredWorker and j.preferredWorker~=owner then return false,'no registered task ownership evidence' end
     if M.workerBusy(state,owner,j.id) then return false,'worker has conflicting ownership in another task' end
     for _,other in pairs(s.jobs) do
       if other.workerId and other.status~='completed' and (other.workerId==owner or intersects(j.bounds,other.bounds)) then return false,'conflicting recovered ownership' end

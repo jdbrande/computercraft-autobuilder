@@ -48,46 +48,27 @@ coordinates **(0,26,0)**. It contains **28 blocks**: 13 cobbled deepslate and
 15 sandstone; the other 36 cells are air. It is a small decorative ground/detail
 sample, not a miniature of the whole cathedral.
 
-1. Use release 0.10.2 or later. Follow [guided setup](../../docs/quick-setup.md)
-   on the controller and **one builder**; no Lua settings edits are needed.
-2. The controller wizard asks for the minimum corner of a clear 8×8 test area
-   and selects the stock and supply chests. It enables building, sets rotation 0,
-   disables mirrors and keeps `clearSite=false`.
-3. The builder wizard retrieves supply settings and saves its position, facing
-   and depot. Leave two clear blocks above all 64 target cells, plus an unobstructed
-   route to the depot outside the footprint. Keep the other workers out of the way.
-4. Stock the source chest with 13 cobbled deepslate and 15 sandstone. Fuel the
-   builder separately with coal/charcoal in slot 15. Leave the supply chest empty.
-5. At the controller's CraftOS shell, download the pilot:
+1. Update to release **0.10.3 or later** and follow [Start here](../../docs/start-here.md).
+   It includes the wiring drawing, exact coordinates/facing instructions, and
+   setup for the controller and **one builder**. The other six can stay idle.
+2. Put **13 cobbled deepslate and 15 sandstone in STOCK**, keep SUPPLY empty, and
+   put **16 coal/charcoal in turtle slot 15**. The wizard loads the turtle's fuel.
+3. On the running controller, type **`1`** and press Enter. Fix any missing setup
+   item, then type **`2`** and press Enter. This imports the bundled pilot,
+   prepares the supplied blocks, builds, and verifies it. No separate blueprint
+   download or import/prepare/start commands are needed.
+4. Keep the route and two blocks above the target layer clear. `3` pauses and `4`
+   continues the saved test. `5` shows workers; `6` shows jobs.
 
-   ```text
-   wget https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/blueprints/classic-cathedral/cathedral-pilot.json /cathedral-pilot.json
-   ```
+Success is **28 physical placements and 64 correct verification cells**, with no
+wrong, missing, unsupported or inaccessible cells. The project is named
+`first_cathedral_test`; repeating `2` will not build a second copy. This mode waits
+for missing stock to be supplied manually rather than starting mining/crafting.
 
-   `wget` refuses an existing file. Preserve or rename an old copy explicitly if
-   needed. Start `/autobuilder/startup.lua` after changing the settings.
-6. In the running controller, enter:
-
-   ```text
-   build import /cathedral-pilot.json cathedral_pilot
-   build analyze cathedral_pilot
-   build simulate cathedral_pilot
-   build prepare cathedral_pilot
-   ```
-
-   Wait for the project to become `ready`, then:
-
-   ```text
-   build start cathedral_pilot
-   build status cathedral_pilot
-   ```
-
-   The successful result is `built`, 28 physical placements and **64 correct
-   verification cells**, with no wrong, missing, unsupported or inaccessible cells.
-   If it blocks, preserve the job/checkpoint and inspect `jobs` and `errors`.
-7. After a successful run, test a controller/worker reboot and repair one removed,
-   exposed block using `build repair cathedral_pilot`. Record real fuel usage,
-   elapsed time, supply behavior and filesystem growth before scaling up.
+After a successful run, test a controller/worker reboot. For an advanced repair
+trial on one removed, exposed block, use `build repair first_cathedral_test`.
+Record real fuel usage, elapsed time, supply behavior and filesystem growth before
+scaling up. `cathedral-pilot.json` remains available for advanced/manual imports.
 
 ## Full-section limitations
 

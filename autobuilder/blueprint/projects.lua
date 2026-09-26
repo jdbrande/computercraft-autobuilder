@@ -162,7 +162,7 @@ function M.new(app,config,e,queue,production)
             if not p.regionJobs[dep] then ready=false else deps[#deps+1]=p.regionJobs[dep] end
           end
           if ready then
-            local j=queue:submit(p.mode,{blocks=region.blocks,project=p.name,region=region.id,clearanceY=a.clearanceY,deferConnections=p.mode~='VERIFY'},deps,p.name..':'..p.generation..':'..region.id)
+            local j=queue:submit(p.mode,{blocks=region.blocks,project=p.name,region=region.id,clearanceY=a.clearanceY,deferConnections=p.mode~='VERIFY',stockOnly=p.stockOnly,preferredWorker=p.preferredWorker},deps,p.name..':'..p.generation..':'..region.id)
             p.jobs[#p.jobs+1]=j.id; p.regionJobs[region.id]=j.id; p.cursor=p.cursor+1; save()
           end
         elseif active==0 and p.cursor>#regions then

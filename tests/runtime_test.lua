@@ -21,7 +21,7 @@ test('real controller and worker models communicate and survive both restarts',f
   local c=R.new(cfg('controller'),ce); local w=R.new(cfg('worker',7),we)
   assert(w:tick()); assert(deliver(we,c)); assert(deliver(ce,w))
   eq(c.state.workers['12'].telemetry.fuel,100); eq(w.agent.connected,true)
-  c:draw(); assert(table.concat(ce.screen,'\n'):find('12'))
+  assert(c:command('workers')); c:draw(); assert(table.concat(ce.screen,'\n'):find('12'))
   local c2=R.new(cfg('controller'),ce); eq(c2.state.workers['12'].online,false)
   we.now=116; assert(w:tick()); assert(deliver(we,c2)); assert(deliver(ce,w))
   local w2=R.new(cfg('worker',7),we); assert(w2.state.boot>w.state.boot)

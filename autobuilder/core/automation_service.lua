@@ -109,7 +109,7 @@ function M.new(app,config,e,network,clock)
               local ok,items=pcall(e.peripheral.call,config.supply.inventory,'list')
               if ok and type(items)=='table' and not next(items) then queue.state.supply=nil; app:save() end
             end
-            production:request({[j.missingItem]=math.min(config.supply.batch,j.missingCount or config.supply.batch)},'supply:'..j.id..':'..j.missingItem)
+            production:request({[j.missingItem]=math.min(config.supply.batch,j.missingCount or config.supply.batch)},'supply:'..j.id..':'..j.missingItem,{stockOnly=j.stockOnly})
           end
         end
       end

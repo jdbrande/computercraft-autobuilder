@@ -16,7 +16,23 @@ local function env(role,answers)
     send=function(to,m,protocol) e.packet={to=to,message=m,protocol=protocol}; return true end,
     receive=function(protocol) return 1,{version=1,type='setup_profile',requestId=e.packet.message.requestId,supply={inventory='stage',side='front'}} end}
   e.gps={locate=function() return 12,64,-9 end}
-  if role=='worker' then e.turtle=S.turtle(); e.turtle.inspect=function() return true,{name='minecraft:chest'} end end
+  if role=='worker' then
+    e.turtle=S.turtle(); local t=e.turtle
+    t.inspect=function() return true,{name='minecraft:chest'} end
+    t.items={[15]={name='minecraft:coal',count=16}}; t.selected=3
+    t.getSelectedSlot=function() return t.selected end
+    t.select=function(slot) t.selected=slot; return true end
+    t.getItemDetail=function(slot) return t.items[slot] end
+    t.getItemCount=function(slot) return t.items[slot] and t.items[slot].count or 0 end
+    t.refuel=function(n)
+      local item=t.items[t.selected]
+      assert(t.selected==15 and item and (item.name=='minecraft:coal' or item.name=='minecraft:charcoal'))
+      assert(e.fs.exists('/autobuilder/data/worker.state'),'fuel consumed before settings were saved')
+      item.count=item.count-n; t.fuel=t.fuel+80*n
+      if item.count==0 then t.items[t.selected]=nil end
+      return true
+    end
+  end
   return e
 end
 local function settings(e) return assert(load(e.fs.files['/autobuilder/settings.lua'],'settings','t',{}))() end
@@ -65,14 +81,14 @@ test('failed setup promotion restores working settings',function()
   assert(e.fs.exists('/autobuilder/data/settings-before-setup.lua'))
   eq(e.fs.exists('/.autobuilder-install/transaction'),false)
 end)
-test('wizard refuses a controller with queued production and a builder without a supply chest',function()
+test('wizard refuses a controller with queued production and can cancel a missing supply chest',function()
   local e=env('controller',{})
   assert(CP.new(e.fs,e.textutils,'/autobuilder/data/controller.state'):save({schema=1,id=1,role='controller',boot=1,
     phase='telemetry',automation={jobs={},requests={r={status='pending'}}}}))
   assert(not pcall(require('autobuilder.setup_wizard').run,{},e))
-  e=env('worker',{'north','yes'}); e.turtle.inspect=function() return false end
+  e=env('worker',{'cancel'}); e.turtle.inspect=function() return false end
   local original=e.fs.files['/autobuilder/settings.lua']
-  assert(not pcall(require('autobuilder.setup_wizard').run,{},e)); eq(e.fs.files['/autobuilder/settings.lua'],original)
+  eq(require('autobuilder.setup_wizard').run({},e),false); eq(e.fs.files['/autobuilder/settings.lua'],original)
 end)
 test('GPS failure asks for one coordinate line and validates heading',function()
   local e=env('worker',{'12 64 -9','bad','w','yes','yes'}); e.gps.locate=function() return nil end
@@ -101,4 +117,94 @@ test('existing runtime fleet discovers setup profile and reconnects as a configu
   assert(controller:receive(8,we.packet.message,we.packet.protocol))
   local t=controller.state.workers['8'].telemetry
   eq(t.capabilities.building,true); eq(t.position.x,12); eq(t.position.heading,'east'); eq(we.turtle.calls,0)
+end)
+test('controller offers only unambiguous chest defaults and still requires saving',function()
+  local e=env('controller',{'','','20 64 -9','yes'})
+  assert(require('autobuilder.setup_wizard').run({},e))
+  eq(settings(e).supply.inventory,'stage'); eq(settings(e).storageInventories[1],'stock')
+  e=env('controller',{'','','20 64 -9',''})
+  local original=e.fs.files['/autobuilder/settings.lua']
+  eq(require('autobuilder.setup_wizard').run({},e),false)
+  eq(e.fs.files['/autobuilder/settings.lua'],original)
+end)
+test('controller does not guess between two empty supply chests',function()
+  local e=env('controller',{'','2','1 3','20 64 -9','yes'})
+  e.peripheral.getNames=function() return {'right','stock','stage','extra'} end
+  assert(require('autobuilder.setup_wizard').run({},e))
+  eq(settings(e).supply.inventory,'stage'); eq(#settings(e).storageInventories,2)
+end)
+test('controller excludes crafting chests from suggested defaults',function()
+  local e=env('controller',{'','','20 64 -9','yes'})
+  e.fs.files['/autobuilder/settings.lua']='return {role="controller",craftingStation={input="craft"}}'
+  e.peripheral.getNames=function() return {'right','stock','stage','craft'} end
+  assert(require('autobuilder.setup_wizard').run({},e))
+  eq(settings(e).supply.inventory,'stage'); eq(settings(e).storageInventories[1],'stock')
+end)
+test('wizard can detect a wireless modem attached after a failed check',function()
+  local e=env('worker',{'retry','east','yes','yes'})
+  local names=e.peripheral.getNames; local attached=false; local read=e.read
+  e.peripheral.getNames=function() return attached and names() or {} end
+  e.read=function() attached=true; return read() end
+  assert(require('autobuilder.setup_wizard').run({},e)); eq(settings(e).depot.heading,'east'); eq(e.turtle.calls,0)
+end)
+test('controller retries discovery when its empty supply chest is not yet connected',function()
+  local e=env('controller',{'retry','','','20 64 -9','yes'})
+  local names=e.peripheral.getNames; local connected=false; local read=e.read
+  e.peripheral.getNames=function() return connected and names() or {'right','stock'} end
+  e.read=function() connected=true; return read() end
+  assert(require('autobuilder.setup_wizard').run({},e)); eq(settings(e).supply.inventory,'stage')
+end)
+test('builder retries controller discovery without losing setup',function()
+  local e=env('worker',{'retry','east','yes','yes'})
+  local receive=e.rednet.receive; local online=false; local read=e.read
+  e.rednet.receive=function(protocol) if online then return receive(protocol) end end
+  e.read=function() online=true; return read() end
+  assert(require('autobuilder.setup_wizard').run({},e)); eq(settings(e).supply.inventory,'stage')
+end)
+test('builder reads its current pose after retrying a missing depot chest',function()
+  local e=env('worker',{'retry','east','yes','yes'})
+  local ready=false; local read=e.read
+  e.turtle.inspect=function() return ready,ready and {name='minecraft:chest'} or nil end
+  e.gps.locate=function() assert(ready,'pose read before hardware was ready'); return 13,64,-9 end
+  e.read=function() ready=true; return read() end
+  assert(require('autobuilder.setup_wizard').run({},e)); eq(settings(e).depot.x,13); eq(e.turtle.calls,0)
+end)
+test('cancelling hardware retry leaves saved settings, pose and fuel unchanged',function()
+  local e=env('worker',{'cancel'}); local original=e.fs.files['/autobuilder/settings.lua']; local fuel=e.turtle.fuel
+  e.turtle.inspect=function() return false end
+  e.turtle.refuel=function() error('setup must not consume fuel') end
+  eq(require('autobuilder.setup_wizard').run({},e),false)
+  eq(e.fs.files['/autobuilder/settings.lua'],original); eq(e.fs.exists('/autobuilder/data/worker.state'),false)
+  eq(e.turtle.fuel,fuel); eq(e.turtle.calls,0)
+end)
+test('menu setup success tells the user it returns to the app',function()
+  local e=env('worker',{'east','yes','yes'})
+  assert(require('autobuilder.setup_wizard').run({},e,{returnToApp=true}))
+  local output=table.concat(e.output,'\n'); assert(output:find('Returning to Autobuilder',1,true))
+  assert(not output:find('Run reboot',1,true))
+end)
+test('saved builder setup loads only enough slot 15 fuel and restores selection',function()
+  local e=env('worker',{'east','yes','yes'})
+  assert(require('autobuilder.setup_wizard').run({},e))
+  eq(e.turtle.fuel,1060); eq(e.turtle.items[15].count,4); eq(e.turtle.selected,3); eq(e.turtle.calls,0)
+end)
+test('setup cancellation never consumes prepared coal',function()
+  local e=env('worker',{'east','yes','no'})
+  eq(require('autobuilder.setup_wizard').run({},e),false)
+  eq(e.turtle.fuel,100); eq(e.turtle.items[15].count,16); eq(e.turtle.selected,3)
+end)
+test('builder setup does not burn unrelated items or consume fuel once sufficient',function()
+  for _,fuel in ipairs({100,1500,'unlimited'}) do
+    local e=env('worker',{'east','yes','yes'}); e.turtle.fuel=fuel
+    e.turtle.items[15]={name='minecraft:oak_planks',count=16}
+    e.turtle.refuel=function() error('should not burn this fuel') end
+    assert(require('autobuilder.setup_wizard').run({},e))
+    eq(e.turtle.items[15].count,16); eq(e.turtle.fuel,fuel); eq(e.turtle.selected,3)
+  end
+end)
+test('refuel failure after saving preserves settings and restores selection',function()
+  local e=env('worker',{'east','yes','yes'})
+  e.turtle.refuel=function() error('fuel API unavailable') end
+  assert(require('autobuilder.setup_wizard').run({},e))
+  eq(settings(e).depot.heading,'east'); eq(e.turtle.selected,3); eq(e.turtle.calls,0)
 end)

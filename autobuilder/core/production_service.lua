@@ -4,13 +4,20 @@ local M={}
 function M.new(app,config,e,queue)
   local s=queue.state; s.requestSequence=s.requestSequence or 0
   local self={machines={},laneCursor=0}; local save=function() return app:save() end
-  function self:request(requirements,key)
+  function self:request(requirements,key,options)
     assert(type(requirements)=='table' and next(requirements),'resource request needs item quantities')
     for item,n in pairs(requirements) do assert(U.shortString(item,128) and U.integer(n) and n>=1 and n<=1000000,'invalid resource request') end
     for _,r in pairs(s.requests) do if key and r.key==key and r.status~='completed' then return r end end
     s.requestSequence=s.requestSequence+1
     local r={id='request:'..s.requestSequence,key=key,requirements=U.copy(requirements),status='queued',operation=1,mines={},harvests={}}
-    s.requests[r.id]=r; save(); return r
+    if options and options.stockOnly then r.stockOnly=true end
+    s.requests[r.id]=r
+    if options and options.projectName then
+      assert(options.stockOnly,'Automatic project linkage requires stock-only preparation')
+      local p=assert(s.projects[options.projectName],'Preparation project missing')
+      p.stockOnly=true; p.requestId=r.id; p.phase='preparing'
+    end
+    save(); return r
   end
   function self:refresh()
     return app.mining:refresh()
@@ -53,6 +60,18 @@ function M.new(app,config,e,queue)
     if not active or active.paused then return end
     local r=active; local ok,err=self:refresh()
     if not ok then r.status='blocked'; r.error=err; return end
+    if r.stockOnly then
+      -- The beginner test is supplied by the user. It must not queue mining,
+      -- crafting, or a global fuel-stock replenishment as a side effect.
+      for item,n in pairs(r.requirements) do
+        local need=n+(config.turtleFuelReserveItems[item] or 0)
+        local have=app.mining.storage.counts[item] or 0
+        if have<need then
+          r.status='blocked'; r.error='Put '..(need-have)..' more '..item:gsub('^.-:',''):gsub('_',' ')..' in the stock chest.'; save(); return
+        end
+      end
+      r.status='completed'; r.error=nil; save(); return
+    end
     if not r.plan then
       local plan=require('autobuilder.blueprint.planner').expand(r.requirements,app.mining.storage.counts,config)
       r.plan=plan; r.targets={}
