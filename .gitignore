@@ -10,3 +10,5 @@ docs/superpowers/
 *.schematic
 *.litematic
 .DS_Store
+
+.worktrees/
