@@ -1,4 +1,4 @@
-# Autobuilder 0.10.1
+# Autobuilder 0.10.2
 
 A CC:Tweaked controller and Turtle system for Minecraft Java **1.20.1**. It plans
 materials, acquires supported resources, runs crafting and furnaces, converts and
@@ -13,6 +13,7 @@ cells, unavailable resources and uncertain recovery remain visible blocked work.
 | Setup or workflow | Guide |
 | --- | --- |
 | Install, offline folders, update and rollback | [Installation](docs/installation.md) |
+| Guided controller/builder setup without editing Lua | [Quick setup](docs/quick-setup.md) |
 | Miner hardware, bounded excavation and fuel | [Mining setup](docs/milestone-2.md) |
 | Concurrent miners and durable area ownership | [Parallel mining](docs/parallel-mining.md) |
 | Recipe planning, Crafty station and furnace bank | [Production](docs/production.md) |
@@ -57,7 +58,7 @@ The project is hosted at [jdbrande/computercraft-autobuilder](https://github.com
 The commands below use that repository. To prepare a fork, change the raw URL with:
 
 ```sh
-python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.1
+python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.2
 ```
 
 Publish `installer.lua`, `update.lua`, `startup.lua`, `manifest.json`, and
@@ -80,9 +81,13 @@ require explicit capability/hardware settings. **Mining remains opt-in for every
 profile.** Installation itself does not move a Turtle.
 
 The installer creates `/startup.lua`, `/update.lua` and managed `/autobuilder/`
-files. Configure `/autobuilder/settings.lua`, then run `reboot`. Updates preserve
-existing settings byte-for-byte, so an older builder/logger/courier installation
-must enable its new capability manually. Do not put local values in `config.lua`.
+files. For controller/builders, use the [guided setup](docs/quick-setup.md): run
+`/autobuilder/setup.lua` on the controller, reboot it, then run the wizard on one
+registered worker. The wizard detects inventories/GPS, retrieves supply settings
+from the controller, and enables building. Other roles use
+`/autobuilder/settings.lua`. Updates preserve settings byte-for-byte; older
+logger/courier installations must enable their capability explicitly. Do not put
+local values in `config.lua`.
 
 Stop Autobuilder with **Q**, close other Autobuilder tabs, then update:
 

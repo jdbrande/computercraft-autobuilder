@@ -48,18 +48,16 @@ coordinates **(0,26,0)**. It contains **28 blocks**: 13 cobbled deepslate and
 15 sandstone; the other 36 cells are air. It is a small decorative ground/detail
 sample, not a miniature of the whole cathedral.
 
-1. Stop Autobuilder with Q, run `update`, and use release 0.10.1 or later. This
-   release adds project-wide overhead clearance for travel between build regions.
-2. On the controller, edit the existing `/autobuilder/settings.lua` to set
-   `build.enabled=true` and `build.origin` to the minimum corner of a clear 8×8
-   test area. Keep rotation 0 and mirrors false for this first test. For example,
-   `{x=110,y=64,z=-200}` is valid only if that is an actually empty area in your world.
-   The origin identifies the blocks being placed, not the ground below them.
-3. Keep `clearSite=false` for this test. Leave air above all 64 target cells, with
-   a clear route to a nearby depot outside the footprint. Configure the builder's
-   heading, fuel, depot and supply chest using the main README/logistics guide.
-4. Stock the source depot with 13 cobbled deepslate and 15 sandstone, plus the
-   configured turtle-fuel reserve (64 coal by default). Fuel the builder separately.
+1. Use release 0.10.2 or later. Follow [guided setup](../../docs/quick-setup.md)
+   on the controller and **one builder**; no Lua settings edits are needed.
+2. The controller wizard asks for the minimum corner of a clear 8×8 test area
+   and selects the stock and supply chests. It enables building, sets rotation 0,
+   disables mirrors and keeps `clearSite=false`.
+3. The builder wizard retrieves supply settings and saves its position, facing
+   and depot. Leave two clear blocks above all 64 target cells, plus an unobstructed
+   route to the depot outside the footprint. Keep the other workers out of the way.
+4. Stock the source chest with 13 cobbled deepslate and 15 sandstone. Fuel the
+   builder separately with coal/charcoal in slot 15. Leave the supply chest empty.
 5. At the controller's CraftOS shell, download the pilot:
 
    ```text

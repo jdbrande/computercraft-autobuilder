@@ -129,8 +129,9 @@ function M.run(e,opts)
   e.print('Installed '..role..' version '..m.version..': '..changed..' code files changed; '..preserved..' custom startup files preserved.')
   e.print(newSettings and 'Created /autobuilder/settings.lua.' or 'Preserved /autobuilder/settings.lua and saved state.')
   if role=='builder' or role=='logger' or role=='courier' then
-    e.print('Configure position, heading, depot and role hardware in settings.lua before assigning work.')
-  elseif role=='miner' or role=='worker' then e.print('Mining remains opt-in: configure hardware, position, depot and bounds in settings.lua.') end
+    e.print('Builders: run /autobuilder/setup.lua after setting up the controller. Other roles: configure settings.lua.')
+  elseif role=='miner' or role=='worker' then e.print('Building: run /autobuilder/setup.lua. Mining remains opt-in: configure hardware, position, depot and bounds in settings.lua.') end
+  if role=='controller' then e.print('Run /autobuilder/setup.lua for guided building setup.') end
   e.print('Run reboot to load the installed version.')
   return {role=role,version=m.version,changed=changed,preserved=preserved,recovered=recovered}
 end

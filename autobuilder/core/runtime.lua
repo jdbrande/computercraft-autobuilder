@@ -23,6 +23,7 @@ local function validateState(s,role,id)
   end
 end
 function M.new(config,e)
+  if e.shell and e.shell.setAlias then e.shell.setAlias('setup','/autobuilder/setup.lua') end
   local id=e.os.getComputerID()
   assert(config.role~='worker' or e.turtle,'worker must run on a turtle')
   assert(config.role~='worker' or config.controllerId~=id,'worker cannot be its own controller')
@@ -116,6 +117,9 @@ function M.new(config,e)
     return true
   end
   function self:receive(sender,message,protocol)
+    if self.registry and protocol==config.protocol..'.setup' then
+      return require('autobuilder.setup_share').reply(e,config,state.workers,sender,message)
+    end
     local m,err=network:accept(sender,message,protocol,clock())
     if not m then
       if err~='different protocol' and err~='duplicate message' then self:report('DEBUG','Rejected message: '..err) end
