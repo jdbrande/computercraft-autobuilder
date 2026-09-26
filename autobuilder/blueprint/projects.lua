@@ -1,0 +1,184 @@
+local U=require('autobuilder.core.util')
+local Hash=require('autobuilder.install.sha256')
+local IO=require('autobuilder.install.io')
+local Cooperate=require('autobuilder.core.cooperate')
+local M={}
+function M.new(app,config,e,queue,production)
+  local s=queue.state; local cache={}; local self={}
+  local function save() return app:save() end
+  local function project(name)
+    local p=s.projects[name or s.currentProject]; assert(p,'Unknown project; use build import <converted.json> [name]'); return p
+  end
+  local function data(p)
+    local raw=IO.read(e.fs,p.path); assert(Hash.digest(raw)==p.hash,'Imported blueprint changed; import under a new name')
+    local value,err=require('autobuilder.blueprint.schematic').load(e.fs,e.textutils,p.path); assert(value,err); return value
+  end
+  -- Verification and clearance cover cells with no placement dependency. Visit upper
+  -- cells first so an unwanted column can be cleared without digging an access route.
+  local function inspectionRegions(blocks)
+    local size=config.build.regionSize; local groups,regions={},{}
+    for index,b in ipairs(blocks) do
+      Cooperate.every(index)
+      local x,y,z=math.floor(b.x/size),math.floor(b.y/size),math.floor(b.z/size)
+      local id=x..','..y..','..z; local r=groups[id]
+      if not r then r={id=id,x=x,y=y,z=z,blocks={},dependencies={}}; groups[id]=r; regions[#regions+1]=r end
+      r.blocks[#r.blocks+1]=b
+    end
+    local function upperFirst(a,b)
+      if a.y~=b.y then return a.y>b.y end
+      if a.z~=b.z then return a.z<b.z end
+      return a.x<b.x
+    end
+    table.sort(regions,upperFirst)
+    for index,r in ipairs(regions) do
+      assert(#r.blocks<=512,'inspection region exceeds the task block limit')
+      table.sort(r.blocks,upperFirst)
+      if index>1 then r.dependencies={regions[index-1].id} end
+    end
+    return regions
+  end
+  local function analysis(p,verifySource)
+    -- Commands recheck the immutable import even when its derived arrays are cached.
+    local source=verifySource and data(p) or nil
+    if cache[p.name] then return cache[p.name] end
+    source=source or data(p)
+    local bp=require('autobuilder.blueprint.blueprint')
+    local transforms=require('autobuilder.blueprint.transforms')
+    local states=require('autobuilder.build.blockstates')
+    local t=p.transform; local blocks,air,volume={},{},{}; local index=0
+    for _,run in ipairs(source.runs) do
+      local entry=source.palette[run.id]
+      for _=1,run.count do
+        local localPosition={x=index%source.size.x,y=math.floor(index/(source.size.x*source.size.z)),z=math.floor(index/source.size.x)%source.size.z}
+        local position=transforms.position(localPosition,source.size,t.rotation,t.mirrorX,t.mirrorZ)
+        local b={x=t.origin.x+position.x,y=t.origin.y+position.y,z=t.origin.z+position.z,name=entry.name,
+          state=transforms.state(entry.state,t.rotation,t.mirrorX,t.mirrorZ)}
+        volume[#volume+1]=b
+        local list=states.isAir(entry.name) and air or blocks; list[#list+1]=b
+        index=index+1
+        Cooperate.every(index)
+      end
+    end
+    local counts=bp.quantities(source); local issues={}; local partial=0
+    for _,entry in ipairs(source.palette) do
+      local status,reason=states.classify(entry.name,entry.state)
+      if status=='UNSUPPORTED' or status=='SPECIAL_ACQUISITION' then issues[#issues+1]={name=entry.name,status=status,reason=reason}
+      elseif status=='PARTIALLY_SUPPORTED' then partial=partial+1 end
+    end
+    for _,issue in ipairs((source.metadata or {}).issues or {}) do issues[#issues+1]={name='metadata',status='UNSUPPORTED',reason=tostring(issue)} end
+    local regions=bp.regions(blocks,config.build.regionSize)
+    local result={blocks=blocks,requirements=counts,regions=regions,issues=issues,partial=partial,
+      volume=#volume,airCount=#air,airRegions=inspectionRegions(air),verificationRegions=inspectionRegions(volume)}
+    cache[p.name]=result; return result
+  end
+  local function beginPhase(p,mode,a)
+    p.mode=mode; p.phase=mode=='VERIFY' and 'verifying' or mode=='CLEAR' and 'clearing' or mode=='REPAIR' and 'repairing' or 'building'
+    p.total=mode=='VERIFY' and a.volume or mode=='CLEAR' and a.airCount or #a.blocks
+    p.generation=p.generation+1; p.cursor=1; p.jobs={}; p.regionJobs={}; p.completed=0; p.report={counts={},entries={}}
+  end
+  function self:command(args)
+    local action=args[2]; local name=args[3]
+    if action=='import' then
+      assert(name and not name:match('%.schem$'),'Convert .schem on your desktop first: tools/schem_converter.py input.schem output.json')
+      local source,err=require('autobuilder.blueprint.schematic').load(e.fs,e.textutils,name); assert(source,err)
+      local title=args[4] or name:match('([^/]+)%.json$'); assert(title and title:match('^[%w_-]+$') and #title<=64,'Invalid project name')
+      assert(not s.projects[title],'Project exists; import under a new name')
+      local raw=IO.read(e.fs,name); local path=config.blueprintDir..'/'..title..'.json'
+      if e.fs.exists(path) then assert(IO.read(e.fs,path)==raw,'Blueprint destination already exists with different content')
+      else IO.write(e.fs,path..'.tmp',raw); e.fs.move(path..'.tmp',path) end
+      local p={name=title,path=path,hash=Hash.digest(raw),phase='imported',transform=U.copy(config.build),jobs={},regionJobs={},generation=0}
+      s.projects[title]=p; s.currentProject=title; save(); return true,'Imported '..title
+    end
+    local p=project(name); s.currentProject=p.name
+    if action=='status' then return true,p.name..': '..p.phase..' '..(p.completed or 0)..'/'..(p.total or 0)..' blocks' end
+    if action=='pause' then
+      p.paused=true
+      for _,id in ipairs(p.jobs) do local j=s.jobs[id]; if j and j.status~='completed' then j.paused=true end end
+      save(); return true,'Paused '..p.name
+    elseif action=='resume' then
+      p.paused=false
+      for _,id in ipairs(p.jobs) do local j=s.jobs[id]; if j then j.paused=false; j.resumeRequested=true end end
+      save(); return true,'Resuming '..p.name
+    end
+    local a=analysis(p,true); p.total=p.mode=='VERIFY' and a.volume or p.mode=='CLEAR' and a.airCount or #a.blocks; p.volume=a.volume; p.airCells=a.airCount; p.issues=a.issues; p.requirements=U.copy(a.requirements)
+    if action=='analyze' or action=='materials' or action=='simulate' then
+      local ok,err=production:refresh(); local stock=ok and app.mining.storage.counts or {}
+      p.analysis=require('autobuilder.blueprint.planner').expand(a.requirements,stock,config)
+      p.analysis.storageError=not ok and err or nil
+      p.analysis.estimatedMovement=#a.blocks*4; p.analysis.estimatedFuel=#a.blocks*4+config.minimumFuelReserve
+      p.analysis.partialStrategies=a.partial; p.phase=p.phase=='imported' and 'analyzed' or p.phase
+      app.state.view='project'; save()
+      return true,p.name..': '..#a.blocks..' blocks, '..#a.regions..' regions, '..#a.issues..' unsupported entries; materials saved in project analysis'
+    end
+    assert(#a.issues==0,'Unsupported palette or entity data; inspect build analyze before unattended work')
+    if action=='prepare' then
+      if not next(a.requirements) then
+        p.preparedEmpty=true; p.requestId=nil; p.phase='ready'; save(); return true,'No materials required'
+      end
+      local r=production:request(a.requirements,'project:'..p.name); p.requestId=r.id; p.phase='preparing'; save(); return true,r.id
+    elseif action=='start' or action=='verify' or action=='repair' or action=='clear' then
+      assert(config.build.enabled,'Set build.enabled=true and configure the build origin first')
+      for _,id in ipairs(p.jobs) do assert(s.jobs[id].status=='completed','Project still owns unfinished tasks; pause/resume instead') end
+      if action=='clear' then assert(config.clearSite,'Set clearSite=true before clearing schematic air cells') end
+      if action=='start' then
+        local r=p.requestId and s.requests[p.requestId]
+        assert((p.preparedEmpty and not next(a.requirements)) or (r and r.status=='completed'),'Run build prepare and wait for resources first')
+      end
+      local mode=action=='start' and (config.clearSite and 'REPAIR' or 'BUILD') or action=='verify' and 'VERIFY' or action=='clear' and 'CLEAR' or 'REPAIR'
+      p.nextMode=nil; p.afterBuild=nil; p.paused=false
+      if config.clearSite and a.airCount>0 and (action=='start' or action=='repair') then p.nextMode=mode; mode='CLEAR' end
+      beginPhase(p,mode,a)
+      save(); return true,p.phase..' '..p.name
+    end
+    return false,'build import|analyze|materials|simulate|prepare|start|status|pause|resume|verify|repair|clear [name]'
+  end
+  function self:tick()
+    for _,p in pairs(s.projects) do
+      if p.phase=='preparing' and s.requests[p.requestId].status=='completed' then p.phase='ready'; save() end
+      if not p.paused and (p.phase=='building' or p.phase=='verifying' or p.phase=='repairing' or p.phase=='clearing') then
+        local a=analysis(p); local active,done=0,0
+        local regions=p.mode=='VERIFY' and a.verificationRegions or p.mode=='CLEAR' and a.airRegions or a.regions
+        for _,id in ipairs(p.jobs) do
+          local j=s.jobs[id]
+          if j.status~='completed' then active=active+1 end
+          done=done+(j.progress or 0)
+          if j.status=='completed' and j.report and not j.reportCollected then
+            for k,n in pairs(j.report.counts or {}) do p.report.counts[k]=(p.report.counts[k] or 0)+n end
+            p.report.omittedEntries=(p.report.omittedEntries or 0)+(j.report.omittedEntries or 0)
+            for _,entry in ipairs(j.report.entries or {}) do
+              if entry.status~='correct' then
+                if #p.report.entries<512 then p.report.entries[#p.report.entries+1]=entry
+                else p.report.omittedEntries=p.report.omittedEntries+1 end
+              end
+            end
+            j.reportCollected=true; j.report=nil; j.blocks=nil; save()
+          end
+        end
+        p.completed=done
+        -- Only a bounded window of region payloads lives in the checkpoint.
+        if active<4 and p.cursor<=#regions then
+          local region=regions[p.cursor]; local deps={}; local ready=true
+          for _,dep in ipairs(region.dependencies or {}) do
+            if not p.regionJobs[dep] then ready=false else deps[#deps+1]=p.regionJobs[dep] end
+          end
+          if ready then
+            local j=queue:submit(p.mode,{blocks=region.blocks,project=p.name,region=region.id,deferConnections=p.mode~='VERIFY'},deps,p.name..':'..p.generation..':'..region.id)
+            p.jobs[#p.jobs+1]=j.id; p.regionJobs[region.id]=j.id; p.cursor=p.cursor+1; save()
+          end
+        elseif active==0 and p.cursor>#regions then
+          if p.nextMode then
+            local mode=p.nextMode; p.nextMode=nil; beginPhase(p,mode,a)
+          elseif p.mode~='VERIFY' then
+            p.afterBuild=true; beginPhase(p,'VERIFY',a)
+          else
+            local problems=0; for key,n in pairs(p.report.counts) do if key~='correct' then problems=problems+n end end
+            p.phase=problems>0 and 'needs_repair' or p.afterBuild and 'built' or 'verified'; p.afterBuild=nil
+          end
+          save()
+        end
+      end
+    end
+  end
+  return self
+end
+return M

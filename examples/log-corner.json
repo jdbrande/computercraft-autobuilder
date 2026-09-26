@@ -1,0 +1,1 @@
+{"metadata":{"dataVersion":3700,"issues":[],"offset":{"x":0,"y":0,"z":0},"sourceVersion":3},"palette":[{"name":"minecraft:air","state":{}},{"name":"minecraft:oak_log","state":{"axis":"x"}}],"requirements":{"minecraft:oak_log":2},"runs":[{"count":1,"id":1},{"count":2,"id":2},{"count":1,"id":1}],"schema":1,"size":{"x":2,"y":1,"z":2}}

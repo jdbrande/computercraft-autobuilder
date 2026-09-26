@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+dist/
+autobuilder/data/
+autobuilder/logs/
+autobuilder/settings.lua
+.superpowers/
+docs/superpowers/
+*.schem
+*.schematic
+*.litematic
+.DS_Store

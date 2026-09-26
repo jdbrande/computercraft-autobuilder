@@ -1,0 +1,220 @@
+local U=require('autobuilder.core.util')
+local Checkpoint=require('autobuilder.core.checkpoint')
+local Network=require('autobuilder.core.network')
+local M={}
+local function validateState(s,role,id)
+  assert(type(s)=='table' and s.schema==1,'unsupported application checkpoint schema')
+  assert(s.id==id and s.role==role,'checkpoint belongs to a different computer or role')
+  assert(U.integer(s.boot) and s.boot>=0,'invalid checkpoint boot counter')
+  assert(type(s.phase)=='string','invalid phase')
+  if role=='worker' then
+    local p=s.position
+    assert(type(p)=='table' and type(p.known)=='boolean','invalid saved position')
+    assert(not p.known or U.position(p),'invalid saved coordinates')
+    assert(not p.heading or U.heading(p.heading),'invalid saved heading')
+    assert(not p.pending or (type(p.pending)=='table' and ({forward=true,back=true,up=true,down=true,turnLeft=true,turnRight=true})[p.pending.action]),'invalid movement intent')
+  else
+    assert(type(s.workers)=='table','invalid saved workers')
+    for key,w in pairs(s.workers) do
+      assert(type(w)=='table' and tostring(w.id)==key and U.finite(w.lastSeen),'invalid saved worker')
+      local valid,err=Network.validate(w.id,{version=1,id=w.id..':'..w.boot..':'..w.sequence,sender=w.id,boot=w.boot,sequence=w.sequence,type='register',payload=w.telemetry})
+      assert(valid,err)
+    end
+  end
+end
+function M.new(config,e)
+  local id=e.os.getComputerID()
+  assert(config.role~='worker' or e.turtle,'worker must run on a turtle')
+  assert(config.role~='worker' or config.controllerId~=id,'worker cannot be its own controller')
+  local clock=function() return e.os.epoch('utc')/1000 end
+  local store=Checkpoint.new(e.fs,e.textutils,config.dataDir..'/'..config.role..'.state')
+  local state,source=store:load()
+  if not state then
+    assert(source=='missing',source)
+    state={schema=1,id=id,role=config.role,boot=0,phase='telemetry',workers={}}
+    state.position=U.copy(config.initialPosition or {known=false})
+    if config.initialPosition then state.position.known=true; state.position.source='configured' end
+  end
+  validateState(state,config.role,id)
+  -- UTC prevents a restored older snapshot from reusing the last boot's IDs.
+  state.boot=math.max(state.boot+1,math.floor(clock()*1000))
+  local self={state=state,config=config,page=0,motionVersion=0,busy=false,input=''}
+  local log=require('autobuilder.core.log').new(e.fs,config.logDir..'/'..config.role..'.log',config.log,clock)
+  local network=Network.new(e,config,id,state.boot)
+  local lastSave=clock()
+  function self:save()
+    state.savedAt=clock()
+    local ok,err=store:save(state); assert(ok,err)
+    lastSave=clock(); return true
+  end
+  function self:report(level,message)
+    if level=='ERROR' or level=='WARN' then state.lastError=message end
+    local ok,err=log:write(level,message); assert(ok,err)
+  end
+  if config.role=='controller' then
+    if source:find('backup') then state.assignmentRecovery=true end
+    self.registry=require('autobuilder.workers.workers').new(state,config,function() return self:save() end)
+  else
+    state.controllerId=config.controllerId
+    if source:find('backup') then
+      -- Backup can predate a physical action whose intent was in the primary.
+      state.position.known=false; state.position.heading=nil; state.position.uncertain=true
+    end
+    state.status=state.currentTask and 'task_paused' or 'idle'
+    if state.position.pending or state.position.uncertain then state.position.uncertain=true; state.status='recovery_required' end
+    if state.position.source=='gps' then state.position.source='local' end
+    state.gpsError='awaiting GPS'
+    self.navigation=require('autobuilder.core.navigation').new(e.turtle,state.position,config,function() return self:save() end)
+    self.agent=require('autobuilder.workers.agent').new(state,config,network,e.turtle,function() return self:save() end)
+  end
+  self:save() -- Persist boot generation before producing any message IDs.
+  self:report('INFO','Started '..config.role..' '..id..' boot '..state.boot..' from '..source)
+  if source:find('backup') then self:report('WARN','Recovered '..source) end
+  local gps=require('autobuilder.core.gps').new(e.gps,config.gps)
+  self.mining=require('autobuilder.core.mining_service').new(self,config,e,network,clock)
+  self.automation=require('autobuilder.core.automation_service').new(self,config,e,network,clock)
+  function self:confirmPose(fix,heading)
+    if not self.navigation or not U.heading(heading) then return false,'worker and explicit heading required' end
+    local ok,err=self.navigation:reconcile(fix,heading); if not ok then return false,err end
+    state.position.source='manual'; state.status=state.currentTask and (state.currentTask.phase or 'task_paused') or 'idle'
+    if self.mining.poseRecovered then self.mining:poseRecovered() end
+    self:report('INFO','Operator confirmed position and heading'); return self:save()
+  end
+  function self:updateGPS()
+    if not self.agent or self.busy then return true end
+    local revision=self.motionVersion
+    local fix,err=gps:locate()
+    -- A locate call yields; never apply coordinates sampled before intervening motion.
+    if self.busy or revision~=self.motionVersion then return true end
+    local p=state.position
+    if fix then
+      local changed=p.known and (p.x~=fix.x or p.y~=fix.y or p.z~=fix.z)
+      if changed then self:report('WARN','GPS corrected local position') end
+      local ok,why=self.navigation:reconcile(fix); if not ok then return false,why end
+      p.source='gps'; p.lastFix=clock(); state.gpsError=nil
+      if self.mining.poseRecovered then self.mining:poseRecovered() end
+      if state.status=='recovery_required' and U.heading(p.heading) then state.status=state.currentTask and 'task_paused' or 'idle' end
+    else
+      p.source=p.known and 'local' or 'unknown'
+      if state.gpsError~=err then self:report('WARN',err) end
+      state.gpsError=err
+    end
+    return self:save()
+  end
+  function self:tick()
+    local ready,err=network:open()
+    if not ready and state.lastError~=err then self:report('WARN',err) end
+    if self.registry then
+      local ok,why=self.registry:expire(clock()); if not ok then return false,why end
+    else
+      local ok,why=self.agent:tick(clock())
+      if not ok then self:report('WARN',why) end
+    end
+    self.mining:tick()
+    self.automation:tick()
+    if clock()-lastSave>=config.checkpointInterval then self:save() end
+    return true
+  end
+  function self:receive(sender,message,protocol)
+    local m,err=network:accept(sender,message,protocol,clock())
+    if not m then
+      if err~='different protocol' and err~='duplicate message' then self:report('DEBUG','Rejected message: '..err) end
+      return false,err
+    end
+    if m.type:sub(1,5)=='mine_' then return self.mining:handle(sender,m) end
+    if m.type:sub(1,5)=='task_' then return self.automation:handle(sender,m) end
+    if self.registry then
+      local ok,why=self.registry:handle(m,clock())
+      if not ok then
+        if why=='registration required' then
+          local sent,sendError=network:send(sender,'register_required',{reason=why})
+          if not sent then self:report('WARN',sendError) end
+        end
+        self:report('DEBUG','Worker message rejected: '..tostring(why)); return false,why
+      end
+      local sent,reason=network:send(sender,'ack',{requestId=m.id})
+      if not sent then self:report('WARN',reason) end
+      return sent,reason
+    end
+    return self.agent:handle(sender,m,clock())
+  end
+  function self:workStep()
+    if self.busy or self.gpsRequested or self.quitRequested then return true end
+    if not self.agent then return self.automation:step() end
+    if not state.currentTask or state.currentTask.phase=='completed' then return true end
+    local generic=state.currentTask.type and state.currentTask.type~='MINE'
+    if not generic and state.currentTask.phase=='blocked' then
+      if state.motionReservation and state.motionReservation.granted and tostring(state.currentTask.error):find('movement reservation pending',1,true) and self.mining.miner then self.mining.miner:resume()
+      else return true end
+    end
+    self.busy=true; self.motionVersion=self.motionVersion+1
+    local service=generic and self.automation or self.mining
+    local ok,result,err=pcall(service.step,service)
+    self.busy=false
+    if not ok then error(result,0) end
+    return result,err
+  end
+  function self:command(line)
+    local called,ok,result=pcall(function()
+      if self.automation.command then local a,b=self.automation:command(line); if a~=nil then return a,b end end
+      return self.mining:command(line)
+    end)
+    if not called then result=ok; ok=false end
+    state.commandResult=tostring(result or (ok and 'OK' or 'failed'))
+    return ok,result
+  end
+  function self:draw() require('autobuilder.ui.ui').draw(e.term,state,self.agent,self.page,self.input) end
+  function self:event(name,a,b,c)
+    if self.quitRequested and not self.busy then self:save(); return false end
+    if name=='rednet_message' then self:receive(a,b,c)
+    elseif name=='char' and a=='q' and self.input=='' then
+      if self.busy then self.quitRequested=true; return true end
+      self:save(); return false
+    elseif name=='char' and a=='N' and self.input=='' then self.page=self.page+1
+    elseif name=='char' and a=='P' and self.input=='' then self.page=self.page-1
+    elseif name=='char' or name=='paste' then self.input=(self.input..a:gsub('[%c]','')):sub(1,256)
+    elseif name=='key' and a==((e.keys or {}).enter or 28) then self:command(self.input); self.input=''
+    elseif name=='key' and a==((e.keys or {}).backspace or 14) then self.input=self.input:sub(1,-2)
+    elseif name=='peripheral' or name=='peripheral_detach' then self:tick() end
+    return true
+  end
+  return self
+end
+function M.run(config,e)
+  e=e or _G
+  local app=M.new(config,e)
+  local function main()
+    app:tick(); app:draw()
+    local timer=e.os.startTimer(1)
+    while true do
+      local name,a,b,c=e.os.pullEvent()
+      if name=='timer' and a==timer then
+        app:tick(); timer=e.os.startTimer(1)
+      elseif not app:event(name,a,b,c) then return end
+      app:draw()
+    end
+  end
+  local function gpsLoop()
+    if config.role~='worker' or not config.gps.enabled then
+      while true do e.sleep(3600) end
+    end
+    while true do
+      app.gpsRequested=true
+      while app.busy do e.sleep(0.1) end
+      app:updateGPS(); app.gpsRequested=false
+      e.sleep(config.gps.interval)
+    end
+  end
+  local function actionLoop()
+    while true do app:workStep(); e.sleep(0.1) end
+  end
+  -- Each coroutine gets its own event stream; slow hardware cannot eat heartbeats.
+  local ok,err=pcall(e.parallel.waitForAny,main,gpsLoop,actionLoop)
+  if not ok then
+    app:report('ERROR','Runtime stopped: '..tostring(err))
+    app:save()
+    error(err,0)
+  end
+  return app
+end
+return M
