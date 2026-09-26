@@ -11,7 +11,7 @@ function M.draw(term,state,agent,page,input)
     line('Type a number below, then press Enter:')
     line('1 Check setup    2 Start small test')
     line('3 Pause test     4 Continue test')
-    line('5 Workers        6 Jobs       7 Setup')
+    line('5 Workers   6 Jobs   7 Setup   8 Materials')
     line('-----------------------------------')
     local details={}
     for _,text in ipairs(state.guideLines or {'Type 1 to check your setup.'}) do
@@ -25,6 +25,39 @@ function M.draw(term,state,agent,page,input)
     local perPage=math.max(1,height-10); local pages=math.max(1,math.ceil(#details/perPage)); page=(page or 0)%pages
     for i=page*perPage+1,math.min(#details,(page+1)*perPage) do line(details[i]) end
     if pages>1 then line('Help '..(page+1)..'/'..pages..' - Shift N: next page') end
+  elseif state.role=='controller' and (state.view=='production' or state.view=='cathedral') then
+    local a=state.automation or {}; local c=a.cathedral; local details={}
+    local function add(text)
+      text=tostring(text)
+      while #text>width do
+        local cut=text:sub(1,width):match('^.*()%s') or width
+        details[#details+1]=text:sub(1,cut); text=text:sub(cut+1)
+      end
+      details[#details+1]=text
+    end
+    local function item(name) return name:gsub('^minecraft:',''):gsub('_',' ') end
+    if c then
+      line('Cathedral: '..c.status..(c.paused and ' [PAUSED]' or ''))
+      line(c.completedBlocks..'/'..c.root.totalBlocks..' blocks verified')
+      if c.error then add(c.error) end
+    else line('MATERIAL TEAM'); add('Miners gather different missing materials at the same time. Type setup miner on each mining turtle.') end
+    local requests={}; for _,r in pairs(a.requests or {}) do if r.status~='completed' then requests[#requests+1]=r end end
+    table.sort(requests,function(x,y) return x.id<y.id end)
+    for _,r in ipairs(requests) do
+      add(r.id..': '..r.status..(r.paused and ' [PAUSED]' or ''))
+      local names={}; for name in pairs(r.materials or {}) do names[#names+1]=name end; table.sort(names)
+      for _,name in ipairs(names) do
+        local m=r.materials[name]
+        add(item(name)..' '..m.count..'/'..m.target..' '..(m.workerId and 'turtle '..m.workerId or m.status))
+        if m.error then add(m.error) end
+      end
+      if r.error then add(r.error) end
+    end
+    if #requests==0 then add('No materials waiting. Use build auto <project>, or cathedral start <x> <y> <z>.') end
+    add('cathedral pause / cathedral resume')
+    local perPage=math.max(1,height-7); local pages=math.max(1,math.ceil(#details/perPage)); page=(page or 0)%pages
+    line('Details '..(page+1)..'/'..pages..' | Shift N/P')
+    for i=page*perPage+1,math.min(#details,(page+1)*perPage) do line(details[i]) end
   elseif state.role=='controller' and state.view=='project' then
     local a=state.automation or {}; local p=a.projects and a.projects[a.currentProject]
     if p then

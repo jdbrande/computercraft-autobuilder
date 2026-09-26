@@ -1,6 +1,7 @@
 local U=require('autobuilder.core.util')
 local Reports=require('autobuilder.core.reports')
 local M={}
+local construction={BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true}
 local modules={BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',
   CRAFT='autobuilder.factory.crafting',TRANSPORT='autobuilder.workers.courier',HARVEST='autobuilder.resources.logger',FARM='autobuilder.resources.farmer'}
 function M.new(app,config,e,network,clock)
@@ -8,6 +9,36 @@ function M.new(app,config,e,network,clock)
   local function save() return app:save() end
   local function send(kind,payload) return network:send(config.controllerId,kind,payload) end
   local function generic() return s.currentTask and s.currentTask.type and s.currentTask.type~='MINE' end
+  local function constructionFuel(task,origin)
+    local home=config.depot; local pose=origin or app.navigation.pose
+    if not construction[task.type] or not U.position(home) or not U.position(pose) then return nil end
+    local height=math.max(pose.y,home.y+2,task.clearanceY or -math.huge)
+    for _,block in ipairs(task.blocks or {}) do height=math.max(height,block.y+2) end
+    local required=0; local limit=config.maxTravelDistance or 1024
+    for index=task.index or 1,#(task.blocks or {}) do
+      local plan=require('autobuilder.build.placement').plan(task.blocks[index])
+      local stand=plan and plan.stand or task.blocks[index]
+      local outward=math.abs(pose.x-stand.x)+math.abs(pose.z-stand.z)
+      local returning=math.abs(home.x-stand.x)+math.abs(home.z-stand.z)
+      local leg=math.max(outward,returning,height-pose.y,height-home.y,height-stand.y)
+      if leg>limit then return nil,'Construction route needs '..leg..' blocks; maxTravelDistance is '..limit..'. Increase the configured travel limit.' end
+      -- Include both overhead ascents, the work stand and the depot descent.
+      -- Eight extra moves cover the builder's bounded side-approach offsets.
+      local fallback=stand.y<task.blocks[index].y and 2*(height-stand.y) or 0
+      required=math.max(required,outward+returning+(height-pose.y)+(height-home.y)+2*(height-stand.y)+fallback+8+config.minimumFuelReserve)
+    end
+    return required
+  end
+  local function refuelInPlace(target)
+    local item=e.turtle.getItemDetail(15)
+    if item and (item.nbt or not ({['minecraft:coal']=true,['minecraft:charcoal']=true,['minecraft:coal_block']=true})[item.name]) then
+      return false,'Empty slot 15: it contains a foreign or NBT-tagged item; reserve it for fuel.'
+    end
+    local selected=e.turtle.getSelectedSlot and e.turtle.getSelectedSlot()
+    local ok,err=require('autobuilder.storage.inventory').new(e.turtle):refuel(target,false)
+    if selected then e.turtle.select(selected) end
+    return ok,err
+  end
   local function engine()
     local t=s.currentTask
     if not self.engine or self.engine.task~=t then
@@ -56,6 +87,7 @@ function M.new(app,config,e,network,clock)
     if m.type=='task_assign' then
       local j=p.job; local done=s.completedTasks[j.id]
       if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report}) end
+      if require('autobuilder.core.receipts').archived(s,'completedTasks',j.id) then return false,'Old acknowledged task was archived; restore the matching controller checkpoint' end
       if t then return t.id==j.id,'worker already has a task' end
       local cap=({CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end
@@ -63,7 +95,7 @@ function M.new(app,config,e,network,clock)
     end
     if not t or t.id~=p.jobId then return false,'task ID mismatch' end
     if m.type=='task_ack' and t.phase=='completed' then
-      s.completedTasks[t.id]={progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report)}
+      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report)})
       s.currentTask=nil; self.engine=nil; s.status='idle'; save(); return true
     elseif m.type=='task_pause' then t.paused=true; save(); return true
     elseif m.type=='task_resume' then
@@ -99,6 +131,34 @@ function M.new(app,config,e,network,clock)
     recoverSupplyReceipt()
     local t=s.currentTask
     if t.paused or t.phase=='completed' then return true end
+    local required,rangeError=constructionFuel(t)
+    if rangeError then
+      t.resumePhase=t.phase~='blocked' and t.phase or t.resumePhase
+      t.phase='blocked'; t.blockedCategory='inaccessible'; t.error=rangeError; save(); return true
+    end
+    if t.supplyRequest then
+      local supplyId=t.supplyRequest.id
+      if t.supplyReceiptId~=supplyId then t.supplyReceiptId=supplyId; save() end
+      local resupply=require('autobuilder.workers.resupply').new(t,e,config,app.navigation,save)
+      local done,err=resupply:step()
+      if done then
+        s.pendingSupplyAcks[supplyId]=t.id; t.supplyReceiptId=nil; t.missingItem=nil; t.missingCount=nil; resumeTask(); s.status=t.phase; save()
+      elseif err and not tostring(err):find('movement reservation pending',1,true) then t.error=err; save() end
+      return true
+    end
+    -- Budget before beginning a route. Reservation yields during its descent
+    -- must not charge a second ascent and send an adequately fuelled turtle home.
+    if required and not t.moveRoute and not t.supportCheck and not t.pairCheck and not t.intent
+      and not (t.resupply and t.resupply.intent) and not t.fuelRecovery and not t.supplyRequest then
+      local fuel=e.turtle.getFuelLevel()
+      if fuel~='unlimited' and fuel<required then
+        local ok,err=refuelInPlace(math.max(config.mining.fuelTarget,required))
+        if not ok then
+          t.resumePhase=t.phase~='blocked' and t.phase or t.resumePhase
+          t.phase='blocked'; t.blockedCategory='fuel'; t.error='Insufficient construction fuel: '..tostring(err); save()
+        end
+      end
+    end
     if t.fuelRecovery or t.phase=='blocked' and (t.blockedCategory=='fuel' or tostring(t.error):find('insufficient fuel',1,true)) then
       if t.type=='PREPARE_SITE' then
         -- Its access corridor may still be solid. Refuel in place: a depot
@@ -111,21 +171,34 @@ function M.new(app,config,e,network,clock)
         else t.error='Put coal/charcoal or coal blocks in slot 15; waiting for fuel. '..tostring(err) end
         save(); return true
       end
+      if construction[t.type] and required then
+        local ok,err=refuelInPlace(math.max(config.mining.fuelTarget,required))
+        if ok then t.fuelRecovery=nil; resumeTask(); save(); return true end
+        if tostring(err):find('Empty slot 15',1,true) then t.error=err; save(); return true end
+      end
       t.fuelRecovery=t.fuelRecovery or {}; save()
-      local ok,err=require('autobuilder.workers.resupply').travel(t.fuelRecovery,t,app.navigation,config.depot,save)
-      if ok then ok,err=require('autobuilder.storage.inventory').new(e.turtle):refuel(config.mining.fuelTarget,true) end
+      local ok,err=require('autobuilder.workers.resupply').travel(t.fuelRecovery,t,app.navigation,config.depot,save,e.turtle,config)
+      if ok then
+        local depotRequired=constructionFuel(t,config.depot) or 0
+        local target=math.max(config.mining.fuelTarget,depotRequired)
+        if construction[t.type] then
+          -- Builders must keep the overhead return corridor clear. Obtain fuel
+          -- from the same journaled supply chest used for building materials.
+          ok,err=refuelInPlace(target)
+          if not ok and config.supply.inventory~='' then
+            local held=e.turtle.getItemDetail(15)
+            if not held then
+              t.supplySequence=(t.supplySequence or 0)+1
+              t.supplyRequest={id=t.id..':supply:'..t.supplySequence,item='minecraft:coal',
+                count=math.min(64,math.max(1,math.ceil((target-e.turtle.getFuelLevel())/80))),fuel=true,granted=false}
+              t.lastSupply=nil; save(); return true
+            end
+          end
+          if not ok then err='Put coal/charcoal or coal blocks in slot 15. '..tostring(err) end
+        else ok,err=require('autobuilder.storage.inventory').new(e.turtle):refuel(target,true) end
+      end
       if ok then t.fuelRecovery=nil; resumeTask(); save()
       elseif err then t.error=err; save() end
-      return true
-    end
-    if t.supplyRequest then
-      local supplyId=t.supplyRequest.id
-      if t.supplyReceiptId~=supplyId then t.supplyReceiptId=supplyId; save() end
-      local resupply=require('autobuilder.workers.resupply').new(t,e,config,app.navigation,save)
-      local done,err=resupply:step()
-      if done then
-        s.pendingSupplyAcks[supplyId]=t.id; t.supplyReceiptId=nil; t.missingItem=nil; t.missingCount=nil; resumeTask(); s.status=t.phase; save()
-      elseif err and not tostring(err):find('movement reservation pending',1,true) then t.error=err; save() end
       return true
     end
     if t.phase=='blocked' then
@@ -147,7 +220,8 @@ function M.new(app,config,e,network,clock)
       else return true end
     end
     if t.type=='REFUEL' or t.type=='RETURN_HOME' then
-      local ok,err=app.navigation:goHome()
+      t.homeRoute=t.homeRoute or {}
+      local ok,err=require('autobuilder.workers.resupply').travel(t.homeRoute,t,app.navigation,config.depot,save,e.turtle,config)
       if ok and t.type=='REFUEL' then ok,err=require('autobuilder.storage.inventory').new(e.turtle):refuel(config.mining.fuelTarget,true) end
       t.phase=ok and 'completed' or 'blocked'; t.error=err; t.progress=ok and 1 or 0; save(); return true
     end

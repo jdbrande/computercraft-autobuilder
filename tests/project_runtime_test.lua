@@ -69,6 +69,21 @@ test('build commands reject unsupported palette and modified imported data befor
   assert(not c:command('build prepare sample')); eq(w.places,0)
   assert(not c:command('request minecraft:stone nope')); assert(not c:command('request minecraft:stone -1'))
 end)
+test('build auto prepares stock and resumes through reboot without a separate start command',function()
+  local w,ce,we,c,b,step,reboot=fixture()
+  assert(c:command('build import /example.json automatic'))
+  assert(c:command('build auto automatic'))
+  local p=c.state.automation.projects.automatic
+  assert(p.autoStart and not p.stockOnly)
+  assert(c:command('build pause automatic'))
+  for _=1,5 do step() end
+  eq(w.places,0)
+  assert(c.state.automation.requests[p.requestId].paused)
+  c,b=reboot(); assert(c:command('build resume automatic'))
+  for _=1,300 do step(); if c.state.automation.projects.automatic.phase=='built' and not b.state.currentTask then break end end
+  eq(c.state.automation.projects.automatic.phase,'built'); eq(w.places,2)
+  assert(not c.state.automation.projects.automatic.autoStart)
+end)
 local function airBlueprint()
   return {schema=1,size={x=2,y=1,z=1},palette={{name='minecraft:stone',state={}},{name='minecraft:air',state={}}},runs={{id=1,count=1},{id=2,count=1}},metadata={},requirements={['minecraft:stone']=1}}
 end
@@ -156,6 +171,24 @@ test('cached project analysis does not bypass the imported blueprint content has
   ce.fs.files['/autobuilder/blueprints/air.json']='modified after analysis'
   assert(not c:command('build prepare air')); eq(w.digs,0); eq(w.places,0)
 end)
+test('retired stream imports remain available until checkpoint backup no longer references them',function()
+  local w,ce,we,c=fixture()
+  assert(c:command('build import /example.json old_batch'))
+  local p=c.state.automation.projects.old_batch; p.phase='built'; c:save()
+  c.state.automation.jobs['old-job']={id='old-job',project=p.name,status='completed'}
+  c.state.automation.requests['request:99']={id='request:99',key='supply:old-job:minecraft:coal',status='completed'}
+  c.state.automation.jobs['fuel-factory']={id='fuel-factory',key='request:99:op:1',status='completed'}
+  local path=p.path
+  assert(c.automation.projects:retire(p.name))
+  eq(c.state.automation.requests['request:99'],nil); eq(c.state.automation.jobs['fuel-factory'],nil)
+  assert(ce.fs.exists(path),'backup still needs this import')
+  c.automation.projects:tick()
+  assert(not ce.fs.exists(path))
+  local statePath='/autobuilder/data/controller.state'
+  ce.fs.files[statePath]='corrupt primary'
+  local recovered,source=require('autobuilder.core.checkpoint').new(ce.fs,ce.textutils,statePath):load()
+  assert(source:find('backup')); eq(recovered.automation.projects.old_batch,nil)
+end)
 test('project build without clearing finishes with an air-cell defect report',function()
   local w,ce,we,c,b,step=fixture({blueprint=airBlueprint()})
   w.blocks['3,0,0']={name='minecraft:dirt',state={}}
@@ -182,4 +215,35 @@ test('project clears air columns from the top and honors project pause before sc
   assert(c:command('build resume air')); awaitProject(c,b,step,'built')
   eq(w.digs,2); eq(w.blocks['2,0,0'],nil); eq(w.blocks['2,1,0'],nil)
   eq(c.state.automation.projects.air.report.counts.correct,2)
+end)
+test('cathedral real runtimes prepare stocked materials build verify retire and continue the next layer after reboot',function()
+  local prior=package.loaded['autobuilder.blueprint.catalog']
+  local env
+  local entries={
+    {offset={x=0,y=0,z=0},size={x=1,y=1,z=1},blockCount=1},
+    {offset={x=0,y=1,z=0},size={x=1,y=1,z=1},blockCount=1}}
+  package.loaded['autobuilder.blueprint.catalog']={new=function()
+    return {root=function() return {schema=1,size={x=1,y=2,z=1},totalBlocks=2,pages={{count=2}}} end,
+      page=function() return {entries=entries} end,chunk=function()
+        env.fs.files['/chunk.json']=env.textutils.serialize({schema=1,size={x=1,y=1,z=1},
+          palette={{name='minecraft:stone',state={}}},runs={{id=1,count=1}},metadata={},requirements={['minecraft:stone']=1}})
+        return '/chunk.json'
+      end}
+  end}
+  local ok,err=pcall(function()
+    local w,ce,we,c,b,step,reboot=fixture(); env=ce
+    assert(c:command('cathedral start 2 0 0'))
+    local restarted=false
+    for _=1,700 do
+      step()
+      if not restarted and w.places==1 then c,b=reboot(); restarted=true end
+      if c.state.automation.cathedral.status=='completed' and not b.state.currentTask then break end
+    end
+    assert(restarted); eq(c.state.automation.cathedral.status,'completed')
+    eq(c.state.automation.cathedral.completedBlocks,2); eq(w.places,2)
+    eq(w.blocks['2,0,0'].name,'minecraft:stone'); eq(w.blocks['2,1,0'].name,'minecraft:stone')
+    eq(next(c.state.automation.projects),nil); eq(next(c.state.automation.jobs),nil); eq(next(c.state.automation.requests),nil)
+  end)
+  package.loaded['autobuilder.blueprint.catalog']=prior
+  assert(ok,err)
 end)

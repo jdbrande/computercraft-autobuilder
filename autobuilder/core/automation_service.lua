@@ -6,12 +6,15 @@ function M.new(app,config,e,network,clock)
   local queue=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,app.state.id)
   local production=require('autobuilder.core.production_service').new(app,config,e,queue)
   local projects=require('autobuilder.blueprint.projects').new(app,config,e,queue,production)
+  local cathedral=require('autobuilder.blueprint.cathedral').new(app,config,e,projects)
   local infrastructure=require('autobuilder.core.infrastructure').new(app,config,e,queue)
-  local self={queue=queue,production=production,projects=projects,infrastructure=infrastructure}; local last=-math.huge
+  local self={queue=queue,production=production,projects=projects,infrastructure=infrastructure,cathedral=cathedral}; local last=-math.huge
   local function send(owner,kind,payload) return network:send(owner,kind,payload) end
   function self:command(line)
     local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
-    if args[1]=='build' then return projects:command(args)
+    if args[1]=='production' or args[1]=='8' then app.state.view='production'; return true,'Material team: different workers gather each missing resource'
+    elseif args[1]=='cathedral' then return cathedral:command(args)
+    elseif args[1]=='build' then return projects:command(args)
     elseif args[1]=='request' then
       assert(#args==3,'Usage: request minecraft:stone_bricks 1000')
       assert(U.integer(tonumber(args[3])) and tonumber(args[3])>0,'Request quantity must be a positive integer')
@@ -48,6 +51,7 @@ function M.new(app,config,e,network,clock)
       local ok,err=queue:progress(sender,p); if not ok then return false,err end
       if p.phase~='paused' and p.phase~='blocked' then j.resumeRequested=nil end
       if j.status=='completed' then
+        j.completedAt=j.completedAt or clock()
         j.blocks=nil; app:save(); return send(sender,'task_ack',{jobId=j.id})
       end
       return true
@@ -81,7 +85,7 @@ function M.new(app,config,e,network,clock)
       if not ready then app.state.lastError='Backup recovery: waiting for every known worker to register and reconcile task ownership'; return true end
       app.state.assignmentRecovery=nil; app:save()
     end
-    production:tick(); projects:tick(); infrastructure:tick()
+    production:tick(); projects:tick(); infrastructure:tick(); cathedral:tick()
     if clock()-last<config.heartbeatInterval then return true end
     last=clock()
     for _,j in pairs(queue.state.jobs) do

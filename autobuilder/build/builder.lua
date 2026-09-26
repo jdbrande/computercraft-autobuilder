@@ -42,8 +42,9 @@ function M.new(task,e,config,nav,save,mode)
     if not route then
       if U.distance(pose,target)==0 then return true end
       local height=math.max(ceiling,pose.y,target.y)
-      route={target=U.copy(target),height=height,index=1,attempt=0,points={
-        {x=pose.x,y=height,z=pose.z},{x=target.x,y=height,z=target.z},U.copy(target)}}
+      local points,why=require('autobuilder.workers.resupply').overheadPoints(task,nav,t,config,target,height)
+      if not points then return false,why end
+      route={target=U.copy(target),height=height,index=1,attempt=0,points=points}
       task.moveRoute=route; persist()
     end
     local offsets={{-1,0},{1,0},{0,-1},{0,1}}
@@ -54,7 +55,7 @@ function M.new(task,e,config,nav,save,mode)
       else
         -- A failed descent may need an approach from the side. Preserve that
         -- selected approach too: a reservation yield must not restart the ascent.
-        if route.attempt==0 and route.index<3 then task.moveRoute=nil; persist(); return false,err end
+        if route.attempt==0 and route.index<#route.points then task.moveRoute=nil; persist(); return false,err end
         route.originalError=route.originalError or tostring(err)
         route.attempt=route.attempt+1
         local offset=offsets[route.attempt]

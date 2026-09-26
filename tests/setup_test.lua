@@ -37,6 +37,17 @@ local function env(role,answers)
   return e
 end
 local function settings(e) return assert(load(e.fs.files['/autobuilder/settings.lua'],'settings','t',{}))() end
+test('factory wizard saves discovered furnaces while preserving a blocked material request',function()
+  local e=env('controller',{'none','yes'}); local base=e.peripheral
+  local oldType,oldCall=base.getType,base.call
+  base.getNames=function() return {'right','left','furnace_0','stock','stage'} end
+  base.getType=function(n) if n=='left' then return 'modem' elseif n=='furnace_0' then return 'minecraft:furnace' else return oldType(n) end end
+  base.call=function(n,m,...) if n=='left' and m=='isWireless' then return false end; return oldCall(n,m,...) end
+  local store=CP.new(e.fs,e.textutils,'/autobuilder/data/controller.state')
+  assert(store:save({schema=1,id=1,role='controller',boot=1,phase='telemetry',jobs={},automation={jobs={},projects={p={phase='preparing'}},requests={r={status='blocked',error='No configured furnace'}}}}))
+  assert(require('autobuilder.setup_wizard').run({'factory'},e))
+  eq(settings(e).furnaces[1],'furnace_0'); eq(store:load().automation.requests.r.status,'blocked')
+end)
 test('controller setup defaults to automatic site without requesting coordinates',function()
   local e=env('controller',{'1','2','','yes'})
   assert(require('autobuilder.setup_wizard').run({},e))
@@ -225,4 +236,65 @@ test('refuel failure after saving preserves settings and restores selection',fun
   e.turtle.refuel=function() error('fuel API unavailable') end
   assert(require('autobuilder.setup_wizard').run({},e))
   eq(settings(e).depot.heading,'east'); eq(e.turtle.selected,3); eq(e.turtle.calls,0)
+end)
+
+local function minerEnv(answers)
+  local e=env('worker',answers)
+  e.turtle.inspectDown=function() return true,{name='minecraft:chest'} end
+  e.turtle.inspect=function() return false end
+  return e
+end
+
+test('miner wizard creates resource-specialized adjacent mines for every heading without moving',function()
+  local cases={
+    {heading='north',entry={12,64,-10},min={12,64,-17},max={19,66,-10}},
+    {heading='south',entry={12,64,-8},min={12,64,-8},max={19,66,-1}},
+    {heading='east',entry={13,64,-9},min={13,64,-9},max={20,66,-2}},
+    {heading='west',entry={11,64,-9},min={4,64,-9},max={11,66,-2}},
+  }
+  for _,case in ipairs(cases) do
+    local e=minerEnv({case.heading,'','','yes','yes'})
+    assert(require('autobuilder.setup_wizard').run({'miner','stone'},e))
+    local c=C.load(settings(e)); eq(c.mining.enabled,true); eq(c.mining.resources[1],'minecraft:cobblestone')
+    eq(c.automation.enabled,true); eq(c.automation.building,false); eq(c.label,'Keep me'); eq(c.minimumFuelReserve,123)
+    eq(c.depot.x,12); eq(c.depot.y,64); eq(c.depot.z,-9); eq(c.depot.heading,case.heading)
+    for i,axis in ipairs({'x','y','z'}) do eq(c.mining.entry[axis],case.entry[i]); eq(c.mining.bounds.min[axis],case.min[i]); eq(c.mining.bounds.max[axis],case.max[i]) end
+    eq(e.turtle.calls,0); eq(e.turtle.selected,3); eq(e.turtle.fuel,1060)
+    local output=table.concat(e.output,'\n'); assert(output:find('STOCK',1,true)); assert(output:find('different',1,true))
+  end
+end)
+
+test('miner setup without GPS validates resource aliases and manual mine corners',function()
+  local e=minerEnv({'12 64 -9','e','bad','sand, clay minecraft:diorite deepslate','13 64 -9','12 66 -2','16 66 -6','yes','yes'})
+  e.gps.locate=function() return nil end
+  assert(require('autobuilder.setup_wizard').run({'miner'},e))
+  local c=C.load(settings(e)); eq(c.mining.resources[1],'minecraft:sand'); eq(c.mining.resources[2],'minecraft:clay_ball')
+  eq(c.mining.resources[3],'minecraft:diorite'); eq(c.mining.resources[4],'minecraft:cobbled_deepslate')
+  eq(c.mining.bounds.min.x,13); eq(c.mining.bounds.max.x,16); eq(c.mining.bounds.max.z,-6); eq(e.turtle.calls,0)
+end)
+
+test('miner setup cancellation leaves settings pose and fuel unchanged',function()
+  for _,answers in ipairs({{'cancel'},{'east','cancel'},{'east','','','no'},{'east','','','yes','no'}}) do
+    local e=minerEnv(answers); local original=e.fs.files['/autobuilder/settings.lua']
+    eq(require('autobuilder.setup_wizard').run({'miner','coal'},e),false)
+    eq(e.fs.files['/autobuilder/settings.lua'],original); eq(e.fs.exists('/autobuilder/data/worker.state'),false)
+    eq(e.turtle.fuel,100); eq(e.turtle.items[15].count,16); eq(e.turtle.calls,0)
+  end
+end)
+
+test('miner setup requires deposit chest below and refuses active reservations before prompting',function()
+  local e=minerEnv({'cancel'}); e.turtle.inspectDown=function() return false end
+  eq(require('autobuilder.setup_wizard').run({'miner','sand'},e),false); eq(e.turtle.calls,0)
+  e=minerEnv({}); local original=e.fs.files['/autobuilder/settings.lua']
+  assert(CP.new(e.fs,e.textutils,'/autobuilder/data/worker.state'):save({schema=1,id=8,role='worker',boot=1,phase='telemetry',position={known=false},motionReservation={jobId='mine:1'}}))
+  assert(not pcall(require('autobuilder.setup_wizard').run,{'miner','sand'},e)); eq(e.fs.files['/autobuilder/settings.lua'],original)
+end)
+
+test('miner setup refuses protected entries and leaves fuel intact on failed settings promotion',function()
+  local e=minerEnv({'east','','12 64 -8','','yes','yes'})
+  e.fs.files['/autobuilder/settings.lua']='return {role="worker",controllerId=1,restrictedAreas={{min={x=13,y=64,z=-9},max={x=13,y=64,z=-9}}}}'
+  local original=e.fs.files['/autobuilder/settings.lua']; e.fs.fault.move='/autobuilder/settings.lua'
+  local ok,err=pcall(require('autobuilder.setup_wizard').run,{'miner','coal'},e)
+  assert(not ok and tostring(err):find('previous settings restored',1,true),tostring(err))
+  eq(e.fs.files['/autobuilder/settings.lua'],original); eq(e.turtle.fuel,100); eq(e.turtle.items[15].count,16); eq(e.turtle.calls,0)
 end)

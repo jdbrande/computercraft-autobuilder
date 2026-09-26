@@ -76,3 +76,21 @@ test('duplicate at full cache capacity does not evict itself before validation',
   assert(n:accept(12,packet('register',2),'test',1))
   assert(not n:accept(12,packet('register',1),'test',2),'duplicate accepted at capacity')
 end)
+
+test('network validates and preserves resource restrictions on telemetry and mining assignments',function()
+  local N=require('autobuilder.core.network')
+  for _,kind in ipairs({'register','heartbeat','mine_assign'}) do
+    local m=packet(kind,1)
+    if kind=='mine_assign' then m.payload={jobId='mine:1',item='minecraft:coal',quantity=2} end
+    m.payload.miningResources={'minecraft:coal'}
+    assert(N.validate(12,m))
+    local accepted=assert(net(7,1):accept(12,m,'test',0))
+    eq(accepted.payload.miningResources[1],'minecraft:coal')
+    m.payload.miningResources[1]='minecraft:sand'; eq(accepted.payload.miningResources[1],'minecraft:coal')
+    for _,bad in ipairs({false,{'minecraft:invalid'},{[2]='minecraft:coal'},{'minecraft:coal','minecraft:coal'},{coal=true}}) do
+      m.payload.miningResources=bad; assert(not N.validate(12,m))
+    end
+    m.payload.miningResources={}; assert(N.validate(12,m))
+    m.payload.miningResources=nil; assert(N.validate(12,m))
+  end
+end)

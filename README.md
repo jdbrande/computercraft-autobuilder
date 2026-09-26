@@ -1,4 +1,11 @@
-# Autobuilder 0.10.5
+# Autobuilder 0.11.0
+
+**Automatic materials and multiple miners:** [follow this guide](docs/material-team.md).
+Use `setup miner stone,coal`, `setup miner sand`, and other resource profiles on
+different turtles. `build auto NAME` gathers, crafts/smelts, builds and verifies.
+The controller's **8** screen shows the material team. Full simplified cathedral
+construction now streams small batches with `cathedral start X Y Z`; it requires
+a prepared full-size site and configured material sources/factory.
 
 **First time using this? [Start here](docs/start-here.md).** The guide shows the
 hardware drawing and exactly what to place, click, and type. The controller now
@@ -17,8 +24,9 @@ builds schematic projects, resupplies workers, verifies completed structures and
 repairs supported mismatches. Work, inventory transfers and device ownership survive
 restarts through checkpoints and operation journals.
 
-Desktop tests exercise these workflows with stateful hardware simulations. **No live
-Minecraft acceptance run has been performed.** Unsupported blocks, inaccessible
+Desktop tests exercise these workflows with stateful hardware simulations. The small
+28-block pilot has completed in the user's local world; the new full autonomous
+cathedral workflow has not had a live acceptance run. Unsupported blocks, inaccessible
 cells, unavailable resources and uncertain recovery remain visible blocked work.
 
 | Setup or workflow | Guide |
@@ -26,6 +34,7 @@ cells, unavailable resources and uncertain recovery remain visible blocked work.
 | Install, offline folders, update and rollback | [Installation](docs/installation.md) |
 | First test: every placement, click and command, with drawing | [Start here](docs/start-here.md) |
 | Guided controller/builder setup without editing Lua | [Quick setup](docs/quick-setup.md) |
+| Multiple resource miners and automatic construction | [Material team](docs/material-team.md) |
 | Miner hardware, bounded excavation and fuel | [Mining setup](docs/milestone-2.md) |
 | Concurrent miners and durable area ownership | [Parallel mining](docs/parallel-mining.md) |
 | Recipe planning, Crafty station and furnace bank | [Production](docs/production.md) |
@@ -70,7 +79,7 @@ The project is hosted at [jdbrande/computercraft-autobuilder](https://github.com
 The commands below use that repository. To prepare a fork, change the raw URL with:
 
 ```sh
-python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.5
+python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.11.0
 ```
 
 Publish `installer.lua`, `update.lua`, `startup.lua`, `manifest.json`, and

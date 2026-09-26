@@ -17,6 +17,7 @@ local function telemetry(p)
   local count=0
   for k,v in pairs(p.capabilities) do count=count+1; if count>32 or not short(k) or type(v)~='boolean' then return false end end
   if p.task~=nil and not short(p.task,128) then return false end
+  if not require('autobuilder.resources.materials').validResources(p.miningResources) then return false end
   if p.miningArea~=nil then
     if type(p.miningArea)~='table' or not U.position(p.miningArea.min) or not U.position(p.miningArea.max) then return false end
     for _,axis in ipairs({'x','y','z'}) do if p.miningArea.max[axis]<p.miningArea.min[axis] or p.miningArea.max[axis]-p.miningArea.min[axis]>256 then return false end end
@@ -85,6 +86,7 @@ function M.new(hw,config,id,boot)
         inventory={used=p.inventory.used,slots=16},capabilities=U.copy(p.capabilities),
         position={known=p.position.known,heading=p.position.heading,source=p.position.source}}
       if p.position.known then clean.position.x,clean.position.y,clean.position.z=p.position.x,p.position.y,p.position.z end
+      clean.miningResources=U.copy(p.miningResources)
       if p.miningArea then clean.miningArea={min={x=p.miningArea.min.x,y=p.miningArea.min.y,z=p.miningArea.min.z},max={x=p.miningArea.max.x,y=p.miningArea.max.y,z=p.miningArea.max.z}} end
     elseif message.type=='ack' then clean.requestId=p.requestId
     elseif message.type=='register_required' then clean.reason=p.reason

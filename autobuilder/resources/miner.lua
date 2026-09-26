@@ -58,6 +58,9 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
       local heading=p.x>pose.x and 'east' or p.x<pose.x and 'west' or p.z>pose.z and 'south' or 'north'
       local ok,err=nav:face(heading); if not ok then return false,err end
     end
+    -- Excavation changes the destination too: reserve it before any dig,
+    -- then navigation rechecks the grant before committing movement.
+    if nav.guard then local ok,err=nav.guard(pose,p); if not ok then return false,err end end
     local present,b=t['inspect'..suffix]()
     if present then
       observed[P.key(p)]=b.name
@@ -95,9 +98,12 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
   end
   local function surveyTarget()
     local b=c.bounds; local row=math.floor((task.survey-1)/2); local edge=(task.survey-1)%2
-    local z=c.entry.z+row*3
-    if z>b.max.z then return nil end
-    local x=(row%2==0 and edge==1 or row%2==1 and edge==0) and b.max.x or b.min.x
+    local direction=c.entry.z==b.max.z and b.min.z<b.max.z and -1 or 1
+    local z=c.entry.z+row*3*direction
+    if z<b.min.z or z>b.max.z then return nil end
+    local east=row%2==0 and edge==1 or row%2==1 and edge==0
+    if c.entry.x==b.max.x then east=not east end
+    local x=east and b.max.x or b.min.x
     return {x=x,y=c.entry.y,z=z}
   end
   local function adjacentTargets()

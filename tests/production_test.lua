@@ -205,3 +205,134 @@ test('crafting preserves an ambiguous post-crash journal for operator review',fu
   h.slots[13].count=3
   eq(ex:resume(),'blocked'); assert(task.production.intent)
 end)
+
+local function productionFixture(stock)
+  local h=hardware(); h.inventories.store=stock or {}
+  local config=U.copy(cfg); config.treeFarms={}; config.farms={}; config.turtleFuelReserveItems={}
+  config.heartbeatInterval=1; config.checkpointInterval=1
+  local app={state={id=1,role='controller',jobs={},workers={}},saved=nil,now=0,packets={}}
+  function app:save() self.saved=U.copy(self.state); return true end
+  function app:report() end
+  local net={send=function(_,to,kind,payload) app.packets[#app.packets+1]={to=to,kind=kind,payload=payload}; return true end}
+  local clock=function() return app.now end
+  app.mining=require('autobuilder.core.mining_service').new(app,config,h,net,clock)
+  local queue=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,1)
+  local service=require('autobuilder.core.production_service').new(app,config,h,queue)
+  return app,service,queue,config,h
+end
+local function miningWorker(id,item,x)
+  return {id=id,online=true,telemetry={status='idle',capabilities={mining=true},miningResources={item},
+    miningArea={min={x=x,y=0,z=0},max={x=x+10,y=10,z=10}}}}
+end
+test('autonomous preparation persists project linkage with the request and rejects missing projects atomically',function()
+  local app,p,q=productionFixture(); q.state.projects.house={name='house',phase='imported',stockOnly=true}
+  local r=p:request({[mc('cobblestone')]=8},'project:house',{projectName='house'})
+  eq(app.saved.automation.projects.house.requestId,r.id); eq(app.saved.automation.projects.house.stockOnly,false)
+  eq(app.saved.automation.requests[r.id].stockOnly,false)
+  local before=q.state.requestSequence
+  assert(not pcall(p.request,p,{[mc('dirt')]=1},'missing',{projectName='absent'}))
+  eq(q.state.requestSequence,before)
+  for _,request in pairs(q.state.requests) do assert(request.key~='missing') end
+end)
+test('production keeps progress for every material and dispatches different resources in parallel',function()
+  local app,p,q=productionFixture()
+  app.state.workers['2']=miningWorker(2,mc('raw_iron'),20)
+  app.state.workers['3']=miningWorker(3,mc('cobblestone'),40)
+  local r=p:request({[mc('raw_iron')]=6,[mc('cobblestone')]=8})
+  p:tick(); app.mining:tick(); app.now=2; app.mining:tick(); p:tick()
+  assert(r.materials,'all acquisition progress must be visible')
+  eq(r.materials[mc('raw_iron')].workerId,2); eq(r.materials[mc('cobblestone')].workerId,3)
+  eq(r.materials[mc('raw_iron')].target,6); eq(r.materials[mc('cobblestone')].count,0)
+  eq(#app.packets,2); assert(r.materials[mc('raw_iron')].jobId~=r.materials[mc('cobblestone')].jobId)
+  eq(next(q.state.jobs),nil)
+end)
+test('production missing mining workers reports every resource and recovers when eligible workers arrive',function()
+  local app,p,q=productionFixture()
+  app.state.workers['2']=miningWorker(2,mc('coal'),20)
+  local r=p:request({[mc('raw_iron')]=6,[mc('cobblestone')]=8}); p:tick()
+  assert(r.error:find('No online mining worker',1,true),r.error)
+  assert(r.materials[mc('raw_iron')].error:find('raw_iron',1,true))
+  assert(r.materials[mc('cobblestone')].error:find('cobblestone',1,true))
+  local ironId=r.materials[mc('raw_iron')].jobId
+  app.state.workers['3']=miningWorker(3,mc('raw_iron'),40); p:tick(); app.mining:tick(); p:tick()
+  eq(r.materials[mc('raw_iron')].jobId,ironId); eq(r.materials[mc('raw_iron')].workerId,3)
+  eq(r.materials[mc('raw_iron')].error,nil)
+end)
+test('production waits for configured farms and discovers newly configured farms',function()
+  local app,p,q,config=productionFixture(); local r=p:request({[mc('oak_log')]=4}); p:tick()
+  assert(r.error:find('No configured farm',1,true),r.error); eq(next(q.state.jobs),nil)
+  config.treeFarms={{item=mc('oak_log'),base={x=0,y=0,z=0}}}; p:tick()
+  local material=r.materials[mc('oak_log')]; eq(q.state.jobs[material.jobId].type,'HARVEST')
+  eq(material.error,nil)
+end)
+test('production recovers after furnaces and crafting workers become available',function()
+  local app,p,q,config=productionFixture({[1]={name=mc('cobblestone'),count=4},[2]={name=mc('coal'),count=1}})
+  config.furnaces={}; local r=p:request({[mc('stone_bricks')]=4}); p:tick()
+  assert(r.error:find('No configured furnaces',1,true),tostring(r.error)); eq(next(q.state.jobs),nil)
+  config.furnaces={'furnace'}; p:tick(); assert(r.jobIds)
+  local job=q.state.jobs[r.jobIds[1]]; eq(job.furnaceLane,'furnace'); job.status='completed'; p:tick(); p:tick()
+  assert(r.error:find('No online crafting',1,true),tostring(r.error)); eq(r.jobId,nil)
+  app.state.workers['9']={id=9,online=true,telemetry={capabilities={crafting=true}}}; p:tick()
+  eq(q.state.jobs[r.jobId].type,'CRAFT'); eq(r.error,nil); eq(r.status,'running')
+end)
+test('stock-only preparation reports all missing stock without acquiring or replenishing global reserves',function()
+  local app,p,q,config,h=productionFixture({[1]={name=mc('dirt'),count=1}})
+  config.turtleFuelReserveItems={[mc('coal')]=32}
+  local r=p:request({[mc('dirt')]=2,[mc('oak_planks')]=4},nil,{stockOnly=true}); p:tick()
+  eq(r.status,'blocked'); eq(next(app.state.jobs),nil); eq(next(q.state.jobs),nil)
+  eq(r.materials[mc('dirt')].count,1); eq(r.materials[mc('oak_planks')].target,4)
+  h.inventories.store={[1]={name=mc('dirt'),count=2},[2]={name=mc('oak_planks'),count=4}}; p:tick()
+  eq(r.status,'completed'); eq(r.materials[mc('dirt')].status,'ready'); eq(r.error,nil)
+end)
+test('production refuses an unpersisted project request and rolls back its in-memory link',function()
+  local app,p,q=productionFixture(); q.state.projects.house={phase='imported',stockOnly=true}
+  function app:save() return false,'disk full' end
+  local ok,err=pcall(p.request,p,{[mc('dirt')]=2},'project:house',{projectName='house'})
+  assert(not ok and tostring(err):find('disk full',1,true),'request must report checkpoint failure')
+  eq(q.state.projects.house.phase,'imported'); eq(q.state.projects.house.requestId,nil)
+  eq(q.state.projects.house.stockOnly,true); eq(next(q.state.requests),nil); eq(q.state.requestSequence,0)
+end)
+test('production resumes saved acquisition without duplicating mining jobs and completes from delivered stock',function()
+  local app,p,q,config,h=productionFixture()
+  local r=p:request({[mc('cobblestone')]=8}); p:tick(); local id=r.mines[mc('cobblestone')]
+  app.state=U.copy(app.saved)
+  local clock=function() return app.now end
+  app.mining=require('autobuilder.core.mining_service').new(app,config,h,{send=function() return true end},clock)
+  q=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,1)
+  p=require('autobuilder.core.production_service').new(app,config,h,q); r=q.state.requests[r.id]
+  app.state.workers['3']=miningWorker(3,mc('cobblestone'),40); p:tick(); app.mining:tick(); p:tick()
+  eq(r.materials[mc('cobblestone')].jobId,id); eq(app.state.jobSequence,1)
+  h.inventories.store[1]={name=mc('cobblestone'),count=8}; p:tick()
+  eq(r.status,'completed'); eq(r.materials[mc('cobblestone')].count,8)
+end)
+test('production replans consumed output with new factory jobs instead of reusing completed operations',function()
+  local app,p,q,config,h=productionFixture({[1]={name=mc('oak_log'),count=2}})
+  app.state.workers['9']={id=9,online=true,telemetry={capabilities={crafting=true}}}
+  local r=p:request({[mc('oak_planks')]=4}); p:tick(); local first=r.jobId
+  q.state.jobs[first].status='completed'; h.inventories.store[1].count=1
+  p:tick(); p:tick(); p:tick()
+  assert(r.jobId~=first,'replacement operation must not adopt the already completed craft')
+  eq(q.state.jobs[r.jobId].status,'queued')
+end)
+test('production completion checks the resolved substitution rather than requesting the original item again',function()
+  local app,p,q,config=productionFixture({[1]={name=mc('spruce_planks'),count=4}})
+  config.substitutions={[mc('oak_planks')]=mc('spruce_planks')}
+  local r=p:request({[mc('oak_planks')]=4}); p:tick()
+  eq(r.status,'completed'); eq(r.replans,nil)
+end)
+test('production availability uses the same strict resource eligibility as mining dispatch',function()
+  local app,p=productionFixture()
+  app.state.workers['2']=miningWorker(2,mc('raw_iron'),20)
+  app.state.workers['2'].telemetry.miningResources[3]=mc('coal')
+  local r=p:request({[mc('raw_iron')]=6}); p:tick()
+  assert(r.materials[mc('raw_iron')].error and r.materials[mc('raw_iron')].error:find('No online mining worker',1,true))
+end)
+test('material progress keeps live stock counts after acquisition while factory inputs are consumed',function()
+  local app,p,q,config,h=productionFixture({[1]={name=mc('coal'),count=1}})
+  local r=p:request({[mc('stone')]=4}); p:tick()
+  h.inventories.store[2]={name=mc('cobblestone'),count=4}; p:tick()
+  eq(r.materials[mc('cobblestone')].status,'ready')
+  h.inventories.store[2].count=2; p:tick()
+  eq(r.materials[mc('cobblestone')].count,2)
+  eq(r.materials[mc('cobblestone')].status,'ready'); assert(r.acquired)
+end)

@@ -1,54 +1,99 @@
 local U=require('autobuilder.core.util')
 local Coordination=require('autobuilder.core.workflows')
+local Materials=require('autobuilder.resources.materials')
 local M={}
 function M.new(app,config,e,queue)
   local s=queue.state; s.requestSequence=s.requestSequence or 0
   local self={machines={},laneCursor=0}; local save=function() return app:save() end
   function self:request(requirements,key,options)
+    options=options or {}
     assert(type(requirements)=='table' and next(requirements),'resource request needs item quantities')
     for item,n in pairs(requirements) do assert(U.shortString(item,128) and U.integer(n) and n>=1 and n<=1000000,'invalid resource request') end
+    local project=options.projectName and assert(s.projects[options.projectName],'Preparation project missing')
     for _,r in pairs(s.requests) do if key and r.key==key and r.status~='completed' then return r end end
     s.requestSequence=s.requestSequence+1
-    local r={id='request:'..s.requestSequence,key=key,requirements=U.copy(requirements),status='queued',operation=1,mines={},harvests={}}
-    if options and options.stockOnly then r.stockOnly=true end
+    local r={id='request:'..s.requestSequence,key=key,requirements=U.copy(requirements),status='queued',operation=1,mines={},harvests={},stockOnly=options.stockOnly==true}
     s.requests[r.id]=r
-    if options and options.projectName then
-      assert(options.stockOnly,'Automatic project linkage requires stock-only preparation')
-      local p=assert(s.projects[options.projectName],'Preparation project missing')
-      p.stockOnly=true; p.requestId=r.id; p.phase='preparing'
+    local previous
+    if project then
+      -- Capture the old linkage so a failed checkpoint cannot leave a request
+      -- that callers might subsequently mistake for a durable preparation.
+      previous={stockOnly=project.stockOnly,requestId=project.requestId,phase=project.phase}
+      project.stockOnly=r.stockOnly; project.requestId=r.id; project.phase='preparing'
     end
-    save(); return r
+    local called,ok,err=pcall(save)
+    if not called or not ok then
+      if project then project.stockOnly=previous.stockOnly; project.requestId=previous.requestId; project.phase=previous.phase end
+      s.requests[r.id]=nil; s.requestSequence=s.requestSequence-1
+      error(called and (err or 'Failed to save resource request') or ok,0)
+    end
+    return r
   end
   function self:refresh()
     return app.mining:refresh()
   end
+  local function hasWorker(capability,item)
+    -- Small integrations predating the registry can still drive production.
+    if app.state.workers==nil then return true end
+    for _,worker in pairs(app.state.workers) do
+      local t=worker.telemetry
+      if worker.online and t and t.capabilities and t.capabilities[capability] then
+        if not item or Materials.accepts(t.miningResources,item) then return true end
+      end
+    end
+    return false
+  end
+  local function progress(r,item,target)
+    r.materials=r.materials or {}
+    local prior=r.materials[item] or {}
+    local material={count=app.mining.storage:getCount(item) or 0,target=target,status='queued',jobId=prior.jobId,workerId=prior.workerId}
+    r.materials[item]=material; return material
+  end
+  local function blocked(material,reason)
+    material.status='blocked'; material.error=reason; return false
+  end
   local function acquire(r,item,target)
-    local count=app.mining.storage:getCount(item) or 0
-    if count>=target then return true end
-    if require('autobuilder.resources.materials').get(item) then
+    local material=progress(r,item,target); local count=material.count
+    if count>=target then material.status='ready'; return true end
+    if Materials.get(item) then
       local id=r.mines[item]; local existing=id and app.state.jobs[id]
       if not existing or existing.status=='completed' then
         local job,why=app.mining.jobs:submit(item,target,count)
         if not job then
           for _,j in pairs(app.state.jobs) do if j.item==item and j.status~='completed' then job=j; break end end
         end
-        if not job then r.error=why; return false end
+        if not job then return blocked(material,why) end
         r.mines[item]=job.id; save()
       end
-      r.error='Acquiring '..item..' '..count..'/'..target; return false
+      local job=app.state.jobs[r.mines[item]]
+      material.jobId=job.id; material.workerId=job.workerId; material.status=job.status
+      if job.status=='blocked' then return blocked(material,job.error or 'Mining job blocked: '..item) end
+      if not hasWorker('mining',item) then return blocked(material,'No online mining worker eligible for '..item) end
+      return false
     end
     local farm,kind
-    for _,f in ipairs(config.treeFarms) do if f.item==item then farm=f; kind='HARVEST'; break end end
-    if not farm then for _,f in ipairs(config.farms) do if f.item==item then farm=f; kind='FARM'; break end end end
+    for _,f in ipairs(config.treeFarms or {}) do if f.item==item then farm=f; kind='HARVEST'; break end end
+    if not farm then for _,f in ipairs(config.farms or {}) do if f.item==item then farm=f; kind='FARM'; break end end end
     if farm then
       local prior=r.harvests[item] and s.jobs[r.harvests[item]]
       if not prior or prior.status=='completed' then
         local job=queue:submit(kind,{item=item,quantity=target-count,farm=U.copy(farm)},{},r.id..':'..item..':'..(prior and prior.id or 'first'))
         r.harvests[item]=job.id; save()
       end
-      r.error='Waiting for managed farm: '..item; return false
+      local job=s.jobs[r.harvests[item]]
+      material.jobId=job.id; material.workerId=job.workerId; material.status=job.status; material.error=job.error
+      return false
     end
-    r.error='Special acquisition required: '..item..' ('..(target-count)..' missing)'; return false
+    return blocked(material,'No configured farm or acquisition source for '..item..' ('..(target-count)..' missing)')
+  end
+  local function acquisitionSummary(r)
+    local errors,waiting={},{}
+    for item,material in pairs(r.materials) do
+      if material.error then errors[#errors+1]=material.error
+      elseif material.status~='ready' then waiting[#waiting+1]='Acquiring '..item..' '..material.count..'/'..material.target end
+    end
+    table.sort(errors); table.sort(waiting)
+    return table.concat(#errors>0 and errors or waiting,'; ')
   end
   function self:tick()
     local active
@@ -63,26 +108,35 @@ function M.new(app,config,e,queue)
     if r.stockOnly then
       -- The beginner test is supplied by the user. It must not queue mining,
       -- crafting, or a global fuel-stock replenishment as a side effect.
+      r.materials={}; local ready=true
       for item,n in pairs(r.requirements) do
         local need=n+(config.turtleFuelReserveItems[item] or 0)
-        local have=app.mining.storage.counts[item] or 0
+        local material=progress(r,item,need); local have=material.count
         if have<need then
-          r.status='blocked'; r.error='Put '..(need-have)..' more '..item:gsub('^.-:',''):gsub('_',' ')..' in the stock chest.'; save(); return
-        end
+          ready=false; blocked(material,'Put '..(need-have)..' more '..item:gsub('^.-:',''):gsub('_',' ')..' in the stock chest.')
+        else material.status='ready' end
       end
+      if not ready then r.status='blocked'; r.error=acquisitionSummary(r); save(); return end
       r.status='completed'; r.error=nil; save(); return
     end
     if not r.plan then
       local plan=require('autobuilder.blueprint.planner').expand(r.requirements,app.mining.storage.counts,config)
-      r.plan=plan; r.targets={}
+      r.plan=plan; r.targets={}; r.materials={}
       for item,n in pairs(plan.missing) do r.targets[item]=(app.mining.storage.counts[item] or 0)+n end
       r.status='running'; save()
     end
     if not r.acquired then
       local ready=true
       for item,target in pairs(r.targets) do if not acquire(r,item,target) then ready=false end end
-      if not ready then r.status='blocked'; save(); return end
+      if not ready then r.status='blocked'; r.error=acquisitionSummary(r); save(); return end
       r.acquired=true; r.status='running'; r.error=nil; save()
+    end
+    -- Ready records describe completed acquisition, even as the factory spends
+    -- those inputs. Continue showing their live counts without mining them again.
+    for item,material in pairs(r.materials or {}) do
+      material.count=app.mining.storage:getCount(item) or 0
+      local job=material.jobId and (app.state.jobs[material.jobId] or s.jobs[material.jobId])
+      if job then material.workerId=job.workerId end
     end
     local op=r.plan.operations[r.operation]
     if op then
@@ -93,6 +147,16 @@ function M.new(app,config,e,queue)
         r.error='waiting for outstanding supply batch '..tostring(s.supply.jobId); save(); return
       end
       if op.type=='SMELT' then
+        if not r.jobIds and not r.jobId and #(config.furnaces or {})==0 then
+          r.status='blocked'; r.error='No configured furnaces for '..op.item; save(); return
+        end
+        -- A request may have been planned before its first furnace was configured.
+        if not r.jobIds and not r.jobId and op.lanes then
+          for index,lane in ipairs(op.lanes) do
+            if not lane.furnaceLane then lane.furnaceLane=config.furnaces[index] end
+          end
+        end
+        r.status='running'; r.error=nil
         -- Adopt an older unsplit task unchanged. New plans persist each lane's
         -- exact batches and peripheral name before any lane is allowed to run.
         if not r.jobIds then
@@ -110,7 +174,7 @@ function M.new(app,config,e,queue)
           for index,lane in ipairs(lanes) do
             if not r.jobIds[index] then
               local job=queue:submit('SMELT',{item=op.item,quantity=lane.batches,batches=lane.batches,
-                furnaceLane=lane.furnaceLane,productionRequest=r.id,productionOperation=r.operation},{},r.id..':op:'..r.operation..':lane:'..index)
+                furnaceLane=lane.furnaceLane,productionRequest=r.id,productionOperation=r.operation},{},r.id..':op:'..r.operation..':lane:'..index..(r.replans and ':replan:'..r.replans or ''))
               r.jobIds[index]=job.id; save()
             end
           end
@@ -125,14 +189,18 @@ function M.new(app,config,e,queue)
         elseif blocked then r.status='blocked'; r.error=blocked; save() end
       else
         local job=r.jobId and s.jobs[r.jobId]
+        if op.type=='CRAFT' and (not job or job.status~='completed') and not hasWorker('crafting') then
+          r.status='blocked'; r.error='No online crafting-capable worker for '..op.item; save(); return
+        end
+        r.status='running'; r.error=nil
         if not job then
-          job=queue:submit(op.type,{item=op.item,quantity=op.quantity,batches=op.batches},{},r.id..':op:'..r.operation)
+          job=queue:submit(op.type,{item=op.item,quantity=op.quantity,batches=op.batches},{},r.id..':op:'..r.operation..(r.replans and ':replan:'..r.replans or ''))
           r.jobId=job.id; save()
         elseif job.status=='completed' then r.operation=r.operation+1; r.jobId=nil; r.error=nil; save()
         elseif job.status=='blocked' then r.status='blocked'; r.error=job.error; save() end
       end
     else
-      for item,n in pairs(r.requirements) do
+      for item,n in pairs(r.plan.requirements or r.requirements) do
         if (app.mining.storage:getCount(item) or 0)<n then
           r.replans=(r.replans or 0)+1
           if r.replans>3 then r.status='blocked'; r.error='Finished items were consumed externally; pause competing consumers and retry request'; save(); return end
@@ -157,6 +225,7 @@ function M.new(app,config,e,queue)
     job.error=err; save(); return true
   end
   function self:step()
+    for id in pairs(self.machines) do if not s.jobs[id] then self.machines[id]=nil end end
     if app.state.assignmentRecovery then return true end
     local all={}
     for _,job in pairs(s.jobs) do if job.type=='SMELT' then all[#all+1]=job end end

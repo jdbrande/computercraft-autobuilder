@@ -146,3 +146,78 @@ test('controller backup recovers assignment ownership from the workers persisted
   end
   eq(c.state.jobs[id].status,'completed'); eq(w.stock['minecraft:raw_iron'],1)
 end)
+
+test('worker rejects resource mismatches and blocks restored assignments after restriction changes',function()
+  local _,_,_,_,worker,_,wc=fixture()
+  wc.mining.resources={'minecraft:raw_iron'}
+  local function assign(item,resources)
+    return worker.mining:handle(7,{type='mine_assign',payload={jobId='mine:restricted',item=item,quantity=1,miningResources=resources}})
+  end
+  assert(not assign('minecraft:coal',nil)); eq(worker.state.currentTask,nil)
+  assert(not assign('minecraft:raw_iron',{'minecraft:raw_iron','minecraft:sand'})); eq(worker.state.currentTask,nil)
+  assert(assign('minecraft:raw_iron',{'minecraft:raw_iron'}))
+  eq(worker.state.currentTask.miningResources[1],'minecraft:raw_iron')
+  worker.state.currentTask.phase='work'
+  wc.mining.resources={'minecraft:raw_iron','minecraft:sand'}
+  worker:workStep(); eq(worker.state.currentTask.phase,'blocked')
+  assert(worker.state.currentTask.error:find('resources'))
+  wc.mining.resources={'minecraft:raw_iron'}
+  assert(worker.mining:handle(7,{type='mine_resume',payload={jobId='mine:restricted'}}))
+  eq(worker.state.currentTask.phase,'work')
+end)
+
+test('worker accepts legacy assignments while enforcing its local resource eligibility',function()
+  local _,_,_,_,worker,_,wc=fixture(); wc.mining.resources={'minecraft:raw_iron'}
+  assert(worker.mining:handle(7,{type='mine_assign',payload={jobId='mine:legacy',item='minecraft:raw_iron',quantity=1}}))
+  eq(worker.state.currentTask.item,'minecraft:raw_iron')
+  eq(worker.state.currentTask.miningResources[1],'minecraft:raw_iron')
+end)
+
+test('completed mines retain acknowledgements until fresh cleared telemetry and request retirement',function()
+  local w,ce,we,c,worker=fixture(); w.stock['minecraft:raw_iron']=1
+  worker:tick(); pump(we,c); pump(ce,worker)
+  local job=assert(c.mining.jobs:submit('minecraft:raw_iron',2,0)); c.mining.jobs:assign(c.state.workers)
+  c.state.automation.requests.keep={id='keep',status='completed',mines={['minecraft:raw_iron']=job.id}}
+  local packet={type='mine_progress',payload={jobId=job.id,phase='completed',delivered=2,held=0}}
+  w.stock['minecraft:raw_iron']=2
+  assert(c.mining:handle(12,packet)); eq(job.completedAt,100)
+  ce.now=101; assert(c.mining:handle(12,packet)); eq(job.completedAt,100)
+  eq(ce.packets[#ce.packets].message.type,'mine_ack')
+  -- Pre-completion idle telemetry cannot prove the worker consumed its acknowledgement.
+  c.state.automation.requests.keep=nil; c.mining:tick(); assert(c.state.jobs[job.id])
+  local peer=c.state.workers['12']; peer.lastSeen=102; peer.telemetry.task=job.id
+  ce.now=103; c.mining:tick(); assert(c.state.jobs[job.id])
+  peer.telemetry.task=nil; peer.online=false; c.mining:tick(); assert(c.state.jobs[job.id])
+  peer.online=true; c.state.automation.requests.keep={id='keep',status='running',mines={['minecraft:raw_iron']=job.id}}
+  c.mining:tick(); assert(c.state.jobs[job.id])
+  c.state.automation.requests.keep=nil; c.mining:tick(); eq(c.state.jobs[job.id],nil)
+  local sent=#ce.packets; assert(not c.mining:handle(12,packet)); eq(#ce.packets,sent)
+end)
+
+test('mining retirement preserves unfinished supplement chains and releases completed chains together',function()
+  local w,ce,we,c,worker=fixture()
+  worker:tick(); pump(we,c); pump(ce,worker)
+  local parent=assert(c.mining.jobs:submit('minecraft:raw_iron',2,0)); c.mining.jobs:assign(c.state.workers)
+  local function completed(id,count)
+    return c.mining:handle(12,{type='mine_progress',payload={jobId=id,phase='completed',delivered=count,held=0}})
+  end
+  w.stock['minecraft:raw_iron']=1; assert(completed(parent.id,2))
+  local child=c.state.jobs[parent.childId]; assert(child); eq(parent.status,'blocked')
+  c.state.workers['12'].lastSeen=101; ce.now=102; c.mining:tick()
+  assert(c.state.jobs[parent.id]); assert(c.state.jobs[child.id]); eq(child.workerId,12)
+  w.stock['minecraft:raw_iron']=2; assert(completed(child.id,1))
+  eq(parent.status,'completed'); eq(child.status,'completed'); eq(parent.completedAt,102); eq(child.completedAt,102)
+  c.state.workers['12'].lastSeen=103; ce.now=104
+  c.state.automation.requests.keep={status='completed',mines={iron=parent.id}}
+  c.mining:tick(); assert(c.state.jobs[parent.id]); assert(c.state.jobs[child.id])
+  c.state.automation.requests.keep=nil; c.mining:tick()
+  eq(c.state.jobs[parent.id],nil); eq(c.state.jobs[child.id],nil)
+end)
+
+test('legacy completed mines wait for a new observation before retirement',function()
+  local _,ce,we,c,worker=fixture()
+  worker:tick(); pump(we,c); pump(ce,worker)
+  c.state.jobs.legacy={id='legacy',status='completed',workerId=12,physicalComplete=true}
+  c.mining:tick(); assert(c.state.jobs.legacy)
+  c.state.workers['12'].lastSeen=101; ce.now=102; c.mining:tick(); eq(c.state.jobs.legacy,nil)
+end)

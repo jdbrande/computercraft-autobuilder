@@ -12,7 +12,7 @@ function M.new(state,save,clock,controllerId)
     local job={id=id,type='MINE',item=item,target=quantity,quantity=math.max(0,quantity-stock),priority=1,
       status=stock>=quantity and 'completed' or 'queued',requiredCapabilities={mining=true},dependencies={},
       progress={delivered=0,held=0},retryCount=0,created=clock(),parent=parent and parent.id,
-      depth=parent and ((parent.depth or 0)+1) or 0}
+      depth=parent and ((parent.depth or 0)+1) or 0,paused=parent and parent.paused or nil}
     state.jobs[id]=job; return job
   end
   local function finish(j)
@@ -80,7 +80,7 @@ function M.new(state,save,clock,controllerId)
     table.sort(candidates,function(a,b) return a.id<b.id end)
     local queued={}
     for _,job in pairs(state.jobs) do
-      if job.status=='queued' and not job.workerId and not Coordination.factoryPending(state) then
+      if job.status=='queued' and not job.paused and not job.workerId and not Coordination.factoryPending(state) then
         local ready=true
         for _,dep in ipairs(job.dependencies) do if not state.jobs[dep] or state.jobs[dep].status~='completed' then ready=false end end
         if ready then queued[#queued+1]=job end
@@ -88,16 +88,18 @@ function M.new(state,save,clock,controllerId)
     end
     table.sort(queued,order)
     for _,job in ipairs(queued) do
-      local owner,area
+      local owner,area,resources
       for _,w in ipairs(candidates) do
         local bounds=miningArea(w.telemetry)
-        if not conflict(w.id,bounds) then owner=w.id; area=bounds; break end
+        if Materials.accepts(w.telemetry.miningResources,job.item) and not conflict(w.id,bounds) then
+          owner=w.id; area=bounds; resources=w.telemetry.miningResources; break
+        end
       end
       if owner then
         if counts then job.quantity=math.max(0,job.target-(counts[job.item] or 0)) end
         if job.quantity==0 then finish(job); persist()
         else
-          job.workerId=owner; job.miningArea=U.copy(area); job.status='assigned'
+          job.workerId=owner; job.miningArea=U.copy(area); job.miningResources=U.copy(resources); job.status='assigned'
           -- Historic miningWorkerId pins are intentionally not used: each durable
           -- active job now owns its area. Unknown legacy areas remain exclusive.
           persist(); return job
@@ -123,9 +125,10 @@ function M.new(state,save,clock,controllerId)
     if not j or j.status~='queued' or j.workerId or not w or not w.online or not t
       or t.task~=j.id or not t.capabilities or not t.capabilities.mining then return false,'ownership recovery lacks a matching registered task' end
     if not U.integer(p.assignedQuantity) or p.assignedQuantity<1 or p.assignedQuantity>j.target then return false,'ownership recovery requires original assigned quantity' end
+    if not Materials.accepts(t.miningResources,j.item) then return false,'ownership recovery has incompatible mining resources' end
     local area=miningArea(t); if area==false then return false,'ownership recovery has invalid mining bounds' end
     local blocked,why=conflict(workerId,area); if blocked then return false,why end
-    j.workerId=workerId; j.miningArea=U.copy(area); j.quantity=p.assignedQuantity; j.status='assigned'
+    j.workerId=workerId; j.miningArea=U.copy(area); j.miningResources=U.copy(t.miningResources); j.quantity=p.assignedQuantity; j.status='assigned'
     persist(); return true
   end
   function self:progress(workerId,p,stock)

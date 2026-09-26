@@ -6,7 +6,7 @@ M.defaults={
   checkpointInterval=5, gps={enabled=true,timeout=2,interval=30},
   dataDir='/autobuilder/data', logDir='/autobuilder/logs',
   log={level='INFO',maxBytes=65536,backups=3},
-  minimumFuelReserve=100, movementRetries=2, maxTravelDistance=256,
+  minimumFuelReserve=100, movementRetries=2, maxTravelDistance=1024,
   restrictedAreas={}, locations={}, capabilities={telemetry=true},
   maxWorkers=128, dedupLimit=512, dedupTTL=120,
   storageInventories={},
@@ -18,7 +18,7 @@ M.defaults={
   supply={inventory='',side='front',batch=64}, treeFarms={}, farms={}, depotExpansion={}, farmRetrySeconds=60,
   autoDepotExpansion={enabled=false,freeSlots=2},
   scanner={side='left',slot=16,radius=8,ttl=15,cooldown=3,maxCost=0,maxWait=30},
-  mining={enabled=false,fallback=true,maxSurveySteps=256,pathBudget=4096,returnMargin=8,fuelTarget=1000},
+  mining={enabled=false,resources={},fallback=true,maxSurveySteps=256,pathBudget=4096,returnMargin=8,fuelTarget=1000},
   allowedMiningBlocks={['minecraft:stone']=true,['minecraft:deepslate']=true,
     ['minecraft:cobblestone']=true,['minecraft:cobbled_deepslate']=true,
     ['minecraft:granite']=true,['minecraft:diorite']=true,['minecraft:andesite']=true,
@@ -33,7 +33,7 @@ local function merge(dst,src)
     assert(dst[k]~=nil or k=='controllerId' or k=='initialPosition' or k=='depot' or k=='label' or k=='entry' or k=='bounds', 'Unknown config key: '..tostring(k))
     if type(v)=='table' and type(dst[k])=='table' then
       -- These maps/lists are user-defined rather than schema objects.
-      if k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
+      if k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
         or k=='furnaces' or k=='turtleFuelReserveItems' or k=='treeFarms' or k=='farms' or k=='depotExpansion' then dst[k]=U.copy(v)
       else merge(dst[k],v) end
     else dst[k]=U.copy(v) end
@@ -74,6 +74,7 @@ function M.load(overrides)
   assert(U.integer(c.scanner.radius) and c.scanner.radius>=1 and c.scanner.radius<=16,'scanner radius must be 1..16')
   assert(c.scanner.maxCost==0,'Milestone 2 uses free scans to preserve return fuel')
   assert(type(c.mining.enabled)=='boolean' and type(c.mining.fallback)=='boolean','invalid mining mode')
+  assert(require('autobuilder.resources.materials').validResources(c.mining.resources),'invalid mining resources')
   for _,k in ipairs({'maxSurveySteps','pathBudget','returnMargin','fuelTarget'}) do assert(U.integer(c.mining[k]) and c.mining[k]>0,'invalid mining '..k) end
   if c.mining.enabled then
     assert(c.depot and U.position(c.mining.entry),'mining requires depot and entry coordinates')

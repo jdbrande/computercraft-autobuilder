@@ -94,3 +94,34 @@ test('miner replans a cached route around a newly obstructed cell',function()
   eq(w.pose.x,2); w.blocks['3,0,0']='minecraft:bedrock'
   assert(run(m,w)); eq(w.stock['minecraft:raw_iron'],1); eq(w.blocks['3,0,0'],'minecraft:bedrock')
 end)
+
+test('miner reserves destination before digging and resumes after reservation is granted',function()
+  for _,target in ipairs({{x=2,y=0,z=0},{x=1,y=1,z=0},{x=1,y=-1,z=0}}) do
+    local w=W.new(); w.pose.x=1
+    local key=require('autobuilder.core.pathfinding').key(target); w.blocks[key]='minecraft:iron_ore'
+    local task={id='mine:reserve',item='minecraft:raw_iron',quantity=1,phase='work',target=target,trail={{x=0,y=0,z=0},{x=1,y=0,z=0}}}
+    local _,pose,c=setup(w,task)
+    local nav=require('autobuilder.core.navigation').new(w.turtle,pose,c,function() return true end)
+    local granted=false
+    nav.guard=function(_,to) eq(to.x,target.x); eq(to.y,target.y); eq(to.z,target.z); return granted,'movement reservation pending' end
+    local inv=require('autobuilder.storage.inventory').new(w.turtle,{reservedSlots={15,16}})
+    local scan={invalidate=function() end}
+    local miner=require('autobuilder.resources.miner').new(task,{turtle=w.turtle},c,nav,inv,scan,function() return true end,function() return 0 end)
+    assert(not miner:step()); eq(w.blocks[key],'minecraft:iron_ore'); eq(#w.dug,0); eq(task.phase,'blocked')
+    granted=true; assert(miner:resume()); assert(miner:step())
+    eq(w.blocks[key],nil); eq(#w.dug,1); eq(pose.x,target.x); eq(pose.y,target.y)
+  end
+end)
+
+test('fallback survey covers northward rows and westward rows from either entry corner',function()
+  for _,case in ipairs({
+    {entry={x=1,y=0,z=2},ore={x=5,y=1,z=-1}},
+    {entry={x=8,y=0,z=-2},ore={x=4,y=1,z=1}},
+  }) do
+    local w=W.new(); w.peripheral.getType=function() return nil end
+    local key=require('autobuilder.core.pathfinding').key(case.ore); w.blocks[key]='minecraft:iron_ore'
+    local m,_,c=setup(w,{id='mine:corners',item='minecraft:raw_iron',quantity=1})
+    c.mining.entry=case.entry
+    assert(run(m,w,700)); eq(w.stock['minecraft:raw_iron'],1)
+  end
+end)

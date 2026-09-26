@@ -166,9 +166,12 @@ function M.new(config,e)
   function self:command(line)
     line=line:match('^%s*(.-)%s*$')
     local called,ok,result=pcall(function()
-      if line=='setup' or line=='7' then
+      if line=='setup' or line=='7' or line:match('^setup%s') then
         if self.busy then return false,'Wait for the current turtle step to finish, then type setup again.' end
-        self.nextProgram='setup'; self.quitRequested=true; return true,'Opening setup. Current progress stays saved.'
+        self.nextProgram='setup'; self.nextProgramArgs={}
+        local words={}; for word in line:gmatch('%S+') do words[#words+1]=word end
+        for i=2,#words do self.nextProgramArgs[#self.nextProgramArgs+1]=words[i] end
+        self.quitRequested=true; return true,'Opening setup. Current progress stays saved.'
       end
       if self.firstBuild then local a,b=self.firstBuild:command(line); if a~=nil then return a,b end end
       line=({['5']='workers',['6']='jobs'})[line] or line

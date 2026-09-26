@@ -1,4 +1,5 @@
 local U=require('autobuilder.core.util')
+local Materials=require('autobuilder.resources.materials')
 local M={}
 function M.new(app,config,e,network,clock)
   local s=app.state; local self={}; local lastSend=-math.huge; local lastStorage=-math.huge
@@ -38,7 +39,68 @@ function M.new(app,config,e,network,clock)
       elseif args[1]=='workers' or args[1]=='status' then s.view='workers'; return true,'worker status' end
       return false,'Commands: mine <item> <count>, jobs, resources, workers, resume <jobId>'
     end
+    function self:retireCompleted()
+      -- A completion packet may be retransmitted until its acknowledgement arrives.
+      -- Retain its whole supplement chain until newer worker telemetry proves every
+      -- physical owner has cleared the task, and production no longer references it.
+      local referenced={}
+      for _,request in pairs((s.automation or {}).requests or {}) do
+        for _,id in pairs(request.mines or {}) do referenced[id]=true end
+      end
+      for _,job in pairs(s.jobs) do
+        if job.status~='completed' then
+          for _,id in ipairs(job.dependencies or {}) do referenced[id]=true end
+        end
+      end
+      local stamped,removed,visited={},{},{}
+      local now=clock(); local count=0
+      for id,job in pairs(s.jobs) do
+        if job.status=='completed' and not job.completedAt then
+          job.completedAt=now; stamped[#stamped+1]=job
+        end
+      end
+      for id in pairs(s.jobs) do
+        if not visited[id] then
+          local pending={id}; local chain={}; local eligible=true
+          while #pending>0 do
+            local current=table.remove(pending)
+            if not visited[current] then
+              visited[current]=true
+              local job=s.jobs[current]
+              if not job then eligible=false
+              else
+                chain[#chain+1]=job
+                if referenced[current] or job.status~='completed' or not job.completedAt or now<=job.completedAt then eligible=false end
+                if job.workerId then
+                  local worker=s.workers[tostring(job.workerId)]
+                  if not job.physicalComplete or not worker or not worker.online or not worker.telemetry
+                    or not U.finite(worker.lastSeen) or not job.completedAt or worker.lastSeen<=job.completedAt
+                    or worker.telemetry.task==job.id then eligible=false end
+                end
+                if job.parent then pending[#pending+1]=job.parent end
+                if job.childId then pending[#pending+1]=job.childId end
+              end
+            end
+          end
+          -- Limit checkpoint churn for a controller upgraded with a large history.
+          if eligible and count+#chain<=64 then
+            for _,job in ipairs(chain) do removed[job.id]=job; count=count+1 end
+          end
+        end
+      end
+      if count>0 or #stamped>0 then
+        for id in pairs(removed) do s.jobs[id]=nil end
+        local ok,err=save()
+        if not ok then
+          for id,job in pairs(removed) do s.jobs[id]=job end
+          for _,job in ipairs(stamped) do job.completedAt=nil end
+          return false,err
+        end
+      end
+      return true,count
+    end
     function self:tick()
+      local retired,why=self:retireCompleted(); if not retired then return false,why end
       if #config.storageInventories>0 and clock()-lastStorage>=config.checkpointInterval then self:refresh() end
       if not self.storage.valid then return true end
       if s.assignmentRecovery then return true end
@@ -46,7 +108,7 @@ function M.new(app,config,e,network,clock)
       local job=self.jobs:assign(s.workers,self.storage.counts)
       if job then
         lastSend=clock()
-        send(job.workerId,'mine_assign',{jobId=job.id,item=job.item,quantity=job.quantity,miningArea=job.miningArea})
+        send(job.workerId,'mine_assign',{jobId=job.id,item=job.item,quantity=job.quantity,miningArea=job.miningArea,miningResources=job.miningResources})
       end
       return true
     end
@@ -64,6 +126,12 @@ function M.new(app,config,e,network,clock)
       end
       local ok,err=self.jobs:progress(sender,m.payload,stock)
       if not ok then return false,err end
+      local completed=s.jobs[m.payload.jobId]; local stamped=false
+      while completed and completed.status=='completed' do
+        if not completed.completedAt then completed.completedAt=clock(); stamped=true end
+        completed=completed.parent and s.jobs[completed.parent]
+      end
+      if stamped then local saved,why=save(); if not saved then return false,why end end
       if s.jobs[m.payload.jobId].physicalComplete or s.jobs[m.payload.jobId].status=='completed' then return send(sender,'mine_ack',{jobId=m.payload.jobId}) end
       return true
     end
@@ -87,18 +155,21 @@ function M.new(app,config,e,network,clock)
       if not config.mining.enabled then return false,'mining disabled on worker' end
       local p=m.payload
       if m.type=='mine_assign' then
+        if not Materials.accepts(config.mining.resources,p.item) then return false,'assigned item is outside configured mining resources' end
+        if p.miningResources~=nil and not Materials.sameResources(p.miningResources,config.mining.resources) then return false,'assigned mining resources differ from local config' end
         if s.completedMining[p.jobId] then
           return send(sender,'mine_progress',{jobId=p.jobId,phase='completed',delivered=s.completedMining[p.jobId],held=0})
         end
+        if require('autobuilder.core.receipts').archived(s,'completedMining',p.jobId) then return false,'Old acknowledged mine was archived; restore the matching controller checkpoint' end
         if s.currentTask then
           if s.currentTask.id==p.jobId and s.currentTask.item==p.item and s.currentTask.quantity==p.quantity then return true end
           return false,'worker already owns a different task'
         end
-        s.currentTask={id=p.jobId,type='MINE',item=p.item,quantity=p.quantity,phase='setup',delivered=0,miningArea=U.copy(p.miningArea)}
+        s.currentTask={id=p.jobId,type='MINE',item=p.item,quantity=p.quantity,phase='setup',delivered=0,miningArea=U.copy(p.miningArea),miningResources=U.copy(p.miningResources or config.mining.resources or {})}
         s.status='setup'; save(); return true
       elseif m.type=='mine_ack' then
         if s.currentTask and s.currentTask.id==p.jobId and s.currentTask.phase=='completed' then
-          s.completedMining[p.jobId]=s.currentTask.delivered; s.currentTask=nil; self.miner=nil; s.status='idle'; save(); return true
+          require('autobuilder.core.receipts').record(s,'completedMining',p.jobId,s.currentTask.delivered); s.currentTask=nil; self.miner=nil; s.status='idle'; save(); return true
         end
         return false,'unexpected job acknowledgement'
       elseif m.type=='mine_resume' and s.currentTask and s.currentTask.id==p.jobId then
@@ -124,6 +195,11 @@ function M.new(app,config,e,network,clock)
     end
     function self:step()
       if not config.mining.enabled or not s.currentTask or s.currentTask.phase=='completed' then return true end
+      if not Materials.accepts(config.mining.resources,s.currentTask.item)
+        or s.currentTask.miningResources~=nil and not Materials.sameResources(s.currentTask.miningResources,config.mining.resources) then
+        if s.currentTask.phase~='blocked' then s.currentTask.resumePhase=s.currentTask.phase end
+        s.currentTask.phase='blocked'; s.currentTask.error='Assigned mining resources differ from local config; restore original resources'; save(); return true
+      end
       if s.currentTask.miningArea then
         for _,edge in ipairs({'min','max'}) do for _,axis in ipairs({'x','y','z'}) do
           if s.currentTask.miningArea[edge][axis]~=config.mining.bounds[edge][axis] then

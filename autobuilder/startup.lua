@@ -9,7 +9,7 @@ local ok,err=pcall(function()
     local config=require('autobuilder.config').load(require('autobuilder.settings'))
     local app=require('autobuilder.core.runtime').run(config)
     if app.nextProgram~='setup' then return end
-    shell.run('/autobuilder/setup.lua','--menu')
+    shell.run('/autobuilder/setup.lua','--menu',table.unpack(app.nextProgramArgs or {}))
     assert(not fs.exists('/.autobuilder-install/transaction'),'Setup recovery required: run /installer.lua --recover')
   end
 end)

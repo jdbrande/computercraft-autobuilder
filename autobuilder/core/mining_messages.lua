@@ -5,6 +5,7 @@ local phases={setup=true,travel=true,work=true,['return']=true,unload=true,block
 function M.validate(kind,p)
   if not U.shortString(p.jobId,100) then return false,'invalid job ID' end
   if kind=='mine_assign' then
+    if not Materials.validResources(p.miningResources) then return false,'invalid assigned mining resources' end
     if not Materials.get(p.item) or not U.integer(p.quantity) or p.quantity<1 or p.quantity>1000000 then return false,'invalid mining assignment' end
     if p.miningArea then
       if type(p.miningArea)~='table' or not U.position(p.miningArea.min) or not U.position(p.miningArea.max) then return false,'invalid assigned mining area' end
@@ -21,7 +22,7 @@ end
 function M.clean(kind,p)
   local out={jobId=p.jobId}
   if kind=='mine_assign' then
-    out.item=p.item; out.quantity=p.quantity
+    out.item=p.item; out.quantity=p.quantity; out.miningResources=U.copy(p.miningResources)
     if p.miningArea then out.miningArea={min={x=p.miningArea.min.x,y=p.miningArea.min.y,z=p.miningArea.min.z},max={x=p.miningArea.max.x,y=p.miningArea.max.y,z=p.miningArea.max.z}} end
   elseif kind=='mine_progress' then out.phase=p.phase; out.delivered=p.delivered; out.held=p.held; out.error=p.error; out.assignedQuantity=p.assignedQuantity end
   return out

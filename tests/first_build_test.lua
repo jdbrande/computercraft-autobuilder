@@ -183,6 +183,8 @@ test('guide menu explains first build, preserves worker list and opens setup onl
   local screen=table.concat(f.ce.screen,'\n'); assert(screen:find('2 Start') and screen:find('7 Setup'))
   assert(f.c:command('5')); eq(f.c.state.view,'workers')
   assert(f.c:command('setup')); eq(f.c.nextProgram,'setup'); eq(f.c.quitRequested,true)
+  assert(f.c:command('setup factory')); eq(f.c.nextProgramArgs[1],'factory')
+  assert(f.b:command('setup miner stone,coal')); eq(f.b.nextProgramArgs[1],'miner'); eq(f.b.nextProgramArgs[2],'stone,coal')
   local ok,err=f.b:command('2'); eq(ok,false); assert(err:find('controller 1'))
   eq(f.world.places,0)
 end)
@@ -216,13 +218,14 @@ test('startup ends the old runtime before setup and reloads saved settings on re
     elseif name=='autobuilder.config' then return {load=function(v) return v end}
     elseif name=='autobuilder.core.runtime' then return {run=function(c)
       runs=runs+1
-      if runs==1 then eq(c.version,'old'); eq(setups,0); return {nextProgram='setup'} end
+      if runs==1 then eq(c.version,'old'); eq(setups,0); return {nextProgram='setup',nextProgramArgs={'miner','sand'}} end
       eq(runs,2); eq(setups,1); eq(c.version,'new'); return {}
     end} end
     error(name)
   end
-  e.shell={run=function(path,arg)
+  e.shell={run=function(path,arg,role,resource)
     eq(runs,1); eq(path,'/autobuilder/setup.lua'); eq(arg,'--menu')
+    eq(role,'miner'); eq(resource,'sand')
     setups=setups+1; value={version='new'}; return true
   end}
   setmetatable(e,{__index=_G}); assert(load(source,'@startup.lua','t',e))()

@@ -1,9 +1,18 @@
-# Classic cathedral: simplified section plan
+# Classic cathedral: simplified construction data
+
+Release **0.11.0** adds `cathedral start X Y Z` for the full simplified structure.
+Use the [material-team setup guide](../../docs/material-team.md) first. The new
+`stream/index.json` points to 56 index pages and 7,116 small layer-ordered chunks;
+the controller caches one page and chunk at a time. It gathers each batch's missing
+materials and verifies the batch before continuing. A clear full-size site,
+reachable supply depot, material sources and factory hardware are required.
+The full workflow has not yet completed a live Minecraft acceptance run.
 
 The supplied `classic-cathedral.schem` has been preserved locally. This folder
 contains an explicitly simplified approximation for testing and further planning.
-**Only the small pilot below is the initial in-game test target. The 299 full
-sections are not an unattended whole-cathedral build.**
+The small pilot below is the initial in-game test target. The 299 legacy 32-cube
+sections are converter output; use the new streaming command for whole-project
+ordering rather than importing those sections in their old order.
 
 | Measurement | Original | Simplified plan |
 | --- | ---: | ---: |

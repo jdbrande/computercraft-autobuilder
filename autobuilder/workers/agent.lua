@@ -11,6 +11,7 @@ function M.new(state,config,network,turtle,save)
     return {label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,
       position={known=p.known==true,x=p.x,y=p.y,z=p.z,heading=p.heading,source=p.source or 'unknown'},
       fuel=turtle.getFuelLevel(),inventory={used=used,slots=16},
+      miningResources=config.mining and config.mining.enabled and U.copy(config.mining.resources or {}) or nil,
       miningArea=config.mining and config.mining.enabled and U.copy(config.mining.bounds) or nil,
       capabilities=U.copy(config.capabilities or {telemetry=true}),task=state.currentTask and tostring(state.currentTask.id)}
   end

@@ -1,5 +1,13 @@
 # Parallel mining areas
 
+For guided setup, use `setup miner stone,coal`, `setup miner sand`, or
+`setup miner clay` on different turtles. Follow the [material-team guide](material-team.md).
+Optional `mining.resources={'minecraft:cobblestone','minecraft:coal'}` restricts a
+worker to those requested drops. Empty or omitted resources means unrestricted.
+The controller matches each missing resource to an eligible worker and preserves
+that resource restriction with its durable assignment. A changed worker profile
+does not silently redirect an already owned job.
+
 Multiple miners can work concurrently when each worker advertises a configured
 mining box that does not overlap any active mine. Configure separate
 `mining.bounds = { min={x=...,y=...,z=...}, max={x=...,y=...,z=...} }` boxes and valid

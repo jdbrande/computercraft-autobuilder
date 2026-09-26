@@ -32,6 +32,13 @@ test('disjoint advertised mining areas receive concurrent distinct jobs',functio
   workers['12'].telemetry.miningArea.max.x=25
   eq(a.miningArea.max.x,8,'assignment bounds must not alias live telemetry')
 end)
+test('a paused material request does not dispatch a newly created shortfall supplement',function()
+  local queue,state,workers,a,b=fixture(); queue:assign(workers)
+  a.paused=true; b.paused=true
+  assert(queue:progress(12,{jobId=a.id,phase='completed',delivered=8,held=0},4))
+  local child=state.jobs[a.childId]; assert(child and child.paused)
+  eq(queue:assign(workers),nil)
+end)
 
 test('overlapping mining boxes including a shared boundary cannot run together',function()
   local queue,_,workers,a,b=fixture(); workers['13'].telemetry.miningArea=area(8,20)
@@ -113,4 +120,39 @@ test('invalid mining bounds are rejected instead of claiming an unchecked area',
   local recovered=queue:submit('minecraft:raw_gold',2,0)
   workers['12'].telemetry.task=recovered.id
   assert(not queue:recoverOwner(12,{jobId=recovered.id,assignedQuantity=2},workers))
+end)
+
+test('specialized miners concurrently receive only their configured resources',function()
+  local queue,_,workers,a,b,saved=fixture()
+  workers['12'].telemetry.miningResources={'minecraft:coal'}
+  workers['13'].telemetry.miningResources={'minecraft:raw_iron'}
+  eq(queue:assign(workers).id,a.id); eq(a.workerId,13)
+  eq(queue:assign(workers).id,b.id); eq(b.workerId,12)
+  eq(saved().jobs[a.id].miningResources[1],'minecraft:raw_iron')
+  workers['13'].telemetry.miningResources[1]='minecraft:coal'
+  eq(a.miningResources[1],'minecraft:raw_iron')
+end)
+
+test('ineligible or malformed mining resource lists do not take queued work or recover it',function()
+  local queue,_,workers,a,b=fixture()
+  workers['12'].telemetry.miningResources={'minecraft:sand'}
+  workers['13'].telemetry.miningResources={['minecraft:raw_iron']=true}
+  eq(queue:assign(workers),nil); eq(a.workerId,nil); eq(b.workerId,nil)
+  workers['12'].telemetry.task=a.id
+  assert(not queue:recoverOwner(12,{jobId=a.id,assignedQuantity=8},workers))
+  workers['12'].telemetry.task=nil; workers['12'].telemetry.miningResources={}
+  eq(queue:assign(workers).id,a.id); eq(a.workerId,12)
+end)
+
+test('mining resources config validates registered dense distinct item names and advertises copies',function()
+  local C=require('autobuilder.config')
+  local c=C.load({mining={resources={'minecraft:sand','minecraft:cobblestone'}}})
+  c.mining.enabled=true; c.mining.bounds=area(0,8)
+  local agent=require('autobuilder.workers.agent').new({id=12,position={known=false}},c,{},require('tests.support').turtle(),function() return true end)
+  local telemetry=agent:telemetry(); eq(telemetry.miningResources[1],'minecraft:sand')
+  telemetry.miningResources[1]='minecraft:dirt'; eq(c.mining.resources[1],'minecraft:sand')
+  c.mining.enabled=false; eq(agent:telemetry().miningResources,nil)
+  for _,bad in ipairs({'minecraft:coal',{'minecraft:iron_ore'},{'minecraft:coal','minecraft:coal'},{[2]='minecraft:coal'},{coal=true}}) do
+    assert(not pcall(C.load,{mining={resources=bad}}))
+  end
 end)

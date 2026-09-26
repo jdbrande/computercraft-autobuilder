@@ -47,12 +47,47 @@ function M.container(t,side)
   if not found or not containers[b.name] then return nil,'expected supply/cargo container is missing; refusing world transfer' end
   return suffix
 end
+-- Leaving an underside/side stand may require stepping out from under its
+-- support first. Inspect adjacent cells and persist the selected waypoint with
+-- the ordinary route; movement still uses navigation's reservations/protection.
+function M.overheadPoints(task,nav,turtle,config,target,height)
+  local pose=nav.pose; local departure=pose; local points={}
+  if turtle and turtle.inspectUp and pose.y<height then
+    local ok,occupied=pcall(turtle.inspectUp)
+    if not ok then return nil,'cannot inspect construction departure clearance' end
+    if occupied then
+      local directions={{heading='west',x=-1,z=0},{heading='east',x=1,z=0},{heading='north',x=0,z=-1},{heading='south',x=0,z=1}}
+      for _,direction in ipairs(directions) do
+        local candidate={x=pose.x+direction.x,y=pose.y,z=pose.z+direction.z}; local protected=false
+        for _,area in ipairs((config or {}).restrictedAreas or {}) do
+          if candidate.x>=area.min.x and candidate.x<=area.max.x and candidate.y>=area.min.y and candidate.y<=area.max.y
+            and candidate.z>=area.min.z and candidate.z<=area.max.z then protected=true end
+        end
+        if not protected then
+          local faced,why=nav:face(direction.heading); if not faced then return nil,why end
+          local inspected,blocked=pcall(turtle.inspect)
+          if not inspected then return nil,'cannot inspect construction escape cell' end
+          if not blocked then departure=candidate; points[#points+1]=candidate; break end
+        end
+      end
+      if departure==pose then return nil,'No clear unprotected side exit from construction stand; leave nearby blocks intact.' end
+    end
+  end
+  points[#points+1]={x=departure.x,y=height,z=departure.z}
+  points[#points+1]={x=target.x,y=height,z=target.z}
+  points[#points+1]={x=target.x,y=target.y,z=target.z}
+  return points
+end
 -- Persist the route stages: reservation waits must not restart an overhead ascent.
-function M.travel(s,task,nav,target,save)
+function M.travel(s,task,nav,target,save,turtle,config)
   if not U.position(target) then return false,'depot/transport position is not configured' end
   if not s.route then
     local pose=nav.pose
     if not pose or not pose.known or pose.pending or pose.uncertain then return false,'trusted position required for logistics' end
+    if U.distance(pose,target)==0 then
+      if target.heading then return nav:face(target.heading) end
+      return true
+    end
     local y=math.max(pose.y,target.y)+2
     -- Construction already defines an overhead corridor. Stay within it when
     -- returning for materials, including when a previous step ended up there.
@@ -61,9 +96,11 @@ function M.travel(s,task,nav,target,save)
     end
     for _,b in ipairs(task.blocks or {}) do y=math.max(y,b.y+2) end
     if U.finite(task.clearanceY) then y=math.max(y,task.clearanceY) end
-    s.route={index=1,points={{x=pose.x,y=y,z=pose.z},{x=target.x,y=y,z=target.z},{x=target.x,y=target.y,z=target.z}}}; save()
+    local points,why=M.overheadPoints(task,nav,turtle,config,target,y)
+    if not points then return false,why end
+    s.route={index=1,points=points}; save()
   end
-  while s.route.index<=3 do
+  while s.route.index<=#s.route.points do
     local ok,err=nav:goTo(s.route.points[s.route.index]); if not ok then return false,err end
     s.route.index=s.route.index+1; save()
   end
@@ -91,9 +128,17 @@ function M.new(task,e,config,nav,save)
     if s.received>=s.amount then
       task.lastSupply={item=s.item,count=s.received}; task.supplyRequest=nil; task.resupply=nil; persist(); return true
     end
-    local ok,err=M.travel(s,task,nav,config.depot,persist); if not ok then return false,err end
+    local ok,err=M.travel(s,task,nav,config.depot,persist,t,config); if not ok then return false,err end
     local suffix,why=M.container(t,(config.supply or {}).side or 'front'); if not suffix then return false,why end
-    local slot,space=M.slot(t,config,s.item); if not slot then return false,'inventory full before resupply' end
+    local slot,space
+    if r.fuel then
+      assert(s.item=='minecraft:coal','invalid construction fuel supply item')
+      local held=t.getItemDetail(15)
+      assert(not held or held.name==s.item and not held.nbt,'Empty slot 15 before accepting fuel; foreign or NBT-tagged item present')
+      slot=15; space=held and t.getItemSpace and t.getItemSpace(15) or 1
+      if space<=0 then return false,'reserved fuel slot 15 is full' end
+    else slot,space=M.slot(t,config,s.item) end
+    if not slot then return false,'inventory full before resupply' end
     local limit=math.min(space,s.amount-s.received)
     assert(t.select(slot),'cannot select supply slot')
     s.intent={kind='suck',slot=slot,item=s.item,limit=limit,before=M.snapshot(t)}; persist()

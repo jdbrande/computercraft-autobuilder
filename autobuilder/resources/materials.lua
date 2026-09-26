@@ -23,6 +23,31 @@ add('diorite',{'diorite'},16)
 add('andesite',{'andesite'},16)
 add('netherrack',{'netherrack'},64)
 add('quartz',{'nether_quartz_ore'},64)
+-- Missing and empty lists preserve unrestricted legacy miners. Reject sparse
+-- arrays and maps so a malformed advertisement cannot silently become unrestricted.
+function M.validResources(resources)
+  if resources==nil then return true end
+  if type(resources)~='table' then return false end
+  local count,seen=0,{}
+  for k,item in pairs(resources) do
+    if type(k)~='number' or k%1~=0 or k<1 or k>64 or type(item)~='string' or not registry[item] or seen[item] then return false end
+    count=count+1; seen[item]=true
+  end
+  for i=1,count do if resources[i]==nil then return false end end
+  return true
+end
+function M.accepts(resources,item)
+  if not M.validResources(resources) then return false end
+  if not resources or #resources==0 then return true end
+  for _,name in ipairs(resources) do if name==item then return true end end
+  return false
+end
+function M.sameResources(a,b)
+  if not M.validResources(a) or not M.validResources(b) then return false end
+  if #(a or {})~=#(b or {}) then return false end
+  for _,name in ipairs(a or {}) do if not M.accepts(b,name) then return false end end
+  return true
+end
 function M.get(item) return registry[item] end
 function M.all() return registry end
 return M

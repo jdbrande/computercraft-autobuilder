@@ -76,6 +76,23 @@ function M.new(app,config,e,queue,production)
     p.total=mode=='VERIFY' and a.volume or mode=='CLEAR' and a.airCount or #a.blocks
     p.generation=p.generation+1; p.cursor=1; p.jobs={}; p.regionJobs={}; p.completed=0; p.report={counts={},entries={}}
   end
+  local function pauseProduction(p,paused)
+    local r=p.requestId and s.requests[p.requestId]; if not r then return end
+    r.paused=paused
+    for _,id in pairs(r.mines or {}) do
+      local j=(app.state.jobs or {})[id]
+      -- Assigned miners return safely; pause prevents claiming a new tunnel.
+      local seen={}
+      while j and not seen[j.id] do
+        seen[j.id]=true; j.paused=paused; j=j.childId and app.state.jobs[j.childId]
+      end
+    end
+    for _,j in pairs(s.jobs) do
+      if j.key and j.key:sub(1,#r.id+1)==r.id..':' then
+        j.paused=paused; if not paused then j.resumeRequested=true end
+      end
+    end
+  end
   function self:command(args,importTransform)
     local action=args[2]; local name=args[3]
     if action=='import' then
@@ -94,10 +111,12 @@ function M.new(app,config,e,queue,production)
     if action=='status' then return true,p.name..': '..p.phase..' '..(p.completed or 0)..'/'..(p.total or 0)..' blocks' end
     if action=='pause' then
       p.paused=true
+      pauseProduction(p,true)
       for _,id in ipairs(p.jobs) do local j=s.jobs[id]; if j and j.status~='completed' then j.paused=true end end
       save(); return true,'Paused '..p.name
     elseif action=='resume' then
       p.paused=false
+      pauseProduction(p,false)
       for _,id in ipairs(p.jobs) do local j=s.jobs[id]; if j then j.paused=false; j.resumeRequested=true end end
       save(); return true,'Resuming '..p.name
     end
@@ -112,11 +131,13 @@ function M.new(app,config,e,queue,production)
       return true,p.name..': '..#a.blocks..' blocks, '..#a.regions..' regions, '..#a.issues..' unsupported entries; materials saved in project analysis'
     end
     assert(#a.issues==0,'Unsupported palette or entity data; inspect build analyze before unattended work')
-    if action=='prepare' then
+    if action=='prepare' or action=='auto' then
+      assert(not ({building=true,clearing=true,verifying=true,repairing=true})[p.phase],'Project is already active; use pause/resume')
+      if action=='auto' then p.autoStart=true end
       if not next(a.requirements) then
         p.preparedEmpty=true; p.requestId=nil; p.phase='ready'; save(); return true,'No materials required'
       end
-      local r=production:request(a.requirements,'project:'..p.name); p.requestId=r.id; p.phase='preparing'; save(); return true,r.id
+      local r=production:request(a.requirements,'project:'..p.name,{projectName=p.name}); p.requestId=r.id; p.phase='preparing'; save(); return true,r.id
     elseif action=='start' or action=='verify' or action=='repair' or action=='clear' then
       assert(config.build.enabled,'Set build.enabled=true and configure the build origin first')
       for _,id in ipairs(p.jobs) do assert(s.jobs[id].status=='completed','Project still owns unfinished tasks; pause/resume instead') end
@@ -129,13 +150,25 @@ function M.new(app,config,e,queue,production)
       p.nextMode=nil; p.afterBuild=nil; p.paused=false
       if config.clearSite and a.airCount>0 and (action=='start' or action=='repair') then p.nextMode=mode; mode='CLEAR' end
       beginPhase(p,mode,a)
+      p.autoStart=nil
       save(); return true,p.phase..' '..p.name
     end
-    return false,'build import|analyze|materials|simulate|prepare|start|status|pause|resume|verify|repair|clear [name]'
+    return false,'build import|analyze|materials|auto|prepare|start|status|pause|resume|verify|repair|clear [name]'
   end
   function self:tick()
+    if s.retiredBlueprints and #s.retiredBlueprints>0 then
+      -- Roll the backup forward before deleting imports referenced by the
+      -- previous checkpoint. A corrupt primary must not revive a missing file.
+      save()
+      for _,path in ipairs(s.retiredBlueprints) do if e.fs.exists(path) then e.fs.delete(path) end end
+      s.retiredBlueprints=nil; save()
+    end
     for _,p in pairs(s.projects) do
       if p.phase=='preparing' and s.requests[p.requestId].status=='completed' then p.phase='ready'; save() end
+      if p.phase=='ready' and p.autoStart and not p.paused then
+        local ok,err=pcall(self.command,self,{'build','start',p.name})
+        if not ok then p.error=tostring(err); save() else p.error=nil end
+      end
       if not p.paused and (p.phase=='building' or p.phase=='verifying' or p.phase=='repairing' or p.phase=='clearing') then
         local a=analysis(p); local active,done=0,0
         local regions=p.mode=='VERIFY' and a.verificationRegions or p.mode=='CLEAR' and a.airRegions or a.regions
@@ -179,6 +212,49 @@ function M.new(app,config,e,queue,production)
         end
       end
     end
+  end
+  function self:retire(name,advance)
+    local p=project(name)
+    assert(p.phase=='built' or p.phase=='verified','Only verified projects can be retired')
+    local remove,requests={},{}
+    if p.requestId then requests[p.requestId]=true end
+    for id,j in pairs(s.jobs) do
+      if j.project==name then
+        local prefix='supply:'..id..':'
+        for requestId,r in pairs(s.requests) do
+          if r.key and r.key:sub(1,#prefix)==prefix then requests[requestId]=true end
+        end
+      end
+    end
+    for id in pairs(requests) do
+      if s.requests[id] and s.requests[id].status~='completed' then return false,'Waiting for batch material/fuel production to finish' end
+    end
+    for id,j in pairs(s.jobs) do
+      local factory=false
+      for requestId in pairs(requests) do if j.key and j.key:sub(1,#requestId+1)==requestId..':' then factory=true end end
+      if j.project==name or factory then
+        if j.status~='completed' then return false,'Waiting for batch jobs to finish' end
+        if j.workerId then
+          local w=app.state.workers[tostring(j.workerId)]
+          if not w or not w.online or not j.completedAt or w.lastSeen<=j.completedAt or w.telemetry.task==id then
+            return false,'Waiting for turtle '..j.workerId..' to acknowledge its finished batch'
+          end
+        end
+        remove[id]=true
+      end
+    end
+    for id,j in pairs(s.jobs) do
+      if not remove[id] then for _,dep in ipairs(j.dependencies or {}) do if remove[dep] then return false,'Another job still depends on this batch' end end end
+    end
+    for id in pairs(remove) do s.jobs[id]=nil end
+    for id in pairs(requests) do s.requests[id]=nil end
+    s.projects[name]=nil; cache[name]=nil
+    if s.currentProject==name then s.currentProject=nil end
+    s.retiredBlueprints=s.retiredBlueprints or {}; s.retiredBlueprints[#s.retiredBlueprints+1]=p.path
+    -- Commit the stream cursor and removal in the same checkpoint. Never leave
+    -- a cursor pointing to a deleted project if the computer stops here.
+    if advance then advance() else save() end
+    return true
   end
   return self
 end

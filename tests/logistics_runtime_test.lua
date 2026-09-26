@@ -275,3 +275,98 @@ test('released supply batch tombstones survive a crash after the release checkpo
   eq(s:offer('task:7:1:supply:1',12,'minecraft:stone',1),nil); eq(f.stats.staged,1)
   eq(s:offer('task:7:1:supply:2',12,'minecraft:stone',1),1); eq(f.stats.staged,2)
 end)
+
+local function finiteBuilder(f,fuel)
+  local w=f.world; w.fuel=fuel; w.refuels=0
+  w.turtle.getFuelLevel=function() return w.fuel end
+  w.turtle.getFuelLimit=function() return 20000 end
+  w.turtle.refuel=function(n)
+    eq(w.selected,15); local item=assert(w.items[15]); eq(item.name,'minecraft:coal_block')
+    w.refuels=w.refuels+n; w.fuel=w.fuel+n*800; item.count=item.count-n
+    if item.count==0 then w.items[15]=nil end; return true
+  end
+  for _,name in ipairs({'forward','back','up','down'}) do
+    local move=w.turtle[name]
+    if move then w.turtle[name]=function() local ok,err=move(); if ok then w.fuel=w.fuel-1 end; return ok,err end end
+  end
+end
+test('far construction refuels for its full return envelope and verifies without repeating a short depot trip',function()
+  local f=fixture(); finiteBuilder(f,1000)
+  f.world.items[1]={name='minecraft:stone',count=1}; f.world.items[15]={name='minecraft:coal_block',count=64}
+  local block={x=384,y=0,z=224,name='minecraft:stone',state={}}
+  local build=f.controller.automation.queue:submit('BUILD',{blocks={block},clearanceY=2},{})
+  for _=1,1500 do f:step(); if build.status=='completed' and not f.worker.state.currentTask then break end end
+  local task=f.worker.state.currentTask
+  assert(build.status=='completed',task and tostring(task.error) or build.status)
+  eq(f.world.refuels,1); eq(f.world.places,1)
+  assert(f.world.fuel>=U.distance(f.world.pose,f.worker.config.depot),'return fuel must remain after distant placement')
+  local verify=f.controller.automation.queue:submit('VERIFY',{blocks={block},clearanceY=2},{})
+  for _=1,60 do f:step(); if verify.status=='completed' and not f.worker.state.currentTask then break end end
+  eq(verify.status,'completed'); eq(verify.progress,1)
+  local home=f.controller.automation.queue:submit('RETURN_HOME',{}, {})
+  for _=1,1500 do f:step(); if home.status=='completed' and not f.worker.state.currentTask then break end end
+  eq(home.status,'completed'); eq(f.world.pose.x,0); eq(f.world.pose.z,0); eq(f.world.refuels,1)
+end)
+test('explicit construction travel limits block the task before consuming fuel or moving',function()
+  local f=fixture(); finiteBuilder(f,1000); f.worker.config.maxTravelDistance=256
+  f.world.items[1]={name='minecraft:stone',count=1}; f.world.items[15]={name='minecraft:coal_block',count=64}
+  f.controller.automation.queue:submit('BUILD',{blocks={{x=384,y=0,z=224,name='minecraft:stone',state={}}},clearanceY=2},{})
+  for _=1,10 do f:step(); if f.worker.state.currentTask and f.worker.state.currentTask.phase=='blocked' then break end end
+  local task=assert(f.worker.state.currentTask)
+  assert(task.error and task.error:find('maxTravelDistance',1,true),tostring(task.error))
+  eq(f.world.fuel,1000); eq(f.world.refuels,0); eq(f.world.pose.x,0); eq(f.world.pose.z,0)
+end)
+test('construction replenishes reserved fuel through front supply and recovers a crash after the fuel pull',function()
+  local f=fixture(); finiteBuilder(f,994) -- Three coal reach the exact computed round-trip budget.
+  f.world.turtle.refuel=function(n)
+    local item=assert(f.world.items[15]); eq(item.name,'minecraft:coal'); eq(f.world.selected,15)
+    f.world.refuels=f.world.refuels+n; f.world.fuel=f.world.fuel+n*80; item.count=item.count-n
+    if item.count==0 then f.world.items[15]=nil end; return true
+  end
+  f.world.items[1]={name='minecraft:stone',count=1}; f.inventories.stock={[1]={name='minecraft:coal',count=16}}
+  f.worker.config.supply.side='front'; f.controller.config.supply.side='front'
+  f.world.blocks['1,2,0']={name='minecraft:chest',state={}}; f.world.turtle.suck=f.world.turtle.suckDown
+  f.crashSuck=true
+  local build=f.controller.automation.queue:submit('BUILD',{blocks={{x=384,y=0,z=224,name='minecraft:stone',state={}}},clearanceY=4},{})
+  local rebooted=false
+  for _=1,1800 do
+    f:step()
+    if f.crashed and not rebooted then f:reboot(false,true); rebooted=true end
+    if build.status=='completed' and not f.worker.state.currentTask then break end
+  end
+  assert(rebooted,'fuel must use the journaled supply pull')
+  local task=f.worker.state.currentTask
+  assert(build.status=='completed',task and tostring(task.error) or build.status)
+  eq(f.world.places,1); eq(f.stats.staged,3); eq(f.stats.pulled,3); eq(f.world.refuels,3)
+  eq(f.inventories.stock[1].count,13); eq(f.world.items[15],nil); eq(next(f.world.items),nil)
+  assert(f.world.fuel>=U.distance(f.world.pose,f.worker.config.depot))
+end)
+test('construction never replaces a foreign reserved fuel slot with supplied coal',function()
+  local f=fixture(); finiteBuilder(f,1000)
+  f.world.items[15]={name='minecraft:diamond',count=1}; f.inventories.stock={[1]={name='minecraft:coal',count=16}}
+  f.controller.automation.queue:submit('BUILD',{blocks={{x=384,y=0,z=224,name='minecraft:stone',state={}}},clearanceY=2},{})
+  for _=1,12 do f:step() end
+  local task=assert(f.worker.state.currentTask)
+  assert(task.error and task.error:find('slot 15',1,true),tostring(task.error))
+  eq(task.supplyRequest,nil); eq(f.stats.staged,0); eq(f.world.items[15].name,'minecraft:diamond')
+end)
+test('underside verification budgets its fallback descent and escapes safely for construction or return',function()
+  for _,following in ipairs({'RETURN_HOME','BUILD'}) do
+    local f=fixture(); finiteBuilder(f,246)
+    f.world.items[15]={name='minecraft:coal_block',count=1}; f.world.items[1]={name='minecraft:stone',count=1}
+    local slab={x=20,y=0,z=0,name='minecraft:stone_slab',state={type='top',waterlogged='false'}}
+    f.world.blocks['20,0,0']=U.copy(slab)
+    local verify=f.controller.automation.queue:submit('VERIFY',{blocks={slab},clearanceY=50},{})
+    for _=1,800 do f:step(); if verify.status=='completed' and not f.worker.state.currentTask then break end end
+    eq(verify.status,'completed'); eq(verify.progress,1)
+    assert(f.world.fuel>=119,'the underside stand requires 119 moves to return through clearance height')
+    local payload={clearanceY=50}
+    if following=='BUILD' then payload.blocks={{x=21,y=0,z=0,name='minecraft:stone',state={}}} end
+    local job=f.controller.automation.queue:submit(following,payload,{})
+    for _=1,800 do f:step(); if job.status=='completed' and not f.worker.state.currentTask then break end end
+    local task=f.worker.state.currentTask
+    assert(job.status=='completed',following..': '..(task and tostring(task.error) or job.status))
+    eq(f.world.digs,0); eq(f.world.refuels,1)
+    if following=='RETURN_HOME' then eq(f.world.pose.x,0); eq(f.world.pose.y,2) else eq(f.world.places,1) end
+  end
+end)
