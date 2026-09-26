@@ -53,7 +53,7 @@ function M.new(turtle,config)
         if found and containers[b.name] then turtle.select(slot); turtle.suckUp(64) end
       end
       local item=turtle.getItemDetail(slot)
-      if not item or not (config.fuelItems or {['minecraft:coal']=true,['minecraft:charcoal']=true})[item.name] then
+      if not item or not (config.fuelItems or {['minecraft:coal']=true,['minecraft:charcoal']=true,['minecraft:coal_block']=true})[item.name] then
         return false,'fuel supply missing in reserved slot or chest above depot'
       end
       turtle.select(slot)

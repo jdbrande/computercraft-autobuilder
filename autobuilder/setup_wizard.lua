@@ -148,20 +148,30 @@ local function controller(e,overrides,config)
     end
     if #names>0 then return names end
   end,#stocks==1 and stocks[1] or nil)
-  e.print('Step 2/3: choose the empty 8 x 8 test site')
+  e.print('Step 2/3: choose the 8 x 8 test site')
+  e.print('Press Enter for AUTO: the builder clears a small site behind its saved supply position.')
+  e.print('AUTO removes common terrain only. Chests, machines, ores and liquids stop it.')
+  e.print('Keep other turtles and players out of that area. Ground below the build stays in place.')
+  e.print('For a MANUAL site instead, enter three coordinates:')
   e.print('Choose its northwest corner: lowest x and z. It extends 7 east (+x), 7 south (+z).')
   e.print('Press F3 (or Fn+F3), point at the GROUND block at that corner, and read Targeted Block.')
   e.print('Use that x and z; add 1 to its y. Example: ground 20 63 -9 -> enter 20 64 -9.')
   e.print('This is the bottom layer of the build, not your player XYZ. Keep it and two blocks above clear.')
   e.print('Keep the depot/chests outside that square and leave a clear route from the turtle.')
-  local origin=ask(e,'Build corner: x y z',coordinate)
+  local choice=ask(e,'Build corner: auto OR x y z',function(value)
+    if value:lower()=='auto' then return 'auto' end
+    return coordinate(value)
+  end,'auto')
+  local automatic=choice=='auto'
+  local origin=automatic and U.copy(config.build.origin) or choice
   overrides.storageInventories=stock; overrides.supply=U.copy(overrides.supply or {})
   overrides.supply.inventory=stage; overrides.supply.side='front'
-  overrides.build=U.copy(overrides.build or {}); overrides.build.enabled=true; overrides.build.origin=origin
+  overrides.build=U.copy(overrides.build or {}); overrides.build.enabled=true; overrides.build.origin=origin; overrides.build.autoSite=automatic
   overrides.build.rotation=0; overrides.build.mirrorX=false; overrides.build.mirrorZ=false
   overrides.clearSite=false; overrides.automation=U.copy(overrides.automation or {}); overrides.automation.enabled=true
   e.print('Step 3/3: review and save')
-  e.print('Supply: '..stage..'; stock: '..table.concat(stock,', ')); e.print('Build corner: '..describe(origin))
+  e.print('Supply: '..stage..'; stock: '..table.concat(stock,', '))
+  e.print(automatic and 'Build site: AUTO, behind the builder; clears before building.' or 'Build corner: '..describe(origin))
   return true
 end
 local function worker(e,overrides,config)
@@ -178,7 +188,7 @@ local function worker(e,overrides,config)
   e.print('Use ONE builder for the test. Its depot means the block where it parks beside SUPPLY.')
   e.print('Place it directly beside that chest at the same height, with its front facing the chest.')
   e.print('Match the chest modem name above. Keep a pickaxe and wireless modem equipped.')
-  e.print('Leave the block above the turtle and its route to the test site clear.')
+  e.print('Keep machines and cables away from above the turtle. AUTO can clear common terrain there.')
   while true do
     local ok,found,block=pcall(e.turtle.inspect)
     if ok and found and block and containers[block.name] then break end
@@ -209,8 +219,8 @@ local function worker(e,overrides,config)
   e.print('Builder depot: '..describe(position)..' facing '..position.heading)
   e.print('Fuel: '..tostring(e.turtle.getFuelLevel())..'. Target for this test: 1000.')
   e.print('Slots count left to right, top to bottom in the turtle inventory. Slot 15 = bottom row, third box.')
-  e.print('Put 16 coal or charcoal there. Keep slot 16 (bottom-right) reserved; keep build blocks in STOCK.')
-  e.print('Saving will consume only coal/charcoal in slot 15 if fuel is below 1000. It will not move the turtle.')
+  e.print('Put 16 coal/charcoal or 2 coal blocks there. Keep slot 16 (bottom-right) reserved; keep build blocks in STOCK.')
+  e.print('Saving will consume only coal/charcoal or coal blocks in slot 15 if fuel is below 1000. It will not move the turtle.')
   return position
 end
 local function loadFuel(e)
@@ -223,7 +233,7 @@ local function loadFuel(e)
   if ok and ready then e.print('Fuel loaded: '..tostring(t.getFuelLevel())..'.')
   else
     e.print('Settings saved, but more fuel is needed before building.')
-    e.print('Put 16 coal/charcoal in slot 15 (bottom row, third box), then run setup again to load it.')
+    e.print('Put 16 coal/charcoal or 2 coal blocks in slot 15 (bottom row, third box), then run setup again to load it.')
   end
 end
 function M.run(args,e,opts)
@@ -248,7 +258,7 @@ function M.run(args,e,opts)
   else
     pose=worker(e,overrides,config); if not pose then return cancel(e) end
   end
-  if not yes(e,pose and 'Save settings and load slot 15 coal/charcoal if needed? yes/no' or 'Save these settings? yes/no') then return cancel(e) end
+  if not yes(e,pose and 'Save settings and load slot 15 coal/charcoal or coal blocks if needed? yes/no' or 'Save these settings? yes/no') then return cancel(e) end
   persist(e,config,overrides,pose,original)
   if pose then loadFuel(e) end
   if opts and opts.returnToApp then e.print('Setup saved. Returning to Autobuilder...')

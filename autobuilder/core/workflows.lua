@@ -1,7 +1,7 @@
 local U=require('autobuilder.core.util')
 local Types=require('autobuilder.core.task_messages').types
 local M={}
-local caps={CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
+local caps={CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
 local function key(p) return p.x..','..p.y..','..p.z end
 local function intersects(a,b)
   if not a or not b then return false end

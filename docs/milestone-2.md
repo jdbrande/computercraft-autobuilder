@@ -17,7 +17,7 @@ swaps the left pickaxe for that scanner only while scanning, then restores the
 pickaxe. The modem remains installed. If your pickaxe is on the right, configure
 `scanner.side='right'` and put the modem on the left. Modem-side swaps are refused.
 
-Slot **15** is reserved for coal or charcoal fuel; slot **16** is reserved for the
+Slot **15** is reserved for coal, charcoal or coal block fuel; slot **16** is reserved for the
 scanner/displaced pickaxe. Leave both slots alone during a job. Other slots are
 cargo. For a fallback-only worker, slot 16 can be empty: it will use bounded strip
 mining and inspect adjacent ores. It still needs the pickaxe and wireless modem.
@@ -25,7 +25,7 @@ mining and inspect adjacent ores. It still needs the pickaxe and wireless modem.
 A concrete depot layout, viewed from the side:
 
 ```text
-               fuel chest (100,65,-200), coal/charcoal only
+               fuel chest (100,65,-200), coal/charcoal/coal blocks only
                        |
 controller -- cable -- worker parking position (100,64,-200), facing east
                        |

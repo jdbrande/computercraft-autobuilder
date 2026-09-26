@@ -1,7 +1,7 @@
 local U=require('autobuilder.core.util')
 local Reports=require('autobuilder.core.reports')
 local M={}
-local modules={BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',
+local modules={BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',
   CRAFT='autobuilder.factory.crafting',TRANSPORT='autobuilder.workers.courier',HARVEST='autobuilder.resources.logger',FARM='autobuilder.resources.farmer'}
 function M.new(app,config,e,network,clock)
   local s=app.state; s.completedTasks=s.completedTasks or {}; s.pendingSupplyAcks=s.pendingSupplyAcks or {}; local self={}; local lastSend=-math.huge
@@ -57,7 +57,7 @@ function M.new(app,config,e,network,clock)
       local j=p.job; local done=s.completedTasks[j.id]
       if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report}) end
       if t then return t.id==j.id,'worker already has a task' end
-      local cap=({CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
+      local cap=({CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end
       s.currentTask=U.copy(j); s.currentTask.phase='setup'; s.status='setup'; self.engine=nil; save(); return true
     end
@@ -100,6 +100,17 @@ function M.new(app,config,e,network,clock)
     local t=s.currentTask
     if t.paused or t.phase=='completed' then return true end
     if t.fuelRecovery or t.phase=='blocked' and (t.blockedCategory=='fuel' or tostring(t.error):find('insufficient fuel',1,true)) then
+      if t.type=='PREPARE_SITE' then
+        -- Its access corridor may still be solid. Refuel in place: a depot
+        -- detour would abandon the durable adjacent excavation route.
+        local target=math.max(config.mining.fuelTarget,#t.sitePlan.points-(t.index or 1)+1+config.minimumFuelReserve)
+        local selected=e.turtle.getSelectedSlot and e.turtle.getSelectedSlot()
+        local ok,err=require('autobuilder.storage.inventory').new(e.turtle):refuel(target,false)
+        if selected then e.turtle.select(selected) end
+        if ok then t.fuelRecovery=nil; resumeTask()
+        else t.error='Put coal/charcoal or coal blocks in slot 15; waiting for fuel. '..tostring(err) end
+        save(); return true
+      end
       t.fuelRecovery=t.fuelRecovery or {}; save()
       local ok,err=require('autobuilder.workers.resupply').travel(t.fuelRecovery,t,app.navigation,config.depot,save)
       if ok then ok,err=require('autobuilder.storage.inventory').new(e.turtle):refuel(config.mining.fuelTarget,true) end

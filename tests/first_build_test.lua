@@ -54,6 +54,48 @@ local function fixture()
   return {world=world,ce=ce,we=we,c=c,b=b,cc=cc,stock=stock,stage=stage,step=step,
     reboot=function() c=R.new(cc,ce); b=R.new(wc,we); return c,b end}
 end
+test('automatic first build clears terrain then builds and verifies across a clearing restart',function()
+  local f=fixture(); f.cc.build.autoSite=true
+  local Site=require('autobuilder.build.site'); local plan=Site.plan(f.world.pose)
+  local K=require('autobuilder.core.pathfinding').key
+  for _,pos in ipairs(plan.points) do
+    if U.distance(pos,f.world.pose)>0 then f.world.blocks[K(pos)]={name='minecraft:stone',state={}} end
+  end
+  -- Real turtles stack mined stone; this fixture's ordinary dig starts a new slot.
+  for _,suffix in ipairs({'','Up','Down'}) do
+    local dig=f.world.turtle['dig'..suffix]
+    f.world.turtle['dig'..suffix]=function()
+      local ok,err=dig()
+      for slot=2,14 do
+        local item=f.world.items[slot]
+        if item then for earlier=1,slot-1 do
+          local target=f.world.items[earlier]
+          if target and target.name==item.name and target.count+item.count<=64 then
+            target.count=target.count+item.count; f.world.items[slot]=nil; break
+          end
+        end end
+      end
+      return ok,err
+    end
+  end
+  assert(f.c:command('2'))
+  local restarted=false
+  for _=1,5000 do
+    f.step()
+    if not restarted and f.world.digs>5 then
+      assert(f.c:command('3')); f.step(); f.c,f.b=f.reboot()
+      local before=f.world.digs; for _=1,10 do f.step() end; eq(f.world.digs,before)
+      assert(f.c:command('4')); restarted=true
+    end
+    local p=f.c.state.automation.projects.first_cathedral_test
+    if p and p.phase=='built' and not f.b.state.currentTask then break end
+  end
+  local p=f.c.state.automation.projects.first_cathedral_test
+  assert(p and p.phase=='built',f.ce.textutils.serialize({first=f.c.state.firstBuild,project=p,task=f.b.state.currentTask,jobs=f.c.state.automation.jobs}))
+  assert(restarted); eq(f.world.places,28); eq(p.report.counts.correct,64)
+  eq(p.transform.origin.x,plan.origin.x); eq(p.transform.origin.z,plan.origin.z)
+  assert(f.world.blocks['0,2,-1'].name=='minecraft:chest'); assert(f.world.fuel>=100)
+end)
 test('first build refuses missing settings, missing materials and unfueled builders without submitting jobs',function()
   local f=fixture(); f.cc.build.enabled=false
   assert(not f.c:command('pilot start')); eq(f.c.state.firstBuild,nil)
@@ -61,6 +103,39 @@ test('first build refuses missing settings, missing materials and unfueled build
   local ok,err=f.c:command('2'); assert(not ok and err:find('cobbled deepslate')); eq(f.c.state.firstBuild,nil)
   f.stock[1].count=13; f.c.state.workers['8'].telemetry.fuel=0
   assert(not f.c:command('2')); eq(f.c.state.firstBuild,nil); eq(next(f.c.state.automation.jobs),nil)
+end)
+test('automatic site requires an updated builder and refuses occupied or protected cells before scheduling',function()
+  local f=fixture(); f.cc.build.autoSite=true
+  f.c.state.workers['8'].telemetry.capabilities.sitePreparation=nil
+  local ok,err=f.c:command('2'); assert(not ok and err:find('update',1,true)); eq(f.c.state.firstBuild,nil)
+  f.c.state.workers['8'].telemetry.capabilities.sitePreparation=true
+  f.c.state.workers['9']={id=9,online=false,telemetry={position={x=0,y=4,z=0,known=true}}}
+  ok,err=f.c:command('2'); assert(not ok and err:find('turtle 9',1,true)); eq(f.c.state.firstBuild,nil)
+  f.c.state.workers['9']=nil
+  f.cc.restrictedAreas={{min={x=0,y=3,z=0},max={x=0,y=3,z=0}}}
+  ok,err=f.c:command('2'); assert(not ok and err:find('protected',1,true)); eq(f.c.state.firstBuild,nil)
+  eq(next(f.c.state.automation.jobs),nil)
+end)
+test('site fuel recovery burns slot 15 fuel in place and continues the saved route',function()
+  local f=fixture(); f.cc.build.autoSite=true
+  f.world.turtle.refuel=function(n)
+    eq(f.world.selected,15); local item=f.world.items[15]; eq(item.name,'minecraft:coal_block')
+    item.count=item.count-n; f.world.fuel=f.world.fuel+800*n
+    if item.count==0 then f.world.items[15]=nil end
+    return true
+  end
+  assert(f.c:command('2'))
+  for _=1,200 do f.step(); local t=f.b.state.currentTask; if t and t.index and t.index>=8 then break end end
+  local t=assert(f.b.state.currentTask); eq(t.type,'PREPARE_SITE')
+  f.world.fuel=200; f.world.items[15]={name='minecraft:coal_block',count=2}
+  for _=1,200 do f.step(); if f.world.fuel>200 then break end end
+  assert(f.world.fuel>200)
+  for _=1,4500 do
+    f.step(); local p=f.c.state.automation.projects.first_cathedral_test
+    if p and p.phase=='built' then break end
+  end
+  local p=f.c.state.automation.projects.first_cathedral_test
+  assert(p and p.phase=='built',f.ce.textutils.serialize({first=f.c.state.firstBuild,task=f.b.state.currentTask}))
 end)
 test('first build bundles pilot, resupplies, verifies all cells and survives both restarts',function()
   local f=fixture(); assert(f.c:command('2')); assert(f.c:command('2'))

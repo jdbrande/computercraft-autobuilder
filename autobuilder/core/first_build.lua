@@ -8,12 +8,29 @@ local NAME='first_cathedral_test'
 local function friendly(item) return item:gsub('minecraft:',''):gsub('_',' ') end
 local function sameTransform(a,b)
   return a and b and a.origin and b.origin and U.distance(a.origin,b.origin)==0
-    and a.rotation==b.rotation and a.mirrorX==b.mirrorX and a.mirrorZ==b.mirrorZ
+    and a.rotation==b.rotation and a.mirrorX==b.mirrorX and a.mirrorZ==b.mirrorZ and (a.autoSite==true)==(b.autoSite==true)
 end
 function M.new(app,config,e)
   local s=app.state; local a=s.automation; local self={}; local lastCheck=-math.huge
   local function project() return a.projects[NAME] end
   local function save() return app:save() end
+  local function siteJob() return s.firstBuild and s.firstBuild.siteJob and a.jobs[s.firstBuild.siteJob] end
+  local function siteSafe(plan,owner)
+    for _,point in ipairs(plan.points) do
+      for _,area in ipairs(config.restrictedAreas) do
+        if point.x>=area.min.x and point.x<=area.max.x and point.y>=area.min.y and point.y<=area.max.y and point.z>=area.min.z and point.z<=area.max.z then
+          return false,'Automatic site crosses a protected area. Move the depot and run setup again.'
+        end
+      end
+      for _,w in pairs(s.workers) do
+        local pose=w.telemetry and w.telemetry.position
+        if w.id~=owner and pose and pose.known and U.distance(point,pose)==0 then
+          return false,'Move turtle '..w.id..' out of the area behind the builder, then try again.'
+        end
+      end
+    end
+    return true
+  end
   local function execute(action,...)
     local ok,why=app.automation.projects:command({'build',action,...}); assert(ok,why); return why
   end
@@ -64,11 +81,17 @@ function M.new(app,config,e)
       if w.online and t.capabilities.building and (not s.firstBuild or w.id==s.firstBuild.workerId) then
         builders=builders+1
         local problems={}; local prefix='Turtle '..w.id..': '
+        if config.build.autoSite and not t.capabilities.sitePreparation then problems[#problems+1]=prefix..'needs the update for automatic clearing. Press Q on it, run /update.lua, then reboot.' end
         if t.status~='idle' or t.task then problems[#problems+1]=prefix..'finish its current job first.' end
         if not t.position.known or not U.heading(t.position.heading) then problems[#problems+1]=prefix..'type setup on it to save its position and facing.' end
-        if t.fuel~='unlimited' and t.fuel<1000 then problems[#problems+1]=prefix..'only '..t.fuel..' fuel. Put 16 coal/charcoal in slot 15, then type setup on it.' end
+        local fuelNeeded=siteJob() and siteJob().status=='completed' and 500 or 1000
+        if t.fuel~='unlimited' and t.fuel<fuelNeeded then problems[#problems+1]=prefix..'only '..t.fuel..' fuel. Put 16 coal/charcoal or 2 coal blocks in slot 15, then type setup on it.' end
         if t.inventory.used>14 then problems[#problems+1]=prefix..'needs two empty inventory slots. Move extra cargo into STOCK before starting.' end
-        if t.position.known and U.distance(t.position,config.build.origin)>64 then problems[#problems+1]=prefix..'is too far away. Choose a test corner within 64 blocks of its depot in controller setup.' end
+        if not config.build.autoSite and t.position.known and U.distance(t.position,config.build.origin)>64 then problems[#problems+1]=prefix..'is too far away. Choose a test corner within 64 blocks of its depot in controller setup.' end
+        if config.build.autoSite and not s.firstBuild and t.position.known and U.heading(t.position.heading) then
+          local safe,why=siteSafe(require('autobuilder.build.site').plan(t.position),w.id)
+          if not safe then problems[#problems+1]=why end
+        end
         if #problems==0 then ready=ready+1; if not selected or w.id<selected then selected=w.id end
         elseif not problemId or w.id<problemId then problemId=w.id; builderProblems=problems end
       end
@@ -92,6 +115,10 @@ function M.new(app,config,e)
         lines[#lines+1]='TEST FINISHED. Check the blocks in your world.'
         lines[#lines+1]='Verified cells: '..tostring((p.report.counts or {}).correct or 0)..'/64.'
       elseif p and p.phase=='needs_repair' then lines[#lines+1]='Test found a problem. Type errors for details; leave checkpoints intact.'
+      elseif siteJob() and siteJob().status~='completed' then
+        local j=siteJob()
+        lines[#lines+1]='Clearing test space: '..tostring(j.progress or 0)..'/'..#f.sitePlan.points..' steps.'
+        lines[#lines+1]='Keep players and other turtles away from the builder.'
       else
         lines[#lines+1]='Test: '..(p and p.phase or 'preparing')..'. Keep the controller and turtle running.'
         if p then lines[#lines+1]='Progress: '..tostring(p.completed or 0)..'/'..tostring(p.total or 28)..' cells in this phase.' end
@@ -110,7 +137,8 @@ function M.new(app,config,e)
       local ok,issues=self:check()
       if ok then
         lines[#lines+1]='Software checks passed.'
-        lines[#lines+1]='Check the site is empty and the route/space above the turtle is clear. Type 2 to start.'
+        lines[#lines+1]=config.build.autoSite and 'AUTO: clears an 8 x 8 site behind the builder, then builds. Type 2 to start.'
+          or 'Check the site is empty and the route/space above the turtle is clear. Type 2 to start.'
       else for _,issue in ipairs(issues) do lines[#lines+1]=issue end end
     end
     s.guideLines=lines
@@ -131,12 +159,17 @@ function M.new(app,config,e)
       assert(not p,'A project already uses first_cathedral_test. Preserve it; use the normal build commands for that project.')
       local ready,issues,workerId=self:check(); if not ready then self:guide(true); return false,issues[1] end
       local raw=e.textutils.serializeJSON(U.copy(Pilot))
-      s.firstBuild={name=NAME,workerId=workerId,raw=raw,hash=Hash.digest(raw),transform=U.copy(config.build),autoStart=true}
+      local transform=U.copy(config.build)
+      local plan=config.build.autoSite and require('autobuilder.build.site').plan(s.workers[tostring(workerId)].telemetry.position) or nil
+      if plan then transform.origin=U.copy(plan.origin) end
+      s.firstBuild={name=NAME,workerId=workerId,raw=raw,hash=Hash.digest(raw),settings=U.copy(config.build),transform=transform,sitePlan=plan,autoStart=true}
       save(); self:guide(true); return true,'Test requested. Import, preparation, building and verification run automatically.'
     elseif action=='pause' or action=='resume' then
       if not f then return false,'No first test yet. Type 1 to check setup.' end
       if p and (p.phase=='built' or p.phase=='verified' or p.phase=='needs_repair') then return false,'Test already finished. Type errors to inspect any problems.' end
       f.paused=action=='pause'
+      local j=siteJob()
+      if j and j.status~='completed' then j.paused=f.paused; j.resumeRequested=not f.paused end
       if p then
         execute(action,NAME)
         if p.requestId and a.requests[p.requestId] then a.requests[p.requestId].paused=f.paused end
@@ -149,15 +182,25 @@ function M.new(app,config,e)
     local f=s.firstBuild
     if f and f.autoStart and not f.paused and not s.assignmentRecovery then
       local ok,err=pcall(function()
-        assert(config.build.enabled and config.automation.enabled and not config.clearSite and sameTransform(f.transform,config.build),
+        assert(config.build.enabled and config.automation.enabled and not config.clearSite and sameTransform(f.settings or f.transform,config.build),
           'Build settings changed. Restore the original test corner/settings before continuing.')
         assert(not otherWork(),'Waiting for other queued work to finish.')
+        if f.sitePlan then
+          if not f.siteJob then
+            local safe,why=siteSafe(f.sitePlan,f.workerId); assert(safe,why)
+            local j=app.automation.queue:submit('PREPARE_SITE',{sitePlan=f.sitePlan,bounds=f.sitePlan.bounds,project=NAME,
+              preferredWorker=f.workerId,stockOnly=true},{},NAME..':site')
+            f.siteJob=j.id; save()
+          end
+          if siteJob().status~='completed' then return end
+        end
         local p=project()
         if not p then
           local path=config.blueprintDir..'/'..NAME..'.json'
           if e.fs.exists(path) then assert(Hash.digest(IO.read(e.fs,path))==f.hash,'Existing test file differs; preserve it before continuing.')
           else IO.write(e.fs,path..'.tmp',f.raw); e.fs.move(path..'.tmp',path) end
-          execute('import',path,NAME); p=project()
+          local imported,why=app.automation.projects:command({'build','import',path,NAME},f.transform)
+          assert(imported,why); p=project()
         end
         assert(p.hash==f.hash and Hash.digest(IO.read(e.fs,p.path))==f.hash and sameTransform(p.transform,f.transform),
           'Test blueprint or coordinates changed. Restore the saved source before continuing.')

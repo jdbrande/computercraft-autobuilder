@@ -13,7 +13,7 @@ M.defaults={
   furnaces={}, smeltingFuelItem='minecraft:coal', smeltingWaitSteps=600, turtleFuelReserveItems={['minecraft:coal']=64},
   craftingStation={input='',output='',inputSide='up',outputSide='down'},
   automation={enabled=true,building=false,crafting=false,courier=false,logging=false,farming=false},
-  build={enabled=false,origin={x=0,y=64,z=0},rotation=0,mirrorX=false,mirrorZ=false,regionSize=8},
+  build={enabled=false,autoSite=false,origin={x=0,y=64,z=0},rotation=0,mirrorX=false,mirrorZ=false,regionSize=8},
   blueprintDir='/autobuilder/blueprints', clearSite=false,
   supply={inventory='',side='front',batch=64}, treeFarms={}, farms={}, depotExpansion={}, farmRetrySeconds=60,
   autoDepotExpansion={enabled=false,freeSlots=2},
@@ -86,8 +86,9 @@ function M.load(overrides)
   c.capabilities.mining=c.mining.enabled and true or nil
   for k,v in pairs(c.automation) do assert(type(v)=='boolean','invalid automation flag '..k) end
   for _,k in ipairs({'building','crafting','courier','logging','farming'}) do c.capabilities[k]=c.automation.enabled and c.automation[k] or nil end
+  c.capabilities.sitePreparation=c.capabilities.building and true or nil
   assert(U.position(c.build.origin) and ({[0]=true,[90]=true,[180]=true,[270]=true})[c.build.rotation],'invalid build transform')
-  assert(type(c.build.enabled)=='boolean' and type(c.build.mirrorX)=='boolean' and type(c.build.mirrorZ)=='boolean','invalid build flags')
+  assert(type(c.build.enabled)=='boolean' and type(c.build.autoSite)=='boolean' and type(c.build.mirrorX)=='boolean' and type(c.build.mirrorZ)=='boolean','invalid build flags')
   assert(U.integer(c.build.regionSize) and c.build.regionSize>=1 and c.build.regionSize<=8,'regionSize must be 1..8')
   assert(type(c.clearSite)=='boolean' and type(c.blueprintDir)=='string' and c.blueprintDir:sub(1,1)=='/','invalid blueprint/clearing config')
   assert(({front=true,up=true,down=true})[c.supply.side] and U.integer(c.supply.batch) and c.supply.batch>=1 and c.supply.batch<=64,'invalid supply station')

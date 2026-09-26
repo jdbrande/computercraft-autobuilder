@@ -84,6 +84,22 @@ test('refuel continues from chest after using a partial reserved fuel stack',fun
   assert(inv:refuel(100,true)); eq(pulls,1); eq(fuel,160)
 end)
 
+test('refuel preserves explicit item restrictions and does not search other slots',function()
+  local items={[1]={name='minecraft:coal_block',count=4},[15]={name='minecraft:coal_block',count=4},[16]={name='minecraft:coal',count=16}}
+  local t={getFuelLevel=function() return 0 end,
+    getItemCount=function(slot) return items[slot] and items[slot].count or 0 end,
+    getItemDetail=function(slot) return items[slot] end,
+    select=function() error('must not select unsupported fuel') end,
+    refuel=function() error('must not consume unsupported fuel') end}
+  local inventory=require('autobuilder.storage.inventory')
+  assert(not inventory.new(t,{fuelItems={['minecraft:coal']=true}}):refuel(1000,false))
+  items[15]={name='minecraft:oak_planks',count=16}
+  assert(not inventory.new(t):refuel(1000,false))
+  items[15]=nil
+  assert(not inventory.new(t):refuel(1000,false))
+  eq(items[1].count,4); eq(items[16].count,16)
+end)
+
 test('scanner waits out AP operation cooldown before scanning and restoring tool',function()
   local now,scans=0,0
   local p={getType=function() return 'geoScanner' end,getMethods=function() return {'cost','scan','getOperationCooldown'} end,

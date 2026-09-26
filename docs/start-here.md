@@ -3,7 +3,8 @@
 Use **one of your seven online workers** for this first test: a small, 28-block
 cathedral detail. Leave the other six parked outside the work area. You do not
 need to reinstall them. These steps update the controller and chosen worker to
-**release 0.10.3 or later**.
+**release 0.10.4 or later**. The controller can choose and clear the small test
+site automatically; you do not need to enter a build-corner coordinate.
 
 ## 1. Place the hardware
 
@@ -13,15 +14,16 @@ Gather:
 - **2 separate chests**.
 - **13 Cobbled Deepslate** and **15 Sandstone** — ordinary blocks, not stairs,
   slabs, cut sandstone, or polished deepslate.
-- **16 coal or charcoal** for the chosen turtle.
+- **16 coal/charcoal or 2 coal blocks** for the chosen turtle.
 - A wireless modem attached to the controller, and a builder turtle already
   equipped with a **pickaxe and wireless modem**.
 
 ![Controller, two wired chests, and one wireless builder turtle](images/controller-layout.png)
 
 [Open the drawing at full size](images/controller-layout.png).
-The drawing shows connections, not exact distances. The controller's modem sides
-can be swapped; leave its screen accessible. If you copy the drawing's directions,
+This is a **connection example**, not an exact drawing of the automatic build site.
+The controller's modem sides can be swapped; leave its screen accessible.
+If you copy the drawing's directions,
 align its **N** arrow with north in your world first. Otherwise enter your
 turtle's actual direction in step 3.
 
@@ -48,8 +50,8 @@ turtle's actual direction in step 3.
    height, with its **front facing the chest**. The chest must touch the
    turtle's front, with no empty block between them. This parking place is its
    **depot**.
-9. Right-click the turtle. In its **4 × 4 inventory**, put all 16 coal or charcoal
-   in **slot 15: bottom row, third square from the left**. Leave slot 16 empty
+9. Right-click the turtle. In its **4 × 4 inventory**, put 16 coal/charcoal or
+   2 coal blocks in **slot 15: bottom row, third square from the left**. Leave slot 16 empty
    and the other slots available for materials. Close the turtle screen.
 
 ```text
@@ -60,46 +62,50 @@ Turtle inventory — read left to right:
   9   10   11   12
  13   14  [15]  16
            ↑
-       coal here
+       fuel here
 ```
 
-Keep the block **directly above the turtle empty**. Do not put a fuel chest or
-cable above it. Clear its route to the building area of blocks, other turtles,
-and players. The turtle needs room to rise and travel.
+Keep chests, cables, machines, other turtles and players out of the space above
+and behind the builder. Do not put a fuel chest or cable directly above it.
 
-## 2. Record the build corner
+## 2. Leave room for the automatic site
 
-Choose a flat **8 × 8** patch near the depot, outside the chests and cables.
-Leave the layer where new blocks will go empty, plus **two empty blocks above
-that layer**. This test does not clear a site for you.
+With its front touching the supply chest, the builder chooses an **8 × 8**
+footprint beginning **two blocks behind itself**, away from the chest. The build
+bottom is at the same height as the parked turtle. Keep the other six workers
+and all players away from this area and the turtle's route.
 
-The first corner is the **northwest corner**. The footprint runs from there
-**7 blocks east and 7 blocks south**: counting the corner itself makes 8 × 8.
+After you start the test, the builder clears the footprint's **bottom layer and
+two layers above it**. It also clears an **8 × 10 overhead rectangle**, two blocks
+above its parked height, covering the route from the depot through the footprint,
+and the vertical shaft above its depot. **The ground below the bottom layer stays.**
+This is a fixed area; the turtle does not expand it to find another site.
 
-1. Close computer and chest screens. Press **F3** in Minecraft Java to show
-   coordinates. If your function keys control other actions, try **Fn + F3**.
-2. Look at the ground block under your chosen northwest corner. Read the three
-   numbers labelled **Targeted Block**, usually on the right of the F3 screen.
-   They describe the block under your crosshair. Do not copy the player's
-   `XYZ` or `Block` position.
-3. Write down the targeted block's **x**, **y**, and **z**, in that order.
-   Add **1 to y** so the new blocks sit on the ground. For example, ground at
-   `100 64 200` means a build corner of `100 65 200`. Use your own numbers.
-4. Keep that resulting line as your **build corner**. Keep any minus signs.
+Clearing accepts only common terrain such as dirt, stone, sand and gravel.
+It stops at containers, machines, ores, liquids, waterlogged blocks, protected
+blocks and restricted areas. Choose a location without buildings or stored items
+in this space; ordinary stone or dirt is not recognized as someone's construction.
 
-Check directions with F3's **Facing** line as you turn your player: east
-increases x; south increases z. A normal Minecraft compass points toward world
-spawn, so do not use its needle to choose north. See
-[Minecraft's explanation of the compass](https://www.minecraft.net/en-us/article/taking-inventory--compass).
+The turtle keeps dug drops in cargo slots **1–14** and stops when it needs more
+space. It does not discard those drops. For an ordinary **inventory full** message,
+pause with `3`, empty the cargo slots, then resume with `4`. **If the message says
+an unresolved dig or ambiguous outcome needs recovery, do not empty or change
+the inventory or target block**: they are needed to determine what happened.
+
+For an optional **manual site**, prepare an empty 8 × 8 patch and two empty layers
+above it, with a clear route from the depot. In F3, aim at the ground under its
+northwest corner and copy **Targeted Block** `x y z`, adding **1 to y**. Enter that
+line instead of `auto` during controller setup. The footprint extends seven blocks
+east (+x) and seven south (+z); manual sites do not get this automatic clearing.
 
 ## 3. Record the turtle's position and direction
 
 Do this after parking the turtle at its depot. Do not move or rotate it after
 recording these values.
 
-1. With F3 open, point your crosshair at the **turtle itself**.
-2. Copy its **Targeted Block** coordinates as **turtle position**. This time,
-   **do not add 1 to y**: you want the block the turtle occupies.
+1. Press **F3** (or **Fn + F3**) and point your crosshair at the **turtle itself**.
+2. Copy its **Targeted Block** coordinates as **turtle position**, not your
+   player's `XYZ`. **Do not add 1 to y**: you want the block the turtle occupies.
 3. Below the targeted block's name, look for `facing: north`, `east`, `south`,
    or `west`. Write down this **turtle facing** value.
 4. If those details do not show facing, stand behind the turtle and look straight
@@ -140,10 +146,10 @@ Do not type them in your Mac's Terminal, Minecraft chat, or this repository.
 7. For **stock chest**, enter the number beside the chest showing your cobbled
    deepslate and sandstone and press Enter. These numbers identify chests;
    they are not computer IDs or the controller menu choices.
-8. When asked for the **build corner**, enter your three recorded build-corner
-   numbers on one line, separated by spaces, and press Enter.
-9. Read the summary. If it matches your chests and corner, type **`yes`** when
-   asked to save and press Enter.
+8. When asked for the **build corner**, press **Enter** for the default **AUTO**
+   site, or type **`auto`** and press Enter. No build-corner coordinates are needed.
+9. Read the summary. If it matches your chests and automatic site choice,
+   type **`yes`** when asked to save and press Enter.
 
 Setup returns to Autobuilder automatically. Leave controller 1 running while you
 configure the turtle. A message about waiting for a builder is expected here;
@@ -166,9 +172,10 @@ you have not started the test yet.
 8. When asked whether it is parked facing the selected supply chest, check the
    physical turtle and chest. Type **`yes`** only if they match.
 9. Check the summary and fuel instructions. Type **`yes`** to save and press
-   Enter. This also lets setup consume coal or charcoal from slot 15 to fill
-   the turtle's fuel to at least 1,000 for this test. Setup does
-   not move the turtle.
+   Enter. This also lets setup consume coal, charcoal or coal blocks from slot 15
+   until the turtle has at least **1,000 fuel**, leaving extra items there.
+   With the default fuel values, two coal blocks supply **1,600 fuel** from empty.
+   Setup does not move or clear with the turtle.
 
 The worker returns to Autobuilder automatically. Leave it running. Setup enables
 this existing worker to build; it does not need another installation profile.
@@ -179,21 +186,22 @@ this existing worker to build; it does not need another installation profile.
 2. Type **`1`** and press Enter. This checks readiness and gives the next action.
    Resolve anything it says is missing, then type `1` again.
 3. Once the check is ready, type **`2`** and press Enter to start the small pilot.
-4. Watch the turtle collect materials and build the 28-block detail. Keep
-   yourself and the other six workers out of its path. Stay nearby so the
+4. Watch the turtle **clear its automatic site**, collect materials and build
+   the 28-block detail. Keep yourself and the other six workers out of its path.
+   Stay nearby so the
    controller, chests, route, and building area remain loaded in Minecraft.
 
-The pilot blueprint is included. Menu `2` handles importing, material preparation,
-and starting it once readiness checks pass. You do not need `wget`, a separate
-blueprint download, or `import`, `analyze`, or `prepare` commands. Setup or reboot
+The pilot blueprint is included. Menu `2` handles importing, automatic site clearing,
+material preparation and building once readiness checks pass. You do not need
+`wget`, a separate blueprint download, or `import`, `analyze`, or `prepare` commands. Setup or reboot
 alone does not start the pilot.
 
 | Type in controller 1's running app | What it does |
 | --- | --- |
 | `1` | Check setup and show guidance (`guide`) |
-| `2` | Start the small pilot (`pilot start`) |
-| `3` | Pause the pilot (`pilot pause`) |
-| `4` | Resume the pilot (`pilot resume`) |
+| `2` | Clear the automatic site, then build the small pilot (`pilot start`) |
+| `3` | Pause the pilot, including site clearing (`pilot pause`) |
+| `4` | Resume the saved clearing/building work (`pilot resume`) |
 | `5` | Show workers |
 | `6` | Show jobs |
 | `7` | Open setup (`setup`) |
@@ -212,7 +220,10 @@ chunk loader.
 | Worker cannot find controller settings | Leave **controller 1** running after its setup is saved. Check that the chosen worker has connected and both have wireless modems. Type `setup` on the worker again. Both must be updated. |
 | No chest in front of worker | Close the **worker screen**. Make its front touch the supply chest at the same height. If you reposition it, record new turtle coordinates and facing before retrying `setup`. |
 | Controller is waiting for a builder | On the **chosen worker**, finish setup and leave Autobuilder running. Return to **controller 1** and type `1` again after it connects. |
-| Worker setup saved but says fuel is insufficient | Open the **chosen turtle's inventory**, put 16 coal or charcoal in slot 15, then run `setup` in its app again. |
+| Worker setup saved but says fuel is insufficient | Open the **chosen turtle's inventory**, put 16 coal/charcoal or 2 coal blocks in slot 15, then run `setup` in its app again. |
+| Site clearing refuses a block or restricted area | On **controller 1**, type `3` and read the reported reason. Clearing cannot remove containers, machines, ores, liquids, waterlogged or protected blocks, or enter restricted areas. It will not choose a larger site. Keep the saved task and resolve the obstruction before `4`. |
+| Site clearing says inventory full | Pause with `3`. Only if there is no unresolved dig or ambiguous recovery message, empty cargo slots **1–14**, keep fuel in 15 and slot 16 reserved, then resume with `4`. |
+| Unresolved dig or ambiguous site outcome | Pause and keep the turtle, target block, inventory and saved state intact. Do not empty or rearrange inventory; recovery uses it as evidence. Read the reported reason before attempting recovery. |
 | Turtle cannot move or reports low fuel | On **controller 1**, type `3` to pause. Check the turtle's slot 15 and clear the space above it and its route. Keep its body in place; do not break and replace it during a job. Review the reported reason before resuming with `4`. |
 | Setup refuses because work or recovery is pending | Read the message on that computer. Finish or recover the existing job before changing setup; pausing alone does not release it. Keep the saved state files. See [recovery notes](quick-setup.md#saved-settings-and-interruptions). |
 

@@ -76,7 +76,7 @@ function M.new(app,config,e,queue,production)
     p.total=mode=='VERIFY' and a.volume or mode=='CLEAR' and a.airCount or #a.blocks
     p.generation=p.generation+1; p.cursor=1; p.jobs={}; p.regionJobs={}; p.completed=0; p.report={counts={},entries={}}
   end
-  function self:command(args)
+  function self:command(args,importTransform)
     local action=args[2]; local name=args[3]
     if action=='import' then
       assert(name and not name:match('%.schem$'),'Convert .schem on your desktop first: tools/schem_converter.py input.schem output.json')
@@ -86,7 +86,8 @@ function M.new(app,config,e,queue,production)
       local raw=IO.read(e.fs,name); local path=config.blueprintDir..'/'..title..'.json'
       if e.fs.exists(path) then assert(IO.read(e.fs,path)==raw,'Blueprint destination already exists with different content')
       else IO.write(e.fs,path..'.tmp',raw); e.fs.move(path..'.tmp',path) end
-      local p={name=title,path=path,hash=Hash.digest(raw),phase='imported',transform=U.copy(config.build),jobs={},regionJobs={},generation=0}
+      local transform=importTransform and require('autobuilder.config').load({build=importTransform}).build or config.build
+      local p={name=title,path=path,hash=Hash.digest(raw),phase='imported',transform=U.copy(transform),jobs={},regionJobs={},generation=0}
       s.projects[title]=p; s.currentProject=title; save(); return true,'Imported '..title
     end
     local p=project(name); s.currentProject=p.name

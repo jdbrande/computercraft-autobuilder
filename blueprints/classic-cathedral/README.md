@@ -48,17 +48,36 @@ coordinates **(0,26,0)**. It contains **28 blocks**: 13 cobbled deepslate and
 15 sandstone; the other 36 cells are air. It is a small decorative ground/detail
 sample, not a miniature of the whole cathedral.
 
-1. Update to release **0.10.3 or later** and follow [Start here](../../docs/start-here.md).
-   It includes the wiring drawing, exact coordinates/facing instructions, and
-   setup for the controller and **one builder**. The other six can stay idle.
+1. Update to release **0.10.4 or later** and follow [Start here](../../docs/start-here.md).
+   On the controller and chosen builder, press **Q**, run **`/update.lua`**, then
+   **`reboot`**. Run controller `setup` first and press **Enter** or type **`auto`**
+   at **Build corner**. Run the chosen worker's `setup` to save its actual turtle
+   coordinates and heading; GPS is optional. The other six can stay idle outside
+   the work area.
 2. Put **13 cobbled deepslate and 15 sandstone in STOCK**, keep SUPPLY empty, and
-   put **16 coal/charcoal in turtle slot 15**. The wizard loads the turtle's fuel.
+   put **16 coal/charcoal or 2 coal blocks in turtle slot 15**. The wizard consumes
+   only enough to reach **1,000 fuel**; two coal blocks provide 1,600 from empty
+   with default fuel values.
 3. On the running controller, type **`1`** and press Enter. Fix any missing setup
    item, then type **`2`** and press Enter. This imports the bundled pilot,
-   prepares the supplied blocks, builds, and verifies it. No separate blueprint
-   download or import/prepare/start commands are needed.
-4. Keep the route and two blocks above the target layer clear. `3` pauses and `4`
+   clears its automatic site, prepares the supplied blocks, builds, and verifies it.
+   No separate blueprint download or import/prepare/start commands are needed.
+4. Keep other workers and players away. `3` pauses clearing or building and `4`
    continues the saved test. `5` shows workers; `6` shows jobs.
+
+AUTO starts the **8 × 8** footprint **two blocks behind** the builder parked with
+its front against the supply chest, at the turtle's height. It clears the bottom
+layer and two layers above, an **8 × 10 overhead rectangle** over the
+depot-to-footprint route, and the depot shaft. Ground below stays and bounds do
+not expand. Only common natural terrain is removed; containers, machines, ores,
+liquids, waterlogged blocks and protected blocks/areas stop clearing. Drops remain
+in slots **1–14**. For an ordinary inventory-full stop, pause, empty cargo and
+resume. **Do not alter inventory or the target block when an unresolved dig or
+ambiguous outcome needs recovery.**
+
+To use a manual site instead, enter its northwest build-bottom corner as `x y z`
+in controller setup. Prepare that 8 × 8 patch, two empty layers above it and the
+route yourself; manual mode does not use automatic site clearing.
 
 Success is **28 physical placements and 64 correct verification cells**, with no
 wrong, missing, unsupported or inaccessible cells. The project is named
@@ -69,6 +88,8 @@ After a successful run, test a controller/worker reboot. For an advanced repair
 trial on one removed, exposed block, use `build repair first_cathedral_test`.
 Record real fuel usage, elapsed time, supply behavior and filesystem growth before
 scaling up. `cathedral-pilot.json` remains available for advanced/manual imports.
+No live Minecraft acceptance run has been performed; the automated checks use
+simulated hardware.
 
 ## Full-section limitations
 

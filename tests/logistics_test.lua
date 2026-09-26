@@ -1,4 +1,13 @@
 local U=require('autobuilder.core.util')
+test('building resupply stays inside the cleared overhead plane',function()
+  local w=require('tests.build_world').new(); local depot=U.copy(w.pose)
+  w.pose.x=3; w.pose.y=3
+  for x=0,3 do w.blocks[x..',5,0']={name='minecraft:stone',state={}} end
+  local nav=require('autobuilder.core.navigation').new(w.turtle,U.copy(w.pose),{minimumFuelReserve=0},function() return true end)
+  local ok,err=require('autobuilder.workers.resupply').travel({},
+    {type='BUILD',clearanceY=4,blocks={{x=3,y=2,z=0}}},nav,depot,function() return true end)
+  assert(ok,err); eq(w.pose.x,0); eq(w.pose.y,2)
+end)
 local function wired()
   local w={inventories={stock={[1]={name='minecraft:stone',count=100}},stage={}},capacity=64,transfers=0}
   w.peripheral={call=function(name,method,...)

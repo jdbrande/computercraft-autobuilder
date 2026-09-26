@@ -26,9 +26,10 @@ local function env(role,answers)
     t.getItemCount=function(slot) return t.items[slot] and t.items[slot].count or 0 end
     t.refuel=function(n)
       local item=t.items[t.selected]
-      assert(t.selected==15 and item and (item.name=='minecraft:coal' or item.name=='minecraft:charcoal'))
+      local values={['minecraft:coal']=80,['minecraft:charcoal']=80,['minecraft:coal_block']=800}
+      assert(t.selected==15 and item and values[item.name])
       assert(e.fs.exists('/autobuilder/data/worker.state'),'fuel consumed before settings were saved')
-      item.count=item.count-n; t.fuel=t.fuel+80*n
+      item.count=item.count-n; t.fuel=t.fuel+values[item.name]*n
       if item.count==0 then t.items[t.selected]=nil end
       return true
     end
@@ -36,6 +37,11 @@ local function env(role,answers)
   return e
 end
 local function settings(e) return assert(load(e.fs.files['/autobuilder/settings.lua'],'settings','t',{}))() end
+test('controller setup defaults to automatic site without requesting coordinates',function()
+  local e=env('controller',{'1','2','','yes'})
+  assert(require('autobuilder.setup_wizard').run({},e))
+  local c=C.load(settings(e)); eq(c.build.autoSite,true); eq(c.clearSite,false)
+end)
 test('setup discovers inventories without moving any items',function()
   local e=env('controller',{}); local list=require('autobuilder.setup_wizard').inventories(e)
   eq(#list,2); eq(list[1].name,'stage'); eq(list[2].items['minecraft:sandstone'],15)
@@ -187,6 +193,18 @@ test('saved builder setup loads only enough slot 15 fuel and restores selection'
   local e=env('worker',{'east','yes','yes'})
   assert(require('autobuilder.setup_wizard').run({},e))
   eq(e.turtle.fuel,1060); eq(e.turtle.items[15].count,4); eq(e.turtle.selected,3); eq(e.turtle.calls,0)
+end)
+test('saved builder setup consumes only enough coal blocks to reach its fuel target',function()
+  for _,case in ipairs({{before=0,after=1600,left=2},{before=200,after=1000,left=3},{before=1000,after=1000,left=4}}) do
+    local e=env('worker',{'east','yes','yes'}); e.turtle.fuel=case.before
+    e.turtle.items[15]={name='minecraft:coal_block',count=4}
+    e.turtle.items[1]={name='minecraft:oak_planks',count=16}
+    e.turtle.items[16]={name='minecraft:coal_block',count=4}
+    assert(require('autobuilder.setup_wizard').run({},e))
+    eq(e.turtle.fuel,case.after); eq(e.turtle.items[15].count,case.left)
+    eq(e.turtle.items[1].count,16); eq(e.turtle.items[16].count,4)
+    eq(e.turtle.selected,3); eq(e.turtle.calls,0)
+  end
 end)
 test('setup cancellation never consumes prepared coal',function()
   local e=env('worker',{'east','yes','no'})

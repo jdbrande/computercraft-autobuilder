@@ -1,9 +1,11 @@
-# Autobuilder 0.10.3
+# Autobuilder 0.10.4
 
 **First time using this? [Start here](docs/start-here.md).** The guide shows the
 hardware drawing and exactly what to place, click, and type. The controller now
-has a numbered menu: `1` checks setup and `2` runs the bundled small cathedral
-test. Type `setup` inside Autobuilder to configure it without editing Lua.
+has a numbered menu: `1` checks setup and `2` clears an automatic site, then runs
+the bundled 28-block cathedral test. In controller `setup`, press Enter or type
+`auto` at **Build corner**; manual `x y z` corners remain available. Configure the
+chosen worker's actual coordinates and heading in its own `setup` (GPS is optional).
 
 A CC:Tweaked controller and Turtle system for Minecraft Java **1.20.1**. It plans
 materials, acquires supported resources, runs crafting and furnaces, converts and
@@ -64,7 +66,7 @@ The project is hosted at [jdbrande/computercraft-autobuilder](https://github.com
 The commands below use that repository. To prepare a fork, change the raw URL with:
 
 ```sh
-python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.3
+python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.4
 ```
 
 Publish `installer.lua`, `update.lua`, `startup.lua`, `manifest.json`, and
@@ -91,7 +93,9 @@ files. For controller/builders, follow [Start here](docs/start-here.md). After
 updating and rebooting, type `setup` inside the running controller app, then do
 the same on one registered worker. Each wizard returns to the app automatically.
 The wizard detects inventories/GPS, retrieves supply settings from the controller,
-loads the builder's slot-15 fuel after confirmation, and enables building. Other roles use
+loads the builder's slot-15 fuel after confirmation, and enables building. Supply
+**16 coal/charcoal or 2 coal blocks**; setup stops at at least **1,000 fuel**, leaving
+extra items (two blocks give 1,600 from empty with default fuel values). Other roles use
 `/autobuilder/settings.lua`. Updates preserve settings byte-for-byte; older
 logger/courier installations must enable their capability explicitly. Do not put
 local values in `config.lua`.
@@ -126,6 +130,23 @@ installation guide when replacing an existing computer directory; never copy
 another computer's `autobuilder/data/` or overwrite saved settings/state.
 
 ## Configure a production and building setup
+
+The settings examples below use a manual build origin. The beginner pilot's AUTO
+mode instead chooses an 8 × 8 footprint starting two blocks behind its builder,
+which must be parked with its front against the supply chest. It clears the build
+layer at the turtle's height and two layers above, plus an 8 × 10 overhead rectangle
+over the depot-to-footprint route and the depot shaft. Ground below remains.
+These fixed bounds never expand. This pilot preparation is separate from the
+global **`clearSite`** setting, which can remain `false`; it does not enable general
+clearing for other projects.
+
+Automatic pilot clearing accepts only common natural terrain and refuses
+containers, machines, ores, liquids, waterlogged blocks and protected blocks/areas.
+Keep other workers and players away. Drops remain in cargo slots 1–14; a full
+inventory stops work. `3` pauses clearing or building and `4` resumes it. Empty
+cargo only for an ordinary inventory-full stop; **leave inventory and the target
+block unchanged if a dig outcome is unresolved or ambiguous**. See
+[Start here](docs/start-here.md) for the update and setup sequence.
 
 Replace every coordinate and peripheral name below with your actual layout. The
 controller needs wired access to source storage, the furnace bank and an initially

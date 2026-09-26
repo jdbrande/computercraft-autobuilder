@@ -54,6 +54,11 @@ function M.travel(s,task,nav,target,save)
     local pose=nav.pose
     if not pose or not pose.known or pose.pending or pose.uncertain then return false,'trusted position required for logistics' end
     local y=math.max(pose.y,target.y)+2
+    -- Construction already defines an overhead corridor. Stay within it when
+    -- returning for materials, including when a previous step ended up there.
+    if ({BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true})[task.type] and U.finite(task.clearanceY) then
+      y=math.max(pose.y,target.y+2,task.clearanceY)
+    end
     for _,b in ipairs(task.blocks or {}) do y=math.max(y,b.y+2) end
     if U.finite(task.clearanceY) then y=math.max(y,task.clearanceY) end
     s.route={index=1,points={{x=pose.x,y=y,z=pose.z},{x=target.x,y=y,z=target.z},{x=target.x,y=target.y,z=target.z}}}; save()
