@@ -11,6 +11,10 @@ function M.new(task,e,config,nav,save,mode)
   task.deferred=task.deferred or {}
   local ceiling=-math.huge
   for _,b in ipairs(task.blocks) do assert(U.position(b) and type(b.name)=='string','invalid construction block'); ceiling=math.max(ceiling,b.y+2) end
+  if task.clearanceY then
+    assert(U.integer(task.clearanceY) and math.abs(task.clearanceY)<=30000000,'invalid construction clearance height')
+    ceiling=math.max(ceiling,task.clearanceY)
+  end
   local reserved={[config.fuelSlot or 15]=true,[16]=true}
   for _,s in ipairs(config.reservedSlots or {}) do reserved[s]=true end
   local function persist()

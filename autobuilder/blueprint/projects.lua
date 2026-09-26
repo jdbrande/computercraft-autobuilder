@@ -67,7 +67,7 @@ function M.new(app,config,e,queue,production)
     end
     for _,issue in ipairs((source.metadata or {}).issues or {}) do issues[#issues+1]={name='metadata',status='UNSUPPORTED',reason=tostring(issue)} end
     local regions=bp.regions(blocks,config.build.regionSize)
-    local result={blocks=blocks,requirements=counts,regions=regions,issues=issues,partial=partial,
+    local result={blocks=blocks,requirements=counts,regions=regions,issues=issues,partial=partial,clearanceY=t.origin.y+source.size.y+1,
       volume=#volume,airCount=#air,airRegions=inspectionRegions(air),verificationRegions=inspectionRegions(volume)}
     cache[p.name]=result; return result
   end
@@ -162,7 +162,7 @@ function M.new(app,config,e,queue,production)
             if not p.regionJobs[dep] then ready=false else deps[#deps+1]=p.regionJobs[dep] end
           end
           if ready then
-            local j=queue:submit(p.mode,{blocks=region.blocks,project=p.name,region=region.id,deferConnections=p.mode~='VERIFY'},deps,p.name..':'..p.generation..':'..region.id)
+            local j=queue:submit(p.mode,{blocks=region.blocks,project=p.name,region=region.id,clearanceY=a.clearanceY,deferConnections=p.mode~='VERIFY'},deps,p.name..':'..p.generation..':'..region.id)
             p.jobs[#p.jobs+1]=j.id; p.regionJobs[region.id]=j.id; p.cursor=p.cursor+1; save()
           end
         elseif active==0 and p.cursor>#regions then

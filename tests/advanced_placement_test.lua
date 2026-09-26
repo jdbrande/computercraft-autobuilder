@@ -169,6 +169,13 @@ test('fixed construction waypoints converge with one adjacent reservation grante
     task=gatedRun(w,task,new,saved,reboot); eq(task.phase,'completed'); eq(w.places,2); eq(task.progress,2)
   end
 end)
+test('project-wide clearance lets a low region cross previously built taller regions',function()
+  local w,task,new,saved=fixture({block('stone',{},3,1,0)})
+  task.clearanceY=6; w.items[1]={name='minecraft:stone',count=1}
+  w.blocks['1,4,0']={name='minecraft:stone',state={}}
+  task=gatedRun(w,task,new,saved,true)
+  eq(task.phase,'completed'); eq(w.places,1)
+end)
 test('support inspection resumes its return stage across reservation yields and reboot',function()
   for _,reboot in ipairs({false,true}) do
     local w,task,new,saved=fixture({block('oak_slab',{type='bottom',waterlogged='false'},1,0,0)}); w.pose.y=2; w.items[1]={name='minecraft:oak_slab',count=1}; w.blocks['1,-1,0']={name='minecraft:stone',state={}}

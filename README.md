@@ -1,4 +1,4 @@
-# Autobuilder 0.10.0
+# Autobuilder 0.10.1
 
 A CC:Tweaked controller and Turtle system for Minecraft Java **1.20.1**. It plans
 materials, acquires supported resources, runs crafting and furnaces, converts and
@@ -21,6 +21,7 @@ cells, unavailable resources and uncertain recovery remain visible blocked work.
 | Builder resupply and chest-to-chest transport | [Logistics](docs/logistics.md) |
 | Managed trees and crops | [Renewables](docs/renewables.md) |
 | Configured depot footprint expansion | [Infrastructure](docs/infrastructure.md) |
+| Simplified cathedral sections and first live pilot | [Cathedral plan](blueprints/classic-cathedral/README.md) |
 
 ## Hardware target
 
@@ -56,7 +57,7 @@ The project is hosted at [jdbrande/computercraft-autobuilder](https://github.com
 The commands below use that repository. To prepare a fork, change the raw URL with:
 
 ```sh
-python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.0
+python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.10.1
 ```
 
 Publish `installer.lua`, `update.lua`, `startup.lua`, `manifest.json`, and

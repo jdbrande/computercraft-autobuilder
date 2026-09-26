@@ -1,6 +1,6 @@
 # Installation, updates and offline deployment
 
-Release **0.10.0** packages resource acquisition, production, schematic projects,
+Release **0.10.1** packages resource acquisition, production, schematic projects,
 construction/verification/repair, managed renewables and logistics. Python is needed only
 on the desktop when preparing releases or offline folders. Computers and turtles
 use CC:Tweaked's Lua, HTTP, filesystem and JSON APIs with no downloaded libraries.
@@ -41,7 +41,7 @@ Start with the [main setup and command guide](../README.md), then follow
 2. In the desktop project directory, set the raw repository URL:
 
    ```sh
-   python3 tools/release.py --base https://raw.githubusercontent.com/USERNAME/REPOSITORY/main --version 0.10.0
+   python3 tools/release.py --base https://raw.githubusercontent.com/USERNAME/REPOSITORY/main --version 0.10.1
    ```
 
 3. Commit/publish the application sources together with generated `installer.lua`
