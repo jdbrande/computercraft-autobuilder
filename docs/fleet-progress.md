@@ -1,0 +1,87 @@
+# Fleet requirements progress
+
+Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
+[autonomous mining plan](autonomous-mining-plan.md). Updated 2026-10-02.
+
+## Current work
+
+- Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
+- Current branch: `milestone/0.13.0`, resource dependency graph and provider registry.
+- Next: finish provider selection, expose aggregated dependency nodes/operations,
+  integrate acquisition and operator visibility, then inventory ownership and fuel
+  delivery/rescue in dependency order. Continue through all rows below.
+- No external blocker is currently established. Missing implementation is remaining
+  work, not an external blocker.
+
+## Requirement coverage
+
+“Partial” means useful existing behavior exists but the complete section is not
+accepted. Suggested examples are supported through registered adapters; unavailable
+Minecraft hardware must be reported honestly rather than emulated as completion.
+
+| Requirements | Current evidence | Remaining acceptance |
+| --- | --- | --- |
+| 1–2, 40, 43: complete fleet and hands-off pipeline | Small autonomous chain live-verified in 0.12.0 | Concurrent mixed-material large fleet, binary schematic entry, automatic recovery, safe final return |
+| 3: coordination, persistence, physical accounting, capabilities | Existing queues, journals and validated worker telemetry | Extend the same guarantees to all new providers/reservations |
+| 4: logical roles | Miners, builders, Crafty workers, furnace controller, managed farms and courier executor | More harvest/processor adapters, fleet-level logistics/rescue; optional scouting |
+| 5: automatic registration | Installer, discovery/setup sharing, reconnect and capabilities | Single fleet install flow, equipment/software negotiation, automatic eligibility |
+| 6: schematic analyzer | JSON and desktop Sponge converter, transforms, supported-state classification | Native binary import, supported block entities/fluids/redstone analysis, required tools |
+| 7: recursive dependency graph | Recursive planner with surplus and reserve accounting | In progress: explicit aggregated nodes and operation edges; bounded expansion |
+| 8: provider registry | Acquisition paths hard-coded in production | In progress: deterministic configured candidates, availability/preferences, durable selection |
+| 9: autonomous mining | Accepted 0.12.0 with four live explorers | Preserve during later pipeline integration |
+| 10: mining intelligence | Surveys, observed resources, protection, routes and exhaustion | Persist hazard/inaccessibility/density evidence and apply ranking |
+| 11: fuel management | Finite mission/return budgets, reserved fuel and some builder refueling | Configurable fuel providers, fleet forecasting, stations/distribution/rescue |
+| 12: logistics network | Journaled point-to-point courier and supply batch executors | Pickup/destination capacity reservations, automatic station routing and dispatch |
+| 13: storage abstraction | Aggregated wired physical stock, one factory barrier | Available/reserved/transit/expected/project views; concurrent ownership |
+| 14: continuous forecasting | Acquisition targets and shortages | Proactive per-project coverage of all physical/expected states |
+| 15: parallel crafting | One exclusive Crafty station | Multiple stations and finite tasks backed by ingredient/output leases |
+| 16: processing network | Furnace lanes and fuel partitioning | Generic machine providers, timing/capacity forecasts and supported processors |
+| 17: renewables | Managed trees, crops, column farms with replant/return journals | Provider coverage/reserve policies for registered additional farms |
+| 18: builder fleet | Owned regions and movement reservations | Concurrent multi-builder acceptance with independent supply and dependencies |
+| 19–20: placement graph/adapters | Basic support, stairs/slabs/logs, doors, panes/fences, ladders/lanterns | Beds, signs, rails, buttons/redstone/plants and supported fluid/tile adapters; cross-region dependencies |
+| 21: builder supply | Bounded journaled supply batches | Early replenishment and automatic project logistics/direct delivery |
+| 22–23: verification/repair | Physical comparison and explicit repair jobs | Automatic bounded defect scheduling and independent repair-worker acceptance |
+| 24: worker states | Heartbeats, task/fuel/pose/errors | Equipment/software health and full recovery-state presentation |
+| 25: rescue | Safe blocked return and journal preservation | Fuel delivery, reachable inventory recovery and automatic recovery missions |
+| 26: offline owners | Ownership survives timeout/restart | Extend to new leases and configurable recovery commands |
+| 27: chunk loading | Explicit operator-loaded envelope assumption | Installed-mod integration, loaded mission checks and unsupported-area blocking |
+| 28–29: protection/traffic | Protected projects/depots/routes, cell reservations | Global station/farm registration, larger fleet deadlock/routing checks |
+| 30–31: priorities/scheduling | Capabilities, dependencies and exclusive jobs | Priority/cost/fuel/chunk scheduling, dynamic roles and simultaneous projects |
+| 32–34: monitor, commands, logs | Terminal screens and role/project commands, rotating logs | Monitor fleet dashboard, consistent fleet/project/resource/recovery commands, structured significant events |
+| 35–37: messages, duplicates, checkpoints | Existing validation, exact receipts and physical-action journals | Apply and regression-test every new message and side effect |
+| 38–39: completion and failures | Verified small projects and visible blocked states | Final inventory/logistics/worker settlement gate, bounded automatic retries and actionable project errors |
+| 41–42: dependency-ordered milestones | Milestone 1 accepted | Implement remaining milestones using existing controller/executor boundaries |
+
+## Evidence and discovered bugs
+
+- 0.12.0 permanent report: [validation-0.12.0.md](validation-0.12.0.md).
+- Final clean-main release gate at `fc15407`: 406 Lua tests, 16 Python tests,
+  release artifact check and whitespace check passed; git status empty.
+  Local logs: `dist/release-0.12.0/`.
+- Live 0.12.0: controller 100, four miners, crafter and builder, finite fuel,
+  staged loaded territory; original 3/3 blocks and follow-up 1/1 verified.
+  Full evidence and limitations are in the release report; no claim of natural
+  terrain scale, scanner live acceptance or automatic chunk loading.
+- Fixed blocked CRAFT resume and duplicate production after released supply;
+  regression tests failed before fixes and passed after. Commit `487c1bb`.
+- Live harness exposed possible console-event loss during yielding peripheral
+  calls. Terminal input reliability remains a tracked runtime recovery item.
+
+## Decisions and authorization
+
+- Ruling: execute natively on milestone branches in the current checkout — user
+  authorized autonomous Git choices and continued current-branch work; this keeps
+  IDE paths stable. Cost: no separate working-directory isolation; keep commits
+  bounded and leave the unrelated `.worktrees/autonomous-production` untouched.
+- Ruling: use the source-of-truth milestone order, inserting prerequisite durable
+  inventory reservations before parallel physical consumers — double spending
+  would invalidate every later fuel/logistics/factory acceptance.
+- User explicitly authorized routine commits, merges, pushes, live tests and
+  destructive test-world changes. Do not ask routine workflow/design approvals.
+  Preserve recovery guarantees in product code even when test fixtures may reset.
+- Two pre-existing HEIC photos remain unchanged and excluded locally by exact name.
+
+## Execution log
+
+- Milestone 1 released and independently reviewed; next implementation task is
+  provider registry configuration/selection with focused red-green tests.

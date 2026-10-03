@@ -18,12 +18,17 @@ Java 1.20.1 target; existing Python/Lupa tests and Python standard-library tooli
 **Spec:** [Milestone 1 design](autonomous-mining-design.md), governed by the user's
 [full fleet requirements](fleet-requirements.md), especially sections 41 and 42.
 
-**Execution:** All eight tasks implemented on `feature/autonomous-exploration`.
-The final independent review produced eight findings, addressed in one regression
-fix pass. Final evidence: 405 Lua tests; 16 Python tests run, one skipped;
-release checks passed. See [validation and live checklist](validation-autonomous-mining.md).
-Live Minecraft acceptance and branch integration remain pending. The operating
-guide records the exclusive-corridor and bounded-detour implementation decisions.
+**Execution:** Tasks 1–8 are implemented, integrated and released as `v0.12.0`
+(commit `fc15407`). Final checks: 406 Lua tests, all 16 Python tests, release
+and clean-tree checks passed. Live acceptance completed; see the permanent
+[0.12.0 report](validation-0.12.0.md). Track all remaining requirements and
+execution rulings in [fleet progress](fleet-progress.md).
+
+The user authorized continuous native implementation, routine integration/pushes
+and destructive Minecraft test-world changes on 2026-10-02. Proceed through the
+remaining source-of-truth requirements without milestone approval pauses.
+Tasks 1–8 constraints apply to the released exploration milestone; later tasks
+explicitly extend them according to the full fleet requirements.
 
 ## Global constraints
 
@@ -119,23 +124,23 @@ Use an isolated worktree at execution time, following the worktree skill.
 - `E.plan(sector, context) -> geometry | nil, reason`; context contains config,
   depot, exitRoute, protectedAreas, activeJobs, confirmedClear and availableFuel.
 
-- [ ] Add tests for disabled defaults, mode-specific required settings, negative
+- [x] Add tests for disabled defaults, mode-specific required settings, negative
   coordinates, clipping, 4096-sector acceptance, 4097-sector rejection, stable IDs
   after expansion, deterministic ordering and route/protection conflicts. Expanding
   a previously clipped edge sector must expose its newly added cells for survey
   without discarding the old cursor or changing an already-owned trip's geometry.
-- [ ] Run the suite and confirm the new module/config contract is the failure.
-- [ ] Add `mining.mode='fixed'|'explore'` with fixed default and optional dense
+- [x] Run the suite and confirm the new module/config contract is the failure.
+- [x] Add `mining.mode='fixed'|'explore'` with fixed default and optional dense
   `mining.exitRoute`. Add exploration configuration with enabled=false by default;
   enabled configurations require base, envelope bounds, dimension bounds and base
   protection. Validate the explicit schema rather than allowing arbitrary keys.
-- [ ] Implement the geometry functions with existing `pathfinding.find`. A route
+- [x] Implement the geometry functions with existing `pathfinding.find`. A route
   consists of adjacent coordinates from the depot exit to the sector entry;
   depot exits are declared already-clear traversal only. Cap route entries at
   `min(floor(maxTravelDistance),1024)` for bounded messages. Reject a mission whose
   outward route and return cannot fit fuel plus reserve; work uses a live return
   threshold. Unlimited fuel still respects geometry and route length limits.
-- [ ] Verify tests pass; commit this independently testable geometry/config change.
+- [x] Verify tests pass; commit this independently testable geometry/config change.
 
 ### Task 2: Negotiated exploration assignments and reports
 
@@ -149,19 +154,19 @@ accept optional assignment `p.exploration` from the data contract. Progress adds
 carrying only `jobId` to request a safe return. Existing envelopes remain version 1;
 the new assignment payload is explicitly versioned and capability-gated.
 
-- [ ] Add round-trip tests for valid exploration telemetry/assignment/progress and
+- [x] Add round-trip tests for valid exploration telemetry/assignment/progress and
   rejection tests for sparse/cyclic routes, nonadjacent waypoints, false coordinates,
   out-of-envelope entries, excessive observations, unknown results and legacy
   packets acquiring exploration fields through unvalidated copying.
-- [ ] Run and observe the new protocol assertions fail.
-- [ ] Validate dense lists before copying; route cap is 1024, observation cap 64 per
+- [x] Run and observe the new protocol assertions fail.
+- [x] Validate dense lists before copying; route cap is 1024, observation cap 64 per
   report, sector axes at most 8/3/8. Check finite integers, bounded strings and
   geometry membership. Copy only known validated fields. Preserve old telemetry
   and fixed mining messages byte-for-field where unchanged.
-- [ ] Advertise exploration support and home geometry from valid worker config;
+- [x] Advertise exploration support and home geometry from valid worker config;
   keep ordinary capabilities independent of role labels. Return unknown or
   malformed exploration data as an error, not an unrestricted legacy assignment.
-- [ ] Verify tests pass; commit protocol and capability negotiation.
+- [x] Verify tests pass; commit protocol and capability negotiation.
 
 ### Task 3: Acquisition groups and finite trip ownership
 
@@ -177,26 +182,26 @@ existing `progress(workerId,p,stock)` routes new trips by their saved group link
 `E.record(records,trip,report) -> true | nil,reason` merges validated observations
 and survey cursors, preserving ownership in the job records.
 
-- [ ] Add tests where a demand of 128 and two capable workers produces two disjoint
+- [x] Add tests where a demand of 128 and two capable workers produces two disjoint
   64-item trips. Assert unavailable/offline workers retain claims, zero/partial
   results leave the group open, duplicated reports do not alter credited counts,
   and failed saves produce no dispatchable ownership.
-- [ ] Add delayed-report cases: stock increases before progress, incidental drops
+- [x] Add delayed-report cases: stock increases before progress, incidental drops
   satisfy another material, stock refresh fails, and a partial result arrives after
   a restart. Assert no new quota exceeds uncovered demand and conservative waiting
   ends after reconciliation. Also test duplicate request keys and legacy groups.
   Temporary route/sector ownership conflicts must produce waiting, not permanent
   inaccessibility or search-envelope exhaustion.
-- [ ] Run and confirm these tests fail for the missing acquisition behavior.
-- [ ] Implement quota allocation from refreshed stock minus outstanding undelivered
+- [x] Run and confirm these tests fail for the missing acquisition behavior.
+- [x] Implement quota allocation from refreshed stock minus outstanding undelivered
   quotas. Choose geometry using task 1 and require the task 2 capability. Persist
   the trip, group linkage and original quota atomically before returning a job.
   Respect the existing factory barrier and workerBusy checks across both queues.
-- [ ] Accept terminal partial results only for a saved exploration owner, retain
+- [x] Accept terminal partial results only for a saved exploration owner, retain
   transfer uncertainty, and complete a group only with enough stock and no owned
   physical trips left to reconcile. Exhausted or inaccessible candidates produce
   visible shortfalls. Revisit only an unfinished cursor or newly permitted sector.
-- [ ] Verify tests pass; commit acquisition accounting and assignment.
+- [x] Verify tests pass; commit acquisition accounting and assignment.
 
 ### Task 4: Physical exploration and journaled excavation
 
@@ -208,27 +213,27 @@ For `task.exploration`, use saved assignment geometry and mutable
 `task.explorationProgress={cursor,observations,clearedRouteCount,result}`.
 Add executor `requestReturn() -> true | false,reason`; keep `step()` and `resume()`.
 
-- [ ] Add physical-world tests for excavation on the explicit access route, a
+- [x] Add physical-world tests for excavation on the explicit access route, a
   partial survey followed by return, cursor persistence across unloading, full
   cargo, finite fuel, optional scanner and inspection-only operation. Assert
   unrelated cells and protected exits are never dug.
-- [ ] Inject failure immediately before/after dig, movement and deposit. Include
+- [x] Inject failure immediately before/after dig, movement and deposit. Include
   falling gravel, waterlogged blocks, a changed tool slot, foreign item metadata,
   and an obstacle on return. Assert exact observed delivery or a preserved blocked
   intent; never repeated unbounded digs, spillover to slots 15/16 or false success.
-- [ ] Run and establish the failing physical regressions.
-- [ ] Limit dig permission to the assigned sector and access route. A clear exit
+- [x] Run and establish the failing physical regressions.
+- [x] Limit dig permission to the assigned sector and access route. A clear exit
   permits traversal only. Reuse scanner and inspection fallback; survey each
   sector layer so a saved survey cursor describes the actual pattern attempted.
   Keep observed targets and confirmations bounded using task 3's record format.
-- [ ] Journal exploration digs using the existing site's before/after block and
+- [x] Journal exploration digs using the existing site's before/after block and
   inventory approach, adapted to allowed mining drops. Unreconciled outcomes block.
   Require new inspection after each falling block and cap retries at the existing
   site-clearing bound of four; never infer a clear target from dig's return alone.
-- [ ] On trip end, retrace the saved trail, unload measured cargo and expose the
+- [x] On trip end, retrace the saved trail, unload measured cargo and expose the
   terminal reason. Low fuel and full cargo are partial trip results after unloading;
   blocked return remains nonterminal. Fixed-box mining retains existing behavior.
-- [ ] Verify tests pass; commit the executor and recovery behavior.
+- [x] Verify tests pass; commit the executor and recovery behavior.
 
 ### Task 5: Runtime dispatch and crash recovery
 
@@ -241,20 +246,20 @@ Send the task 2 fields from saved jobs; instantiate task 4 with the original
 payload. Completed exploration receipts retain delivered count and terminal
 survey result so acknowledgements can be retried without repeating physical work.
 
-- [ ] Add runtime tests for dropped assignments, dropped terminal reports/acks,
+- [x] Add runtime tests for dropped assignments, dropped terminal reports/acks,
   duplicate dispatch with different geometry, controller/worker restarts during
   partial unloading, and backup recovery missing the original assignment.
-- [ ] Assert a changed local fixed mining box does not rewrite an exploration
+- [x] Assert a changed local fixed mining box does not rewrite an exploration
   assignment, old receipts still replay correctly, and an offline owner cannot be
   replaced merely because its heartbeat expired. Run and observe failures.
-- [ ] Wire validated assignments and reports through existing transport. Worker
+- [x] Wire validated assignments and reports through existing transport. Worker
   duplicate acceptance compares the immutable exploration geometry too. Restore
   active saved exploration execution even if new exploration dispatch is disabled.
-- [ ] Extend safe receipt retirement to group/trip references and acknowledged
+- [x] Extend safe receipt retirement to group/trip references and acknowledged
   survey state. Never delete a trip while production references it or worker
   telemetry still reports it. Keep bounded historical receipts and confirm backup
   recovery cannot recreate a lease from a worker's unsupported claim.
-- [ ] Verify tests pass; commit runtime/recovery integration.
+- [x] Verify tests pass; commit runtime/recovery integration.
 
 ### Task 6: Production, protection and pause integration
 
@@ -269,25 +274,25 @@ survey result so acknowledgements can be retried without repeating physical work
 combines it with explicit protected infrastructure. Project pause calls
 `setAcquisitionPaused` and retries `mine_return` until owned workers return.
 
-- [ ] Add tests proving registered mining resources choose exploration when
+- [x] Add tests proving registered mining resources choose exploration when
   configured, farms still use HARVEST/FARM, recipes still use production operations,
   and no capable explorer yields an actionable blocked reason.
-- [ ] Add project-import overlap, paused outbound mission, disabled exploration,
+- [x] Add project-import overlap, paused outbound mission, disabled exploration,
   missing stock, and outstanding unload tests. Assert no factory starts before
   every affected physical miner has returned and reconciled. Run and observe failures.
-- [ ] Use the existing resource request -> acquisition -> physical-job boundary;
+- [x] Use the existing resource request -> acquisition -> physical-job boundary;
   tag the exploration provider without introducing a generic registry prematurely.
   Aggregate each group's workers and shortfall into the existing material status.
-- [ ] Build protected boxes from transformed imported volumes and known stations,
+- [x] Build protected boxes from transformed imported volumes and known stations,
   including standing/overhead clearance used by current build routes. Treat the
   configured base protection and explicit infrastructure boxes as dig exclusions.
   Refuse project/config mutations conflicting with owned work before saving them;
   never authorize a protected-area dig to recover progress.
-- [ ] Preserve explicit cleared exit traversal without weakening the global
+- [x] Preserve explicit cleared exit traversal without weakening the global
   navigation restrictions: the exploration route admits only its prevalidated
   clear-exit cells, and the dig guard still rejects them. Unknown return pose or a
   newly invalid route stops with a recovery explanation.
-- [ ] Verify tests pass; commit pipeline/protection/pause integration.
+- [x] Verify tests pass; commit pipeline/protection/pause integration.
 
 ### Task 7: Operator setup, status and bounded expansion
 
@@ -301,23 +306,23 @@ combines it with explicit protected infrastructure. Project pause calls
 Controller commands: `exploration status`, `exploration expand <radius>`,
 `exploration pause`, `exploration resume`.
 
-- [ ] Add setup transcript tests for valid save, cancel, missing depot/pose, bad
+- [x] Add setup transcript tests for valid save, cancel, missing depot/pose, bad
   exit routes, conflicting protection, invalid dimension bounds and active jobs.
   Add command tests for expansion that preserves IDs, shrink rejection, 4096-sector
   limit and keeping offline ownership. Run and observe failures.
-- [ ] Reuse setup's transactional settings save. Prompt for the base, operating
+- [x] Reuse setup's transactional settings save. Prompt for the base, operating
   boundary, loaded-area assumption, infrastructure protection and declared clear
   exits; display coordinates before saving. Do not move or consume fuel merely to
   detect hardware. Require known heading when it cannot be established.
-- [ ] Show material target/live stock, all owners, sector/cursor, trip quota,
+- [x] Show material target/live stock, all owners, sector/cursor, trip quota,
   state/fuel and actionable shortfalls. Keep existing screens usable on small
   terminals. Log assignments, partial deliveries, exhaustion and recovery using
   the existing logger, without flooding normal screens.
-- [ ] Explain exactly how to place/connect deposit chests, provide startup fuel,
+- [x] Explain exactly how to place/connect deposit chests, provide startup fuel,
   configure exits, keep the envelope loaded, import the current JSON schematic
   format and run `build auto NAME`. Clearly label direct `.schem` commands and
   automatic fuel rescue as later requirements, not implemented commands.
-- [ ] Verify tests pass; commit setup, commands and operating documentation.
+- [x] Verify tests pass; commit setup, commands and operating documentation.
 
 ### Task 8: Full acquisition to verified construction and release checks
 
@@ -330,34 +335,106 @@ modify `README.md`, `docs/autonomous-mining.md`; add
 `options.exploration`, `options.scanner`, `options.finiteFuel` and
 `options.restartAt`; retain existing defaults and existing tests.
 
-- [ ] Add a small-project test with two explorers sharing cobblestone demand, raw
+- [x] Add a small-project test with two explorers sharing cobblestone demand, raw
   coal/sand discovered in other sectors, no configured deposits, and no preloaded
   finished building blocks. Assert distinct ownership, an empty first-sector result,
   real deliveries, furnace/crafting output, exact placement and clean verification.
-- [ ] Repeat with inspection fallback and finite fuel; inject controller/worker
+- [x] Repeat with inspection fallback and finite fuel; inject controller/worker
   restarts plus lost terminal acknowledgements. Assert every worker is accounted
   for and no active exploration claim or unresolved transfer remains. Establish
   that the new acceptance tests initially fail on the missing integration.
-- [ ] Fix only demonstrated integration gaps; preserve the original autonomous
+- [x] Fix only demonstrated integration gaps; preserve the original autonomous
   chain and pilot tests. Record resource/fuel fixture setup so results do not imply
   fuel distribution or chunk-loading support that was not implemented.
-- [ ] Run `.venv/bin/python tests/run.py` and
+- [x] Run `.venv/bin/python tests/run.py` and
   `python3 -m unittest discover -s tests -p 'test_*.py'`. Require successful exits
   and inspect any skips. Record new counts from output, not this plan.
-- [ ] Generate a 0.12.0 candidate with
+- [x] Generate a 0.12.0 candidate with
   `python3 tools/release.py --version 0.12.0`, then run
   `python3 tools/release.py --check`, the installer tests in the Lua suite and
   `git diff --check`. Keep the existing release base URL; do not publish or update
   live computers as a side effect of generating artifacts.
-- [ ] Write the validation record and live checklist: loaded test area, two miners,
+- [x] Write the validation record and live checklist: loaded test area, two miners,
   one crafter, furnace/storage and one builder; second-sector selection, partial
   delivery, pause/return, reboot recovery and verified construction. Mark the live
   trial pending unless it actually ran in Minecraft. Commit the verified candidate.
 
-## Execution handoff
+## Continued execution: milestone 2, resource dependency graph
 
-Native execution is recommended because the protocol, ownership, physical actions
-and recovery contracts share state and benefit from one implementation context.
-Review this plan and choose native or subagent-driven execution before code work.
-After implementation, run a whole-change review and resolve reproduced issues.
-Implementation completion and live Minecraft acceptance must remain separate claims.
+**Spec:** [resource dependency design](resource-dependency-design.md), fleet
+requirements 7–8 and 41. Use native execution and test-first changes. Keep the
+0.12.0 behavior as the regression baseline. Do not rewrite its physical queues.
+
+**Review focus:** shared intermediate stock must not be spent twice; provider
+preferences must not steal active ownership; sparse/unknown preference data must
+fail validation; recipe expansion must remain bounded and reject invalid yields;
+missing workers/providers must produce recoverable status, never phantom stock.
+
+### Task 9: Resource provider registry
+
+**Files:** create `autobuilder/resources/providers.lua`, `tests/providers_test.lua`;
+modify `autobuilder/config.lua`, `tests/run.lua`.
+
+**Interfaces:** `Providers.candidates(item, config)` returns copied descriptors
+with stable `id`, `type`, `item`, optional `capability`, `farm`, `recipe`.
+`Providers.select(item, config, context)` returns descriptor or nil/reason;
+context accepts `available`, `required`, `workers`, `acquisitionOnly`.
+`Providers.validatePreferences(map)` validates item -> ordered dense provider-type
+lists. `config.providerPreferences` defaults to `{}`. Supported types: storage,
+exploration, mining, tree_farm, farm, crafting, smelting.
+
+- [ ] Add literal candidate/selection cases for iron, glass, oak logs, two farms,
+  stocked demand, configured type preference, offline fallback, and no provider.
+  Reject duplicate/unknown types, sparse arrays, invalid item/counts; verify
+  returned descriptors cannot mutate config. Run and observe missing module failure.
+- [ ] Implement registry over existing material/recipe/farm definitions. Require
+  compatible resource-filtered mining capabilities; absence of a workers context
+  means availability unknown, not all workers offline. Fall back to best configured
+  candidate when none currently available so recovery remains possible.
+- [ ] Add and validate the config field. Register tests in the complete suite.
+  Run focused tests and full Lua suite; expected zero failures. Commit.
+
+### Task 10: Explicit aggregated dependency graph
+
+**Files:** modify `autobuilder/blueprint/planner.lua`, `tests/production_test.lua`.
+
+**Interfaces:** `Planner.expand` keeps existing outputs and adds `graph.nodes`:
+item-keyed nodes with `required`, `available`, `deficit`, `produced`, `missing`,
+`projectRequired`, `provider`, and aggregate `inputs`; operations add `id` and
+`dependencies` of earlier producer operation IDs. Node `available` is usable
+original stock, not expected output. Provider metadata is explanatory planning
+state; only refreshed physical inventories establish completed acquisition.
+
+- [ ] Write cases with two roots sharing planks, intermediate/final stock and
+  surplus: aggregate exact demand without treating planned surplus as stock.
+  Check operation dependencies precede consumers and fuel shortages are represented.
+  Include malformed yield/count, excessive expansion, cycles and substitutions.
+  Observe failures before changing implementation.
+- [ ] Add graph accounting to the existing traversal and bounded validation.
+  Reuse provider descriptors; no alternate hardware executor or second queue.
+  Preserve old operation ordering and stock/fuel behavior. Run focused and full
+  suites and commit after passing.
+
+### Task 11: Provider dispatch, graph visibility and milestone acceptance
+
+**Files:** modify `autobuilder/core/production_service.lua`,
+`autobuilder/core/automation_service.lua`, `tests/production_test.lua`,
+`tests/automation_runtime_test.lua`; add `docs/resource-planning.md` and update
+`README.md`, `docs/fleet-progress.md`, release artifacts.
+
+**Interfaces:** acquisition chooses a provider only when no existing physical
+mine/group/harvest job owns the material. Save selected `material.provider` ID;
+resume existing jobs using saved geometry. `resource ITEM` returns a readable
+summary of selected/candidate providers and current graph demand/stock/deficit.
+
+- [ ] Add dispatch cases proving farm preference over mining, online fallback,
+  controller restart/offline owner/preference changes retain the original job,
+  newly configured farms recover blocked demand and unknown sources stay explicit.
+  Add command assertions against real request graph values. Observe failures.
+- [ ] Route provider choices into existing MINE/HARVEST/FARM paths; use ordinary
+  recipe operations for manufactured outputs. Keep the global factory barrier.
+  Implement read-only resource summary and document exact config/command usage.
+- [ ] Run full Lua/Python/release/whitespace checks; use meaningful live dispatch
+  acceptance where useful, record exact fixture/limitations. Request final branch
+  review, fix reproduced important issues with regressions, commit/integrate and
+  continue to inventory ownership and fuel automation without an approval pause.
