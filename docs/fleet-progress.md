@@ -1123,3 +1123,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   a70-cell hazardous trip and its next route, initial-unload recovery, malformed/regressing
   counters and legacy reports. Focused exploration/miner/runtime tests pass. No second
   review is planned. Final native regression extension and complete gates remain pending.
+
+- Native0.25 final-source review extension passed: preloaded depot cargo was excluded
+  from mined yield; an actual turtle obstruction retained its active trip across a
+  controller restart, then resumed automatically when removed. Independent reads
+  confirmed nine stored cobblestone (eight mined plus one explicit preload), empty
+  home cargo and1,846 finite fuel. Both computers are off and their eight test chunks
+  are unloaded. See validation-0.25.0.md. Complete Lua gates remain running.

@@ -1081,7 +1081,7 @@ prior delivery and hazard costs; `E.plan` consumes bounded known route obstacles
 
 ### Task52: Native intelligent exploration acceptance and integration
 
-- [ ] Run staged loaded hazard/alternative-resource native acquisition with finite fuel;
+- [x] Run staged loaded hazard/alternative-resource native acquisition with finite fuel;
   verify automatic useful selection, observed diagnostics and actual deposited stock.
 - [ ] Add regressions for discovered bugs, preserve cleanup/restart evidence and update
   permanent acceptance/progress documentation. Run one final review/fix pass and the
