@@ -256,6 +256,7 @@ function M.new(app,config,e,network,clock)
       end
       return true
     end
+    function self:resumeFuelTask() return miner():resume() end
     function self:poseRecovered()
       if config.mining.enabled and s.currentTask and (not s.currentTask.type or s.currentTask.type=='MINE') and s.currentTask.phase=='blocked'
         and s.currentTask.error=='trusted position and heading required' and U.heading(s.position.heading) then

@@ -527,9 +527,9 @@ operator configuration and visibility in Task18.
 **Files:** extend task/message/telemetry validation, worker recovery and courier
 executor; add rescue service tests and full-chain recovery scenario.
 
-- [ ] Add failing frozen-target/finite-courier cases with partial pickup/delivery,
+- [x] Add failing frozen-target/finite-courier cases with partial pickup/delivery,
   full receiver, lost acknowledgements, controller/worker reboot and blocked route.
-- [ ] Implement bounded identity-checked rescue handshake and measured fuel
+- [x] Implement bounded identity-checked rescue handshake and measured fuel
   delivery without replacing the original worker task. Reserve pickup/capacity,
   deny unsafe courier missions, resume only known fuel-blocked work and return the
   courier before releasing ownership. Run suites and commit.

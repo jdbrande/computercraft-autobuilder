@@ -157,7 +157,9 @@ test('controller scheduling survives its timer being consumed by a yielding peri
     local telemetry={label='Builder',status='idle',position={known=false},fuel=1600,inventory={used=1,slots=16},capabilities={telemetry=true}}
     pending=true
     broadcast({'rednet_message',2,{version=1,id='2:1:1',sender=2,boot=1,sequence=1,type='register',payload=telemetry},'autobuilder.v1'})
-    eq(filters[1],'task_complete')
+    local yielding=false; for _,filter in pairs(filters) do if filter=='task_complete' then yielding=true end end
+    assert(yielding,'fixture did not enter a yielding peripheral call')
+    broadcast({'rednet_message',3,{version=1,id='3:1:1',sender=3,boot=1,sequence=1,type='register',payload=telemetry},'autobuilder.v1'})
     e.now=102; broadcast({'timer',latest}) -- discarded by peripheral's event filter
     broadcast({'task_complete'})
     assert(timers>1,'scheduler timer was lost forever while the peripheral yielded')
@@ -166,4 +168,5 @@ test('controller scheduling survives its timer being consumed by a yielding peri
   end}
   local app=R.run(cfg('controller'),e)
   eq(app.state.workers['2'].online,false) -- periodic expiration still runs
+  assert(app.state.workers['3'],'network packet was discarded during a yielding peripheral call')
 end)

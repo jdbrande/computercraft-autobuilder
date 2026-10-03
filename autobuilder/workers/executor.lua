@@ -2,7 +2,7 @@ local U=require('autobuilder.core.util')
 local Reports=require('autobuilder.core.reports')
 local M={}
 local construction={BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true}
-local modules={BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',
+local modules={RESCUE='autobuilder.workers.fuel_courier',BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',
   CRAFT='autobuilder.factory.crafting',TRANSPORT='autobuilder.workers.courier',HARVEST='autobuilder.resources.logger',FARM='autobuilder.resources.farmer'}
 function M.new(app,config,e,network,clock)
   local s=app.state; s.completedTasks=s.completedTasks or {}; s.pendingSupplyAcks=s.pendingSupplyAcks or {}; local self={}; local lastSend=-math.huge
@@ -53,6 +53,12 @@ function M.new(app,config,e,network,clock)
     if t.type=='REFUEL' or t.type=='RETURN_HOME' or t.type=='CRAFT' then t.phase='work'; t.error=nil; t.blockedCategory=nil; return true end
     return engine():resume()
   end
+  function self:resumeFuelTask()
+    -- Remote delivery satisfied the fuel recovery; do not keep executing the
+    -- old depot detour and demand a second top-up after travelling home.
+    s.currentTask.fuelRecovery=nil
+    return resumeTask()
+  end
   local function recoverSupplyReceipt()
     local t=s.currentTask
     if t and t.lastSupply and t.supplyReceiptId and not t.supplyRequest then
@@ -80,6 +86,15 @@ function M.new(app,config,e,network,clock)
     if previous and (m.boot<previous.boot or (m.boot==previous.boot and m.sequence<=previous.sequence)) then return false,'stale task control' end
     s.lastTaskControl={boot=m.boot,sequence=m.sequence}; save()
     local p=m.payload; local t=s.currentTask
+    if m.type=='task_fuel_freeze' or m.type=='task_fuel_consume' or m.type=='task_fuel_release' then
+      local recovery=app.fuelRecovery; if not recovery then return false,'fuel recovery unavailable' end
+      local method=({task_fuel_freeze='freeze',task_fuel_consume='consume',task_fuel_release='release'})[m.type]
+      local ok,why=recovery[method](recovery,p)
+      local status=recovery:status(p.jobId) or {jobId=p.jobId,phase='blocked',position=U.copy(s.position),
+        quantity=0,capacity=0,fuel=e.turtle.getFuelLevel(),error=tostring(why):sub(1,512)}
+      if status.error then status.error=tostring(status.error):sub(1,512) end
+      send('task_fuel_status',status); return ok,why
+    end
     if m.type=='task_supply_ack' then
       if s.pendingSupplyAcks[p.supplyId]~=p.jobId then return false,'supply receipt job mismatch' end
       s.pendingSupplyAcks[p.supplyId]=nil; save(); return true
@@ -89,7 +104,7 @@ function M.new(app,config,e,network,clock)
       if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report}) end
       if require('autobuilder.core.receipts').archived(s,'completedTasks',j.id) then return false,'Old acknowledged task was archived; restore the matching controller checkpoint' end
       if t then return t.id==j.id,'worker already has a task' end
-      local cap=({CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
+      local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end
       s.currentTask=U.copy(j); s.currentTask.phase='setup'; s.status='setup'; self.engine=nil; save(); return true
     end
@@ -115,6 +130,10 @@ function M.new(app,config,e,network,clock)
   function self:tick()
     if clock()-lastSend<config.heartbeatInterval then return true end
     recoverSupplyReceipt()
+    if app.fuelRecovery and app.fuelRecovery:active() then
+      local status=app.fuelRecovery:status(); if status.error then status.error=tostring(status.error):sub(1,512) end
+      send('task_fuel_status',status)
+    end
     for supplyId,jobId in pairs(s.pendingSupplyAcks) do send('task_supply_done',{jobId=jobId,supplyId=supplyId}) end
     if s.motionReservation and not s.motionReservation.granted then send('task_reserve',s.motionReservation) end
     if not generic() then lastSend=clock(); return true end
@@ -125,7 +144,7 @@ function M.new(app,config,e,network,clock)
     if t.type=='CRAFT' and t.production and t.production.stockSequence then
       stockReceipt={sequence=t.production.stockSequence,withdrawn=U.copy(t.production.withdrawn or {}),delivered={[t.item]=t.production.delivered or 0}}
     end
-    send('task_progress',{stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
+    send('task_progress',{fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
       missingItem=t.supplyRequest and t.supplyRequest.item or t.missingItem,
       missingCount=t.supplyRequest and t.supplyRequest.count or t.missingCount,supplyId=t.supplyRequest and t.supplyRequest.id,report=Reports.compact(t.report)})
     return true
@@ -159,7 +178,7 @@ function M.new(app,config,e,network,clock)
         local ok,err=refuelInPlace(math.max(config.mining.fuelTarget,required))
         if not ok then
           t.resumePhase=t.phase~='blocked' and t.phase or t.resumePhase
-          t.phase='blocked'; t.blockedCategory='fuel'; t.error='Insufficient construction fuel: '..tostring(err); save()
+          t.requiredFuel=required; t.phase='blocked'; t.blockedCategory='fuel'; t.error='Insufficient construction fuel: '..tostring(err); save()
         end
       end
     end
@@ -206,6 +225,9 @@ function M.new(app,config,e,network,clock)
       return true
     end
     if t.phase=='blocked' then
+      if t.type=='RESCUE' and t.cargo and t.cargo.intent then
+        engine():step(); s.status=t.phase; save(); return true
+      end
       if t.error and tostring(t.error):find('movement reservation pending',1,true) and s.motionReservation and s.motionReservation.granted then resumeTask()
       elseif t.blockedCategory=='immature' and clock()-(t.lastFarmRetry or 0)>=config.farmRetrySeconds then
         t.lastFarmRetry=clock(); engine():resume(); save()
@@ -228,7 +250,9 @@ function M.new(app,config,e,network,clock)
         assert(config.fuel.enabled and t.station and U.distance(t.station.position,config.depot)==0,'managed fuel station does not match depot')
       end
       t.homeRoute=t.homeRoute or {}
-      local ok,err=require('autobuilder.workers.resupply').travel(t.homeRoute,t,app.navigation,config.depot,save,e.turtle,config)
+      local routes=require('autobuilder.workers.resupply')
+      local travel=t.type=='REFUEL' and routes.stationTravel or routes.travel
+      local ok,err=travel(t.homeRoute,t,app.navigation,config.depot,save,e.turtle,config)
       if ok and t.type=='REFUEL' then ok,err=require('autobuilder.storage.inventory').new(e.turtle,config):refuel(t.fuelTarget or config.mining.fuelTarget,true) end
       t.phase=ok and 'completed' or 'blocked'; t.error=err; t.progress=ok and 1 or 0; save(); return true
     end

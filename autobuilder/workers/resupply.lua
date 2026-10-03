@@ -107,6 +107,32 @@ function M.travel(s,task,nav,target,save,turtle,config)
   if target.heading then local ok,err=nav:face(target.heading); if not ok then return false,err end end
   return true
 end
+-- A fuel chest occupies the block above its stand. Descend beside it and
+-- enter horizontally; the ordinary overhead route would hit the chest.
+function M.stationTravel(s,task,nav,target,save,turtle,config)
+  if not U.position(target) then return false,'fuel station position is missing' end
+  if U.distance(nav.pose,target)==0 then return true end
+  if not s.stationApproach then
+    for _,offset in ipairs({{-1,0},{1,0},{0,-1},{0,1}}) do
+      local p={x=target.x+offset[1],y=target.y,z=target.z+offset[2]}; local protected=false
+      for _,area in ipairs(config.restrictedAreas or {}) do
+        if p.x>=area.min.x and p.x<=area.max.x and p.y>=area.min.y and p.y<=area.max.y
+          and p.z>=area.min.z and p.z<=area.max.z then protected=true end
+      end
+      if not protected then s.stationApproach=p; break end
+    end
+    if not s.stationApproach then return false,'fuel station has no unprotected side approach' end
+    s.route=nil; save()
+  end
+  if not s.stationApproached then
+    local ok,why=M.travel(s,task,nav,s.stationApproach,save,turtle,config)
+    if not ok then return false,why end
+    s.stationApproached=true; s.route=nil; save()
+  end
+  local ok,why=nav:goTo(target); if not ok then return false,why end
+  if target.heading then return nav:face(target.heading) end
+  return true
+end
 function M.new(task,e,config,nav,save)
   local self={task=task}; local t=e.turtle; local fault
   local function persist()

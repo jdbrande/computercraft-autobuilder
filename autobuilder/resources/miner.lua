@@ -338,6 +338,7 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
       if task.returnReason=='survey exhausted' then return block('survey exhausted; only '..task.delivered..' / '..task.quantity..' collected') end
       local required=math.max(c.fuelTarget or 1000,math.max(#(task.outbound or {}),U.distance(config.depot,c.entry))*2+(config.minimumFuelReserve or 100)+(c.returnMargin or 8))
       if g then required=math.max(required,#travel*2+(config.minimumFuelReserve or 100)+(c.returnMargin or 8)+2) end
+      task.requiredFuel=required
       ok,err=inventory:refuel(required,true); if not ok then return block(err) end
       task.phase='travel'; return persist()
     end

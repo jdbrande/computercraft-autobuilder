@@ -1,6 +1,6 @@
 local U=require('autobuilder.core.util')
 local M={}
-M.types={FUEL_STATION=true,CRAFT=true,SMELT=true,BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true,PREPARE_SITE=true,TRANSPORT=true,HARVEST=true,FARM=true,REFUEL=true,RETURN_HOME=true}
+M.types={RESCUE=true,FUEL_STATION=true,CRAFT=true,SMELT=true,BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true,PREPARE_SITE=true,TRANSPORT=true,HARVEST=true,FARM=true,REFUEL=true,RETURN_HOME=true}
 local phases={setup=true,work=true,running=true,waiting=true,blocked=true,completed=true,paused=true,supply=true}
 local function bounded(value,depth,seen,budget)
   budget.n=budget.n+1; if budget.n>20000 or depth>12 then return false end
@@ -28,6 +28,8 @@ function M.validate(kind,p)
   if kind=='task_assign' then
     local j=p.job
     if type(j)~='table' or not U.shortString(j.id,100) or not M.types[j.type] then return false,'invalid task assignment' end
+    if j.type=='RESCUE' and (not U.position(j.source) or not U.position(j.destination) or not U.position(j.home)
+      or not U.integer(j.targetWorker) or j.targetWorker<0 or not U.integer(j.quantity) or j.quantity<1 or j.quantity>64) then return false,'invalid rescue assignment' end
     if j.managedFuel and (j.type~='REFUEL' or type(j.station)~='table' or not U.position(j.station.position)
       or not U.integer(j.fuelTarget) or j.fuelTarget<1 or j.fuelTarget>100000000) then return false,'invalid managed fuel assignment' end
     if j.type=='FUEL_STATION' then return false,'controller-only task' end
@@ -54,7 +56,20 @@ function M.validate(kind,p)
     if kind=='task_supply' or kind=='task_supply_done' or kind=='task_supply_ack' then
       if not U.shortString(p.supplyId,160) or p.supplyId:sub(1,#p.jobId+8)~=p.jobId..':supply:' or not p.supplyId:sub(#p.jobId+9):match('^%d+$') then return false,'supply batch identity required' end
     end
-    if kind=='task_progress' then
+    if kind=='task_fuel_freeze' then
+      if not U.position(p.position) or not U.shortString(p.item,128) or not U.integer(p.quantity) or p.quantity<1 or p.quantity>64
+        or not U.integer(p.fuelTarget) or p.fuelTarget<1 or p.fuelTarget>100000000 then return false,'invalid rescue freeze' end
+    elseif kind=='task_fuel_consume' then
+      if not U.integer(p.quantity) or p.quantity<1 or p.quantity>64 then return false,'invalid rescue consumption' end
+    elseif kind=='task_fuel_status' then
+      if not ({frozen=true,consuming=true,consumed=true,released=true,blocked=true})[p.phase] or not U.position(p.position)
+        or not U.integer(p.quantity) or p.quantity<0 or p.quantity>64 or not U.integer(p.capacity) or p.capacity<0 or p.capacity>64
+        or p.fuel~='unlimited' and (not U.finite(p.fuel) or p.fuel<0)
+        or p.error and not U.shortString(p.error,512) then return false,'invalid rescue status' end
+    elseif kind=='task_fuel_release' then
+      -- Identity-only release; the worker verifies its durable consumed receipt.
+    elseif kind=='task_progress' then
+      if p.fuelDelivered~=nil and (not U.integer(p.fuelDelivered) or p.fuelDelivered<0 or p.fuelDelivered>64) then return false,'invalid rescue delivery quantity' end
       local r=p.stockReceipt
       if r and (type(r)~='table' or not U.integer(r.sequence) or r.sequence<1 or r.sequence>9007199254740991
         or not quantities(r.withdrawn) or not quantities(r.delivered)) then return false,'invalid stock receipt' end

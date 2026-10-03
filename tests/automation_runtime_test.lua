@@ -346,3 +346,88 @@ test('native runtime protocol refuels an empty turtle through a claimed station 
   eq(refuels,1); assert(not require('autobuilder.core.workflows').workerBusy(f.c.state,12))
   assert(not f.rejections,table.concat(f.rejections or {},'; '))
 end)
+
+test('fleet runtime rescues a stranded worker and resumes its original task across lost receipts and reboot',function()
+  local f=fixture(); local h=f.h; local courier=f.we.turtle
+  local ve=environment(13); ve.peripheral=f.we.peripheral
+  local recipient={slots={[1]={name=mc('coal'),count=4}},fuel=0,burns=0}
+  local vt=S.turtle(); vt.fuel=0; ve.turtle=vt
+  vt.inspect=function() return false end; vt.inspectUp=vt.inspect; vt.inspectDown=vt.inspect
+  vt.getItemDetail=function(i) return U.copy(recipient.slots[i]) end
+  vt.getItemCount=function(i) return recipient.slots[i] and recipient.slots[i].count or 0 end
+  vt.getItemSpace=function(i) return 64-vt.getItemCount(i) end
+  vt.select=function(i) recipient.selected=i; return true end
+  vt.refuel=function(n)
+    local i=recipient.slots[recipient.selected]; assert(i and i.name==mc('coal'))
+    local used=math.min(n,i.count); i.count=i.count-used; if i.count==0 then recipient.slots[recipient.selected]=nil end
+    vt.fuel=vt.fuel+80*used; recipient.burns=recipient.burns+1; return true
+  end
+  h.inventories.fuel={}; courier.fuel=500
+  courier.getItemSpace=function(i) return 64-courier.getItemCount(i) end
+  courier.inspect=function() return false end
+  courier.inspectUp=function()
+    local p=f.w.state.position
+    if p.x==0 and p.y==64 and p.z==0 then return true,{name=mc('chest')} end
+    return false
+  end
+  courier.inspectDown=function()
+    local p=f.w.state.position
+    if p.x==5 and p.y==65 and p.z==0 then return true,{name='computercraft:turtle_advanced'} end
+    return false
+  end
+  courier.suckUp=function(n)
+    for slot,i in pairs(h.inventories.fuel) do
+      local moved=math.min(n,i.count); h.slots[h.selected]={name=i.name,count=(h.slots[h.selected] and h.slots[h.selected].count or 0)+moved}
+      i.count=i.count-moved; if i.count==0 then h.inventories.fuel[slot]=nil end; return true
+    end
+    return false
+  end
+  courier.dropDown=function(n)
+    local p=f.w.state.position; eq(p.x,5); eq(p.y,65)
+    local i=h.slots[h.selected]; local moved=math.min(n,i.count)
+    recipient.slots[1].count=recipient.slots[1].count+moved
+    i.count=i.count-moved; if i.count==0 then h.slots[h.selected]=nil end
+    return true
+  end
+  local call=f.we.peripheral.call; local getType=f.we.peripheral.getType
+  f.we.peripheral.getType=function(name) return name=='bottom' and 'turtle' or getType(name) end
+  f.we.peripheral.call=function(name,method,...) if name=='bottom' and method=='getID' then return 13 end; return call(name,method,...) end
+  local C=require('autobuilder.config')
+  f.cc.fuel={enabled=true,low=80,target=160,stations={{id='courier',workerId=12,inventory='fuel',position={x=0,y=64,z=0},targetItems=2}}}
+  f.wc.fuel={enabled=true,low=80,target=160}; f.wc.depot={x=0,y=64,z=0}; f.wc.automation.courier=true
+  local vc=C.load({role='worker',controllerId=7,initialPosition={x=5,y=64,z=0,heading='north'},depot={x=5,y=64,z=3},
+    fuel={enabled=true,low=80,target=160},mining={fuelTarget=160},heartbeatInterval=1,registrationInterval=3,workerTimeout=8})
+  f.cc=C.load(f.cc); f.wc=C.load(f.wc)
+  f.c=Runtime.new(f.cc,f.ce); f.w=Runtime.new(f.wc,f.we); local v=Runtime.new(vc,ve)
+  local original=f.c.automation.queue:submit('RETURN_HOME',{preferredWorker=13},{})
+  local rebooted,dropped=false,false
+  local function pump()
+    for _=1,8 do
+      local any=false; local apps={[7]=f.c,[12]=f.w,[13]=v}
+      for _,env in ipairs({f.ce,f.we,ve}) do
+        local packets=env.packets; env.packets={}
+        for _,p in ipairs(packets) do
+          any=true
+          if not dropped and p.message.type=='task_fuel_status' and p.message.payload.phase=='consumed' then dropped=true
+          else local ok,why=apps[p.to]:receive(p.message.sender,p.message,p.protocol)
+            assert(ok or why=='task message needs current worker registration' or tostring(why):find('position reserved by worker',1,true),why) end
+        end
+      end
+      if not any then break end
+    end
+  end
+  for _=1,150 do
+    f.ce.now=f.ce.now+1; f.we.now=f.ce.now; ve.now=f.ce.now
+    for _,app in ipairs({f.c,f.w,v}) do assert(app:tick()); pump(); assert(app:workStep()); pump() end
+    if not rebooted and recipient.burns>0 and v.fuelRecovery:active() then
+      local originalId=v.state.currentTask.id; eq(originalId,original.id)
+      f.c=Runtime.new(f.cc,f.ce); v=Runtime.new(vc,ve); rebooted=true
+    end
+  end
+  assert(rebooted and dropped); eq(recipient.burns,1); eq(recipient.slots[1].count,4)
+  eq(f.c.state.automation.jobs[original.id].status,'completed'); eq(v.state.currentTask,nil)
+  eq(v.state.position.x,5); eq(v.state.position.z,3); assert(vt.fuel>0); assert(courier.fuel<500 and courier.fuel>100)
+  local rescues=0
+  for _,j in pairs(f.c.state.automation.jobs) do if j.type=='RESCUE' then rescues=rescues+1; eq(j.status,'completed'); eq(j.rescueSettled,true) end end
+  eq(rescues,1); assert(not v.fuelRecovery:active()); eq(f.w.state.position.x,0); eq(f.w.state.currentTask,nil)
+end)

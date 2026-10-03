@@ -13,6 +13,9 @@ function M.new(app,config,e,queue,production,clock)
     return inv,F.count(inv,item)
   end
   local function stationTick(station)
+    for _,j in pairs(queue.state.jobs) do
+      if j.type=='RESCUE' and not j.rescueSettled and j.station.id==station.id then return end
+    end
     local row=stations[station.id]
     if not row then row={}; stations[station.id]=row; assert(save()) end
     local refuel=active(row.refuel)
@@ -28,7 +31,7 @@ function M.new(app,config,e,queue,production,clock)
       local distance=U.distance(t.position,station.position)
       -- The normal station route ascends two blocks, may step sideways out
       -- from under a chest, and retains navigation's return reserve throughout.
-      local required=distance==0 and 0 or distance+6+(config.minimumFuelReserve or 100)
+      local required=distance==0 and 0 or distance+8+(config.minimumFuelReserve or 100)
       assert(required<=t.fuel,'worker needs remote fuel rescue')
       refuel=queue:submit('REFUEL',{managedFuel=true,fuelReady=false,preferredWorker=worker.id,
         fuelTarget=config.fuel.target,station=U.copy(station)}, {}, 'fuel-worker:'..station.id..':'..tostring(row.refuel or 'first'))

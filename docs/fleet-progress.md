@@ -178,3 +178,19 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Task17 started: receiver recovery contract and four failing tests define frozen
   task preservation, measured delivery, consumption after a reboot, changed-message
   rejection, failed-save safety and refusal of uncertain or active movement.
+
+- Task17: receiver freeze/receipt/consumption, station-backed courier dispatch,
+  identity-checked partial delivery and return are implemented. All462 Lua tests
+  passed, including full runtime original-task recovery through lost receipts and
+  controller/recipient reboot. A stale pre-release heartbeat cannot start a second
+  rescue, and an interrupted delivery reconciles without manual resume.
+- Native fuel trial: depot worker113 reached160 fuel; courier112 delivered two
+  coal to stranded111, whose original RETURN_HOME task finished with152 fuel.
+  Two live bugs were reproduced and fixed: overhead return hit the station chest
+  (side approach now tested), and controller peripheral yields discarded incoming
+  release receipts (bounded network collector/main-loop drain now tested). The
+  first route was resumed after deployment; a fresh unattended retest on114/115
+  is in progress. The initial settled courier returned with462 finite fuel.
+- Task18 current: operational fuel status/setup documentation, fresh native
+  acceptance, complete release checks and whole-branch review. Dynamic scaling
+  and terrain preparation remain required later work under sections44–45.

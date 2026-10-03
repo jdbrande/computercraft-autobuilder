@@ -1,7 +1,7 @@
 local U=require('autobuilder.core.util')
 local Types=require('autobuilder.core.task_messages').types
 local M={}
-local caps={CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
+local caps={RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
 local function key(p) return p.x..','..p.y..','..p.z end
 local function intersects(a,b)
   if not a or not b then return false end
@@ -17,6 +17,8 @@ function M.workerBusy(state,owner,exceptId)
     if job.id~=exceptId and job.workerId==owner and job.status~='completed' and not job.physicalComplete then return true end
   end
   for _,job in pairs((state.automation or {}).jobs or {}) do
+    if job.id~=exceptId and job.type=='RESCUE' and not job.rescueSettled
+      and (job.preferredWorker==owner and job.status~='completed' or job.targetWorker==owner) then return true end
     if job.id~=exceptId and (job.workerId==owner or job.managedFuel and job.preferredWorker==owner) and job.status~='completed' then return true end
   end
   return false
@@ -98,6 +100,7 @@ function M.new(state,save,clock,id)
     local factoryPending=M.factoryPending(state)
     for _,j in ipairs(ordered) do
       local allowed=not (storageWorkers[j.type] and factoryPending)
+      if j.type=='RESCUE' then allowed=j.rescueReady==true and not M.factoryActive(state) end
       if j.managedFuel then allowed=j.fuelReady==true and not M.factoryActive(state) end
       if j.type=='CRAFT' then allowed=M.factoryCanRun(state,j) end
       if allowed and j.status=='queued' and not j.workerId and j.requiredCapability and self:ready(j) and not j.paused then
@@ -131,7 +134,9 @@ function M.new(state,save,clock,id)
     if not j or j.workerId~=owner then return false,'task owner mismatch' end
     if j.status=='completed' then return true end
     if (p.progress or 0)<j.progress then return false,'stale task progress' end
+    if j.type=='RESCUE' and p.fuelDelivered~=nil and (p.fuelDelivered<(j.fuelDelivered or 0) or p.fuelDelivered>j.quantity) then return false,'invalid rescue delivery counter' end
     j.progress=p.progress or 0; j.phase=p.phase; j.error=p.error; j.missingItem=p.missingItem
+    if j.type=='RESCUE' and p.fuelDelivered~=nil then j.fuelDelivered=p.fuelDelivered end
     j.missingCount=p.missingCount; j.supplyId=p.supplyId; j.report=U.copy(p.report)
     j.status=p.phase=='completed' and 'completed' or p.phase=='blocked' and 'blocked' or p.phase=='paused' and 'paused' or 'running'
     persist(); return true

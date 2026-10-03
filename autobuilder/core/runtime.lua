@@ -66,6 +66,7 @@ function M.new(config,e)
     if state.position.source=='gps' then state.position.source='local' end
     state.gpsError='awaiting GPS'
     self.navigation=require('autobuilder.core.navigation').new(e.turtle,state.position,config,function() return self:save() end)
+    self.fuelRecovery=require('autobuilder.workers.fuel_recovery').new(self,config,e)
     self.agent=require('autobuilder.workers.agent').new(state,config,network,e.turtle,function() return self:save() end)
   end
   self:save() -- Persist boot generation before producing any message IDs.
@@ -115,7 +116,7 @@ function M.new(config,e)
       local ok,why=self.agent:tick(clock())
       if not ok then self:report('WARN',why) end
     end
-    if self.automation.fuel and config.automation.enabled then self.automation.fuel:tick() end
+    if self.automation.preflight then self.automation:preflight() end
     self.mining:tick()
     self.automation:tick()
     if self.firstBuild then self.firstBuild:tick() end
@@ -151,6 +152,24 @@ function M.new(config,e)
   function self:workStep()
     if self.busy or self.gpsRequested or self.quitRequested then return true end
     if not self.agent then return self.automation:step() end
+    if self.fuelRecovery and self.fuelRecovery:active() then
+      self.busy=true
+      local ok,result,err=pcall(self.fuelRecovery.step,self.fuelRecovery)
+      self.busy=false
+      if not ok then error(result,0) end
+      -- A frozen recipient remains available for status and recovery messages.
+      if not result and err then self:report('WARN',err) end
+      return true
+    end
+    if state.fuelResume then
+      local task=state.currentTask
+      if task and task.id==state.fuelResume and not task.paused
+        and require('autobuilder.workers.fuel_recovery').needsFuel(task) then
+        local service=task.type=='MINE' and self.mining or self.automation
+        service:resumeFuelTask()
+      end
+      state.fuelResume=nil; self:save()
+    end
     if not state.currentTask or state.currentTask.phase=='completed' then return true end
     local generic=state.currentTask.type and state.currentTask.type~='MINE'
     if not generic and state.currentTask.phase=='blocked' then
@@ -207,15 +226,34 @@ end
 function M.run(config,e)
   e=e or _G
   local app=M.new(config,e)
+  local inbox={}; local dropped=0
+  local function collectNetwork()
+    while true do
+      local _,sender,message,protocol=e.os.pullEvent('rednet_message')
+      if #inbox<128 then inbox[#inbox+1]={sender,message,protocol}
+      else dropped=dropped+1 end
+    end
+  end
+  local function drainNetwork()
+    -- Only the main coroutine mutates controller/worker state. The collector
+    -- retains packets while a peripheral call yields with another event filter.
+    local batch=inbox; inbox={}
+    for _,p in ipairs(batch) do app:receive(p[1],p[2],p[3]) end
+    if dropped>0 then
+      app:report('WARN','Network inbox overflow: '..dropped..' packets dropped; durable protocols will retry')
+      dropped=0
+    end
+  end
   local function main()
-    app:tick(); app:draw()
+    app:tick(); drainNetwork(); app:draw()
     local nextTick=e.os.epoch('utc')/1000+1
     local timer=e.os.startTimer(1)
     while true do
       local name,a,b,c=e.os.pullEvent()
       if name=='timer' and a==timer then
         app:tick(); nextTick=e.os.epoch('utc')/1000+1
-      elseif not app:event(name,a,b,c) then return end
+      elseif name~='rednet_message' and not app:event(name,a,b,c) then return end
+      drainNetwork()
       if app.quitRequested and not app.busy then app:save(); return end
       -- CraftOS peripheral calls can yield with a task_complete filter and
       -- consume our one-shot timer while handling a command or network event.
@@ -244,8 +282,8 @@ function M.run(config,e)
   local function actionLoop()
     while true do app:workStep(); e.sleep(0.1) end
   end
-  -- Each coroutine gets its own event stream; slow hardware cannot eat heartbeats.
-  local ok,err=pcall(e.parallel.waitForAny,main,gpsLoop,actionLoop)
+  -- Start the collector first so an idle main loop can drain the same event.
+  local ok,err=pcall(e.parallel.waitForAny,collectNetwork,main,gpsLoop,actionLoop)
   if not ok then
     app:report('ERROR','Runtime stopped: '..tostring(err))
     app:save()

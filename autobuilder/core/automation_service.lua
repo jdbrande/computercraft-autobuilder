@@ -6,10 +6,11 @@ function M.new(app,config,e,network,clock)
   local queue=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,app.state.id)
   local production=require('autobuilder.core.production_service').new(app,config,e,queue)
   local fuel=require('autobuilder.core.fuel_service').new(app,config,e,queue,production,clock)
+  local rescue=require('autobuilder.core.fuel_rescue_service').new(app,config,e,queue,production,network,clock)
   local projects=require('autobuilder.blueprint.projects').new(app,config,e,queue,production)
   local cathedral=require('autobuilder.blueprint.cathedral').new(app,config,e,projects)
   local infrastructure=require('autobuilder.core.infrastructure').new(app,config,e,queue)
-  local self={queue=queue,production=production,fuel=fuel,projects=projects,infrastructure=infrastructure,cathedral=cathedral}; local last=-math.huge
+  local self={queue=queue,production=production,fuel=fuel,rescue=rescue,projects=projects,infrastructure=infrastructure,cathedral=cathedral}; local last=-math.huge
   local function send(owner,kind,payload) return network:send(owner,kind,payload) end
   function self:command(line)
     local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
@@ -48,7 +49,9 @@ function M.new(app,config,e,network,clock)
     if not worker or not worker.online or worker.boot~=m.boot then return false,'task message needs current worker registration' end
     if m.sequence<=math.max(worker.sequence or 0,worker.taskSequence or 0) then return false,'stale task packet' end
     worker.taskSequence=m.sequence
-    local p=m.payload; local j=queue.state.jobs[p.jobId] or (app.state.jobs or {})[p.jobId]
+    local p=m.payload
+    if m.type=='task_fuel_status' then return rescue:handle(sender,p) end
+    local j=queue.state.jobs[p.jobId] or (app.state.jobs or {})[p.jobId]
     if j and not j.workerId and m.type=='task_progress' then queue:recoverOwner(sender,p,app.state.workers) end
     if not j or j.workerId~=sender then return false,'unknown task or owner' end
     if m.type=='task_progress' then
@@ -74,6 +77,9 @@ function M.new(app,config,e,network,clock)
       return false,err
     end
     return false,'unexpected worker task packet'
+  end
+  function self:preflight()
+    if config.automation.enabled then fuel:tick(); rescue:tick() end
   end
   function self:tick()
     if not config.automation.enabled then return true end
