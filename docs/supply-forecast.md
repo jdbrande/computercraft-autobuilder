@@ -24,7 +24,10 @@ owned work.
 Builders and repair workers with positive cargo at or below a quarter of the supply
 batch top up before placing their last held item, when the remaining region needs
 more. The amount is capped by the configured batch and remaining requirement after
-subtracting usable held items. Reserved slots and NBT-tagged inventory do not count.
+subtracting usable held items, and safe receiving capacity. Matching stacks use
+the native free-space count; empty slots initially count as one item until their
+stack capacity is known. A full inventory skips early top-up. Reserved slots and
+NBT-tagged inventory do not count.
 The existing supply journal owns this top-up through restart and partial transfer.
 It waits for stock and returns to the station through the normal resupply flow.
 
@@ -33,3 +36,7 @@ support checks and movement routes finish before an early top-up can begin. At z
 cargo the existing inspected-shortage path still decides whether material is really
 needed. Initial full-project preparation and sustained production/build overlap
 remain separate pipeline work.
+
+Fresh task-bound harvest telemetry reports measured delivery separately from
+harvest progress. Held output is shown once; future yield excludes that cargo and
+delivered output. Legacy, offline or unresolved mutation evidence remains unknown.

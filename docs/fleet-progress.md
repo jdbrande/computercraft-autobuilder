@@ -1234,3 +1234,15 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 
 - Propagated the shared physical-detour correction into0.26. Superseded the
   incomplete final Lua run and restarted on the merged source before integration.
+
+- Task56 broader project runtime suite passed. The single final0.27 review found
+  two important issues: oversized early top-up could strand staging, and harvesting
+  progress was incorrectly treated as delivery. Focused red/green tests now cover
+  native stack limits, full/reserved/tagged slots, validated delivery telemetry, and
+  actual HARVEST/FARM collection, partial deposit and reboot. The larger capacity
+  runtime regression and final release gates remain in progress.
+
+- The full-cargo early-supply regression passes for64- and16-item stacks across
+  power loss after a partial pull:65 placements,64 supplied items, empty staging
+  and released ownership. Python18 tests, generated release verification and
+  whitespace checks pass. Complete Lua and native acceptance are next.

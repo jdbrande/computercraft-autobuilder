@@ -72,3 +72,10 @@ a safe boundary. This starts acquisition before zero with one durable owner and
 requires no new network message. Cost: that worker waits during replenishment;
 overlapping initial production and sustained placement remains the next pipeline
 change rather than an unsupported claim in this milestone.
+
+Final review found two important defects, both accepted: early demand exceeded
+receiving capacity, and collected farm output was mistaken for delivery. Reuse
+resupply's conservative empty-stack rule and native matching-stack capacity.
+Add optional validated task-bound harvest delivery telemetry alongside the cargo
+snapshot; subtract both delivery and confirmed held output from future yield.
+Unresolved physical intents omit delivery evidence and remain explicitly unknown.

@@ -144,3 +144,11 @@ test('idle explorer advertises its departure fuel target before a trip exists',f
   local p=a:telemetry();eq(p.miningRoute.fuelTarget,1000);eq(p.miningRoute.entry.x,1);eq(p.task,nil)
   c.mining.exitRoute[1].x=2;eq(p.miningRoute.entry.x,1)
 end)
+
+test('renewable delivery telemetry is task bound bounded and retained by network cleaning',function()
+  local N=require('autobuilder.core.network');local p=packet('heartbeat',1)
+  p.payload.task='harvest';p.payload.harvestDelivered=2;assert(N.validate(12,p))
+  for _,bad in ipairs({-1,1.5,100000001,'2',false}) do p.payload.harvestDelivered=bad;assert(not N.validate(12,p)) end
+  p.payload.harvestDelivered=2;p.payload.task=nil;assert(not N.validate(12,p))
+  p.payload.task='harvest';local n=net(7,1);local m=assert(n:accept(12,p,'test',100));eq(m.payload.harvestDelivered,2)
+end)

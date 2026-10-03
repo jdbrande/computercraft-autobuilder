@@ -72,3 +72,30 @@ test('builder lookahead does not revive paused complete supply or speculative fo
   task.moveRoute={};eq(F.upcoming(task,t,c),nil);task.moveRoute=nil
   t.getItemDetail=function() return nil end;eq(F.upcoming(task,t,c),nil)
 end)
+
+test('early replenishment bounds native capacity including smaller stacks and skips full cargo',function()
+  local F=require('autobuilder.resources.material_forecast');local t=require('tests.support').turtle()
+  local items={};for s=1,16 do items[s]={name='minecraft:dirt',count=64} end
+  items[1]={name='minecraft:stone',count=1}
+  t.getItemDetail=function(s) return items[s] end
+  local limit=64;t.getItemSpace=function(s) return limit-(items[s] and items[s].count or 0) end
+  local task={type='BUILD',blocks={}};for i=1,65 do task.blocks[i]={name='minecraft:stone'} end
+  local c={supply={inventory='stage',batch=64}}
+  eq(F.upcoming(task,t,c).count,63)
+  limit=16;eq(F.upcoming(task,t,c).count,15)
+  limit=1;eq(F.upcoming(task,t,c),nil)
+  items[2]=nil;eq(F.upcoming(task,t,c).count,1)
+  items[2]={name='minecraft:stone',count=1,nbt='tag'};eq(F.upcoming(task,t,c),nil)
+end)
+
+test('harvest forecast separates held output from future yield and measured delivery',function()
+  local F=require('autobuilder.resources.material_forecast')
+  local j={id='harvest',type='HARVEST',item='log',quantity=5,progress=5,status='running',workerId=12}
+  local a=scope('a',{log=5},{harvest=j});local t={task='harvest',harvestDelivered=0,cargo={items={log=5}}}
+  local s={workers={['12']={online=true,telemetry=t}}}
+  local f=F.build(s,{log=0},{a}).a;eq(f.items.log.held,5);eq(f.items.log.harvesting,0);eq(f.items.log.deficit,0);eq(f.materialUnknown,false)
+  t.harvestDelivered=2;t.cargo.items.log=3
+  f=F.build(s,{log=2},{a}).a;eq(f.items.log.held,3);eq(f.items.log.harvesting,0);eq(f.items.log.stored,2);eq(f.items.log.deficit,0)
+  t.harvestDelivered=nil;f=F.build(s,{log=2},{a}).a;eq(f.materialUnknown,true);eq(f.items.log.held,3)
+  s.workers['12'].online=false;f=F.build(s,{log=2},{a}).a;eq(f.materialUnknown,true);eq(f.items.log.held,0)
+end)

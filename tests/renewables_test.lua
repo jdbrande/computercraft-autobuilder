@@ -169,3 +169,33 @@ test('farm soil inspection and planting resume with independent movement and mut
  end
  eq(task.phase,'completed');assert(rebooted);eq(w.digs,1);eq(w.plants,1);eq(task.delivered,1)
 end)
+
+test('renewable forecast follows collected cargo partial delivery and reboot without losing coverage',function()
+  for _,kind in ipairs({'oak','sugar_cane'}) do
+    local w,task,config,new,restart=setup(kind,2);task.id='harvest'
+    if kind=='oak' then
+      w.blocks['3,0,0']={name='minecraft:dirt',state={}};w.items[1]={name='minecraft:oak_sapling',count=1}
+      for y=1,2 do w.blocks['3,'..y..',0']={name=task.item,state={axis='y'}} end
+    else for y=1,3 do w.blocks['3,'..y..',0']={name=task.item,state={}} end end
+    config.automation={enabled=true};config.capabilities={};config.mining={}
+    local e=new();w.capacity=1;local collected=false
+    local function forecast()
+      local agent=require('autobuilder.workers.agent').new({id=12,position=U.copy(w.pose),currentTask=task},config,{},w.t,function() return true end)
+      local t=agent:telemetry()
+      local scope={project={name='p',requirements={[task.item]=2},jobs={}},work={harvest={id=task.id,type=task.type,item=task.item,quantity=2,progress=task.progress,status=task.phase=='completed' and 'completed' or 'running',workerId=12}}}
+      return require('autobuilder.resources.material_forecast').build({workers={['12']={online=true,telemetry=t}}},w.stock,{scope}).p
+    end
+    for _=1,200 do
+      e:step()
+      if task.progress==2 and task.delivered==0 and not task.intent and not collected then
+        local f=forecast();eq(f.items[task.item].held,2);eq(f.items[task.item].harvesting,0);eq(f.items[task.item].deficit,0);collected=true
+      end
+      if task.phase=='blocked' then break end
+    end
+    assert(collected);eq(task.delivered,1);eq(task.blockedCategory,'depot_full')
+    local f=forecast();eq(f.items[task.item].held,1);eq(f.items[task.item].stored,1);eq(f.items[task.item].harvesting,0);eq(f.items[task.item].deficit,0)
+    e,task=restart();f=forecast();eq(f.items[task.item].deficit,0)
+    w.capacity=10;assert(e:resume());run(e,task);eq(task.phase,'completed');eq(task.delivered,2)
+    f=forecast();eq(f.items[task.item].held,0);eq(f.items[task.item].stored,2);eq(f.items[task.item].deficit,0)
+  end
+end)

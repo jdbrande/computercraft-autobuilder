@@ -10,14 +10,17 @@ function M.upcoming(task,turtle,config)
     if name==item and item then remaining=remaining+1 end
   end
   if not item then return nil end
-  local held=0;local reserved=require('autobuilder.workers.resupply').reserved(config)
+  local held,capacity=0,0;local reserved=require('autobuilder.workers.resupply').reserved(config)
   for slot=1,16 do if not reserved[slot] then
     local value=turtle.getItemDetail(slot)
-    if value and value.name==item and not value.nbt then held=held+value.count end
+    if not value then capacity=capacity+1 -- Seed empty stacks conservatively, as resupply.slot does.
+    elseif value.name==item and not value.nbt then
+      held=held+value.count;capacity=capacity+(turtle.getItemSpace and turtle.getItemSpace(slot) or 0)
+    end
   end end
   local batch=config.supply.batch or 64
-  if held==0 or held>=remaining or held>math.max(1,math.floor(batch/4)) then return nil end
-  return {item=item,remaining=remaining,held=held,count=math.min(batch,remaining-held)}
+  if capacity<=0 or held==0 or held>=remaining or held>math.max(1,math.floor(batch/4)) then return nil end
+  return {item=item,remaining=remaining,held=held,count=math.min(batch,remaining-held,capacity)}
 end
 -- Read-only allocation for visibility. This does not create inventory promises;
 -- actual dispatch and transfer still require the existing physical ledger.
@@ -57,17 +60,29 @@ function M.build(state,stock,scopes)
         local item=j.item;local row=item and f.items[item]
         local kind=j.type=='CRAFT' and 'crafting' or j.type=='SMELT' and 'processing'
           or (j.type=='HARVEST' or j.type=='FARM') and 'harvesting' or (not j.type or j.type=='MINE') and 'mining'
+        local w=j.workerId and (state.workers or {})[tostring(j.workerId)]
+        local t=w and w.online and w.telemetry
+        if not (t and t.task==id and t.cargo and not t.cargo.error) then t=nil end
+        local held=0
+        if (current[id] or kind=='harvesting') and j.workerId and not seenCargo[j.workerId] then
+          seenCargo[j.workerId]=true
+          if t then
+            for name,n in pairs(t.cargo.items or {}) do if f.items[name] and (current[id] or name==item) then
+              f.items[name].held=f.items[name].held+n
+              if name==item then held=n end
+            end end
+          else f.materialUnknown=true end
+        end
         if row and kind then
           local delivered=kind=='mining' and type(j.progress)=='table' and (j.progress.delivered or 0)
-            or kind=='harvesting' and (j.progress or 0) or lease and (lease.delivered or {})[item] or 0
-          row[kind]=row[kind]+math.max(0,(j.quantity or (j.stockOutputs or {})[item] or 0)-delivered)
-        end
-        if current[id] and j.workerId and not seenCargo[j.workerId] then
-          seenCargo[j.workerId]=true
-          local w=(state.workers or {})[tostring(j.workerId)];local t=w and w.telemetry
-          if w and w.online and t and t.task==id and t.cargo and not t.cargo.error then
-            for name,n in pairs(t.cargo.items or {}) do if f.items[name] then f.items[name].held=f.items[name].held+n end end
-          else f.materialUnknown=true end
+            or lease and (lease.delivered or {})[item] or 0
+          if kind=='harvesting' then
+            delivered=t and t.harvestDelivered
+            if delivered==nil then f.materialUnknown=true end
+          end
+          if delivered~=nil then
+            row[kind]=row[kind]+math.max(0,(j.quantity or (j.stockOutputs or {})[item] or 0)-delivered-held)
+          end
         end
       end
     end

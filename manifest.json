@@ -582,7 +582,7 @@
       "version": "0.27.0"
     },
     {
-      "bytes": 8216,
+      "bytes": 8436,
       "path": "autobuilder/core/network.lua",
       "roles": [
         "controller",
@@ -592,7 +592,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "6e02cbf38be61c4e8d662765d8d59eacefd97bfa45e933c878202f6164768543",
+      "sha256": "79d4e3f0c2b69c05b4f460d536fd1fce5c5d61e3c93db83250c1ed1b20fc70cd",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/network.lua",
       "version": "0.27.0"
     },
@@ -1061,7 +1061,7 @@
       "version": "0.27.0"
     },
     {
-      "bytes": 6221,
+      "bytes": 6803,
       "path": "autobuilder/resources/material_forecast.lua",
       "roles": [
         "controller",
@@ -1071,7 +1071,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "a497a9d6e4911fbf5911b86cb75398118656cfa0b94c2235c8fa4341d58314b5",
+      "sha256": "8a0e2790a20c39e61a21dfc2ca268291a6153396fe7f1a8fb7aac0ae86932fde",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/resources/material_forecast.lua",
       "version": "0.27.0"
     },
@@ -1331,7 +1331,7 @@
       "version": "0.27.0"
     },
     {
-      "bytes": 4935,
+      "bytes": 5065,
       "path": "autobuilder/workers/agent.lua",
       "roles": [
         "controller",
@@ -1341,7 +1341,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "4a09bfa728a55a7eb1f0969b30ed08d051058a9b5a71b9935b711c33b3ee4fad",
+      "sha256": "548405d82addd6c9b16d968c0abf64c2aeb064512ffd1c9a2f881dbdb7db9d04",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/workers/agent.lua",
       "version": "0.27.0"
     },

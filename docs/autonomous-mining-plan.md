@@ -1156,24 +1156,24 @@ ordered integration of accepted0.24–0.26. Reuse production and inventory journ
 
 ### Task56: Validated material progress and project forecasts
 
-- [ ] Add failing mixed-item/door/air compact-report tests and malformed/regressing
+- [x] Add failing mixed-item/door/air compact-report tests and malformed/regressing
   owned progress cases. Implement optional per-item correct-position totals and
   preserve them through task payload retirement and project aggregation.
-- [ ] Add project forecast tests separating shared stock, held claims, actual transit,
+- [x] Add project forecast tests separating shared stock, held claims, actual transit,
   worker cargo and each active provider estimate. Legacy/missing evidence is unknown,
   never fabricated delivery. Add `build forecast [name]` and operator documentation.
-- [ ] Run focused report/network/workflow/project/ledger tests, record evidence, commit.
+- [x] Run focused report/network/workflow/project/ledger tests, record evidence, commit.
 
 ### Task57: Bounded builder lookahead and proactive production
 
-- [ ] Add failing worker cases for positive-but-low cargo, next region material,
+- [x] Add failing worker cases for positive-but-low cargo, next region material,
   reserved/NBT slots, existing supplies, paused/finished work and preparation fill.
   Calculate bounded upcoming demand at safe boundaries and enter the existing
   supply journal before zero; no new wire message or staging owner is needed.
-- [ ] Add shared-demand/controller restart/duplicate/offline/completed request tests.
+- [x] Add shared-demand/controller restart/duplicate/offline/completed request tests.
   Use existing finite supply-production requests before zero inventory, preserving
   factory exclusion, duplicate protection and measured station journals.
-- [ ] Run focused and actual-runtime replenishment tests with controller/worker
+- [x] Run focused and actual-runtime replenishment tests with controller/worker
   restart; document surplus and initial-preparation limits, commit.
 
 ### Task58: Acceptance and integration
