@@ -374,3 +374,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   recovers turn/probe reboots and lost grant/ack packets, delivering9 items once.
   Unit tests cover post-backtrack reboot, GPS outage/mismatch, fuel, obstruction,
   pause, disable and failed persistence. Native GPS acceptance follows.
+
+- Task34 native: real GPS hosts162–165 restored courier161 after post-effect reboots
+  on up, turn, forward probe and backtrack, plus controller160 restart. GPS absence
+  retained ownership for at least10 seconds before hosts started. One9-stone automatic
+  haul completed in39.30s. Independent world reads: source55 stone+7 dirt, destination9
+  stone, empty buffers/turtle,1978 finite fuel. Claims released; computers shut down
+  and force loading removed. No operator pose/stock/fuel correction. Whole-branch
+  review and final release gate follow; all broader requirements remain active.

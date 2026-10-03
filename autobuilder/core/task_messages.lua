@@ -87,6 +87,7 @@ function M.validate(kind,p)
       if p.missingCount and (not U.integer(p.missingCount) or p.missingCount<1 or p.missingCount>1000000) then return false,'invalid missing count' end
     elseif kind=='task_pose_reserve' or kind=='task_pose_grant' or kind=='task_pose_done' or kind=='task_pose_ack' then
       if not U.integer(p.sequence) or p.sequence<1 or p.sequence>9007199254740991 or not U.position(p.origin)
+        or p.reason~=nil and not U.shortString(p.reason,512)
         or kind=='task_pose_grant' and type(p.granted)~='boolean' then return false,'invalid pose recovery contract' end
     elseif kind=='task_reserve' or kind=='task_position' then
       if not U.position(p.from) or not U.position(p.target) then return false,'invalid movement reservation' end

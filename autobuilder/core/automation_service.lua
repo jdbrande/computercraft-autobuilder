@@ -71,7 +71,7 @@ function M.new(app,config,e,network,clock)
       return true
     elseif m.type=='task_pose_reserve' then
       local granted,why=queue:reservePose(sender,j.id,p.sequence,p.origin,app.state.workers)
-      send(sender,'task_pose_grant',{jobId=j.id,sequence=p.sequence,origin=U.copy(p.origin),granted=granted==true})
+      send(sender,'task_pose_grant',{jobId=j.id,sequence=p.sequence,origin=U.copy(p.origin),granted=granted==true,reason=why and tostring(why):sub(1,512)})
       return granted,why
     elseif m.type=='task_pose_done' then
       local ok,why=queue:finishPose(sender,j.id,p.sequence,p.origin)

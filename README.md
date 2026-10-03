@@ -1,4 +1,4 @@
-# Autobuilder 0.19.0
+# Autobuilder 0.20.0
 
 Development direction: [full fleet requirements](docs/fleet-requirements.md) and
 [milestone 1 autonomous exploration design](docs/autonomous-mining-design.md).
@@ -436,3 +436,5 @@ verification and gated repair, and one courier trip. Test worker/controller rebo
 full destination storage and missing supply without deleting checkpoints. Run the
 [mining acceptance checklist](docs/milestone-2.md) before excavation. Keep backups
 when testing corrupted-checkpoint or interrupted-install recovery.
+
+Interrupted movement: [GPS pose recovery](docs/pose-recovery.md) and [0.20 acceptance](docs/validation-0.20.0.md).

@@ -153,6 +153,8 @@ function M.draw(term,state,agent,page,input)
     line('Status: '..state.status); line(position(state.position))
     if state.telemetry then line('Fuel '..state.telemetry.fuel..' | slots '..state.telemetry.inventory.used..'/16') end
     line('GPS: '..(state.gpsError or 'fix available'))
+    if state.poseRecovery then line('Pose recovery: '..state.poseRecovery.stage) end
+    if state.poseError then line(state.poseError) end
     local task=state.currentTask
     if task then
       line(task.id); line((task.item or task.type or 'task')..' progress '..(tonumber(task.progress) or task.delivered or 0)..'/'..(task.quantity or #(task.blocks or {})))

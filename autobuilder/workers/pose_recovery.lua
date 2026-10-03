@@ -28,7 +28,7 @@ function M.new(app,config,e,network,clock,gps)
     local r=s.poseRecovery
     if not r or p.jobId~=r.jobId or p.sequence~=r.sequence or U.distance(p.origin,r.origin)~=0 then return false,'pose contract mismatch' end
     if kind=='task_pose_grant' and r.stage=='ready' then
-      r.granted=p.granted==true;save();return true
+      r.granted=p.granted==true;s.poseError=not r.granted and (p.reason or 'waiting for controller pose reservation') or nil;save();return true
     elseif kind=='task_pose_ack' and r.stage=='settling' then
       s.poseRecovery=nil;s.motionReservation=nil;s.poseError=nil;save();app:poseRecovered();return true
     end

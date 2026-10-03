@@ -61,5 +61,6 @@ test('pose request protocol validates bounded identity coordinates and exact gra
   assert(P.validate('task_pose_reserve',p))
   p.sequence=0;assert(not P.validate('task_pose_reserve',p));p.sequence=1
   assert(not P.validate('task_pose_grant',p));p.granted=true;assert(P.validate('task_pose_grant',p))
+  p.reason={};assert(not P.validate('task_pose_grant',p),'malformed refusal reason accepted');p.reason=nil
   p.origin.x=0/0;assert(not P.validate('task_pose_grant',p))
 end)
