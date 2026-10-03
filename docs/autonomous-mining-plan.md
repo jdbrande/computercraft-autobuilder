@@ -730,3 +730,53 @@ executor/navigation, setup sharing, runtime tests and explicit loaded test fixtu
 - [x] Run all tests/release checks, one final whole-branch review and required fix
   pass. Integrate/push and continue recovery/logistics/scaling/site preparation and
   every other unfinished requirement without a milestone handoff pause.
+
+## Milestone0.19: physical logistics and infrastructure nodes
+
+Spec: [logistics design](logistics-design.md). Native inline execution continues.
+Review focus: mixed-stock suction, changed endpoints after reboot, factory/haul
+starvation, final slot overbooking and stale worker completion. Each is exercised
+below. Reuse count/capacity ledgers and private transfer journals; no dependencies.
+
+### Task 29: Registered nodes and protected ownership
+
+**Files:** `autobuilder/storage/nodes.lua`, config/runtime, exploration protection,
+`tests/logistics_nodes_test.lua`, suite list.
+**Interfaces:** `nodes.validate(config)`, `nodes.validateSaved(config,state)`,
+`nodes.get(config,id)`, `nodes.protected(config,state)` return validated identities
+and physical exclusion boxes. Saved jobs use `logistics={source=node,
+destination=node,pickup=buffer,drop=buffer}` immutable snapshots.
+
+- [ ] Add/run failing dense bounded schema, inventory alias, protected stock/stand,
+  saved rebind/removal and unrelated-node edit tests. Expected missing contract.
+- [ ] Implement validated node configuration and held-job protections; reuse existing
+  station ownership guard. Run focused/full Lua tests; expected pass. Commit.
+
+### Task 30: Reserved finite transport batches and measured receipts
+
+**Files:** `autobuilder/core/logistics_service.lua`, production/automation/workflows,
+worker courier/executor, task messages/config, `tests/managed_logistics_test.lua`.
+**Interfaces:** `logistics.new(app,config,e,queue,production)` exposes
+`request(item,count,sourceId,destinationId,key)`, `tick()`, `step()`, `describe()`;
+production invokes step under its inventory lock and synchronizes central receipts.
+
+- [ ] Add/run failing exact stock/capacity/private-buffer claims, mixed input,
+  partial staging/collection and two-hauler cases. Expected no managed service.
+- [ ] Implement finite batch selection, immutable contracts and capability gating;
+  staged readiness, measured worker counters and collecting completion. Add/run
+  restart-after-stage/suck/drop/collect, duplicate counter, offline-owner and
+  changed-contract cases. Expected conserved inventory and retained ownership.
+- [ ] Exercise existing active factory drainage and pending shortage without
+  deadlock; no shared effect while another journal is unresolved. Fix regressions,
+  run full Lua/Python tests and commit complete transport execution.
+
+### Task 31: Automatic restocking, commands and native acceptance
+
+- [ ] Add/run failing desired-stock routing, inbound subtraction, source ranking,
+  capacity-sized batches and production-shortage/restart cases. Implement using
+  Task30 API and existing resource graph; expose `haul` and `logistics` status.
+- [ ] Run native two-courier finite-stock acceptance with both restarts and a
+  temporarily unavailable endpoint. Inspect actual inventories and durable claims;
+  correct bugs with regression tests and document results/limits.
+- [ ] Run all Lua/Python/release checks, one whole-branch review/fix pass. Update
+  running progress, integrate/push and continue all unfinished requirements.

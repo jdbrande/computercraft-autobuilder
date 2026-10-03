@@ -17,7 +17,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   both native construction trials and review correction passed.
 - Loaded mission compatibility completed:533 Lua/18 Python tests, native chunky
   cross-chunk acceptance, final review fixes and release checks passed.
-- Next: physical logistics, registered infrastructure and transport reservations.
+- Loaded mission compatibility integrated/pushed at `105f2f3`.
+- Current branch: `milestone/0.19.0`; Task29 registered infrastructure nodes, then
+  reserved physical logistics and automatic restocking.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
