@@ -137,3 +137,29 @@ test('an exhausted traffic cache is checkpointed away so changed traffic can ret
   n.trafficObstacle=function() return nil end
   assert(n:goTo(target));eq(U.distance(pose,target),0);eq(w.digs,0)
 end)
+
+test('traffic detour preserves an inspected chest and replans around it across reboot',function()
+  local U=require('autobuilder.core.util');local P=require('autobuilder.core.pathfinding')
+  local w=require('tests.build_world').new();local pose=U.copy(w.pose);local saved;local denied
+  local occupied={x=1,y=2,z=0};local target={x=3,y=2,z=0}
+  w.blocks['0,2,1']={name='minecraft:chest',state={}}
+  local function boot()
+    local n=require('autobuilder.core.navigation').new(w.turtle,pose,{minimumFuelReserve=0},function() saved=U.copy(pose);return true end)
+    n.guard=function(_,to)
+      denied=U.distance(to,occupied)==0 and U.copy(to) or nil
+      return not denied,denied and 'movement reservation pending: worker occupies destination'
+    end
+    n.trafficObstacle=function() return denied end
+    return n
+  end
+  local n=boot();local done,rebooted=false,false
+  for _=1,20 do
+    local why;done,why=n:goTo(target);if done then break end
+    if why:find('chest',1,true) then
+      assert(why:find('movement reservation pending',1,true),'physical detour obstruction became a terminal task error')
+      pose=U.copy(saved);n=boot();rebooted=true
+    end
+  end
+  assert(done,'detour stalled at the station chest');assert(rebooted)
+  eq(P.key(pose),P.key(target));eq(w.blocks['0,2,1'].name,'minecraft:chest');eq(w.digs,0)
+end)
