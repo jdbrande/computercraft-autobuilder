@@ -18,7 +18,8 @@ M.defaults={
   supply={inventory='',side='front',batch=64}, treeFarms={}, farms={}, depotExpansion={}, farmRetrySeconds=60,
   autoDepotExpansion={enabled=false,freeSlots=2},
   scanner={side='left',slot=16,radius=8,ttl=15,cooldown=3,maxCost=0,maxWait=30},
-  mining={enabled=false,resources={},fallback=true,maxSurveySteps=256,pathBudget=4096,returnMargin=8,fuelTarget=1000},
+  exploration={enabled=false,base={},bounds={},baseProtection={},dimensionMinY=-64,dimensionMaxY=319},
+  mining={mode='fixed',exitRoute={},enabled=false,resources={},fallback=true,maxSurveySteps=256,pathBudget=4096,returnMargin=8,fuelTarget=1000},
   allowedMiningBlocks={['minecraft:stone']=true,['minecraft:deepslate']=true,
     ['minecraft:cobblestone']=true,['minecraft:cobbled_deepslate']=true,
     ['minecraft:granite']=true,['minecraft:diorite']=true,['minecraft:andesite']=true,
@@ -30,10 +31,10 @@ for _,material in pairs(require('autobuilder.resources.materials').all()) do
 end
 local function merge(dst,src)
   for k,v in pairs(src) do
-    assert(dst[k]~=nil or k=='controllerId' or k=='initialPosition' or k=='depot' or k=='label' or k=='entry' or k=='bounds', 'Unknown config key: '..tostring(k))
+    assert(dst[k]~=nil or k=='controllerId' or k=='initialPosition' or k=='depot' or k=='label' or k=='entry' or k=='bounds' or k=='x' or k=='y' or k=='z' or k=='min' or k=='max', 'Unknown config key: '..tostring(k))
     if type(v)=='table' and type(dst[k])=='table' then
       -- These maps/lists are user-defined rather than schema objects.
-      if k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
+      if k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
         or k=='furnaces' or k=='turtleFuelReserveItems' or k=='treeFarms' or k=='farms' or k=='depotExpansion' then dst[k]=U.copy(v)
       else merge(dst[k],v) end
     else dst[k]=U.copy(v) end
@@ -76,7 +77,14 @@ function M.load(overrides)
   assert(type(c.mining.enabled)=='boolean' and type(c.mining.fallback)=='boolean','invalid mining mode')
   assert(require('autobuilder.resources.materials').validResources(c.mining.resources),'invalid mining resources')
   for _,k in ipairs({'maxSurveySteps','pathBudget','returnMargin','fuelTarget'}) do assert(U.integer(c.mining[k]) and c.mining[k]>0,'invalid mining '..k) end
-  if c.mining.enabled then
+  assert(c.mining.mode=='fixed' or c.mining.mode=='explore','invalid mining mode')
+  assert(require('autobuilder.resources.exploration').validate(c.exploration))
+  if c.mining.enabled and c.mining.mode=='explore' then
+    assert(c.depot and U.position(c.depot),'exploration requires depot')
+    local previous=c.depot
+    for _,p in ipairs(c.mining.exitRoute) do assert(U.position(p) and U.distance(previous,p)==1,'invalid clear exit route'); previous=p end
+  end
+  if c.mining.enabled and c.mining.mode=='fixed' then
     assert(c.depot and U.position(c.mining.entry),'mining requires depot and entry coordinates')
     local b=c.mining.bounds
     assert(type(b)=='table' and U.position(b.min) and U.position(b.max),'mining bounds required')
@@ -85,6 +93,7 @@ function M.load(overrides)
     assert(U.distance(c.depot,c.mining.entry)<=c.maxTravelDistance,'mine entry too far from depot')
   end
   c.capabilities.mining=c.mining.enabled and true or nil
+  c.capabilities.explorationV1=c.mining.enabled and c.mining.mode=='explore' and true or nil
   for k,v in pairs(c.automation) do assert(type(v)=='boolean','invalid automation flag '..k) end
   for _,k in ipairs({'building','crafting','courier','logging','farming'}) do c.capabilities[k]=c.automation.enabled and c.automation[k] or nil end
   c.capabilities.sitePreparation=c.capabilities.building and true or nil

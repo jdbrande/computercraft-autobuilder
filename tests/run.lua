@@ -76,6 +76,7 @@ test('GPS outage and exceptions return errors without losing local coordinates',
   eq(G.heading({x=0,y=4,z=0},{x=0,y=5,z=0}),nil)
 end)
 
+dofile('tests/exploration_test.lua')
 dofile('tests/network_test.lua')
 dofile('tests/runtime_test.lua')
 dofile('tests/regression_test.lua')
