@@ -49,7 +49,7 @@ cells, unavailable resources and uncertain recovery remain visible blocked work.
 | Miner hardware, bounded excavation and fuel | [Mining setup](docs/milestone-2.md) |
 | Concurrent miners and durable area ownership | [Parallel mining](docs/parallel-mining.md) |
 | Recipe planning, Crafty station and furnace bank | [Production](docs/production.md) |
-| Dependency graph and resource providers | [Resource planning](docs/resource-planning.md) |
+| Dependency graph and resource providers | [Resource planning](docs/resource-planning.md), [0.13.0 acceptance](docs/validation-0.13.0.md) |
 | Sponge conversion, transforms and JSON format | [Blueprints](docs/blueprints.md) |
 | Placement families, verification and repair | [Construction](docs/construction.md) |
 | Builder resupply and chest-to-chest transport | [Logistics](docs/logistics.md) |

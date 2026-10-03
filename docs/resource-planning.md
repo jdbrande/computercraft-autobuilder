@@ -44,10 +44,12 @@ mining candidates use exploration; otherwise they use the configured mining area
 Preferences select raw acquisition paths; recipe operations keep their registered
 crafting or smelting method.
 
-Once a mining job, exploration group or harvest job owns demand, its saved source
+Once an assigned mining/harvest job or exploration group owns demand, its saved source
 and geometry remain authoritative through offline periods, restart and settings
 changes. Bringing another provider online never steals that work. Newly unowned
-demand can select again. The factory remains exclusive in this milestone; parallel
+demand can select again. A never-assigned queued job may be retired durably when
+its source has no eligible worker and another source becomes executable. Paused
+jobs and worker telemetry claiming the old task prevent replacement. The factory remains exclusive in this milestone; parallel
 consumers and durable stock reservations are subsequent work.
 
 The graph is saved with production requests. `plan.graph.nodes[item]` contains

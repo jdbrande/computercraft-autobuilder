@@ -419,3 +419,23 @@ test('resource summary reports current physical stock separately from planned de
   eq(next(q.state.jobs),nil); eq(r.operation,1)
   assert(p:describe('mod:unknown'):find('No configured provider',1,true))
 end)
+
+test('unassigned unavailable acquisition can switch to a newly online provider without stealing ownership',function()
+  local app,p,q,config=productionFixture(); local item=mc('dirt')
+  config.farms={{item=item,base={x=20,y=0,z=0}}}; config.providerPreferences={[item]={'mining','farm'}}
+  local r=p:request({[item]=4}); p:tick(); local old=r.mines[item]; assert(old)
+  app.state.workers['3']={id=3,online=true,telemetry={capabilities={farming=true}}}; p:tick()
+  eq(r.materials[item].provider,'farm:'..item..':1'); eq(r.mines[item],nil)
+  eq(app.state.jobs[old].status,'completed'); eq(app.state.jobs[old].cancelled,true)
+  eq(q.state.jobs[r.materials[item].jobId].type,'FARM')
+end)
+
+test('provider switching rolls back if its retirement checkpoint fails',function()
+  local app,p,q,config=productionFixture(); local item=mc('dirt')
+  config.farms={{item=item,base={x=20,y=0,z=0}}}
+  local r=p:request({[item]=4}); p:tick(); local old=r.mines[item]
+  app.state.workers['3']={id=3,online=true,telemetry={capabilities={farming=true}}}
+  function app:save() return false,'disk full' end
+  assert(not pcall(p.tick,p)); eq(r.mines[item],old); eq(app.state.jobs[old].status,'queued')
+  eq(next(q.state.jobs),nil)
+end)

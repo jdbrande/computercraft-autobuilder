@@ -38,7 +38,8 @@ function M.new(app,config,e,queue)
     if app.state.workers==nil then return true end
     for _,worker in pairs(app.state.workers) do
       local t=worker.telemetry
-      if worker.online and t and t.capabilities and t.capabilities[capability] then
+      if worker.online and t and t.capabilities and t.capabilities[capability]
+        and not (capability=='mining' and t.capabilities.explorationV1) then
         if not item or Materials.accepts(t.miningResources,item) then return true end
       end
     end
@@ -59,6 +60,30 @@ function M.new(app,config,e,queue)
     local groupId=r.acquisitions[item]
     local legacy=r.mines[item] and app.state.jobs[r.mines[item]]
     local harvest=r.harvests[item] and s.jobs[r.harvests[item]]
+    if legacy and legacy.status=='completed' then legacy=nil end
+    if harvest and harvest.status=='completed' then harvest=nil end
+    local candidate=Providers.select(item,config,{available=count,required=target,workers=app.state.workers,acquisitionOnly=true})
+    local queued=legacy or harvest
+    local oldType=legacy and 'mining' or harvest and (harvest.type=='HARVEST' and 'tree_farm' or 'farm')
+    local capability=legacy and 'mining' or harvest and (harvest.type=='HARVEST' and 'logging' or 'farming')
+    local claimed=queued and queued.workerId
+    for _,w in pairs(app.state.workers or {}) do
+      if queued and w.telemetry and w.telemetry.task==queued.id then claimed=true end
+    end
+    if queued and queued.status=='queued' and not claimed and not queued.paused and not groupId
+      and candidate and candidate.available and candidate.type~='storage' and candidate.type~=oldType
+      and not hasWorker(capability,legacy and item or nil) then
+      -- Never-assigned work may change source. Persist retirement before creating
+      -- a replacement; assigned/offline owners and their journals never expire.
+      local links=legacy and r.mines or r.harvests
+      queued.status='completed'; queued.cancelled=true; links[item]=nil
+      local called,ok,why=pcall(save)
+      if not called or not ok then
+        queued.status='queued'; queued.cancelled=nil; links[item]=queued.id
+        error(called and (why or 'Provider retirement checkpoint failed') or ok,0)
+      end
+      legacy=nil; harvest=nil
+    end
     local provider
     -- Durable jobs keep their source and saved geometry even when configuration
     -- or online eligibility changes. Only unowned demand selects a new source.
@@ -67,7 +92,7 @@ function M.new(app,config,e,queue)
     elseif harvest and harvest.status~='completed' then
       local kind=harvest.type=='HARVEST' and 'tree_farm' or 'farm'
       provider={type=kind,id=material.provider or kind..':'..item,farm=harvest.farm}
-    else provider=Providers.select(item,config,{available=count,required=target,workers=app.state.workers,acquisitionOnly=true}) end
+    else provider=candidate end
     material.provider=provider and provider.id or nil
     if provider and provider.type=='exploration' then
       local group=groupId and app.state.exploration.groups[groupId]

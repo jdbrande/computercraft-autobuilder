@@ -42,7 +42,8 @@ local function available(p,config,context)
   if not context.workers then return true end
   for _,w in pairs(context.workers) do
     local t=w.telemetry
-    if w.online and t and t.capabilities and t.capabilities[p.capability] then
+    if w.online and t and t.capabilities and t.capabilities[p.capability]
+      and not (p.type=='mining' and t.capabilities.explorationV1) then
       if (p.type~='mining' and p.type~='exploration') or Materials.accepts(t.miningResources,p.item) then return true end
     end
   end

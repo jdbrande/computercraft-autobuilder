@@ -427,14 +427,14 @@ mine/group/harvest job owns the material. Save selected `material.provider` ID;
 resume existing jobs using saved geometry. `resource ITEM` returns a readable
 summary of selected/candidate providers and current graph demand/stock/deficit.
 
-- [ ] Add dispatch cases proving farm preference over mining, online fallback,
+- [x] Add dispatch cases proving farm preference over mining, online fallback,
   controller restart/offline owner/preference changes retain the original job,
   newly configured farms recover blocked demand and unknown sources stay explicit.
   Add command assertions against real request graph values. Observe failures.
-- [ ] Route provider choices into existing MINE/HARVEST/FARM paths; use ordinary
+- [x] Route provider choices into existing MINE/HARVEST/FARM paths; use ordinary
   recipe operations for manufactured outputs. Keep the global factory barrier.
   Implement read-only resource summary and document exact config/command usage.
-- [ ] Run full Lua/Python/release/whitespace checks; use meaningful live dispatch
+- [x] Run full Lua/Python/release/whitespace checks; use meaningful live dispatch
   acceptance where useful, record exact fixture/limitations. Request final branch
   review, fix reproduced important issues with regressions, commit/integrate and
   continue to inventory ownership and fuel automation without an approval pause.

@@ -6,9 +6,8 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 ## Current work
 
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
-- Current branch: `milestone/0.13.0`, resource dependency graph and provider registry.
-- Next: integrate provider selection and aggregated dependency nodes/operations,
-  integrate acquisition and operator visibility, then inventory ownership and fuel
+- Resource dependency/provider milestone accepted; next: durable inventory ownership.
+- Next: implement durable inventory ownership, then fuel
   delivery/rescue in dependency order. Continue through all rows below.
 - No external blocker is currently established. Missing implementation is remaining
   work, not an external blocker.
@@ -26,8 +25,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 4: logical roles | Miners, builders, Crafty workers, furnace controller, managed farms and courier executor | More harvest/processor adapters, fleet-level logistics/rescue; optional scouting |
 | 5: automatic registration | Installer, discovery/setup sharing, reconnect and capabilities | Single fleet install flow, equipment/software negotiation, automatic eligibility |
 | 6: schematic analyzer | JSON and desktop Sponge converter, transforms, supported-state classification | Native binary import, supported block entities/fluids/redstone analysis, required tools |
-| 7: recursive dependency graph | Aggregated nodes, shared stock/surplus, operation edges, bounded expansion; 417 Lua tests | Final review and live confirmation in progress |
-| 8: provider registry | Deterministic candidates, availability/preferences, durable acquisition selection | Final review and live confirmation in progress |
+| 7: recursive dependency graph | Aggregated nodes, shared stock/surplus, operation edges, bounded expansion; 417 Lua tests | Accepted 0.13.0; preserve during later integration |
+| 8: provider registry | Deterministic candidates, availability/preferences, durable acquisition selection | Accepted 0.13.0; preserve during later integration |
 | 9: autonomous mining | Accepted 0.12.0 with four live explorers | Preserve during later pipeline integration |
 | 10: mining intelligence | Surveys, observed resources, protection, routes and exhaustion | Persist hazard/inaccessibility/density evidence and apply ranking |
 | 11: fuel management | Finite mission/return budgets, reserved fuel and some builder refueling | Configurable fuel providers, fleet forecasting, stations/distribution/rescue |
@@ -102,3 +101,13 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Real test controller is acquiring four cobblestone for four new stone bricks;
   graph separates two initial bricks from planned output. Reboot was necessary
   to load changed eagerly required modules; lazy planner had loaded immediately.
+
+- Milestone 2 final gate: 420 Lua tests and all 16 Python tests passed; release
+  artifacts and whitespace checks passed. Independent review found two important
+  fallback bugs, both fixed with red-green regressions, plus failed-save rollback.
+  Live request produced four new bricks from mined inputs (six total), and a
+  fresh post-reboot request delivered two cobblestone with its provider ID saved.
+  Independent physical chest inspection confirmed both quantities. Test fleet
+  shut down and force-load tickets removed. See [0.13.0 acceptance](validation-0.13.0.md).
+- Deferred minor: missing farm/logging workers show generic acquisition waits;
+  address with worker-health/status requirements, retaining existing recovery.

@@ -45,3 +45,10 @@ test('provider preferences validate dense known unique types and config preserve
   end
   assert(not pcall(P.candidates,'',{}))
 end)
+
+test('exploration workers are not eligible legacy mining providers',function()
+  local item=mc('dirt'); local c={farms={{item=item}},providerPreferences={[item]={'mining','farm'}}}
+  local workers={a={online=true,telemetry={capabilities={mining=true,explorationV1=true}}},
+    b={online=true,telemetry={capabilities={farming=true}}}}
+  eq(P.select(item,c,{workers=workers}).type,'farm')
+end)
