@@ -178,3 +178,11 @@ test('disabled worker automation retains an active return task without physical 
   local w=R.new(c,e);w.state.currentTask={id='task:7:1',type='RETURN_HOME',phase='work'};w:save()
   w:workStep();eq(e.turtle.calls,0);eq(w.state.currentTask.phase,'work')
 end)
+
+test('fleet status and limits use normal controller commands persist across reboot and draw role diagnostics',function()
+  local R=require('autobuilder.core.runtime');local e=env(7);local c=R.new(cfg('controller'),e)
+  assert(c:command('fleet limit mining 1 3'));assert(c:command('fleet status'));eq(c.state.view,'fleet')
+  c:draw();assert(table.concat(e.screen,'\n'):find('mining',1,true))
+  assert(not c:command('fleet limit mining 4 2'));assert(not c:command('fleet limit missing 0 1'))
+  c=R.new(cfg('controller'),e);eq(require('autobuilder.core.scaling').limits(c.state,c.config,'mining').max,3)
+end)

@@ -272,7 +272,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 32902,
+      "bytes": 33041,
       "path": "autobuilder/build/site_service.lua",
       "roles": [
         "controller",
@@ -282,7 +282,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "26bde1a11c627401dd4b0c4b951dc69877e17d4b0024fcd9f3d31e621a74f9bd",
+      "sha256": "2fcfe62d3d69ecb8c89015252c8b9a529617be9d03c2724e8ecce9059a87b76b",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/build/site_service.lua",
       "version": "0.24.0"
     },
@@ -357,7 +357,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 12833,
+      "bytes": 13922,
       "path": "autobuilder/core/automation_service.lua",
       "roles": [
         "controller",
@@ -367,7 +367,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "bcd7461da5c8e06a2d1e678603cbc5f9f87d493ebd004415d0064b9327550ff7",
+      "sha256": "c661367316aff2c47b282732760f67ab5ac2037796bdcba1b5abcb9cab289111",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/automation_service.lua",
       "version": "0.24.0"
     },
@@ -492,7 +492,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 18933,
+      "bytes": 19319,
       "path": "autobuilder/core/jobs.lua",
       "roles": [
         "controller",
@@ -502,7 +502,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "7e41318fd0401aceb30d440f46c72612987ab3438e04f315df8e1b3c737f7345",
+      "sha256": "ff7a31200b5dcd5aeda0e0a66c798f5670493ed47d3164ecf3f382abe9cb1b61",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/jobs.lua",
       "version": "0.24.0"
     },
@@ -567,7 +567,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 9281,
+      "bytes": 9384,
       "path": "autobuilder/core/navigation.lua",
       "roles": [
         "controller",
@@ -577,7 +577,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "aa2b7b6df5cd1aafe04b30f56aea23c04b57240d5ca2f873ecdaf74eb90af267",
+      "sha256": "cd3246381c8fd320b47110f6a5640d62878f5ba46201af64f21cfa1d87ab0afe",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/navigation.lua",
       "version": "0.24.0"
     },
@@ -702,7 +702,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 8581,
+      "bytes": 14425,
       "path": "autobuilder/core/scaling.lua",
       "roles": [
         "controller",
@@ -712,7 +712,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "23a7850c5df8f9995fc3c8e6728aefad1f4bcb4acb463f3351f9cc41ba43c080",
+      "sha256": "19fc7785b6c5b378931a799f2eff6e4eb442bb5290ca81016263491ae7b58839",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/scaling.lua",
       "version": "0.24.0"
     },
@@ -747,7 +747,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 24495,
+      "bytes": 24774,
       "path": "autobuilder/core/workflows.lua",
       "roles": [
         "controller",
@@ -757,7 +757,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "e79d0a57ed82b09de4c2329a8a0b2660f2b34be50a10ff86acbf9977b5154c98",
+      "sha256": "c99728cd1b90032a6f00f1824f12bfebdfbfaaf8ced67960485fa56ab5ac491f",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/workflows.lua",
       "version": "0.24.0"
     },
@@ -1271,7 +1271,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 11196,
+      "bytes": 11219,
       "path": "autobuilder/ui/ui.lua",
       "roles": [
         "controller",
@@ -1281,7 +1281,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "a29cf5f40aa82f302ccb09d3473bf77b5a872b7f5325105d649ab77988b5f5b6",
+      "sha256": "66e3bcb635fc51131a9c10347188cce75a6aa0e4d8241372439add8b21021b08",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/ui/ui.lua",
       "version": "0.24.0"
     },

@@ -159,3 +159,63 @@ test('delivery rates include collection after worker completion and exclude unfi
   j.status='collecting';j.delivered=8;assert(not S.record(s,j,function() return true end,30))
   j.status='completed';assert(S.record(s,j,function() return true end,40));eq(s.fleet.metrics.hauling.seconds,30)
 end)
+
+test('idle multirole workers balance ready bottlenecks without withholding upstream work for missing ingredients',function()
+  local s,c=fixture(4);local S=require('autobuilder.core.scaling')
+  s.exploration.groups.g={id='g',item='minecraft:coal',target=1000,status='running',tripIds={}}
+  for i=1,4 do job(s,'build'..i,'BUILD',64) end
+  local mine={id='mine',type='MINE',status='running',workerId=1,quantity=64,progress={delivered=0},exploration={groupId='g'}}
+  s.jobs.mine=mine;s.workers['1'].telemetry.task=mine.id
+  assert(not S.canAssign(s,c,{type='MINE'},s.workers['2'],{},100),'mining took every multirole worker before ready construction')
+  assert(S.canAssign(s,c,s.automation.jobs.build1,s.workers['2'],{},100))
+  for _,j in pairs(s.automation.jobs) do j.requiresSite=true;j.preparationError='region not prepared' end
+  assert(S.canAssign(s,c,{type='MINE'},s.workers['2'],{},100),'unready construction withheld useful upstream mining')
+  local craft=job(s,'craft','CRAFT',128);craft.stockInputs={['minecraft:stone']=128};craft.stockError='missing ingredients'
+  assert(S.canAssign(s,c,{type='MINE'},s.workers['2'],{},100),'unreserved craft ingredients withheld upstream work')
+end)
+
+test('fleet limit commands persist effective bounds across restart and yield to changed settings',function()
+  local s,c=fixture();local S=require('autobuilder.core.scaling');local j=job(s,'build','BUILD',64)
+  S.setLimits(s,c,'building',0,0,function() return true end)
+  eq(S.snapshot(s,c,{},100).building.desired,0)
+  local restored=U.copy(s);eq(S.limits(restored,c,'building').max,0)
+  assert(not pcall(S.setLimits,s,c,'building',3,2,function() return true end));eq(S.limits(s,c,'building').max,0)
+  assert(not pcall(S.setLimits,s,c,'building',0,2,function() return false,'disk full' end));eq(S.limits(s,c,'building').max,0)
+  c.scaling.roles.building.max=3;eq(S.limits(restored,c,'building').max,3)
+  assert(S.canAssign(restored,c,j,restored.workers['1'],{},100))
+end)
+
+test('fleet diagnostics keep bounded significant allocation history and roll back failed saves',function()
+  local s,c=fixture();local S=require('autobuilder.core.scaling');local j=job(s,'build','BUILD',64)
+  assert(not pcall(S.update,s,c,{},100,function() return false,'disk full' end));eq(s.fleet,nil)
+  S.update(s,c,{},100,function() return true end);local initial=#s.fleet.decisions;assert(initial>0)
+  S.update(s,c,{},101,function() return true end);eq(#s.fleet.decisions,initial)
+  for i=1,100 do j.status=i%2==0 and 'queued' or 'completed';S.update(s,c,{},101+i,function() return true end) end
+  assert(#s.fleet.decisions<=32)
+  local lines=S.describe(s,c,{},300);local text=table.concat(lines,'\n')
+  for _,name in ipairs({'mining','hauling','crafting','clearing','building','active=','idle=','queue=','remaining=','rate='}) do assert(text:find(name,1,true),name) end
+end)
+
+test('large project backlog drives allocation beyond the currently expanded region payloads',function()
+  local s,c=fixture(4);local S=require('autobuilder.core.scaling')
+  s.automation.projects.large={name='large',phase='building',total=400,completed=0,
+    site={status='surveyed',columnCount=200,regionCount=100,estimatedCells=800,work={status='working',completed=0}}}
+  for i=1,4 do local j=job(s,'build'..i,'BUILD',2);j.project='large';local q=job(s,'clear'..i,'PREPARE_REGION',8);q.project='large' end
+  local view=S.snapshot(s,c,{},100);eq(view.building.remaining,400);eq(view.building.desired,4)
+  eq(view.clearing.remaining,800);eq(view.clearing.desired,4)
+end)
+
+test('role priority cannot wait on a courier excluded by the existing factory storage gate',function()
+  local s,c=fixture(1);local S=require('autobuilder.core.scaling')
+  local craft=job(s,'craft','CRAFT',64);job(s,'haul','TRANSPORT',64)
+  assert(require('autobuilder.core.workflows').factoryCanRun(s,craft))
+  assert(S.canAssign(s,c,craft,s.workers['1'],{},100),'crafting waited on a courier that its own stock gate excludes')
+end)
+
+test('private crafting rates use centrally collected output and the durable factory interval',function()
+  local s,c=fixture();local S=require('autobuilder.core.scaling')
+  local j=job(s,'private','CRAFT',8);j.workerId=1;j.privateStation={};j.status='completed'
+  j.factoryStartedAt=10;j.assignedAt=15;j.completedAt=20;j.factoryCompletedAt=30
+  j.factoryFlow={collect={delivered=8}}
+  assert(S.record(s,j,function() return true end,100));eq(s.fleet.metrics.crafting.units,8);eq(s.fleet.metrics.crafting.seconds,20)
+end)

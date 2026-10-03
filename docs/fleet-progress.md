@@ -959,3 +959,16 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   mining accounting case two miners) to retain their original fault/concurrency
   coverage under the new automatic small-work policy. General bottleneck allocation,
   status/limit commands and native ramp/drain acceptance remain unfinished.
+
+- Dynamic allocation now prioritizes actually dispatchable competing roles, prefers
+  specialist explorers, accounts for unexpanded project/preparation backlog and
+  exposes durable `fleet status`/`fleet limit` commands. Existing ownership, staging,
+  quota-yield, runtime and exploration focused checks pass. A real-runtime miner
+  scenario registered a second explorer after an empty trip, automatically shared
+  eight cobblestone demand, survived controller restart and drained both owners.
+- The larger four-worker construction scenario exposed an incomplete detour after a
+  failed path search. A focused regression reproduced the nil-path exception; failed
+  replanning now discards the incomplete route durably and retries under normal
+  reservation checks after traffic clears. Another regression corrected private
+  crafting rates to use collected output and factory start/completion timestamps.
+  Both focused regressions pass; the larger construction rerun is still pending.

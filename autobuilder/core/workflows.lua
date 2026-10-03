@@ -87,6 +87,15 @@ function M.factoryCanRun(state,job,preparing)
   end
   return true
 end
+function M.canDispatch(state,j)
+  local allowed=not (storageWorkers[j.type] and M.factoryPending(state))
+  if j.returnManaged then allowed=j.returnReady==true end
+  if j.type=='RESCUE' then allowed=j.rescueReady==true and not M.factoryActive(state) end
+  if j.logistics then allowed=j.logisticsReady==true and not M.factoryActive(state) end
+  if j.managedFuel then allowed=j.fuelReady==true and not M.factoryActive(state) end
+  if j.type=='CRAFT' then allowed=M.factoryCanRun(state,j) end
+  return allowed
+end
 function M.poseCells(origin)
   if not U.position(origin) then return nil end
   local cells={{x=origin.x,y=origin.y,z=origin.z}}
@@ -130,15 +139,13 @@ function M.new(state,save,clock,id,chunks,config)
       return not M.workerBusy(state,w.id,j.id),'worker already owns work'
     end
     local ordered={}; for _,j in pairs(s.jobs) do ordered[#ordered+1]=j end
-    table.sort(ordered,function(a,b) return a.created<b.created or (a.created==b.created and a.id<b.id) end)
-    local factoryPending=M.factoryPending(state)
+    local allocation=config and config.scaling and Scaling.snapshot(state,config,nil,clock(),workers)
+    table.sort(ordered,function(a,b)
+      if allocation then local pa,pb=Scaling.priority(allocation,a),Scaling.priority(allocation,b);if pa~=pb then return pa>pb end end
+      return a.created<b.created or (a.created==b.created and a.id<b.id)
+    end)
     for _,j in ipairs(ordered) do
-      local allowed=not (storageWorkers[j.type] and factoryPending)
-      if j.returnManaged then allowed=j.returnReady==true end
-      if j.type=='RESCUE' then allowed=j.rescueReady==true and not M.factoryActive(state) end
-      if j.logistics then allowed=j.logisticsReady==true and not M.factoryActive(state) end
-      if j.managedFuel then allowed=j.fuelReady==true and not M.factoryActive(state) end
-      if j.type=='CRAFT' then allowed=M.factoryCanRun(state,j) end
+      local allowed=M.canDispatch(state,j)
       if j.requiresSite and not j.workerId and j.status=='queued' then
         local prepared,why=false,'preparation verifier is unavailable'
         if self.preparationReady then prepared,why=self.preparationReady(j) end

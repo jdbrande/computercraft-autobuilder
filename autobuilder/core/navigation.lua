@@ -118,7 +118,10 @@ function M.new(turtle,pose,config,save)
         local box={min={},max={}}
         for _,axis in ipairs({'x','y','z'}) do box.min[axis]=math.min(pose[axis],target[axis])-2;box.max[axis]=math.max(pose[axis],target[axis])+2 end
         local path=P.find(pose,target,function(p) return U.position(p) and P.inside(p,box) and not d.blocked[P.key(p)] and allowed(p) end,256)
-        if not path then return false,'movement reservation pending: no bounded traffic detour' end
+        if not path then
+          pose.detour=nil;local ok,why=persist();if not ok then return false,why end
+          return false,'movement reservation pending: no bounded traffic detour'
+        end
         d.path=path;d.index=1
       end
       pose.detour=d;local ok,why=persist();if not ok then return false,why end

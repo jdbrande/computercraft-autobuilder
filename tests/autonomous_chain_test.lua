@@ -37,13 +37,14 @@ local function fixture(options)
     e.rednet={isOpen=function() return true end,open=function() end,send=function(to,message,protocol)
       e.packets[#e.packets+1]={to=to,message=U.copy(message),protocol=protocol}; return true
     end}
-    local a={id=id,e=e,config=Config.load(settings)}; f.actors[id]=a; a.runtime=Runtime.new(a.config,e); return a
+    local a={id=id,e=e,config=Config.load(settings),enabled=id~=options.delayedMiner}; f.actors[id]=a; a.runtime=Runtime.new(a.config,e); return a
   end
   local common={storageInventories={'stock'},furnaces={'furnace'},turtleFuelReserveItems={},minimumFuelReserve=0,
     craftingStation={input='input',output='output',inputSide='up',outputSide='down'},
     heartbeatInterval=1,registrationInterval=3,workerTimeout=8,gps={enabled=false},
     supply={inventory='stage',side='down',batch=64}}
   local cc=U.copy(common); cc.build={enabled=true,origin={x=2,y=0,z=0}}
+  cc.scaling={roles={mining={min=options.scaling and 0 or (options.exploration and 4 or 3)}}}
   if options.exploration then cc.exploration={enabled=true,base={x=0,y=0,z=0},bounds={min={x=16,y=0,z=0},max={x=103,y=0,z=1}},baseProtection={min={x=-12,y=-1,z=-2},max={x=8,y=3,z=2}},dimensionMinY=-64,dimensionMaxY=319} end
   f.controller=actor(7,cc)
   local sources={{id=21,x=20,item='cobblestone',block='stone',count=options.fill and 5 or 4},
@@ -145,12 +146,12 @@ local function fixture(options)
   end
   function f:step()
     self.now=self.now+1
-    for _,a in pairs(self.actors) do a.e.now=self.now; if a.world then a.world.time=self.now end; a.runtime:tick() end
+    for _,a in pairs(self.actors) do a.e.now=self.now; if a.world then a.world.time=self.now end;if a.enabled then a.runtime:tick() end end
     self:pump()
     local active=0
     for _,job in pairs(self.controller.runtime.state.jobs) do if job.workerId and job.status~='completed' and not job.physicalComplete then active=active+1 end end
     self.stats.maxMining=math.max(self.stats.maxMining,active)
-    for _,a in pairs(self.actors) do a.runtime:workStep(); self:pump() end
+    for _,a in pairs(self.actors) do if a.enabled then a.runtime:workStep(); self:pump() end end
     self:smelt()
   end
   function f:count(name)
@@ -237,4 +238,30 @@ test('automatic preparation acquires additional foundation fill while structural
   eq(f.stats.pulled[mc('cobblestone')],1);eq(f.builder.world.blocks['3,-1,0'].name,mc('cobblestone'))
   eq(f.builder.world.places,4);eq(p.report.counts.correct,3)
   for _,a in ipairs(f.miners) do assert(a.world.fuel>0 and a.world.fuel<1000) end
+end)
+
+
+test('late registered miner joins costly shared demand automatically and the fleet drains across restart',function()
+  local f=fixture({exploration=true,scanner=false,finiteFuel=true,scaling=true,delayedMiner=26})
+  local ok,id=f.controller.runtime:command('request minecraft:cobblestone 8');assert(ok,id)
+  local joined,restarted=false,false
+  for _=1,6000 do
+    f:step()
+    if not joined and f.emptyTrip then
+      assert(not f.controller.runtime.state.workers['26']);f.actors[26].enabled=true;joined=true
+    end
+    if not restarted and f.stats.maxMining>=2 then f:reboot(f.controller);restarted=true end
+    local r=f.controller.runtime.state.automation.requests[id]
+    local busy=false;for _,a in ipairs(f.miners) do busy=busy or a.runtime.state.currentTask~=nil end
+    if r.status=='completed' and not busy then break end
+  end
+  local c=f.controller.runtime;local r=c.state.automation.requests[id]
+  assert(r.status=='completed',tostring(r.error));assert(joined and restarted)
+  assert(f.assignmentOwners[mc('cobblestone')][21] and f.assignmentOwners[mc('cobblestone')][26])
+  eq(f:count('cobblestone'),8);eq(f.stats.deposited[mc('cobblestone')],8)
+  for _,a in ipairs(f.miners) do assert(not a.runtime.state.currentTask);eq(a.world.pose.x,a.source.x);assert(a.world.fuel>0) end
+  for _=1,5 do f:step() end
+  local view=require('autobuilder.core.scaling').snapshot(c.state,c.config,c.mining.storage.counts,f.now)
+  eq(view.mining.active,0);eq(view.mining.desired,0)
+  assert(c.state.fleet.metrics.mining.count>1);assert(#c.state.fleet.decisions>0)
 end)

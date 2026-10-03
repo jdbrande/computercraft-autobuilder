@@ -77,7 +77,12 @@ function M.new(state,save,clock,controllerId,config,chunks)
     local attempts=0
     local groups={}; for _,g in pairs(exploration.groups) do if not g.paused and g.status~='completed' then groups[#groups+1]=g end end
     table.sort(groups,function(a,b) return a.id<b.id end)
-    local ids={}; for _,w in pairs(workers) do ids[#ids+1]=w.id end; table.sort(ids)
+    local ids={}; for _,w in pairs(workers) do ids[#ids+1]=w.id end
+    table.sort(ids,function(a,b)
+      local Scaling=require('autobuilder.core.scaling')
+      local pa,pb=Scaling.preference(state,config,{type='MINE'},workers[tostring(a)]),Scaling.preference(state,config,{type='MINE'},workers[tostring(b)])
+      return pa<pb or pa==pb and a<b
+    end)
     for _,g in ipairs(groups) do
       self:refreshAcquisition(g.id,counts[g.item] or 0)
       local outstanding=0
@@ -100,9 +105,11 @@ function M.new(state,save,clock,controllerId,config,chunks)
           local wid=ids[wi]
           local w=workers[tostring(wid)]; local t=w.telemetry; local home=t and t.explorationHome
           if w.online and t and t.capabilities and t.capabilities.explorationV1 and E.home(home) and Materials.accepts(t.miningResources,g.item) then
-            if t.fuel~='unlimited' and t.fuel<2*#home.exitRoute+config.minimumFuelReserve+config.mining.returnMargin+2 then
+            local allocated,allocationError=admission({type='MINE'},w,workers,counts)
+            if not allocated then reason=allocationError;waiting=true
+            elseif t.fuel~='unlimited' and t.fuel<2*#home.exitRoute+config.minimumFuelReserve+config.mining.returnMargin+2 then
               reason='insufficient round-trip fuel for worker '..wid
-            elseif t.status=='idle' and not t.task and not Coordination.workerBusy(state,wid) and admission({type='MINE'},w,workers,counts) then
+            elseif t.status=='idle' and not t.task and not Coordination.workerBusy(state,wid) then
               local choices=E.candidates(exploration.sectors,config.exploration,g.item,home.exitRoute[#home.exitRoute] or home.depot)
               reason='Search envelope exhausted for '..g.item
               local areas={}

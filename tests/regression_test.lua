@@ -110,3 +110,17 @@ test('checkpoint uses compact native encoding and retains legacy Adler checksums
   local saved=base.unserialize(fs.files.large);eq(saved.checksum,b*65536+a)
   eq(cp:load().text,old.text)
 end)
+
+
+test('failed traffic replanning discards its incomplete route and retries after the blocker leaves',function()
+  local U=require('autobuilder.core.util');local w=require('tests.build_world').new();local pose=U.copy(w.pose)
+  local saved;local obstacle={x=1,y=2,z=0};local target={x=3,y=2,z=0}
+  local n=require('autobuilder.core.navigation').new(w.turtle,pose,{minimumFuelReserve=0},function() saved=U.copy(pose);return true end)
+  n.trafficObstacle=function() return obstacle end
+  n.guard=function() return false,'movement reservation pending' end
+  assert(not n:goTo(target));assert(pose.detour and pose.detour.path)
+  obstacle=target;assert(not n:goTo(target))
+  obstacle=nil;n.guard=function() return true end
+  assert(n:goTo(target));eq(U.distance(pose,target),0);eq(w.digs,0)
+  assert(not saved.detour)
+end)

@@ -125,3 +125,15 @@ test('exploration scaling rechecks changed capacity after loaded-area calls befo
   local g=jobs:requestAcquisition('minecraft:coal',64,0,'yielding-scale')
   eq(jobs:assign(workers,{}),nil);eq(#g.tripIds,0);eq(next(s.jobs),nil)
 end)
+
+test('exploration prefers a specialist and leaves a shared worker for ready construction',function()
+  local jobs,s,workers,c=fixture();workers['1'].telemetry.capabilities.building=true
+  local q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 1 end,1,nil,c)
+  local blocks={};for x=100,163 do blocks[#blocks+1]={x=x,y=2,z=100,name='minecraft:stone',state={}} end
+  local build=q:submit('BUILD',{blocks=blocks})
+  local g=jobs:requestAcquisition('minecraft:coal',128,0,'specialized')
+  local first=assert(jobs:assign(workers,{}));eq(first.workerId,2)
+  first.status='running';workers['2'].telemetry.task=first.id
+  jobs:assign(workers,{});eq(#g.tripIds,1)
+  eq(q:assign(workers).id,build.id);eq(build.workerId,1)
+end)

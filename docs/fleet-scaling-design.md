@@ -78,7 +78,7 @@ cell and three per structural cell. Mining adds the amortized round-trip distanc
 of eligible workers' exit routes. These conservative estimates are replaced by the
 last32 physical completion samples per role; zero-yield trips contribute elapsed
 time but no items. Cumulative counts remain available for diagnostics. A restored
-old job without an assignment timestamp is excluded from rate samples.
+old job without a durable work-start timestamp is excluded from rate samples.
 
 Desired counts are bounded by useful independent ready work, capable idle/active
 workers and configured0..128 role limits. They are estimates; final dispatch retains

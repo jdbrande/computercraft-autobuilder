@@ -995,25 +995,25 @@ admission and a concrete reason. It never changes ownership.
 before durable ownership, including after yielding loaded-area observations.
 `Scaling.window(state,config,role)` returns a bounded producer window (1..64).
 
-- [ ] Add failing queue/runtime tests: configured role caps across both ownership
+- [x] Add failing queue/runtime tests: configured role caps across both ownership
   queues, shared-material exploration quota splitting, specialized-worker preference,
   limited stock, independent build/preparation regions and simultaneous role demand.
-- [ ] Replace fixed four-job producer windows with bounded eligible-capacity windows.
+- [x] Replace fixed four-job producer windows with bounded eligible-capacity windows.
   Scale private craft/haul batches through their existing stock/capacity reservations.
   Preserve every safety/route/protection/fuel/dependency check; scaling does not
   authorize a task those checks reject.
-- [ ] Apply dispatch targets and bottleneck priority to idle workers only. Rescue,
+- [x] Apply dispatch targets and bottleneck priority to idle workers only. Rescue,
   fuel delivery and home/debris settlement bypass ordinary role quotas.
-- [ ] Test a lease/worker/quota changing during a yielding chunk call, owner recovery,
+- [x] Test a lease/worker/quota changing during a yielding chunk call, owner recovery,
   failed root save, offline owners, and scale-down while cargo/return is outstanding.
-- [ ] Run relevant focused regressions and commit.
+- [x] Run relevant focused regressions and commit.
 
 ### Task48: Operator diagnostics and actual-runtime ramp/drain
 
 **Files:** scaling module, controller commands/UI, `tests/fleet_scaling_runtime_test.lua`,
 operator docs and progress ledger.
 
-- [ ] Add `fleet status`/role-limit commands and concise role counts, queue depth,
+- [x] Add `fleet status`/role-limit commands and concise role counts, queue depth,
   estimated work, delivery rate, limiting resource and bounded scaling-decision history.
   Reuse existing command/event logging and configuration persistence.
 - [ ] Add actual controller/miner/worker runtime scenarios that start with one

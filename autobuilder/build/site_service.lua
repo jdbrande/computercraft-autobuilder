@@ -65,7 +65,8 @@ function M.new(app,config,e,queue,production)
     end
     F.commit(p,save,function()
       p.generation=p.generation+1
-      p.site={identity=plan.identity,generation=p.generation,projectRun=p.run or 0,cursor=1,completed=0,blocked=0,active={},status='surveying'}
+      p.site={identity=plan.identity,generation=p.generation,projectRun=p.run or 0,cursor=1,completed=0,blocked=0,active={},status='surveying',
+        columnCount=plan.columnCount,regionCount=plan.regionCount,estimatedCells=plan.columnCount*(plan.bounds.max.y-plan.bounds.min.y+1)}
       p.protectedBounds=protection;p.phase='surveying';p.completed=0;p.total=plan.columnCount;p.error=nil
     end)
   end
