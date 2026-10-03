@@ -27,7 +27,7 @@ function M.new(app,config,e,queue,production)
     local job=r.jobId and s.jobs[r.jobId];local w=app.state.workers[tostring(r.owner)];local t=w and w.telemetry
     if job and (job.returnReady or job.workerId) then return false end
     if not task or task.returnManaged or task.workerId~=r.owner or task.status=='completed'
-      or not w.online or not t or t.task~=taskId or not w.lastSeen or w.lastSeen<(task.created or 0)
+      or task.physicalComplete or not w or not w.online or not t or t.task~=taskId or not w.lastSeen or w.lastSeen<(task.created or 0)
       or not Cargo.validCargo(t.cargo) or t.cargo.error or next(t.cargo.items) then return false end
     for _,name in ipairs({'inventoryLedger','capacityLedger','chunkLedger'}) do
       local lease=job and (app.state[name] or {}).leases and app.state[name].leases[job.id]

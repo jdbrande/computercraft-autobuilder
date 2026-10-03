@@ -460,3 +460,13 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 
 - Task40 complete gate:622 Lua/18 Python passed; release0.22 generation/check and
   whitespace clean. Final whole-branch review/fix pass follows before integration.
+
+- Second native0.22 trial: two stone blocks built/verified, settling observed, controller
+  rebooted, spare2 stone unloaded before built in38.48s. Independent world counts:
+  central7 stone+3 dirt, empty home buffer, reserved coal/pickaxe retained,1952 fuel,
+  no held claims. Rig shut down and all loading tickets removed again.
+- Final0.22 review found two Important settlement races: completed unrelated tasks
+  falsely qualified as reassignment; completed home evidence was ignored after newer
+  unrelated cargo. Both reproduced RED→GREEN and fixed; stale evidence now requests
+  a new return, and durable fresh evidence survives subsequent offline telemetry.
+  Final gates:623 Lua/18 Python passed, release/check and whitespace clean; no second review.

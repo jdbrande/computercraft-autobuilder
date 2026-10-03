@@ -387,3 +387,25 @@ test('project pause before home job creation prevents return admission until res
   assert(not j.returnReady,'paused project granted home ownership')
   assert(c:command('build resume paused'));c:workStep();assert(j.returnReady)
 end)
+
+test('project consumes durable home settlement evidence before later unrelated cargo or offline telemetry',function()
+  for _,mode in ipairs({'cargo','offline','stale','completed_task'}) do
+    local w,ce,we,c,b,step=fixture();assert(c:command('build import /example.json proof'));assert(c:command('build prepare proof'))
+    for _=1,3 do step() end
+    local s=c.state.automation;local p=s.projects.proof;local worker=c.state.workers['12']
+    p.phase='settling';p.settlement={target='built'};p.actors={['12']={after=ce.now}};p.returnRequests={}
+    local r
+    if mode~='completed_task' then
+      r=c.automation.production.returns:request(12,'project:proof:run:0:worker:12')
+      r.status='completed';r.settledAt=mode=='stale' and ce.now or ce.now+1;p.returnRequests['12']=r.id
+    end
+    local j=c.automation.queue:submit('BUILD',{blocks={{x=20,y=0,z=0,name='minecraft:stone',state={}}}},{})
+    j.workerId=12;j.status=mode=='completed_task' and 'completed' or 'assigned'
+    worker.lastSeen=ce.now+2;worker.telemetry.task=j.id;worker.telemetry.status='working';worker.telemetry.position.x=8
+    worker.telemetry.cargo=mode=='completed_task' and {items={},limits={}} or {items={['minecraft:dirt']=1},limits={['minecraft:dirt']=64}}
+    if mode=='offline' then worker.online=false end
+    c.automation.projects:tick()
+    if mode=='cargo' or mode=='offline' then eq(p.phase,'built')
+    else eq(p.phase,'settling');if mode=='stale' then assert(p.returnRequests['12']~=r.id,'stale completed return was reused') end end
+  end
+end)

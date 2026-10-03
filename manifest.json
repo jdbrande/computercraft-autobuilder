@@ -107,7 +107,7 @@
       "version": "0.22.0"
     },
     {
-      "bytes": 23320,
+      "bytes": 23726,
       "path": "autobuilder/blueprint/projects.lua",
       "roles": [
         "controller",
@@ -117,7 +117,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "55f61458b0af44d51e7d9c037896f915f73208ff19dee40858a6be6c1546f836",
+      "sha256": "1bf2b6e9cf4913c63df5ecbc60d0f041e214df179f2fec98aab29afa6c29c782",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/blueprint/projects.lua",
       "version": "0.22.0"
     },
@@ -582,7 +582,7 @@
       "version": "0.22.0"
     },
     {
-      "bytes": 9696,
+      "bytes": 9730,
       "path": "autobuilder/core/return_service.lua",
       "roles": [
         "controller",
@@ -592,7 +592,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "b7cc42f7b1c72b97cd26aa76d89b11b08266fbcf60d0ad44a6562bc326bfbdcd",
+      "sha256": "00a3108fe417c46e5a696c1f3181d079f6cf56ef99bdfa80b654422c6e79b179",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/return_service.lua",
       "version": "0.22.0"
     },

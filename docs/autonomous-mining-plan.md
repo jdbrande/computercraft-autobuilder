@@ -894,5 +894,5 @@ config capability negotiation and actual runtime tests.
 
 - [x] Exercise remote finite-cargo return, post-effect restart and independent world
   inspection. Record setup, counts, fuel, claims, cleanup and limits.
-- [ ] Run full Lua/Python/release gates, one final whole-branch review/fix pass, update
+- [x] Run full Lua/Python/release gates, one final whole-branch review/fix pass, update
   running progress and docs, integrate/push and continue all fleet requirements.

@@ -148,15 +148,20 @@ function M.new(app,config,e,queue,production)
     for id,a in pairs(p.actors or {}) do if not a.settled then
       local w=app.state.workers[id];local t=w and w.telemetry
       local cargo=t and t.cargo
-      if not w or not w.online or not t or not w.lastSeen or w.lastSeen<=a.after then
+      local request=p.returnRequests[id] and s.returns[p.returnRequests[id]]
+      if request and request.status=='completed' and request.owner==tonumber(id)
+        and U.finite(request.settledAt) and request.settledAt>a.after then
+        a.settled={at=request.settledAt,returnRequest=request.id};assert(save())
+      elseif not w or not w.online or not t or not w.lastSeen or w.lastSeen<=a.after then
         why=why or 'Waiting for fresh acknowledgement from worker '..id
       elseif active[id] then why=why or 'Waiting for project worker '..id
       elseif not require('autobuilder.storage.returns').validCargo(cargo) or cargo.error then
         why=why or 'Worker '..id..' needs supported cargo telemetry: '..tostring(cargo and cargo.error or 'update worker software')
       else
-        local request=p.returnRequests[id] and s.returns[p.returnRequests[id]]
+        if request and request.status=='completed' then request=nil end
         local newTask=t.task and (s.jobs[t.task] or (app.state.jobs or {})[t.task])
-        local reassigned=newTask and newTask.workerId==w.id and not work[newTask.id] and not newTask.returnManaged
+        local reassigned=newTask and newTask.workerId==w.id and newTask.status~='completed'
+          and not newTask.physicalComplete and not work[newTask.id] and not newTask.returnManaged
         if not next(cargo.items) and reassigned and (not request or request.status=='completed'
           or production.returns:releaseToTask(request.id,newTask.id)) then
           a.settled={at=w.lastSeen,reassigned=newTask.id};assert(save())
@@ -166,7 +171,7 @@ function M.new(app,config,e,queue,production)
           a.settled={at=w.lastSeen,home=U.copy(t.depot)};assert(save())
         else
           if not request then
-            request=production.returns:request(w.id,'project:'..p.name..':run:'..(p.run or 0)..':worker:'..id)
+            request=production.returns:request(w.id,'project:'..p.name..':run:'..(p.run or 0)..':worker:'..id..':after:'..a.after)
             p.returnRequests[id]=request.id;assert(save())
           end
           why=why or 'Worker '..id..' return: '..(request.error or request.status)
