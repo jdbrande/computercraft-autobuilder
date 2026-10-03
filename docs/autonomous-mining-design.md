@@ -1,7 +1,7 @@
 # Autonomous material gathering for schematic builds
 
 Status: milestone 1 design, confirmed by the supplied fleet requirements on
-2026-10-02. Implementation has not started.
+2026-10-02. Implemented on the autonomous exploration branch; live Minecraft acceptance is pending.
 
 The [fleet requirements](fleet-requirements.md) define the complete product and
 milestone order. This document specifies autonomous exploration, the first

@@ -323,7 +323,10 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
         task.explorationProgress.result=assert(reason,'unknown exploration return result'); task.phase='completed'; return persist()
       end
       if g and task.returnRequested then task.returnReason='paused'; return persist() end
-      if task.delivered>=task.quantity then task.phase='completed'; return persist() end
+      if task.delivered>=task.quantity then
+        if g then task.explorationProgress.result='quota' end
+        task.phase='completed'; return persist()
+      end
       if task.returnReason=='survey exhausted' then return block('survey exhausted; only '..task.delivered..' / '..task.quantity..' collected') end
       local required=math.max(c.fuelTarget or 1000,math.max(#(task.outbound or {}),U.distance(config.depot,c.entry))*2+(config.minimumFuelReserve or 100)+(c.returnMargin or 8))
       if g then required=math.max(required,#travel*2+(config.minimumFuelReserve or 100)+(c.returnMargin or 8)+2) end

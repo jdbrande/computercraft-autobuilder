@@ -5,7 +5,8 @@ local S=require('tests.support')
 local Runtime=require('autobuilder.core.runtime')
 local Config=require('autobuilder.config')
 local function mc(name) return 'minecraft:'..name end
-local function fixture()
+local function fixture(options)
+  options=options or {}
   local f={inventories={stock={},stage={},input={},output={},furnace={}},actors={},now=100,
     stats={mined={},deposited={},smelted={},crafts=0,burned=0,pulled={},maxMining=0},assignments={}}
   local function change(inv,slot,item,delta)
@@ -43,14 +44,18 @@ local function fixture()
     heartbeatInterval=1,registrationInterval=3,workerTimeout=8,gps={enabled=false},
     supply={inventory='stage',side='down',batch=64}}
   local cc=U.copy(common); cc.build={enabled=true,origin={x=2,y=0,z=0}}
+  if options.exploration then cc.exploration={enabled=true,base={x=0,y=0,z=0},bounds={min={x=16,y=0,z=0},max={x=103,y=0,z=1}},baseProtection={min={x=-12,y=-1,z=-2},max={x=8,y=3,z=2}},dimensionMinY=-64,dimensionMaxY=319} end
   f.controller=actor(7,cc)
   local sources={{id=21,x=20,item='cobblestone',block='stone',count=4},
     {id=22,x=40,item='sand',block='sand',count=1},{id=23,x=60,item='coal',block='coal_ore',count=2}}
+  if options.exploration then sources[#sources+1]={id=26,x=84,item='cobblestone',block='stone',count=4} end
+  local sharedBlocks={}
   f.miners={}
   for _,source in ipairs(sources) do
-    local w=require('tests.world').new(); w.pose.x=source.x; w.blocks={}
+    local w=require('tests.world').new(); w.pose.x=source.x; w.blocks=options.exploration and sharedBlocks or {}
+    if options.finiteFuel then w.fuel=1000 end
     w.blocks[source.x..',-1,0']=mc('chest')
-    for x=source.x+2,source.x+1+source.count do w.blocks[x..',0,0']=mc(source.block) end
+    for x=source.x+(options.exploration and 10 or 2),source.x+(options.exploration and 9 or 1)+source.count do w.blocks[x..',0,0']=mc(source.block) end
     local equipped=false; w.items[16]={name='advancedperipherals:geo_scanner',count=1}
     w.turtle.equipLeft=function() equipped=not equipped; w.items[16]={name=equipped and mc('diamond_pickaxe') or 'advancedperipherals:geo_scanner',count=1}; return true end
     w.turtle.dropDown=function()
@@ -65,6 +70,8 @@ local function fixture()
     local wc=U.copy(common); wc.role='worker'; wc.controllerId=7; wc.initialPosition=U.copy(w.pose)
     wc.depot={x=source.x,y=0,z=0}; wc.mining={enabled=true,resources={mc(source.item)},entry={x=source.x+1,y=0,z=0},
       bounds={min={x=source.x+1,y=0,z=-1},max={x=source.x+7,y=0,z=1}},fuelTarget=100}
+    if options.exploration then wc.mining.mode='explore'; wc.mining.exitRoute={{x=source.x+1,y=0,z=0}}; wc.mining.bounds=nil; wc.mining.entry=nil end
+    if options.scanner==false then p.getType=function(name) if name=='right' then return 'modem' end end; w.items[16]=nil end
     local a=actor(source.id,wc,w.turtle,p); a.world=w; a.source=source; f.miners[#f.miners+1]=a
   end
   local crafty={slots={},selected=1}; local t=S.turtle(); t.getFuelLevel=function() return 'unlimited' end
@@ -110,6 +117,10 @@ local function fixture()
           any=true
           if p.message.type=='mine_assign' then
             self.assignments[p.message.payload.item]=p.to
+            self.assignmentOwners=self.assignmentOwners or {}; self.assignmentOwners[p.message.payload.item]=self.assignmentOwners[p.message.payload.item] or {}
+            self.assignmentOwners[p.message.payload.item][p.to]=true
+          elseif p.message.type=='mine_progress' and p.message.payload.exploration and p.message.payload.phase=='completed' and p.message.payload.delivered==0 then
+            self.emptyTrip=true
           end
           assert(self.actors[p.to],'unknown packet recipient')
           self.actors[p.to].runtime:receive(p.message.sender,p.message,p.protocol)
@@ -180,3 +191,27 @@ test('autonomous project physically mines different materials in parallel then s
   eq(f.builder.world.blocks['2,0,0'].name,mc('stone_bricks')); eq(f.builder.world.blocks['3,0,0'].name,mc('stone_bricks'))
   eq(f.builder.world.blocks['4,0,0'].name,mc('glass')); eq(next(f.inventories.stage),nil); eq(next(f.craft.slots),nil)
 end)
+
+for _,scan in ipairs({true,false}) do
+  test('exploration fleet discovers shares and builds a schematic with scanner '..tostring(scan),function()
+    local f=fixture({exploration=true,scanner=scan,finiteFuel=true}); local c=f.controller.runtime
+    assert(c:command('build import /chain.json explore')); assert(c:command('build auto explore'))
+    local restarted=false
+    for i=1,5000 do
+      f:step()
+      if not restarted and f.miners[1].runtime.state.currentTask and f.miners[1].runtime.state.currentTask.phase=='work' then
+        f:reboot(f.controller); f:reboot(f.miners[1]); restarted=true
+      end
+      local p=f.controller.runtime.state.automation.projects.explore
+      if p.phase=='built' and not f.builder.runtime.state.currentTask and not f.craft.runtime.state.currentTask then break end
+    end
+    local p=f.controller.runtime.state.automation.projects.explore
+    local errors={p.phase,p.error or ''}
+    for _,r in pairs(f.controller.runtime.state.automation.requests) do errors[#errors+1]=r.status..':'..tostring(r.error) end
+    for id,a in pairs(f.actors) do local t=a.runtime.state.currentTask; if t then errors[#errors+1]=id..':'..t.phase..':'..tostring(t.error) end end
+    assert(p.phase=='built',table.concat(errors,'; ')); assert(restarted); assert(f.emptyTrip,'expected automatic advance after an empty sector')
+    assert(f.assignmentOwners[mc('cobblestone')][21] and f.assignmentOwners[mc('cobblestone')][26])
+    eq(p.report.counts.correct,3); eq(f.builder.world.places,3)
+    for _,a in ipairs(f.miners) do eq(a.runtime.state.currentTask,nil); eq(a.world.pose.x,a.source.x) end
+  end)
+end

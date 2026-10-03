@@ -72,6 +72,11 @@ function M.new(state,save,clock,controllerId,config)
       for _,id in ipairs(g.tripIds) do local j=state.jobs[id]; if j and not j.physicalComplete then outstanding=outstanding+math.max(0,j.quantity-j.progress.delivered) end end
       local remaining=g.target-(counts[g.item] or 0)-outstanding
       if remaining>0 then
+        local eligible=0
+        for _,w in pairs(workers) do local t=w.telemetry
+          if w.online and t and t.capabilities and t.capabilities.explorationV1 and E.home(t.explorationHome)
+            and Materials.accepts(t.miningResources,g.item) and t.status=='idle' and not t.task and not Coordination.workerBusy(state,w.id) then eligible=eligible+1 end
+        end
         local reason='No online exploration-capable worker'; local waiting=false
         for _,wid in ipairs(ids) do
           local w=workers[tostring(wid)]; local t=w.telemetry; local home=t and t.explorationHome
@@ -84,7 +89,7 @@ function M.new(state,save,clock,controllerId,config)
                 for _,b in ipairs(home.protectedAreas) do areas[#areas+1]=b end
                 local geometry,why=E.plan(sector,{config=config,depot=home.depot,exitRoute=home.exitRoute,protectedAreas=areas,activeJobs=state.jobs,availableFuel=t.fuel})
                 if geometry then
-                  local j=create(g.item,math.min(64,remaining),0); geometry.groupId=g.id
+                  local j=create(g.item,math.min(64,math.ceil(remaining/math.max(1,eligible))),0); geometry.groupId=g.id
                   j.exploration=geometry; j.workerId=wid; j.miningArea=U.copy(geometry.bounds); j.miningResources=U.copy(t.miningResources or {}); j.status='assigned'
                   g.tripIds[#g.tripIds+1]=j.id; g.status='running'; g.error=nil
                   local ok,err=save()

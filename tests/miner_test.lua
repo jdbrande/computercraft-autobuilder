@@ -173,3 +173,23 @@ test('explorer traverses declared protected exits but never excavates them',func
     eq(m.task.explorationProgress.result,blocked and 'route_blocked' or 'survey_exhausted')
   end
 end)
+test('explorer unloading existing requested cargo completes with a valid terminal result',function()
+  local w=W.new(); w.items[1]={name='minecraft:raw_iron',count=2}
+  local m=explorer(w); assert(run(m,w)); eq(w.pose.x,0); eq(m.task.delivered,2)
+  eq(m.task.explorationProgress.result,'quota')
+end)
+test('exploration low fuel returns a partial trip and refuses obstructed return excavation',function()
+  local w=W.new(); local m=explorer(w)
+  for _=1,5 do assert(m:step()) end
+  assert(w.pose.x>0); w.fuel=#m.task.trail+13
+  assert(run(m,w)); eq(m.task.explorationProgress.result,'fuel'); eq(w.pose.x,0)
+  w=W.new(); m=explorer(w); for _=1,5 do assert(m:step()) end
+  assert(m:requestReturn()); w.blocks['1,0,0']='minecraft:stone'
+  local ok,why=run(m,w); assert(not ok and why:find('return route obstructed')); eq(#w.dug,0)
+end)
+test('exploration refuses waterlogged route blocks without digging',function()
+  local w=W.new(); w.blocks['1,0,0']='minecraft:stone'
+  local inspect=w.turtle.inspect
+  w.turtle.inspect=function() local found,b=inspect(); if found and b.name=='minecraft:stone' then b.state.waterlogged=true end; return found,b end
+  local m=explorer(w); assert(run(m,w)); eq(m.task.explorationProgress.result,'route_blocked'); eq(#w.dug,0)
+end)

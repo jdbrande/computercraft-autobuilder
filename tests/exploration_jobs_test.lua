@@ -47,3 +47,8 @@ test('production requests use exploration groups and wait for physical returns',
   assert(jobs:progress(trip.workerId,{jobId=trip.id,phase='completed',delivered=64,held=0,exploration={result='quota',cursor=2,observations={},clearedRouteCount=0}},128))
   ps:tick(); assert(r.acquired)
 end)
+test('small exploration demands share finite quotas across eligible idle workers',function()
+  local j,s,w=fixture(); j:requestAcquisition('minecraft:cobblestone',4,0,'small')
+  local a=assert(j:assign(w,{})); eq(a.quantity,2)
+  local b=assert(j:assign(w,{})); eq(b.quantity,2); assert(a.workerId~=b.workerId)
+end)

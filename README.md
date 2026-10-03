@@ -1,8 +1,14 @@
-# Autobuilder 0.11.0
+# Autobuilder 0.12.0
 
 Development direction: [full fleet requirements](docs/fleet-requirements.md) and
 [milestone 1 autonomous exploration design](docs/autonomous-mining-design.md).
-These describe planned work; the current release behavior is documented below.
+The full fleet roadmap remains in progress. The current release behavior is documented below.
+
+**Automatic exploration:** [configure explorers](docs/autonomous-mining.md) with
+`setup exploration` on the controller and `setup miner explore` on miners.
+Several explorers can share one material request, search new sectors automatically,
+return partial deliveries, and resume after restarts. `build auto NAME` feeds those
+materials into the existing crafting and construction pipeline.
 
 **Automatic materials and multiple miners:** [follow this guide](docs/material-team.md).
 Use `setup miner stone,coal`, `setup miner sand`, and other resource profiles on
