@@ -432,7 +432,7 @@
       "version": "0.14.0"
     },
     {
-      "bytes": 21990,
+      "bytes": 22975,
       "path": "autobuilder/core/production_service.lua",
       "roles": [
         "controller",
@@ -442,7 +442,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "2142a815a899bc6ddecd9c3af187fbb27742e976e73ae1edf2d7f95bbefee299",
+      "sha256": "dc49804ed49b27a397e909a8054ed5ade1c624c7b86c2c205fa56b91ed16ed71",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/production_service.lua",
       "version": "0.14.0"
     },

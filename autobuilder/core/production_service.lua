@@ -32,7 +32,12 @@ function M.new(app,config,e,queue)
     return r
   end
   function self:refresh()
-    return app.mining:refresh()
+    if self.working or self.reading then return false,'inventory operation in progress' end
+    self.reading=true
+    local called,ok,why=pcall(app.mining.refresh,app.mining)
+    self.reading=false
+    if not called then error(ok,0) end
+    return ok,why
   end
   function self:acceptReceipt(job,receipt)
     if not job.stockInputs then return true end -- exclusive legacy job
@@ -51,7 +56,7 @@ function M.new(app,config,e,queue)
     end
     return {withdrawn=withdrawn,delivered={[job.item]=p.delivered or 0},sequence=p.stockSequence}
   end
-  function self:syncClaims(allowGrant)
+  local function syncClaims(allowGrant)
     local jobs={}; for _,j in pairs(s.jobs) do if j.stockInputs then jobs[#jobs+1]=j end end
     table.sort(jobs,function(a,b) return a.id<b.id end)
     for _,j in ipairs(jobs) do
@@ -77,6 +82,17 @@ function M.new(app,config,e,queue)
         app.mining.storage.valid and app.mining.storage.counts or nil,{protected=config.turtleFuelReserveItems})
       if j.stockError~=why then j.stockError=why; save() end
     end end
+  end
+  function self:syncClaims(allowGrant)
+    if allowGrant==false then return syncClaims(false) end
+    if self.working or self.reading then return end
+    -- Peripheral list calls yield in CraftOS. Keep the action coroutine out of
+    -- the complete observation/grant interval, and always observe anew here.
+    self.reading=true
+    local ok,result=pcall(function() app.mining:refresh(); return syncClaims(true) end)
+    self.reading=false
+    if not ok then error(result,0) end
+    return result
   end
   local function hasWorker(capability,item)
     -- Small integrations predating the registry can still drive production.
@@ -194,6 +210,7 @@ function M.new(app,config,e,queue)
     return table.concat(#errors>0 and errors or waiting,'; ')
   end
   function self:tick()
+    if self.working then return end
     local active
     for _,r in pairs(s.requests) do if r.status=='running' or r.status=='blocked' then active=r; break end end
     if not active then
@@ -358,7 +375,7 @@ function M.new(app,config,e,queue)
     job.status=status=='complete' and 'completed' or status=='blocked' and 'blocked' or 'running'
     job.error=err; save(); self:syncClaims(false); return true
   end
-  function self:step()
+  local function step()
     for id in pairs(self.machines) do if not s.jobs[id] then self.machines[id]=nil end end
     if app.state.assignmentRecovery then return true end
     local all={}
@@ -397,6 +414,14 @@ function M.new(app,config,e,queue)
       job.furnaceLane=chosen; save()
     end
     return execute(job)
+  end
+  function self:step()
+    if self.reading or self.working then return true end
+    self.working=true
+    local ok,result=pcall(step)
+    self.working=false
+    if not ok then error(result,0) end
+    return result
   end
   return self
 end

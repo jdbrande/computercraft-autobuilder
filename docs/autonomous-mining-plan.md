@@ -483,8 +483,8 @@ add regressions to production/runtime/logistics tests.
 **Files:** update resource command/UI, README, progress and acceptance documentation;
 regenerate release artifacts.
 
-- [ ] Show distinct physical/available/reserved/transit/expected/project demand
+- [x] Show distinct physical/available/reserved/transit/expected/project demand
   values without counting forecasts as stock. Add command regression assertions.
-- [ ] Run full Lua/Python/release checks and live furnace/Crafty acceptance. Review
+- [x] Run full Lua/Python/release checks and live furnace/Crafty acceptance. Review
   whole branch, fix reproduced important findings with regressions, integrate and
   continue directly to station staging, fuel distribution and rescue.

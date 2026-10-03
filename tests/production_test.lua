@@ -476,3 +476,21 @@ test('resource status distinguishes measured stock from reservations and expecte
   text=p:describe(mc('stone_bricks'))
   assert(text:find('stock=0 available=0 reserved=0 transit=0 expected=4 demand=4',1,true),text)
 end)
+
+test('inventory grants cannot race a yielding storage snapshot against a furnace transfer',function()
+  local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=4},[2]={name=mc('coal'),count=1}})
+  local a=q:submit('SMELT',{item=mc('stone'),quantity=4,batches=4,furnaceLane='furnace',
+    stockInputs={[mc('cobblestone')]=4,[mc('coal')]=1},stockOutputs={[mc('stone')]=4}},{})
+  p:tick(); assert(app.state.inventoryLedger.leases[a.id])
+  local b=q:submit('CRAFT',{item=mc('stone_bricks'),quantity=4,batches=1,
+    stockInputs={[mc('cobblestone')]=4},stockOutputs={[mc('stone_bricks')]=4}},{})
+  local call=h.peripheral.call; local yielded=false
+  h.peripheral.call=function(name,method,...)
+    local result=call(name,method,...)
+    if name=='store' and method=='list' and not yielded then
+      yielded=true; p:step() -- action coroutine runs after list captured its result
+    end
+    return result
+  end
+  p:tick(); assert(yielded); eq(app.state.inventoryLedger.leases[b.id],nil)
+end)

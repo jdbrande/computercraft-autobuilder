@@ -7,7 +7,7 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
 - Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
-- Current branch: `milestone/0.14.0`, durable inventory ownership.
+- Inventory ownership prerequisite accepted; next: fuel management/distribution/rescue.
 - Next: implement durable inventory ownership, then fuel
   delivery/rescue in dependency order. Continue through all rows below.
 - No external blocker is currently established. Missing implementation is remaining
@@ -134,3 +134,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   request made four additional bricks from staged raw inputs; both claims showed
   measured withdrawals/deliveries and released. Reboot retained released state;
   independent chest inspection confirmed ten bricks. Final branch review pending.
+
+- Inventory final: 431 Lua/16 Python tests passed after a reproduced yielding-read
+  race was fixed with reciprocal observation/action locks. Independent review
+  found no additional issues. Fixed live run reached fourteen physical bricks,
+  four claims released overall, and test computers/tickets were cleaned up.
+  [0.14.0 acceptance](validation-0.14.0.md) records scope and evidence.

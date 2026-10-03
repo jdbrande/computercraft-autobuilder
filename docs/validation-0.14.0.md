@@ -54,3 +54,22 @@ raw receipt observations and independent inspection are in `dist/live-inventory/
   receipts hold conservative claims until exact-output completion acknowledgement.
 - External inventory mutation can create a shortfall; the system blocks and keeps
   ownership rather than inventing stock or silently abandoning a worker.
+
+## Final concurrency check and review
+
+Independent branch review found no concrete defect in its pass. An additional
+coroutine-boundary regression then reproduced overbooking: a peripheral list
+returned its pre-transfer snapshot after the action coroutine had withdrawn stock
+and updated the first claim. A second claim could use that stale count. The
+regression failed before reciprocal observation/action locks were added. Grant
+synchronization now obtains a fresh snapshot while holding the observation lock;
+physical stepping cannot overlap it. Lock cleanup also occurs after exceptions.
+
+Focused suites passed. A live follow-up with the fix staged four cobblestone and
+one coal, requested fourteen total bricks, and completed from the previous ten.
+Both new claims released; controller and Crafty were shut down and force-load
+tickets removed. Snapshots are stored with the earlier live evidence.
+
+Final gate after the concurrency fix: **431 Lua tests, all 16 Python tests**,
+release regeneration/check and whitespace check passed. Independent world
+inspection confirmed fourteen bricks. Local final logs: `dist/release-0.14.0/`.
