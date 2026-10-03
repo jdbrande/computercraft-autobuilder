@@ -324,3 +324,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Lua tests passed. Registered stocks and private courier stands are protected;
   active endpoint identities survive restart and configuration cannot adopt an
   orphan private lease. Task30 reserved transport execution follows.
+
+- Task30:552 Lua/18 Python tests passed. Finite private-buffer hauls atomically
+  reserve stock and final slot capacity, stage only the requested mixed-stock item,
+  and credit destination stock only after measured collection. Two actual courier
+  runtimes pass concurrency, both reboots, lost acknowledgement and full-destination
+  recovery with finite fuel. Regression fixes also cover coverage of registered
+  remote stock and shared legacy/fuel consumer isolation. Native acceptance and
+  automatic restocking remain Task31.

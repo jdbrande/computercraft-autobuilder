@@ -1,6 +1,9 @@
 local U=require('autobuilder.core.util')
 local Reports=require('autobuilder.core.reports')
 local M={}
+local function transportReceipt(t)
+  if t.logistics then return {sequence=t.transportSequence or 0,pickedUp=t.pickedUp or 0,delivered=t.delivered or 0} end
+end
 local construction={BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true}
 local modules={RESCUE='autobuilder.workers.fuel_courier',BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',
   CRAFT='autobuilder.factory.crafting',TRANSPORT='autobuilder.workers.courier',HARVEST='autobuilder.resources.logger',FARM='autobuilder.resources.farmer'}
@@ -108,10 +111,16 @@ function M.new(app,config,e,network,clock)
     end
     if m.type=='task_assign' then
       local j=p.job; local done=s.completedTasks[j.id]
-      if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report}) end
+      if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report,transportReceipt=done.transportReceipt}) end
       if require('autobuilder.core.receipts').archived(s,'completedTasks',j.id) then return false,'Old acknowledged task was archived; restore the matching controller checkpoint' end
       local covered,why=require('autobuilder.core.chunks').workerAccept(config,s,j);if not covered then return false,why end
+      if t and (t.logistics or j.logistics) then
+        for _,field in ipairs({'logistics','source','destination','item','quantity','stockInputs','stockOutputs'}) do
+          if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed managed transport assignment' end
+        end
+      end
       if t then return t.id==j.id,'worker already has a task' end
+      if j.logistics and (not config.capabilities.logisticsV1 or not require('autobuilder.storage.nodes').validContract(j)) then return false,'invalid managed transport assignment' end
       local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end
       if j.privateStation and not require('autobuilder.factory.stations').matches(j.privateStation,config,s.id) then return false,'private crafting station does not match worker configuration' end
@@ -119,7 +128,7 @@ function M.new(app,config,e,network,clock)
     end
     if not t or t.id~=p.jobId then return false,'task ID mismatch' end
     if m.type=='task_ack' and t.phase=='completed' then
-      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report)})
+      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report),transportReceipt=transportReceipt(t)})
       s.currentTask=nil; self.engine=nil; s.status='idle'; save(); return true
     elseif m.type=='task_pause' then t.paused=true; save(); return true
     elseif m.type=='task_resume' then
@@ -153,7 +162,7 @@ function M.new(app,config,e,network,clock)
     if t.type=='CRAFT' and t.production and t.production.stockSequence then
       stockReceipt={sequence=t.production.stockSequence,withdrawn=U.copy(t.production.withdrawn or {}),delivered={[t.item]=t.production.delivered or 0}}
     end
-    send('task_progress',{fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
+    send('task_progress',{transportReceipt=transportReceipt(t),fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
       missingItem=t.supplyRequest and t.supplyRequest.item or t.missingItem,
       missingCount=t.supplyRequest and t.supplyRequest.count or t.missingCount,supplyId=t.supplyRequest and t.supplyRequest.id,report=Reports.compact(t.report)})
     return true
@@ -238,6 +247,8 @@ function M.new(app,config,e,network,clock)
         engine():step(); s.status=t.phase; save(); return true
       end
       if t.error and tostring(t.error):find('movement reservation pending',1,true) and s.motionReservation and s.motionReservation.granted then resumeTask()
+      elseif t.logisticsRetryable and clock()-(t.lastLogisticsRetry or 0)>=config.heartbeatInterval then
+        t.lastLogisticsRetry=clock();resumeTask();save()
       elseif t.blockedCategory=='immature' and clock()-(t.lastFarmRetry or 0)>=config.farmRetrySeconds then
         t.lastFarmRetry=clock(); engine():resume(); save()
       elseif t.missingItem and config.supply.inventory~='' and t.type~='CRAFT' then

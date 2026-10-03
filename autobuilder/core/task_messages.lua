@@ -29,6 +29,7 @@ function M.validate(kind,p)
     local j=p.job
     if type(j)~='table' or not U.shortString(j.id,100) or not M.types[j.type] then return false,'invalid task assignment' end
     if j.loadedArea~=nil and not require('autobuilder.core.chunks').validGrant(j.loadedArea) then return false,'invalid loaded mission envelope' end
+    if j.logistics~=nil and not require('autobuilder.storage.nodes').validContract(j) then return false,'invalid managed logistics contract' end
     if j.privateStation and (j.type~='CRAFT' or not require('autobuilder.factory.stations').valid(j.privateStation)
       or j.workerId~=j.privateStation.workerId or j.preferredWorker~=j.workerId) then return false,'invalid private crafting station' end
     if j.type=='RESCUE' and (not U.position(j.source) or not U.position(j.destination) or not U.position(j.home)
@@ -72,6 +73,10 @@ function M.validate(kind,p)
     elseif kind=='task_fuel_release' then
       -- Identity-only release; the worker verifies its durable consumed receipt.
     elseif kind=='task_progress' then
+      local tr=p.transportReceipt
+      if tr and (type(tr)~='table' or not U.integer(tr.sequence) or tr.sequence<0 or tr.sequence>9007199254740991
+        or not U.integer(tr.pickedUp) or tr.pickedUp<0 or tr.pickedUp>64
+        or not U.integer(tr.delivered) or tr.delivered<0 or tr.delivered>tr.pickedUp) then return false,'invalid transport receipt' end
       if p.fuelDelivered~=nil and (not U.integer(p.fuelDelivered) or p.fuelDelivered<0 or p.fuelDelivered>64) then return false,'invalid rescue delivery quantity' end
       local r=p.stockReceipt
       if r and (type(r)~='table' or not U.integer(r.sequence) or r.sequence<1 or r.sequence>9007199254740991

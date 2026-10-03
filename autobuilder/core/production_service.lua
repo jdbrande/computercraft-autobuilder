@@ -8,6 +8,7 @@ function M.new(app,config,e,queue)
   local self={machines={},laneCursor=0}; local save=function() return app:save() end
   self.ledger=require('autobuilder.storage.ledger').new(app.state,save)
   self.parallel=require('autobuilder.factory.parallel').new(app,config,e,queue,self)
+  self.logistics=require('autobuilder.core.logistics_service').new(app,config,e,queue,self)
   function self:request(requirements,key,options)
     options=options or {}
     assert(type(requirements)=='table' and next(requirements),'resource request needs item quantities')
@@ -41,12 +42,19 @@ function M.new(app,config,e,queue)
     return ok,why
   end
   function self:acceptReceipt(job,receipt)
-    if job.privateStation then return true end -- worker receipts describe private stock, not central delivery
+    if job.privateStation or job.logistics then return true end -- worker receipts describe private stock, not central delivery
     if not job.stockInputs then return true end -- exclusive legacy job
-    local ok,err=pcall(self.ledger.receipt,self.ledger,job.id,receipt.withdrawn,receipt.delivered,{},receipt.sequence)
+    local ok,err=pcall(self.ledger.receipt,self.ledger,job.id,receipt.withdrawn,receipt.delivered,receipt.transit or {},receipt.sequence)
     return ok,not ok and tostring(err) or nil
   end
   local function localReceipt(job)
+    if job.logistics then
+      local f=job.logisticsFlow;if not f then return end
+      local sequence=(f.stage.stockSequence or 0)+(f.collect.stockSequence or 0)
+      if sequence==0 then return end
+      local taken=(f.stage.withdrawn or {})[job.item] or 0;local delivered=f.collect.delivered or 0
+      return {withdrawn={[job.item]=taken},delivered={[job.item]=delivered},transit={[job.item]=taken-delivered},sequence=sequence}
+    end
     if job.privateStation then
       local flow=job.factoryFlow
       if not flow then return end
@@ -72,13 +80,13 @@ function M.new(app,config,e,queue)
       local lease=self.ledger.state.leases[j.id]
       if lease and lease.status=='held' then
         local receipt=localReceipt(j)
-        if receipt then self.ledger:receipt(j.id,receipt.withdrawn,receipt.delivered,{},receipt.sequence) end
+        if receipt then self.ledger:receipt(j.id,receipt.withdrawn,receipt.delivered,receipt.transit or {},receipt.sequence) end
         lease=self.ledger.state.leases[j.id]
         if j.status=='completed' then
           -- Older Crafty workers can acknowledge completion without counters.
           -- Their exclusive job completion already guarantees exact output.
           if not require('autobuilder.factory.factory').equal(lease.delivered,j.stockOutputs) then
-            assert(not j.privateStation,'private factory output has not reached shared storage')
+            assert(not j.privateStation and not j.logistics,'private output has not reached shared storage')
             local withdrawn=j.type=='CRAFT' and j.stockInputs or lease.withdrawn
             self.ledger:receipt(j.id,withdrawn,j.stockOutputs,{},lease.sequence+1)
           end
@@ -87,7 +95,7 @@ function M.new(app,config,e,queue)
       end
     end
     if allowGrant==false then return end
-    for _,j in ipairs(jobs) do if j.status~='completed' and not self.ledger.state.leases[j.id] then
+    for _,j in ipairs(jobs) do if j.status~='completed' and not j.logistics and not self.ledger.state.leases[j.id] then
       local lease,why=self.ledger:reserve(j.id,j.stockInputs,j.stockOutputs,
         app.mining.storage.valid and app.mining.storage.counts or nil,{protected=j.type=='FUEL_STATION' and {} or config.turtleFuelReserveItems})
       if j.stockError~=why then j.stockError=why; save() end
@@ -390,6 +398,7 @@ function M.new(app,config,e,queue)
   local function step()
     for id in pairs(self.machines) do if not s.jobs[id] then self.machines[id]=nil end end
     if app.state.assignmentRecovery then return true end
+    if self.logistics:step() then return true end
     if self.parallel:step() then return true end
     local all={}
     for _,job in pairs(s.jobs) do if job.type=='SMELT' then all[#all+1]=job end end

@@ -20,11 +20,18 @@ function M.workerBusy(state,owner,exceptId)
   for _,job in pairs((state.automation or {}).jobs or {}) do
     if job.id~=exceptId and job.type=='RESCUE' and not job.rescueSettled
       and (job.preferredWorker==owner and job.status~='completed' or job.targetWorker==owner) then return true end
-    if job.id~=exceptId and (job.workerId==owner or (job.managedFuel or job.privateStation) and job.preferredWorker==owner) and job.status~='completed' then return true end
+    if job.id~=exceptId and (job.workerId==owner or (job.managedFuel or job.privateStation or job.logistics) and job.preferredWorker==owner) and job.status~='completed' then return true end
+  end
+  return false
+end
+function M.logisticsActive(state)
+  for _,job in pairs((state.automation or {}).jobs or {}) do
+    if job.logistics and job.logisticsFlow and job.status~='completed' then return true end
   end
   return false
 end
 function M.factoryPending(state)
+  if M.logisticsActive(state) then return true end
   for _,job in pairs((state.automation or {}).jobs or {}) do
     if factory(job) and (job.status~='completed' or job.production and job.production.intent) then return true end
   end
@@ -50,7 +57,7 @@ function M.storageBusy(state)
   end
   local automation=state.automation or {}
   for _,job in pairs(automation.jobs or {}) do
-    if (storageWorkers[job.type] and job.workerId or job.type=='FUEL_STATION' and job.production) and job.status~='completed' then return true,'waiting for active storage job '..job.id end
+    if (storageWorkers[job.type] and job.workerId or job.logistics and job.logisticsFlow or job.type=='FUEL_STATION' and job.production) and job.status~='completed' then return true,'waiting for active storage job '..job.id end
   end
   if automation.supply then return true,'waiting for outstanding supply batch '..tostring(automation.supply.jobId) end
   return false
@@ -103,6 +110,7 @@ function M.new(state,save,clock,id,chunks)
     for _,j in ipairs(ordered) do
       local allowed=not (storageWorkers[j.type] and factoryPending)
       if j.type=='RESCUE' then allowed=j.rescueReady==true and not M.factoryActive(state) end
+      if j.logistics then allowed=j.logisticsReady==true and not M.factoryActive(state) end
       if j.managedFuel then allowed=j.fuelReady==true and not M.factoryActive(state) end
       if j.type=='CRAFT' then allowed=M.factoryCanRun(state,j) end
       if allowed and j.status=='queued' and not j.workerId and j.requiredCapability and self:ready(j) and not j.paused then
@@ -114,6 +122,7 @@ function M.new(state,save,clock,id,chunks)
             local t=w.telemetry
             if w.online and t and t.status=='idle' and not t.task and t.capabilities and t.capabilities[j.requiredCapability]
               and (not j.privateStation or t.capabilities.isolatedCraftingV1)
+              and (not j.logistics or t.capabilities.logisticsV1)
               and (not j.preferredWorker or j.preferredWorker==w.id)
               and not M.workerBusy(state,w.id,j.id) then ids[#ids+1]=tonumber(wid) end
           end
@@ -148,13 +157,27 @@ function M.new(state,save,clock,id,chunks)
     local j=s.jobs[p.jobId]
     if not j or j.workerId~=owner then return false,'task owner mismatch' end
     if j.status=='completed' or j.workerFinished then return true end
+    if j.logistics then
+      local r=p.transportReceipt;local old=j.transportReceipt
+      if type(r)~='table' or not U.integer(r.sequence) or r.sequence<0
+        or not U.integer(r.pickedUp) or r.pickedUp<0 or r.pickedUp>j.quantity
+        or not U.integer(r.delivered) or r.delivered<0 or r.delivered>r.pickedUp then return false,'invalid transport receipt' end
+      if p.phase=='completed' and (r.pickedUp~=j.quantity or r.delivered~=j.quantity) then return false,'transport completion lacks exact receipt' end
+      if old then
+        if r.sequence<old.sequence then return false,'stale transport receipt' end
+        if r.sequence==old.sequence and not require('autobuilder.factory.factory').equal(old,r) then return false,'changed duplicate transport receipt' end
+        if r.pickedUp<old.pickedUp or r.delivered<old.delivered then return false,'regressed transport receipt' end
+      end
+      if (p.progress or 0)~=r.delivered then return false,'transport progress disagrees with delivery' end
+    end
     if (p.progress or 0)<j.progress then return false,'stale task progress' end
     if j.type=='RESCUE' and p.fuelDelivered~=nil and (p.fuelDelivered<(j.fuelDelivered or 0) or p.fuelDelivered>j.quantity) then return false,'invalid rescue delivery counter' end
+    if j.logistics then j.transportReceipt=U.copy(p.transportReceipt) end
     j.progress=p.progress or 0; j.phase=p.phase; j.error=p.error; j.missingItem=p.missingItem
     if j.type=='RESCUE' and p.fuelDelivered~=nil then j.fuelDelivered=p.fuelDelivered end
     j.missingCount=p.missingCount; j.supplyId=p.supplyId; j.report=U.copy(p.report)
     j.status=p.phase=='completed' and 'completed' or p.phase=='blocked' and 'blocked' or p.phase=='paused' and 'paused' or 'running'
-    if j.privateStation and p.phase=='completed' then j.workerFinished=true; j.status='collecting' end
+    if (j.privateStation or j.logistics) and p.phase=='completed' then j.workerFinished=true; j.status='collecting' end
     persist(); return true
   end
   function self:reserve(owner,jobId,from,target,workers)

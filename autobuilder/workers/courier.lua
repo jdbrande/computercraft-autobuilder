@@ -11,13 +11,15 @@ function M.new(task,e,config,nav,save)
     if not ok or not v then fault='courier checkpoint failed: '..tostring(ok and err or v); error(fault,0) end
   end
   local function block(err)
+    task.logisticsRetryable=task.logistics and err=='destination container full or unavailable' or nil
     task.phase='blocked'; task.error=tostring(err); persist(); return false,task.error
   end
   local function reconcile()
     local i=s.intent; if not i then return 0 end
     local delta,err=R.delta(t,i); assert(delta,err)
     if i.kind=='drop' then s.held=s.held-delta; task.delivered=task.delivered+delta; task.progress=task.delivered
-    else s.held=s.held+delta end
+    else s.held=s.held+delta;task.pickedUp=(task.pickedUp or 0)+delta end
+    task.transportSequence=(task.transportSequence or 0)+1
     s.intent=nil; persist(); return delta
   end
   local function switch(stage)

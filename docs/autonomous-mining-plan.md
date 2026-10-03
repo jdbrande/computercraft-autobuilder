@@ -760,13 +760,13 @@ worker courier/executor, task messages/config, `tests/managed_logistics_test.lua
 `request(item,count,sourceId,destinationId,key)`, `tick()`, `step()`, `describe()`;
 production invokes step under its inventory lock and synchronizes central receipts.
 
-- [ ] Add/run failing exact stock/capacity/private-buffer claims, mixed input,
+- [x] Add/run failing exact stock/capacity/private-buffer claims, mixed input,
   partial staging/collection and two-hauler cases. Expected no managed service.
-- [ ] Implement finite batch selection, immutable contracts and capability gating;
+- [x] Implement finite batch selection, immutable contracts and capability gating;
   staged readiness, measured worker counters and collecting completion. Add/run
   restart-after-stage/suck/drop/collect, duplicate counter, offline-owner and
   changed-contract cases. Expected conserved inventory and retained ownership.
-- [ ] Exercise existing active factory drainage and pending shortage without
+- [x] Exercise existing active factory drainage and pending shortage without
   deadlock; no shared effect while another journal is unresolved. Fix regressions,
   run full Lua/Python tests and commit complete transport execution.
 

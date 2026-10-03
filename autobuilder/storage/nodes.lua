@@ -13,6 +13,19 @@ end
 function M.identity(node)
   return {id=node.id,inventory=node.inventory,position={x=node.position.x,y=node.position.y,z=node.position.z}}
 end
+function M.validContract(job)
+  local c=job.logistics
+  if job.type~='TRANSPORT' or type(c)~='table' or not U.position(job.source) or not U.position(job.destination)
+    or not U.integer(job.quantity) or job.quantity<1 or job.quantity>64 then return false end
+  local names={}
+  for _,field in ipairs({'source','destination','pickup','drop'}) do
+    local v=c[field]
+    if type(v)~='table' or not U.shortString(v.inventory,128) or names[v.inventory] or not U.position(v.position) then return false end
+    if (field=='source' or field=='destination') and not U.shortString(v.id,64) then return false end
+    names[v.inventory]=true
+  end
+  return c.source.id~=c.destination.id and U.distance(c.pickup.position,job.source)==0 and U.distance(c.drop.position,job.destination)==0
+end
 function M.validate(config)
   local c=config.logistics
   assert(type(c)=='table' and U.integer(c.batchSize) and c.batchSize>=1 and c.batchSize<=64,'logistics batchSize must be 1..64')

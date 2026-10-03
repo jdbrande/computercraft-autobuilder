@@ -57,6 +57,7 @@ function M.area(job,t)
   -- Only executable geometry: exploration permission/exclusion boxes can cover
   -- distant unrelated terrain and never describe where this finite trip goes.
   for _,field in ipairs({'blocks','bounds','source','destination','home','recipient','miningArea'}) do visit(job[field],0) end
+  if job.logistics then visit(job.logistics.source.position,0);visit(job.logistics.destination.position,0) end
   if job.station then visit(job.station.position,0) end
   if job.farm then visit(job.farm.sites,0) end
   if job.sitePlan then for _,field in ipairs({'start','points','bounds'}) do visit(job.sitePlan[field],0) end end

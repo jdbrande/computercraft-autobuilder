@@ -180,3 +180,14 @@ test('resupply grant cannot exceed the amount originally requested',function()
   local w=carrier(); local task={supplyRequest={item='minecraft:stone',count=1,amount=5,granted=true}}; local ex=worker(w,task,'resupply')
   assert(not finish(ex,task,true)); eq(w.sucks,0)
 end)
+
+test('managed courier reports cumulative physical pickups and drops across both after-effect restarts',function()
+  for _,crash in ipairs({'crashSuck','crashDrop'}) do
+    local w=carrier();w[crash]=true
+    local task={source={x=0,y=1,z=0},destination={x=3,y=1,z=0},item='minecraft:stone',quantity=5,logistics={}}
+    local ex,saved=worker(w,task,'courier');pcall(function() finish(ex,task) end)
+    task=saved();assert(task.cargo.intent);task.phase='work';ex=worker(w,task,'courier');assert(finish(ex,task))
+    eq(task.pickedUp,5);eq(task.delivered,5);assert(task.transportSequence>=3)
+    eq(w.chests['3,0,0'].items.count,5);eq(w.chests['0,0,0'].items.count,27)
+  end
+end)

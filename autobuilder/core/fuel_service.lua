@@ -123,7 +123,7 @@ function M.new(app,config,e,queue,production,clock)
   function self:step()
     if not config.fuel.enabled or app.state.assignmentRecovery then return false end
     return production:inventoryAction(function()
-      if Q.factoryActive(app.state) or queue.state.supply then return false end
+      if Q.factoryActive(app.state) or Q.logisticsActive(app.state) or queue.state.supply then return false end
       local jobs={}
       for _,j in pairs(queue.state.jobs) do if j.type=='FUEL_STATION' and j.status~='completed' then jobs[#jobs+1]=j end end
       table.sort(jobs,function(a,b) return a.id<b.id end)
