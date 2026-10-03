@@ -82,3 +82,21 @@ the whole requirement as complete until native uneven-terrain acceptance demonst
 survey, leveling, fill acquisition, clearance, verification and construction without
 manual site preparation, and scaling acceptance demonstrates automatic worker ramp-up
 and drain-down for the required roles.
+
+## Implemented batch boundary
+
+`PREPARE_REGION` carries one immutable region identity, owned bounds, clearance
+height and at most512 target cells. Clear cells may retain an exact schematic
+block/state; fill cells use a supported stable cube and may accept existing stable
+support. Verification batches inspect the same contracts without mutation. Progress
+must count every inspected cell before completion and cannot regress or certify
+uninspected coordinates. A completed batch may contain explicit defects; it is not
+by itself a prepared-region certificate.
+
+The existing construction executor handles approach, inspection and placement.
+Preparation adds side inspection beneath retained floors, permission before each
+mutation, bounded excavation attempts, and exact no-drop/falling-block recovery.
+Reserved or unrelated inventory changes retain the journal. Known protected blocks
+and controller-denied targets become coordinate-specific defects so other cells
+continue. Workers exit the interior before releasing their task. Project batch
+scheduling, material/debris flow, fluid handling and verification gates follow.

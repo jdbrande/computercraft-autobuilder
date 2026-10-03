@@ -509,3 +509,20 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   generation/check and whitespace checks passed. Native-hardware-style runtime also
   verifies a real obstructed overhead cell triggers a higher immutable survey job.
   No new live Minecraft acceptance is claimed for this intermediate foundation.
+
+- Task44 physical batch foundation: PREPARE_REGION uses the existing construction
+  executor with controller mutation reservations. It preserves matching planned
+  cells and suitable support, clears supported terrain, records exact protected or
+  inaccessible targets and continues unaffected cells. Side inspection can fill
+  beneath a retained floor. Completion first leaves the work interior.
+- New physical evidence tests reconcile no-drop vegetation and falling replacement
+  excavation; fill journals reject unrelated inventory changes. Actual runtime
+  covers post-dig/post-place worker and controller restarts, lost acknowledgement,
+  finite fuel and exact two-block fill. A RED→GREEN runtime regression fixes a
+  denied mutation waiting forever instead of recording its blocker.
+- Full project excavation/fill scheduling, fill shortages/debris return, fluids and
+  final preparation gates remain unfinished; these batch tests are not native
+  Minecraft acceptance or completion of requirement45.
+- Physical batch foundation gate:660 Lua/18 Python tests passed; release0.23
+  generation/check and whitespace checks passed. Continuing bounded survey-derived
+  work planning and full project integration on the same milestone branch.

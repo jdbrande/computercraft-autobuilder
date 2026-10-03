@@ -1,7 +1,7 @@
 local U=require('autobuilder.core.util')
 local Types=require('autobuilder.core.task_messages').types
 local M={}
-local caps={RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
+local caps={RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',PREPARE_REGION='siteWorkV1',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
 local function key(p) return p.x..','..p.y..','..p.z end
 local function intersects(a,b)
   if not a or not b then return false end
@@ -107,7 +107,8 @@ function M.new(state,save,clock,id,chunks,config)
     local j=U.copy(payload or {}); j.id='task:'..id..':'..s.sequence; j.type=kind
     j.key=dedup; j.status='queued'; j.progress=0; j.dependencies=U.copy(deps or {}); j.retryCount=0
     j.created=clock(); j.requiredCapability=caps[kind]
-    if j.blocks and #j.blocks>0 then
+    if j.type=='PREPARE_REGION' then assert(require('autobuilder.build.site_work').validContract(j),'invalid preparation region contract') end
+    if j.blocks and #j.blocks>0 and not j.siteWork then
       j.bounds={min={x=math.huge,y=math.huge,z=math.huge},max={x=-math.huge,y=-math.huge,z=-math.huge}}
       for _,b in ipairs(j.blocks) do for _,a in ipairs({'x','y','z'}) do j.bounds.min[a]=math.min(j.bounds.min[a],b[a]); j.bounds.max[a]=math.max(j.bounds.max[a],b[a]) end end
       j.bounds.max.y=j.bounds.max.y+2
@@ -179,6 +180,7 @@ function M.new(state,save,clock,id,chunks,config)
     local j=s.jobs[p.jobId]
     if not j or j.workerId~=owner then return false,'task owner mismatch' end
     if j.status=='completed' or j.workerFinished then return true end
+    if j.type=='PREPARE_REGION' and not require('autobuilder.build.site_work').validProgress(j,p) then return false,'preparation receipt differs from inspected work' end
     if j.type=='SURVEY_SITE' then
       local r=p.siteReport
       if not require('autobuilder.build.site_survey').validReport(j,r,p.phase=='completed')
@@ -233,7 +235,8 @@ function M.new(state,save,clock,id,chunks,config)
     if not j or j.workerId~=owner or j.status=='completed' then return false,'reservation requires active task ownership' end
     if j.poseRecovery and j.poseRecovery.status=='held' then return false,'pose recovery owns movement cells' end
     if work then
-      if not config or not ({BUILD=true,REPAIR=true,CLEAR=true})[j.type] then return false,'task cannot reserve physical changes' end
+      if not config or not ({BUILD=true,REPAIR=true,CLEAR=true,PREPARE_REGION=true})[j.type]
+        or j.siteWork and j.siteWork.stage=='verify' then return false,'task cannot reserve physical changes' end
       local planned=false;for _,b in ipairs(j.blocks or {}) do if U.distance(b,target)==0 then planned=true;break end end
       if not planned then return false,'mutation target is not in the immutable task' end
       local ok,why=require('autobuilder.core.protection').canModify(state,config,j,target);if not ok then return false,why end

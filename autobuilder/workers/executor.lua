@@ -7,8 +7,9 @@ end
 local function homeReceipt(t)
   if t.returning then return {sequence=t.homeCargo and t.homeCargo.sequence or 0,deposited=U.copy(t.homeCargo and t.homeCargo.deposited or {})} end
 end
-local construction={BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true,SURVEY_SITE=true}
+local construction={BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true,SURVEY_SITE=true,PREPARE_REGION=true}
 local modules={RETURN_HOME='autobuilder.workers.home',RESCUE='autobuilder.workers.fuel_courier',BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',SURVEY_SITE='autobuilder.build.site_survey',
+  PREPARE_REGION='autobuilder.build.site_work',
   CRAFT='autobuilder.factory.crafting',TRANSPORT='autobuilder.workers.courier',HARVEST='autobuilder.resources.logger',FARM='autobuilder.resources.farmer'}
 function M.new(app,config,e,network,clock)
   local s=app.state; s.completedTasks=s.completedTasks or {}; s.pendingSupplyAcks=s.pendingSupplyAcks or {}; local self={}; local lastSend=-math.huge
@@ -102,7 +103,7 @@ function M.new(app,config,e,network,clock)
     local r=s.motionReservation; local id=s.currentTask.id
     if r and r.jobId==id and (r.work==true)==(work==true) and U.distance(r.target,target)==0 then
       if r.granted then return true end
-      return false,'movement reservation pending'..(r.reason and ': '..r.reason or '')
+      return false,'movement reservation pending'..(r.reason and ': '..r.reason or ''),r.reason~=nil
     end
     s.motionReservation={jobId=id,from={x=from.x,y=from.y,z=from.z},target={x=target.x,y=target.y,z=target.z},work=work,granted=false}; save()
     send('task_reserve',s.motionReservation)
@@ -153,6 +154,11 @@ function M.new(app,config,e,network,clock)
           if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed site survey assignment' end
         end
       end
+      if t and (t.siteWork or j.siteWork) then
+        for _,field in ipairs({'siteWork','blocks','bounds','clearanceY'}) do
+          if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed region preparation assignment' end
+        end
+      end
       if t and (t.returning or j.returning) then
         for _,field in ipairs({'returning','home','stockInputs','stockOutputs'}) do
           if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed home return assignment' end
@@ -167,7 +173,7 @@ function M.new(app,config,e,network,clock)
       end
       if t then return t.id==j.id,'worker already has a task' end
       if j.logistics and (not config.capabilities.logisticsV1 or not require('autobuilder.storage.nodes').validContract(j)) then return false,'invalid managed transport assignment' end
-      local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
+      local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',PREPARE_REGION='siteWorkV1',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end
       if j.privateStation and not require('autobuilder.factory.stations').matches(j.privateStation,config,s.id) then return false,'private crafting station does not match worker configuration' end
       s.currentTask=U.copy(j); s.currentTask.phase='setup';
@@ -297,7 +303,8 @@ function M.new(app,config,e,network,clock)
       if t.type=='RESCUE' and t.cargo and t.cargo.intent then
         engine():step(); s.status=t.phase; save(); return true
       end
-      if t.error and tostring(t.error):find('movement reservation pending',1,true) and s.motionReservation and s.motionReservation.granted then resumeTask()
+      if t.error and tostring(t.error):find('movement reservation pending',1,true) and s.motionReservation
+        and (s.motionReservation.granted or t.siteWork and s.motionReservation.work and s.motionReservation.reason) then resumeTask()
       elseif (t.logisticsRetryable or t.homeRetryable) and clock()-(t.lastLogisticsRetry or 0)>=config.heartbeatInterval then
         t.lastLogisticsRetry=clock();resumeTask();save()
       elseif t.blockedCategory=='immature' and clock()-(t.lastFarmRetry or 0)>=config.farmRetrySeconds then

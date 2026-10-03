@@ -1,6 +1,7 @@
 local U=require('autobuilder.core.util')
 local C=require('autobuilder.build.blockstates')
 local P=require('autobuilder.build.placement')
+local Site=require('autobuilder.build.site_work')
 local M={}
 function M.new(task,e,config,nav,save,mode)
   assert(type(task)=='table' and type(task.blocks)=='table' and #task.blocks<=4096,'bounded blocks task required')
@@ -10,13 +11,14 @@ function M.new(task,e,config,nav,save,mode)
   task.attempts=task.attempts or {}; task.report=task.report or {entries={},counts={}}
   task.deferred=task.deferred or {}
   local ceiling=-math.huge
-  for _,b in ipairs(task.blocks) do assert(U.position(b) and type(b.name)=='string','invalid construction block'); ceiling=math.max(ceiling,b.y+2) end
+  for _,b in ipairs(task.blocks) do assert(U.position(b) and type(b.name)=='string','invalid construction block'); ceiling=math.max(ceiling,b.y+(mode=='prepare' and 1 or 2)) end
   if task.clearanceY then
     assert(U.integer(task.clearanceY) and math.abs(task.clearanceY)<=30000000,'invalid construction clearance height')
     ceiling=math.max(ceiling,task.clearanceY)
   end
   local reserved={[config.fuelSlot or 15]=true,[16]=true}
   for _,s in ipairs(config.reservedSlots or {}) do reserved[s]=true end
+  if mode=='prepare' then reserved=require('autobuilder.workers.resupply').reserved(config) end
   local function persist()
     local ok,value,err=pcall(save)
     if not ok or not value then fault='construction checkpoint failed: '..tostring(ok and err or value); error(fault,0) end
@@ -145,13 +147,19 @@ function M.new(task,e,config,nav,save,mode)
   local function clearPreparation()
     task.moveRoute=nil; task.supportCheck=nil; task.supportApproved=nil
     task.pairCheck=nil; task.pairResults=nil
+    task.siteApproach=nil;task.siteApproachIndex=nil
   end
   local function matchesBlock(b,found,actual)
+    if mode=='prepare' and found then
+      if b.retain and P.compare(b.retain,found,actual) then return true end
+      if b.support and Site.support(actual.name) then return true end
+    end
     local family=C.family(b.name)
     local defer=mode~='verify' and not task.recheck and (family=='pane' or family=='fence')
     return P.compare(b,found,actual,defer)
   end
   local function inventory()
+    if mode=='prepare' then return require('autobuilder.workers.resupply').snapshot(t) end
     local result={}
     for s=1,16 do local i=t.getItemDetail(s); if i then result[s]={name=i.name,count=i.count} end end
     return result
@@ -164,7 +172,7 @@ function M.new(task,e,config,nav,save,mode)
     return true
   end
   local function slotFor(item)
-    for s=1,16 do local i=t.getItemDetail(s); if not reserved[s] and i and i.name==item and i.count>0 then return s,i.count end end
+    for s=1,16 do local i=t.getItemDetail(s); if not reserved[s] and i and i.name==item and i.count>0 and (mode~='prepare' or not i.nbt) then return s,i.count end end
   end
   local function missing(item)
     task.missingItem=item; task.missingCount=1; return blocked('missing inventory: '..item,'missing_inventory')
@@ -190,12 +198,12 @@ function M.new(task,e,config,nav,save,mode)
     if status=='correct' or status=='pending' and task.deferConnections==true then task.progress=task.progress+1; task.delivered=task.progress end
     task.index=task.index+1; task.intent=nil; task.missingItem=nil; task.missingCount=nil
     if task.index>#task.blocks then
-      if #task.deferred>0 and task.deferConnections~=true then task.recheck=1 else task.phase='completed' end
+      if #task.deferred>0 and task.deferConnections~=true then task.recheck=1 elseif mode~='prepare' then task.phase='completed' end
     end
     return persist()
   end
   local function issue(b,category,reason,actual)
-    if mode=='verify' then return record(b,category,reason,actual) end
+    if mode=='verify' or mode=='prepare' then return record(b,category,reason,actual) end
     return blocked(reason,category)
   end
   local function countAttempt(kind)
@@ -207,6 +215,10 @@ function M.new(task,e,config,nav,save,mode)
     local i=task.intent; if not i then return true end
     if i.index~=task.index then return false,'intent index does not match current block' end
     if i.kind=='place' then
+      if mode=='prepare' then
+        local delta,why=require('autobuilder.workers.resupply').delta(t,{kind='drop',slot=i.slot,item=i.item,limit=1,before=i.inventory})
+        if not delta then return false,why end
+      end
       local item=t.getItemDetail(i.slot)
       if item and item.name~=i.item then return false,'placement inventory changed during recovery' end
       local count=item and item.count or 0; local matches=matchesBlock(b,found,actual)
@@ -216,10 +228,15 @@ function M.new(task,e,config,nav,save,mode)
         if matches and not P.compare(p.pair,paired,other) then return false,'paired door half does not match recorded placement' end
         if not found and paired then return false,'paired door space changed during placement recovery' end
       end
-      if matches and count==i.before-1 then task.intent=nil; persist(); return true end
-      if not found and count==i.before then task.intent=nil; persist(); return true end
+      if matches and count==i.before-1 or not found and count==i.before then
+        task.intent=nil;persist();if mode=='prepare' and nav.workDone then nav.workDone() end;return true
+      end
       return false,'ambiguous placement outcome; inspected block/inventory disagree with recorded intent'
     elseif i.kind=='dig' then
+      if mode=='prepare' then
+        local ok,why=Site.reconcileDig(i,t,config,found,actual);if not ok then return false,why end
+        task.intent=nil;persist();if nav.workDone then nav.workDone() end;return true
+      end
       if not found then
         if sameInventory(i.inventory,inventory()) then return false,'dig target disappeared without observed inventory change' end
         task.intent=nil; persist(); return true
@@ -240,6 +257,7 @@ function M.new(task,e,config,nav,save,mode)
   end
   function self:step()
     if fault then return false,fault end
+    if task.paused then return false,'construction paused' end
     if task.phase=='completed' then return true end
     if task.phase=='blocked' then return false,task.error end
     local pose=nav.pose
@@ -248,10 +266,16 @@ function M.new(task,e,config,nav,save,mode)
       if mode~='repair' or config.clearSite~=true then return blocked('site clearing is not enabled','unsupported') end
       for _,b in ipairs(task.blocks) do if not C.isAir(b.name) then return blocked('clear tasks must explicitly target air cells','unsupported') end end
     end
-    if task.index>#task.blocks and not task.recheck then task.phase='completed'; return persist() end
+    if task.index>#task.blocks and not task.recheck then
+      if mode=='prepare' and pose.y<ceiling then
+        local ok,why=move({x=pose.x,y=ceiling,z=pose.z});if not ok then return blocked(why,'inaccessible') end;return true
+      end
+      task.phase='completed'; return persist()
+    end
     task.phase='work'; local b=task.blocks[task.recheck and task.deferred[task.recheck] or task.index]
     if restricted(b) then return issue(b,'inaccessible','target is in a restricted area') end
     local p,why=P.plan(b)
+    if mode=='prepare' and task.siteApproach then p=task.siteApproach end
     if not p then return issue(b,'unsupported',why) end
     if p.pair and restricted(p.pair) then return issue(b,'inaccessible','paired door cell is in a restricted area') end
     if restricted(p.stand) then return issue(b,'inaccessible','placement stand is in a restricted area') end
@@ -266,6 +290,16 @@ function M.new(task,e,config,nav,save,mode)
     local ok,err=move(p.stand)
     if not ok then
       if tostring(err):find('reservation',1,true) then return blocked(err,'inaccessible') end
+      if mode=='prepare' and not task.intent and not awaitingMovement(err) then
+        local choices={{x=-1,y=0,z=0,heading='east'},{x=1,y=0,z=0,heading='west'},
+          {x=0,y=0,z=-1,heading='south'},{x=0,y=0,z=1,heading='north'},{x=0,y=-1,z=0,heading='north'}}
+        local index=(task.siteApproachIndex or 0)+1;local offset=choices[index]
+        if offset then
+          task.siteApproachIndex=index;task.moveRoute=nil
+          task.siteApproach={stand={x=b.x+offset.x,y=b.y+offset.y,z=b.z+offset.z},direction=offset.y==-1 and 'up' or 'forward',heading=offset.heading,item=p.item}
+          return persist()
+        end
+      end
       return issue(b,'inaccessible',err)
     end
     ok,err=nav:face(p.heading); if not ok then return issue(b,'inaccessible',err) end
@@ -285,28 +319,37 @@ function M.new(task,e,config,nav,save,mode)
       end
       return record(b,'correct',nil,actual)
     end
-    if mode=='verify' then return record(b,found and 'wrong' or 'missing',reason,actual) end
+    if mode=='verify' or mode=='prepare' and task.siteWork.stage=='verify' then return record(b,found and 'wrong' or 'missing',reason,actual) end
     if task.recheck then return blocked('final connected block verification failed: '..tostring(reason),'wrong') end
     if p.observeOnly then return blocked('upper door half must be generated by a matching lower half','unsupported') end
     if found then
-      if mode~='repair' then return issue(b,'wrong','existing block differs; explicit repair required',actual) end
+      if mode~='repair' and mode~='prepare' then return issue(b,'wrong','existing block differs; explicit repair required',actual) end
       local classification=C.classify(actual.name,actual.state)
       local actualFamily=C.family(actual.name)
-      if (config.protectedBlocks or {})[actual.name] or actualFamily=='door' or (classification~='SUPPORTED' and classification~='PARTIALLY_SUPPORTED') or actual.name:find('computercraft:',1,true) then
+      local allowed=mode=='prepare' and Site.drops(actual,config)
+      if mode=='prepare' and not allowed or mode~='prepare' and ((config.protectedBlocks or {})[actual.name] or actualFamily=='door' or (classification~='SUPPORTED' and classification~='PARTIALLY_SUPPORTED') or actual.name:find('computercraft:',1,true)) then
         return issue(b,'unsupported','refusing to dig protected or unsupported block: '..actual.name,actual)
       end
       if p.item and not slotFor(p.item) then return missing(p.item) end
       local empty
       for s=1,16 do if not reserved[s] and t.getItemCount(s)==0 then empty=s; break end end
-      if not empty then return blocked('inventory full before repair dig','inventory_full') end
-      if not countAttempt('dig') then return blocked('repair dig attempt limit reached','attempt_limit') end
+      if not empty then return issue(b,'inventory_full','inventory full before repair dig',actual) end
+      if mode=='prepare' then
+        local granted,why,denied=false,'controller mutation permission required'
+        if nav.workGuard then granted,why,denied=nav.workGuard(b) end
+        if not granted then
+          if denied then if nav.workDone then nav.workDone() end;return issue(b,'inaccessible',why,actual) end
+          return blocked(why,'inaccessible')
+        end
+      end
+      if not countAttempt('dig') then return issue(b,'attempt_limit','repair dig attempt limit reached',actual) end
       assert(t.select(empty),'cannot select free repair slot')
       task.intent={kind='dig',index=task.index,block=U.copy(actual),inventory=inventory()}; persist()
       local callOk,result,detail=pcall(t['dig'..P.suffix(p.direction)])
       if not callOk then return blocked('dig hardware error: '..tostring(result),'ambiguous') end
       local now,observed,readError=inspect(p); if readError then return blocked(readError,'inaccessible') end
       ok,err=recover(b,p,now,observed); if not ok then return blocked(err,'ambiguous') end
-      if now then return blocked(detail or 'block remains after repair dig','wrong') end
+      if now and mode~='prepare' then return blocked(detail or 'block remains after repair dig','wrong') end
       return true
     end
     if C.isAir(b.name) then return record(b,'correct') end
@@ -329,8 +372,16 @@ function M.new(task,e,config,nav,save,mode)
     -- Any observation made before placement belongs to the pre-mutation world.
     -- Recovery must inspect the actual generated pair, even after a power loss.
     task.pairResults=nil; task.supportApproved=nil
+    if mode=='prepare' then
+      local granted,why,denied=false,'controller mutation permission required'
+      if nav.workGuard then granted,why,denied=nav.workGuard(b) end
+      if not granted then
+        if denied then if nav.workDone then nav.workDone() end;return issue(b,'inaccessible',why,actual) end
+        return blocked(why,'inaccessible')
+      end
+    end
     assert(t.select(slot),'cannot select placement item')
-    countAttempt('place'); task.intent={kind='place',index=task.index,slot=slot,item=p.item,before=before}; persist()
+    countAttempt('place'); task.intent={kind='place',index=task.index,slot=slot,item=p.item,before=before,inventory=mode=='prepare' and inventory() or nil}; persist()
     local callOk,result,detail=pcall(t['place'..P.suffix(p.direction)])
     if not callOk then return blocked('placement hardware error: '..tostring(result),'ambiguous') end
     found,actual,inspectError=inspect(p)

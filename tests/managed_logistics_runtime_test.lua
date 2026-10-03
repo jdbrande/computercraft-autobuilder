@@ -180,3 +180,49 @@ test('site survey real runtimes retain observed columns through both reboots and
   eq(w.digs,0);eq(w.places,0);assert(w.fuel<2000 and w.fuel>0)
   eq(#f.apps[12].state.completedTasks[id].siteReport.observations,2)
 end)
+
+test('preparation runtime uses mutation grants and reconciles native dig and fill reboots exactly once',function()
+  local f=fixture();local C=require('tests.loaded_config');local id=12
+  f.configs[id].automation.building=true;f.configs[id]=C.load(f.configs[id]);f:reboot(id)
+  local w=f.worlds[id];w.items[2]={name='minecraft:cobblestone',count=2};w.items[15]={name='minecraft:coal',count=2}
+  w.blocks['8,0,4']={name='minecraft:dirt',state={}}
+  local cut,crashed={},{}
+  for _,method in ipairs({'digDown','placeDown'}) do
+    local native=w.turtle[method]
+    w.turtle[method]=function(...)
+      if not crashed[method] then cut={method=method,files=U.copy(f.envs[id].fs.files)};crashed[method]=true end
+      return native(...)
+    end
+  end
+  local j=f.apps[7].automation.queue:submit('PREPARE_REGION',{clearanceY=4,bounds={min={x=8,y=0,z=4},max={x=9,y=4,z=4}},
+    siteWork={identity=string.rep('a',64),region=1,stage='fill'},blocks={
+      {x=8,y=0,z=4,name='minecraft:cobblestone',state={}},{x=9,y=0,z=4,name='minecraft:cobblestone',state={}}}}, {})
+  local jobId=j.id;f.loseAck=true;local restarts=0
+  for _=1,500 do
+    f:cycle()
+    if cut.method then
+      local files=f.envs[id].fs.files;for path in pairs(files) do files[path]=nil end;for path,raw in pairs(cut.files) do files[path]=raw end
+      cut={};restarts=restarts+1;f:reboot(7);f:reboot(id)
+    end
+    j=f.apps[7].state.automation.jobs[jobId]
+    if j.status=='completed' and not f.apps[id].state.currentTask then break end
+  end
+  eq(restarts,2);eq(j.status,'completed');eq(j.progress,2);eq(j.report.counts.correct,2)
+  eq(w.digs,1);eq(w.places,2);eq(w.items[15].count,2);eq(w.blocks['8,0,4'].name,'minecraft:cobblestone');eq(w.blocks['9,0,4'].name,'minecraft:cobblestone')
+  eq(w.pose.y,4);assert(w.fuel<2000 and w.fuel>0)
+end)
+
+test('controller-denied preparation mutation records the blocker and continues unaffected work',function()
+  local f=fixture();local C=require('tests.loaded_config')
+  f.configs[12].automation.building=true;f.configs[12]=C.load(f.configs[12]);f:reboot(12)
+  f.configs[7].restrictedAreas={{min={x=8,y=0,z=4},max={x=8,y=0,z=4}}};f:reboot(7)
+  local w=f.worlds[12]
+  w.blocks['8,0,4']={name='minecraft:dirt',state={}};w.blocks['9,0,4']={name='minecraft:dirt',state={}}
+  local j=f.apps[7].automation.queue:submit('PREPARE_REGION',{clearanceY=4,bounds={min={x=8,y=0,z=4},max={x=9,y=4,z=4}},
+    siteWork={identity=string.rep('a',64),region=1,stage='clear'},blocks={
+      {x=8,y=0,z=4,name='minecraft:air',state={}},{x=9,y=0,z=4,name='minecraft:air',state={}}}}, {})
+  for _=1,400 do f:cycle();if j.status=='completed' and not f.apps[12].state.currentTask then break end end
+  eq(j.status,'completed');eq(j.report.counts.inaccessible,1);eq(j.report.counts.correct,1);eq(w.digs,1)
+  eq(w.blocks['8,0,4'].name,'minecraft:dirt');assert(not w.blocks['9,0,4']);eq(j.report.entries[1].x,8)
+  assert(j.report.entries[1].reason:find('protected',1,true))
+end)
