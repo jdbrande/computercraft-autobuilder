@@ -1181,3 +1181,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   return, empty cargo and114 finite fuel. Independent reads reconcile8 initial
   coal as6 stored plus2 consumed. Final mining-target source rebooted idle.
   Permanent evidence: validation-0.26.0.md; complete Lua gate remains running.
+
+- Started0.27 design in isolated `.worktrees/supply-forecast`: per-project material
+  categories, retained measured material progress and bounded early builder demand.
+  Ruling: implement these prerequisites before changing initial full-project
+  preparation into overlapping production/construction; reusing current finite
+  requests preserves ownership. Cost: the full continuous pipeline remains open.
+  No0.27 implementation or acceptance is claimed yet.
