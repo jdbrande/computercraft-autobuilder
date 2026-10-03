@@ -934,3 +934,15 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   yielding chunk check. Full final validation remains pending. Controller-only
   preparation/admission fixes were deployed to208/210 and both restarted while
   their independent native trials continued.
+- Native208/209 cross-region foundation access passed:all nine preparation regions
+  completed,38 sampled child jobs crossed region boundaries,9 retained floor blocks
+  verified,100 independent world checks passed, and net fill consumption was one
+  cobblestone. All120 jobs completed; no access/supply lease remained. The worker
+  returned home idle with12,470 finite fuel and empty cargo/private inventories.
+  Both computers are off and their four test chunks released. The permanent
+  [foundation report](validation-foundation-access.md#cross-region-access) includes
+  deployment/restart evidence and limits. External-inflow acceptance remains active.
+- The pre-review containment snapshot completed744 Lua tests successfully. The
+  final committed review-fix tree has18 Python tests and release checks passing;
+  its complete Lua run is still in progress. Do not confuse the earlier snapshot
+  result with the pending final gate.

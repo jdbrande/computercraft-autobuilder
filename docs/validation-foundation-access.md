@@ -47,3 +47,33 @@ access, concurrent fleets, automatic loading and large-scale throughput require
 their separate acceptance evidence. The bounded implementation currently performs
 many small access jobs even for existing sealed supports; this trial records that
 cost rather than claiming efficient large-foundation throughput.
+
+## Cross-region access
+
+A second rig used controller208 and builder209 with the same3×3 retained floor
+and sealed center hole, shifted32 blocks east. Setting`regionSize=2` divided the
+working area into nine preparation regions. The interior region could reach its
+hidden supports only through the project margin and neighboring regions. Sampled
+native state recorded38 child jobs with explicit cross-region access bounds.
+
+All nine preparation regions completed, then final verification reported **9
+correct** floor blocks. All120 jobs completed. The temporary access lease and
+supply lease were released, and the worker returned idle and empty to
+`(976,301,0)`, facing north, with12,470 of its initial16,000 fuel remaining.
+The controller restarted after the settlement-gate update and again after the
+review fixes, preserving active preparation and physical ownership.
+
+Independent commands checked100 coordinates at`(983..987,298..301,5..9)`:
+all50 required ground/support cells, nine retained floor blocks and41 air cells
+matched. The missing center`(985,299,7)` was cobblestone. Central stock contained
+32 stone and31 cobblestone; private return and supply chests were empty.
+Both computers were shut down and all four force-load tickets removed. The
+floor and rig remain in place. Local setup, sampled cross-region routes, deployed
+update hashes, final state, independent observations and cleanup receipts are in
+ignored`dist/live-cross-access/`. Focus-loss pause remained disabled for the
+separate external-inflow trial.
+
+This establishes native execution of cross-region temporary access and restoration
+with a single worker. Shared-lease concurrency and corruption recovery retain
+simulation coverage; this trial did not inject sidecar corruption or ambiguous
+worker movement interruption.
