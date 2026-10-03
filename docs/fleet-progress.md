@@ -1069,3 +1069,15 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   A full obstacle cache is checkpointed away to permit later traffic changes; it no
   longer creates an absorbing blocked state. Focused navigation/runtime/coordination
   checks pass. Native workers213–218 received the fix; larger and final suites restart.
+
+- The48-block four-worker runtime simulation now passes: late registration increases
+  preparation/build ownership, a controller restart preserves work, all48 blocks verify,
+  and all workers finish idle with empty cargo and positive finite fuel. The native run
+  separately hit CraftOS's non-yielding execution limit during a checkpoint while
+  handling network traffic. A native139,791-byte checksum benchmark took roughly15ms
+  after warmup; moving yields into checksum transactions was unnecessary and unsafe.
+  The event loop now drains at most8 packets or250ms per turn, between complete handlers,
+  with a short follow-up timer while backlog remains. A burst regression fails before
+  the change and passes after, preserving all21 packets in order. Runtime/navigation
+  checks pass. Controller212 was restarted from its saved files with this fix; no
+  worker ownership or cargo was reset. Final full-suite evidence will use this source.

@@ -304,8 +304,13 @@ function M.run(config,e)
   local function drainNetwork()
     -- Only the main coroutine mutates controller/worker state. The collector
     -- retains packets while a peripheral call yields with another event filter.
-    local batch=inbox; inbox={}
-    for _,p in ipairs(batch) do app:receive(p[1],p[2],p[3]) end
+    -- A backlog can contain128 packets, each requiring several atomic saves.
+    -- Bound a turn between complete handlers; never yield inside a checkpoint.
+    local started=e.os.epoch('utc')
+    for _=1,math.min(8,#inbox) do
+      local p=table.remove(inbox,1);app:receive(p[1],p[2],p[3])
+      if e.os.epoch('utc')-started>=250 then break end
+    end
     if dropped>0 then
       app:report('WARN','Network inbox overflow: '..dropped..' packets dropped; durable protocols will retry')
       dropped=0
@@ -314,7 +319,7 @@ function M.run(config,e)
   local function main()
     app:tick(); drainNetwork(); app:draw()
     local nextTick=e.os.epoch('utc')/1000+1
-    local timer=e.os.startTimer(1)
+    local timer=e.os.startTimer(#inbox>0 and 0.05 or 1)
     while true do
       local name,a,b,c=e.os.pullEvent()
       if name=='timer' and a==timer then
@@ -331,7 +336,7 @@ function M.run(config,e)
         app:tick(); nextTick=e.os.epoch('utc')/1000+1
       end
       if e.os.cancelTimer then e.os.cancelTimer(timer) end
-      timer=e.os.startTimer(math.max(0.05,nextTick-e.os.epoch('utc')/1000))
+      timer=e.os.startTimer(#inbox>0 and 0.05 or math.max(0.05,nextTick-e.os.epoch('utc')/1000))
       app:draw()
     end
   end

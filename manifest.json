@@ -687,7 +687,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 18594,
+      "bytes": 18895,
       "path": "autobuilder/core/runtime.lua",
       "roles": [
         "controller",
@@ -697,7 +697,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "1c41eca41a555cc6debba71465aa4fb2096a39a9fcb6b44a648cc3a1abd082e2",
+      "sha256": "ba1fd6e4dc28304c2d249a12748fd12dcd970e25efa7ffdb8d35f0ebe3239e7c",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/runtime.lua",
       "version": "0.24.0"
     },
