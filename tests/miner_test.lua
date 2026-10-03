@@ -6,10 +6,11 @@ local function setup(w,task,pose)
     allowedMiningBlocks={['minecraft:stone']=true,['minecraft:iron_ore']=true,['minecraft:deepslate_iron_ore']=true},protectedBlocks={}}
   pose=pose or U.copy(w.pose)
   local n=require('autobuilder.core.navigation').new(w.turtle,pose,config,function() return true end)
+  n.workGuard=function() return true end
   local inv=require('autobuilder.storage.inventory').new(w.turtle,{reservedSlots={15,16}})
   local scan=require('autobuilder.resources.scanner').new({peripheral=w.peripheral},{radius=8,side='left',cooldown=0,ttl=10,maxCost=0},function() return w.time end)
   local miner=require('autobuilder.resources.miner').new(task,{turtle=w.turtle},config,n,inv,scan,function() return true end,function() return w.time end)
-  return miner,pose,config
+  return miner,pose,config,n
 end
 local function run(m,w,limit)
   for _=1,limit or 500 do w.time=w.time+1; local ok,err=m:step(); if not ok then return false,err end; if m.task.phase=='completed' then return true end end
@@ -74,6 +75,7 @@ test('failed scanner tool restoration blocks rather than entering fallback',func
   w.pose.x=1; pose.x=1
   local inv=require('autobuilder.storage.inventory').new(w.turtle,{})
   local nav=require('autobuilder.core.navigation').new(w.turtle,pose,c,function() return true end)
+    nav.workGuard=function() return true end
   local scanner={scan=function() return nil,'tool recovery failed',nil,'hardware' end,invalidate=function() end}
   m=require('autobuilder.resources.miner').new(m.task,{turtle=w.turtle},c,nav,inv,scanner,function() return true end,function() return 0 end)
   local ok=m:step(); assert(not ok); eq(m.task.phase,'blocked'); eq(w.pose.x,1)
@@ -102,8 +104,10 @@ test('miner reserves destination before digging and resumes after reservation is
     local task={id='mine:reserve',item='minecraft:raw_iron',quantity=1,phase='work',target=target,trail={{x=0,y=0,z=0},{x=1,y=0,z=0}}}
     local _,pose,c=setup(w,task)
     local nav=require('autobuilder.core.navigation').new(w.turtle,pose,c,function() return true end)
+    nav.workGuard=function() return true end
     local granted=false
     nav.guard=function(_,to) eq(to.x,target.x); eq(to.y,target.y); eq(to.z,target.z); return granted,'movement reservation pending' end
+    nav.workGuard=function(to) return nav.guard(pose,to) end
     local inv=require('autobuilder.storage.inventory').new(w.turtle,{reservedSlots={15,16}})
     local scan={invalidate=function() end}
     local miner=require('autobuilder.resources.miner').new(task,{turtle=w.turtle},c,nav,inv,scan,function() return true end,function() return 0 end)
@@ -132,6 +136,7 @@ local function explorer(w,task,save,pose)
   local _,p,c=setup(w,task,pose); c.mining.mode='explore'
   c.mining.bounds={min={x=99,y=0,z=0},max={x=100,y=0,z=0}}
   local n=require('autobuilder.core.navigation').new(w.turtle,p,c,save or function() return true end)
+  n.workGuard=function() return true end
   local inv=require('autobuilder.storage.inventory').new(w.turtle,{reservedSlots={15,16}})
   local scan=require('autobuilder.resources.scanner').new({peripheral=w.peripheral},{radius=8,side='left',cooldown=0,ttl=10,maxCost=0},function() return w.time end)
   return require('autobuilder.resources.miner').new(task,{turtle=w.turtle},c,n,inv,scan,save or function() return true end,function() return w.time end),p,c
@@ -182,6 +187,7 @@ test('explorer traverses declared protected exits but never excavates them',func
     local g=m.task.exploration; g.exitRoute={{x=1,y=0,z=0}}; g.route={{x=2,y=0,z=0}}
     c.restrictedAreas={{min={x=1,y=0,z=0},max={x=1,y=0,z=0}}}; g.protectedAreas=U.copy(c.restrictedAreas)
     local nav=require('autobuilder.core.navigation').new(w.turtle,p,c,function() return true end)
+    nav.workGuard=function() return true end
     local inv=require('autobuilder.storage.inventory').new(w.turtle,{reservedSlots={15,16}})
     local scan={scan=function() return nil,'no scanner' end,invalidate=function() end}
     m=require('autobuilder.resources.miner').new(m.task,{turtle=w.turtle},c,nav,inv,scan,function() return true end,function() return 0 end)
@@ -209,4 +215,16 @@ test('exploration refuses waterlogged route blocks without digging',function()
   local inspect=w.turtle.inspect
   w.turtle.inspect=function() local found,b=inspect(); if found and b.name=='minecraft:stone' then b.state.waterlogged=true end; return found,b end
   local m=explorer(w); assert(run(m,w)); eq(m.task.explorationProgress.result,'route_blocked'); eq(#w.dug,0)
+end)
+
+
+test('miners need separate mutation permission and resume a delayed grant without digging early',function()
+  local w=W.new();w.pose.x=1;w.blocks['2,0,0']='minecraft:iron_ore'
+  local task={id='mine:mutation',item='minecraft:raw_iron',quantity=1,phase='work',target={x=2,y=0,z=0},trail={{x=0,y=0,z=0},{x=1,y=0,z=0}}}
+  local m,pose,c,nav=setup(w,task);local allowed=false;local released=0
+  nav.guard=function() return true end
+  nav.workGuard=function(target) eq(target.x,2);return allowed,'movement reservation pending' end
+  nav.workDone=function() released=released+1 end
+  assert(not m:step());eq(#w.dug,0);eq(w.blocks['2,0,0'],'minecraft:iron_ore')
+  allowed=true;assert(m:resume());assert(m:step());eq(#w.dug,1);eq(released,1)
 end)

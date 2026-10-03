@@ -198,7 +198,7 @@ function M.new(app,config,e,queue)
     if provider and provider.type=='mining' then
       local id=r.mines[item]; local existing=id and app.state.jobs[id]
       if not existing or existing.status=='completed' then
-        local job,why=app.mining.jobs:submit(item,target,count)
+        local job,why=app.mining.jobs:submit(item,target,count,r.id)
         if not job then
           for _,j in pairs(app.state.jobs) do if j.item==item and j.status~='completed' then job=j; break end end
         end

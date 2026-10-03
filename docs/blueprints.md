@@ -32,10 +32,19 @@ is retained. Each region must pass foundation and clearance verification before 
 is reported prepared; failures retain coordinates, observed blocks and reasons.
 Independent regions continue when another has a defect.
 
-This command is an intermediate0.23 development feature. Automatic construction
-gating, recovery of lost region evidence, flowing-fluid clearance and native
-uneven-terrain acceptance are still being implemented. A `site_ready` result does
-not place the structural schematic. Final `build auto` integration follows.
+On the0.23 development branch, normal `build auto`, `build start` and `build repair`
+run this preparation pipeline automatically. Structural work waits for verified
+preparation in its region and adjacent access columns; an independent region can
+build while another remains blocked. Repairs resurvey changed terrain. Air-only
+schematics clear the requested volume without adding an implicit foundation.
+`build level` stops at `site_ready` without placing the structural schematic.
+
+Lost region evidence reopens surveying and verification while retaining physical
+owners and cargo settlement. Retiring streamed projects removes their region files
+only after the controller backup no longer references the project. Construction, repair and mining now request controller permission before mutation;
+generated door halves share one atomic grant. Flowing-fluid clearance, protection
+for the remaining legacy/renewable executors and
+native uneven-terrain acceptance remain in progress; requirement45 is not complete.
 
 Import reads one binary snapshot, validates the whole structure, and saves an
 immutable JSON copy. Corrupt data creates no project; unsupported entities or
@@ -137,3 +146,8 @@ the command-line interface, malformed inputs and decompression limits. Lua tests
 cover schema validation, transforms, material counts and support ordering. These are
 desktop simulations. Native import/placement evidence is recorded separately in
 [0.17 acceptance](validation-0.17.0.md).
+
+Final verification after construction now starts up to three automatic repair
+rounds, each with a fresh preparation survey. Correct blocks are retained. Repeated
+defects stop with an exact report and retry-limit explanation. `build verify`
+remains read-only; `build repair` explicitly starts a fresh repair budget.

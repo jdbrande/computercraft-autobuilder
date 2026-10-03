@@ -128,3 +128,21 @@ test('work batches are bounded resumable and refuse blocked mismatched or unstab
   assert(not pcall(plan.work,plan,1,record,'clear',0,8))
   assert(not pcall(plan.work,plan,1,record,'clear',1,513))
 end)
+
+test('structural region prerequisites include its foundation tiles and adjacent working clearance',function()
+  local source={schema=1,size={x=32,y=1,z=8},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=256}},metadata={},requirements={}}
+  local plan=require('autobuilder.build.site_plan').new(source,{origin={x=100,y=0,z=100}},string.rep('a',64))
+  local regions=plan:requiredRegions({{x=100,y=0,z=100},{x=107,y=0,z=107}})
+  eq(table.concat(regions,','),'1,2,6,7')
+  regions=plan:requiredRegions({{x=124,y=0,z=100},{x=131,y=0,z=107}})
+  eq(table.concat(regions,','),'4,5,9,10')
+  assert(not pcall(plan.requiredRegions,plan,{{x=1000,y=0,z=0}}))
+end)
+
+test('an air-only schematic clears its requested volume without inventing an unrequested foundation',function()
+  local source={schema=1,size={x=1,y=1,z=1},palette={{name='minecraft:air',state={}}},runs={{id=1,count=1}},metadata={},requirements={}}
+  local plan=require('autobuilder.build.site_plan').new(source,{origin={x=10,y=5,z=10}},string.rep('a',64),{margin=0})
+  local j=plan:survey(1,1,64);assert(not j.siteSurvey.columns[1].foundationY);eq(j.siteSurvey.columns[1].minY,5)
+  local evidence={identity=plan.identity,region=1,clearanceY=j.clearanceY,report={identity=plan.identity,region=1,observations={{x=10,y=5,z=10,name='minecraft:stone',status='surface'}}}}
+  eq(plan:work(1,evidence,'fill',1,8,'minecraft:cobblestone'),nil)
+end)

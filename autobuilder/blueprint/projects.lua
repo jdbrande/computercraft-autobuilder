@@ -23,6 +23,17 @@ function M.new(app,config,e,queue,production)
     end
     return sites[p.name]
   end
+  local function ensureSite(p,refresh)
+    local plan=sitePlan(p,true)
+    if refresh or not p.site or (p.site.projectRun or 0)~=(p.run or 0) then siteService:start(p,plan) end
+    assert(p.site.identity==plan.identity,'site geometry changed; finish owned work before importing a new project')
+    p.levelAfterSurvey=not p.site.work or nil;p.siteRequired=true;assert(save());return plan
+  end
+  queue.preparationReady=function(j)
+    local p=s.projects[j.project]
+    if not p or (p.run or 0)~=(j.projectRun or 0) then return false,'preparation project or run is unavailable' end
+    return siteService:readyFor(p,sitePlan(p),j.blocks)
+  end
   -- Verification and clearance cover cells with no placement dependency. Visit upper
   -- cells first so an unwanted column can be cleared without digging an access route.
   local function inspectionRegions(blocks)
@@ -91,7 +102,7 @@ function M.new(app,config,e,queue,production)
   local function beginPhase(p,mode,a)
     p.mode=mode; p.phase=mode=='VERIFY' and 'verifying' or mode=='CLEAR' and 'clearing' or mode=='REPAIR' and 'repairing' or 'building'
     p.total=mode=='VERIFY' and a.volume or mode=='CLEAR' and a.airCount or #a.blocks
-    p.generation=p.generation+1; p.cursor=1; p.jobs={}; p.regionJobs={}; p.completed=0; p.report={counts={},entries={}}
+    p.generation=p.generation+1; p.cursor=1;p.issuedCount=0; p.jobs={}; p.regionJobs={}; p.completed=0; p.report={counts={},entries={}}
   end
   local function linked(p,allRuns)
     local work,requests={},{}
@@ -134,6 +145,8 @@ function M.new(app,config,e,queue,production)
   end
   local function startRun(p,productionLinked)
     p.run=p.run and p.run+1 or (p.phase=='built' or p.phase=='verified') and 1 or 0;p.actors={};p.returnRequests={};p.settlement=nil;p.includeProduction=productionLinked
+    p.siteRequired=nil
+    p.repairAttempts=nil;p.repairHistory=nil
   end
   local function settle(p,work,requests)
     local why;local active={}
@@ -257,12 +270,12 @@ function M.new(app,config,e,queue,production)
     if action=='pause' then
       p.paused=true
       pauseProduction(p,true)
-      for _,id in ipairs(p.jobs) do local j=s.jobs[id]; if j and j.status~='completed' then j.paused=true end end
+      for _,j in pairs(linked(p)) do if j.status~='completed' then j.paused=true end end
       save(); return true,'Paused '..p.name
     elseif action=='resume' then
       p.paused=false
       pauseProduction(p,false)
-      for _,id in ipairs(p.jobs) do local j=s.jobs[id]; if j then j.paused=false; j.resumeRequested=true end end
+      for _,j in pairs(linked(p)) do j.paused=false;j.resumeRequested=true end
       save(); return true,'Resuming '..p.name
     end
     if action=='survey' or action=='level' then
@@ -291,20 +304,33 @@ function M.new(app,config,e,queue,production)
     if action=='prepare' or action=='auto' then
       assert(not ({building=true,clearing=true,verifying=true,repairing=true,settling=true,surveying=true,preparing_site=true})[p.phase],'Project is already active; use pause/resume')
       if not p.run or p.phase=='built' or p.phase=='verified' then startRun(p,true) end
-      if action=='auto' then p.autoStart=true end
+      p.includeProduction=true
+      if action=='auto' then p.autoStart=true;ensureSite(p) end
+      local message
       if not next(a.requirements) then
-        p.preparedEmpty=true; p.requestId=nil; p.phase='ready'; save(); return true,'No materials required'
+        p.preparedEmpty=true;p.requestId=nil;p.phase='ready';message='No materials required'
+      else
+        local r=production:request(a.requirements,'project:'..p.name,{projectName=p.name});p.requestId=r.id;p.phase='preparing';message=r.id
       end
-      local r=production:request(a.requirements,'project:'..p.name,{projectName=p.name}); p.requestId=r.id; p.phase='preparing'; save(); return true,r.id
+      if action=='auto' and p.site.status=='surveying' then p.phase='surveying' end
+      save();return true,message
     elseif action=='start' or action=='verify' or action=='repair' or action=='clear' then
       assert(config.build.enabled,'Set build.enabled=true and configure the build origin first')
       assert(p.phase~='settling','Project still owns worker or inventory settlement; wait for completion')
       if not p.run or p.phase=='built' or p.phase=='verified' then startRun(p,action=='start' and p.phase~='built' and p.phase~='verified') end
-      for _,id in ipairs(p.jobs) do assert(s.jobs[id].status=='completed','Project still owns unfinished tasks; pause/resume instead') end
+      for _,id in ipairs(p.jobs) do
+        local j=s.jobs[id]
+        assert(j.status=='completed' or action=='start' and (j.siteWork or j.siteSurvey),'Project still owns unfinished tasks; pause/resume instead')
+      end
       if action=='clear' then assert(config.clearSite,'Set clearSite=true before clearing schematic air cells') end
       if action=='start' then
         local r=p.requestId and s.requests[p.requestId]
         assert((p.preparedEmpty and not next(a.requirements)) or (r and r.status=='completed'),'Run build prepare and wait for resources first')
+      end
+      if action=='start' or action=='repair' then
+        if action=='repair' and p.autoStart~='repair' then p.repairAttempts=nil;p.repairHistory=nil end
+        ensureSite(p,action=='repair' and p.autoStart~='repair')
+        if not p.site.work or (p.site.work.preparedCount or 0)==0 then p.autoStart=action;assert(save());return true,'Waiting for verified site regions' end
       end
       local mode=action=='start' and (config.clearSite and 'REPAIR' or 'BUILD') or action=='verify' and 'VERIFY' or action=='clear' and 'CLEAR' or 'REPAIR'
       p.nextMode=nil; p.afterBuild=nil; p.paused=false
@@ -325,16 +351,19 @@ function M.new(app,config,e,queue,production)
     end
     for _,p in pairs(s.projects) do
       local work,requests=linked(p);actors(p,work)
-      if p.phase=='surveying' then siteService:tick(p,sitePlan(p)) end
-      if p.levelAfterSurvey and not p.paused and (p.phase=='surveyed' or p.phase=='survey_blocked') then
+      if p.site and (p.site.status=='surveying' or p.phase=='surveying') then siteService:tick(p,sitePlan(p)) end
+      if p.levelAfterSurvey and not p.paused and p.site and p.site.completed==sitePlan(p).regionCount and not next(p.site.active) then
         siteService:startWork(p,sitePlan(p));p.levelAfterSurvey=nil;assert(save())
       end
-      if p.phase=='preparing_site' then siteService:workTick(p,sitePlan(p)) end
+      if p.site and p.site.work then siteService:workTick(p,sitePlan(p)) end
       if p.phase=='settling' and not p.paused then settle(p,work,requests) end
-      if p.phase=='preparing' and s.requests[p.requestId].status=='completed' then p.phase='ready'; save() end
-      if p.phase=='ready' and p.autoStart and not p.paused then
-        local ok,err=pcall(self.command,self,{'build','start',p.name})
-        if not ok then p.error=tostring(err); save() else p.error=nil end
+      if p.phase=='preparing' and p.requestId and s.requests[p.requestId].status=='completed' then p.phase='ready'; save() end
+      if p.autoStart and not p.paused then
+        local r=p.requestId and s.requests[p.requestId]
+        if (p.autoStart=='repair' or p.preparedEmpty or r and r.status=='completed') and p.site and p.site.work and (p.site.work.preparedCount or 0)>0 then
+          local ok,err=pcall(self.command,self,{'build',p.autoStart=='repair' and 'repair' or 'start',p.name})
+          if not ok then p.error=tostring(err);save() else p.error=nil end
+        end
       end
       if not p.paused and (p.phase=='building' or p.phase=='verifying' or p.phase=='repairing' or p.phase=='clearing') then
         local a=analysis(p); local active,done=0,0
@@ -357,25 +386,42 @@ function M.new(app,config,e,queue,production)
         end
         p.completed=done
         -- Only a bounded window of region payloads lives in the checkpoint.
-        if active<4 and p.cursor<=#regions then
-          local region=regions[p.cursor]; local deps={}; local ready=true
-          for _,dep in ipairs(region.dependencies or {}) do
-            if not p.regionJobs[dep] then ready=false else deps[#deps+1]=p.regionJobs[dep] end
+        if p.issuedCount==nil then p.issuedCount=0;for _ in pairs(p.regionJobs) do p.issuedCount=p.issuedCount+1 end end
+        if active<4 and p.issuedCount<#regions then
+          for _=1,math.min(32,#regions) do
+            p.cursor=(p.cursor-1)%#regions+1;local region=regions[p.cursor];p.cursor=p.cursor+1
+            if not p.regionJobs[region.id] then
+              local deps,ready={},true
+              for _,dep in ipairs(region.dependencies or {}) do if not p.regionJobs[dep] then ready=false else deps[#deps+1]=p.regionJobs[dep] end end
+              local requiresSite=p.siteRequired and (p.mode~='VERIFY' or p.afterBuild) or nil
+              if ready and requiresSite then ready,p.error=siteService:readyFor(p,sitePlan(p),region.blocks) end
+              if ready then
+                local j=queue:submit(p.mode,{blocks=region.blocks,project=p.name,projectRun=p.run or 0,region=region.id,requiresSite=requiresSite,
+                  clearanceY=math.max(a.clearanceY,p.site and p.protectedBounds.max.y or a.clearanceY),deferConnections=p.mode~='VERIFY',stockOnly=p.stockOnly,preferredWorker=p.preferredWorker},deps,p.name..':'..p.generation..':'..region.id)
+                p.jobs[#p.jobs+1]=j.id;p.regionJobs[region.id]=j.id;p.issuedCount=p.issuedCount+1;p.error=nil;break
+              end
+            end
           end
-          if ready then
-            local j=queue:submit(p.mode,{blocks=region.blocks,project=p.name,projectRun=p.run or 0,region=region.id,clearanceY=a.clearanceY,deferConnections=p.mode~='VERIFY',stockOnly=p.stockOnly,preferredWorker=p.preferredWorker},deps,p.name..':'..p.generation..':'..region.id)
-            p.jobs[#p.jobs+1]=j.id; p.regionJobs[region.id]=j.id; p.cursor=p.cursor+1; save()
-          end
-        elseif active==0 and p.cursor>#regions then
+          save()
+        elseif active==0 and p.issuedCount==#regions then
           if p.nextMode then
             local mode=p.nextMode; p.nextMode=nil; beginPhase(p,mode,a)
           elseif p.mode~='VERIFY' then
             p.afterBuild=true; beginPhase(p,'VERIFY',a)
           else
             local problems=0; for key,n in pairs(p.report.counts) do if key~='correct' then problems=problems+n end end
-            if problems>0 then p.phase='needs_repair'
-            else p.settlement={target=p.afterBuild and 'built' or 'verified'};p.phase='settling' end
-            p.afterBuild=nil
+            local afterBuild=p.afterBuild;p.afterBuild=nil
+            if problems>0 then
+              p.phase='needs_repair'
+              if afterBuild and (p.repairAttempts or 0)<3 then
+                p.repairAttempts=(p.repairAttempts or 0)+1;p.repairHistory=p.repairHistory or {}
+                p.repairHistory[#p.repairHistory+1]=require('autobuilder.core.reports').compact(p.report)
+                p.autoStart='repair'
+                -- Persist the attempt and its fresh survey together. A reboot
+                -- continues this generation instead of spending another retry.
+                ensureSite(p,true)
+              else p.error=afterBuild and 'Defects remain after 3 automatic repair rounds; inspect build status before retrying' or 'Verification found unresolved defects' end
+            else p.settlement={target=afterBuild and 'built' or 'verified'};p.phase='settling' end
           end
           save()
         end
@@ -422,6 +468,7 @@ function M.new(app,config,e,queue,production)
     s.projects[name]=nil; cache[name]=nil;sites[name]=nil
     if s.currentProject==name then s.currentProject=nil end
     s.retiredBlueprints=s.retiredBlueprints or {}; s.retiredBlueprints[#s.retiredBlueprints+1]=p.path
+    s.retiredBlueprints[#s.retiredBlueprints+1]=config.dataDir..'/sites/'..p.name
     -- Commit the stream cursor and removal in the same checkpoint. Never leave
     -- a cursor pointing to a deleted project if the computer stops here.
     if advance then advance() else save() end

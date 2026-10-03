@@ -224,7 +224,7 @@ end)
 test('exploration runtime preserves partial receipts across controller and worker reboot',function()
   local w,ce,we,c,worker,cc,wc=fixture()
   cc.exploration={enabled=true,base={x=0,y=0,z=0},bounds={min={x=0,y=0,z=0},max={x=3,y=1,z=1}},baseProtection={min={x=0,y=-1,z=0},max={x=0,y=-1,z=0}},dimensionMinY=-64,dimensionMaxY=319}
-  wc.mining.mode='explore'; wc.mining.exitRoute={}; wc.capabilities.explorationV1=true
+  wc.mining.mode='explore'; wc.mining.exitRoute={{x=1,y=0,z=0}}; wc.capabilities.explorationV1=true
   local R=require('autobuilder.core.runtime'); c=R.new(cc,ce); worker=R.new(wc,we)
   w.blocks['3,1,1']='minecraft:iron_ore'
   worker:tick(); pump(we,c); pump(ce,worker)

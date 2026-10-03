@@ -232,7 +232,7 @@ function M.record(records,trip,report)
   r.observations={}; for i=math.max(1,#keys-63),#keys do r.observations[#r.observations+1]=positions[keys[i]] end
   return true
 end
-function M.protectedAreas(state,config,exceptProject)
+function M.protectedAreas(state,config,exceptProject,skipMiningBase)
   local boxes=U.copy(config.restrictedAreas or {})
   for _,b in ipairs(require('autobuilder.storage.nodes').protected(config,state)) do boxes[#boxes+1]=b end
   for name,p in pairs((state.automation or {}).projects or {}) do
@@ -242,7 +242,7 @@ function M.protectedAreas(state,config,exceptProject)
     end
   end
   if config.depot then boxes[#boxes+1]={min={x=config.depot.x,y=config.depot.y-1,z=config.depot.z},max={x=config.depot.x,y=config.depot.y+2,z=config.depot.z}} end
-  if M.box(config.exploration.baseProtection) then boxes[#boxes+1]=U.copy(config.exploration.baseProtection) end
+  if not skipMiningBase and M.box(config.exploration.baseProtection) then boxes[#boxes+1]=U.copy(config.exploration.baseProtection) end
   for _,w in pairs(state.workers or {}) do
     local h=w.telemetry and w.telemetry.explorationHome
     if h then

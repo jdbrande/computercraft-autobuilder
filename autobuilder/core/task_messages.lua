@@ -37,6 +37,10 @@ function M.validate(kind,p)
   if kind=='task_assign' then
     local j=p.job
     if type(j)~='table' or not U.shortString(j.id,100) or not M.types[j.type] then return false,'invalid task assignment' end
+    if j.requiresSite~=nil and (type(j.requiresSite)~='boolean' or not ({BUILD=true,REPAIR=true,CLEAR=true,VERIFY=true})[j.type]
+      or not U.shortString(j.project,64) or not j.project:match('^[%w_-]+$') or not U.integer(j.projectRun) or j.projectRun<0) then
+      return false,'invalid preparation gate'
+    end
     if j.loadedArea~=nil and not require('autobuilder.core.chunks').validGrant(j.loadedArea) then return false,'invalid loaded mission envelope' end
     if j.returnManaged~=nil and (type(j.returnManaged)~='boolean' or j.type~='RETURN_HOME' or not U.position(j.home)) then return false,'invalid managed home assignment' end
     if j.returning~=nil and not require('autobuilder.storage.returns').validContract(j) then return false,'invalid home cargo contract' end

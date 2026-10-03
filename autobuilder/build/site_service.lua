@@ -42,16 +42,17 @@ function M.new(app,config,e,queue,production)
   end
   function self:start(p,plan)
     assert(not p.site or not next(p.site.active),'site still owns active survey work')
+    assert(not p.site or not p.site.work or not next(p.site.work.active),'site still owns active preparation work')
     assert(not E.conflicts(app.state,plan.bounds),'Site overlaps owned exploration territory; wait for miners to return')
     F.commit(p,save,function()
       p.generation=p.generation+1
-      p.site={identity=plan.identity,generation=p.generation,cursor=1,completed=0,blocked=0,active={}}
+      p.site={identity=plan.identity,generation=p.generation,projectRun=p.run or 0,cursor=1,completed=0,blocked=0,active={},status='surveying'}
       p.protectedBounds=U.copy(plan.bounds);p.phase='surveying';p.completed=0;p.total=plan.columnCount;p.error=nil
     end)
   end
   function self:tick(p,plan)
     local site=p.site;assert(site and site.identity==plan.identity,'site geometry changed during preparation')
-    if p.paused or p.phase~='surveying' then return end
+    if p.paused or not (site.status=='surveying' or not site.status and p.phase=='surveying') then return end
     for key,a in pairs(site.active) do
       local j=a.jobId and s.jobs[a.jobId]
       if j and j.status=='completed' then
@@ -89,22 +90,23 @@ function M.new(app,config,e,queue,production)
       if expanded.max.y~=p.protectedBounds.max.y then F.commit(p,save,function() p.protectedBounds=expanded end) end
       payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
       local j=queue:submit('SURVEY_SITE',payload,{},p.name..':site:'..site.generation..':'..a.region..':'..a.attempt)
-      F.commit(p,save,function() a.jobId=j.id;p.jobs[#p.jobs+1]=j.id end)
+      F.commit(p,save,function() a.jobId=j.id end)
       return
     end end
     if site.cursor>plan.regionCount and not next(site.active) then
       F.commit(p,save,function()
-        p.phase=site.blocked>0 and 'survey_blocked' or 'surveyed'
+        site.status=site.blocked>0 and 'survey_blocked' or 'surveyed'
+        if p.phase=='surveying' then p.phase=site.status end
         p.error=site.blocked>0 and (site.blocked..' site regions remain inaccessible; inspect saved region observations') or nil
       end)
     end
   end
-  local function fillMaterial()
+  local function fillMaterial(required)
     local counts=app.mining and app.mining.storage.counts or {};local best,bestCount,bestAvailable
     for _,item in ipairs({'minecraft:cobblestone','minecraft:dirt','minecraft:cobbled_deepslate','minecraft:netherrack','minecraft:andesite','minecraft:diorite','minecraft:granite','minecraft:stone'}) do
       local available=production.ledger:view(item,counts).available
-      local provider=require('autobuilder.resources.providers').select(item,config,{available=available,workers=app.state.workers})
-      local useful=available>0 or provider and provider.available
+      local provider=require('autobuilder.resources.providers').select(item,config,{available=available,required=math.max(1,required),workers=app.state.workers})
+      local useful=available>=required or provider and provider.available
       if not best or useful and not bestAvailable or useful==bestAvailable and available>bestCount then best,bestCount,bestAvailable=item,available,useful end
     end
     return best
@@ -114,7 +116,7 @@ function M.new(app,config,e,queue,production)
     assert(p.site and p.site.identity==plan.identity and p.site.completed==plan.regionCount and not next(p.site.active),'survey all site regions first')
     assert(not p.site.work,'site preparation already started')
     F.commit(p,save,function()
-      p.site.work={cursor=1,completed=0,blocked=0,active={}};p.returnRequests=p.returnRequests or {};p.phase='preparing_site';p.error=nil
+      p.site.work={cursor=1,completed=0,blocked=0,preparedCount=0,active={},status='working'};p.returnRequests=p.returnRequests or {};p.phase='preparing_site';p.error=nil
     end)
   end
   function self:prepared(p,plan,region)
@@ -122,6 +124,27 @@ function M.new(app,config,e,queue,production)
     if not record then return false,why end
     local work=record.preparation
     return work and work.status=='prepared' and work.stage=='verified' and work.verifiedFill==true and work.verifiedClear==true or false
+  end
+  function self:readyFor(p,plan,blocks)
+    if not p.site or p.site.identity~=plan.identity or not p.site.work then return false,'site preparation has not started' end
+    for _,region in ipairs(plan:requiredRegions(blocks)) do
+      local record,why=self:evidence(p,plan,region)
+      if not record then
+        local w=p.site.work
+        F.commit(p,save,function()
+          if not w.rechecking then
+            w.cursor=1;w.completed=0;w.blocked=0;w.preparedCount=0;w.firstDefect=nil;w.rechecking=true
+            for _,a in pairs(w.active) do a.countInAudit=false end
+          end
+          w.status='working'
+          local active=0;for _ in pairs(w.active) do active=active+1 end
+          if not w.active[tostring(region)] and active<4 then w.active[tostring(region)]={region=region,countInAudit=false} end
+        end)
+        return false,'preparation region '..region..' needs evidence recovery: '..tostring(why)
+      end
+      if not record.preparation or record.preparation.status~='prepared' then return false,'preparation region '..region..' is not verified' end
+    end
+    return true
   end
   local function collectDefects(work,report)
     work.defects=work.defects or {}
@@ -166,7 +189,7 @@ function M.new(app,config,e,queue,production)
     if not j then
       local payload=contract(plan,a.region,recovery.clearanceY);payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
       j=queue:submit('SURVEY_SITE',payload,{},p.name..':site:'..p.site.generation..':'..a.region..':resurvey:'..a.recoveries..':'..recovery.attempt)
-      F.commit(p,save,function() recovery.jobId=j.id;p.jobs[#p.jobs+1]=j.id end);return true
+      F.commit(p,save,function() recovery.jobId=j.id end);return true
     end
     if j.status~='completed' then a.error='Re-surveying missing evidence with '..j.id;return false end
     if not j.siteReport then
@@ -220,12 +243,20 @@ function M.new(app,config,e,queue,production)
     end
     if work.status~='working' then
       F.commit(p,save,function()
-        p.site.work.completed=p.site.work.completed+1;p.site.work.blocked=p.site.work.blocked+(work.status=='blocked' and 1 or 0)
-        if work.status=='blocked' and not p.site.work.firstDefect then p.site.work.firstDefect=U.copy(work.defects[1]) end
+        if a.countInAudit~=false then
+          p.site.work.completed=p.site.work.completed+1;p.site.work.blocked=p.site.work.blocked+(work.status=='blocked' and 1 or 0)
+          p.site.work.preparedCount=(p.site.work.preparedCount or 0)+(work.status=='prepared' and 1 or 0)
+          if work.status=='blocked' and not p.site.work.firstDefect then p.site.work.firstDefect=U.copy(work.defects[1]) end
+        end
         p.site.work.active[tostring(a.region)]=nil
       end);return true
     end
-    if not work.fill and work.stage~='clear' then work.fill=fillMaterial();assert(cp:save(record));return true end
+    if not work.fill and work.stage~='clear' then
+      -- This bounds possible demand without crediting unseen support. Selection
+      -- may prefer replenishable stock; actual supply still follows inspection.
+      local _,_,required=plan:work(a.region,record,'fill',1,1,'minecraft:cobblestone')
+      work.fill=fillMaterial(required);assert(cp:save(record));return true
+    end
     if work.jobId then
       local j=assert(s.jobs[work.jobId],'preparation task ownership missing')
       if j.status~='completed' then return false end
@@ -254,23 +285,24 @@ function M.new(app,config,e,queue,production)
     payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
     local j=queue:submit('PREPARE_REGION',payload,{},p.name..':site:'..p.site.generation..':'..a.region..':work:'..(work.epoch or 0)..':'..work.sequence)
     work.jobId=j.id;work.nextCursor=nextCursor;assert(cp:save(record))
-    local linked=false;for _,id in ipairs(p.jobs) do if id==j.id then linked=true end end
-    if not linked then F.commit(p,save,function() p.jobs[#p.jobs+1]=j.id end) end
     a.error=nil;return true
   end
   function self:workTick(p,plan)
     assert(p.site and p.site.identity==plan.identity and p.site.work,'preparation geometry missing or changed')
-    if p.paused then return end
+    if p.paused or p.site.work.status=='completed' then return end
     local work=p.site.work;local active=0;for _ in pairs(work.active) do active=active+1 end
-    if active<4 and work.cursor<=plan.regionCount then
-      F.commit(p,save,function() work.active[tostring(work.cursor)]={region=work.cursor};work.cursor=work.cursor+1 end)
+    if work.cursor<=plan.regionCount and (active<4 or work.active[tostring(work.cursor)]) then
+      F.commit(p,save,function()
+        local key=tostring(work.cursor);work.active[key]=work.active[key] or {region=work.cursor};work.active[key].countInAudit=true;work.cursor=work.cursor+1
+      end)
     end
     for _,a in pairs(work.active) do if workRegion(p,plan,a) then return end end
     local waiting;for _,a in pairs(work.active) do waiting=waiting or a.error end
     if waiting~=p.error then p.error=waiting;assert(save()) end
     if work.cursor>plan.regionCount and not next(work.active) then
       F.commit(p,save,function()
-        p.phase=work.blocked==0 and 'site_ready' or 'site_blocked'
+        work.status='completed';work.rechecking=nil
+        if p.phase=='preparing_site' then p.phase=work.blocked==0 and 'site_ready' or 'site_blocked' end
         p.error=work.blocked>0 and (work.blocked..' preparation regions have unresolved defects') or nil
         local d=work.firstDefect
         if d then p.error=p.error..': '..d.x..','..d.y..','..d.z..' '..tostring(d.actual and d.actual.name or d.name or 'unknown block')..': '..tostring(d.reason) end

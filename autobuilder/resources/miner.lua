@@ -98,14 +98,11 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
       local heading=p.x>pose.x and 'east' or p.x<pose.x and 'west' or p.z>pose.z and 'south' or 'north'
       local ok,err=nav:face(heading); if not ok then return false,err end
     end
-    -- Excavation changes the destination too: reserve it before any dig,
-    -- then navigation rechecks the grant before committing movement.
-    if nav.guard then local ok,err=nav.guard(pose,p); if not ok then return false,err end end
     local present,b=t['inspect'..suffix]()
     if g and task.digIntent then
       local intent=task.digIntent; local now=snapshot()
       if not same(p,intent.target) then return false,'pending dig target changed' end
-      if not present and gained(intent.inventory,now) or present and equal(b,intent.block) and equal(now,intent.inventory) then task.digIntent=nil; persist()
+      if not present and gained(intent.inventory,now) or present and equal(b,intent.block) and equal(now,intent.inventory) then task.digIntent=nil;persist();if nav.workDone then nav.workDone() end
       else return false,'ambiguous exploration dig outcome; preserve target and inventory' end
     end
     if present then
@@ -114,6 +111,8 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
       observed[P.key(p)]=b.name
       if not diggable(b.name,p) then avoided[P.key(p)]=true; return false,'protected or disallowed obstacle: '..b.name end
       if inventory:freeSlots()==0 then return false,'inventory full before dig' end
+      if not nav.workGuard then return false,'controller mutation permission required' end
+      local permitted,why=nav.workGuard(p);if not permitted then return false,why end
       -- Keep scanner/fuel slots reserved even when mining changes the selected slot.
       for slot=1,14 do if t.getItemCount(slot)==0 then t.select(slot); break end end
       local ok,err
@@ -126,11 +125,12 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
         if not called then return false,'uncertain exploration dig: '..tostring(ok) end
         local found,actual=t['inspect'..suffix](); local after=snapshot(); local intent=task.digIntent
         if ok and gained(intent.inventory,after) and (not found or equal(actual,b)) then
-          task.digIntent=nil; persist()
+          task.digIntent=nil;persist();if nav.workDone then nav.workDone() end
           if found then return true end
-        elseif found and equal(actual,b) and equal(intent.inventory,after) then task.digIntent=nil; persist(); return false,err or 'dig failed'
+        elseif found and equal(actual,b) and equal(intent.inventory,after) then task.digIntent=nil;persist();if nav.workDone then nav.workDone() end; return false,err or 'dig failed'
         else return false,'ambiguous exploration dig outcome; preserve target and inventory' end
       else ok,err=t['dig'..suffix](); if not ok then return false,err or 'dig failed (diamond pickaxe required)' end end
+      if not g and nav.workDone then nav.workDone() end
       scanner:invalidate(p); observed[P.key(p)]='minecraft:air'
       local still,obstacle=t['inspect'..suffix]()
       if still then return false,'obstacle remains after dig: '..tostring(obstacle.name) end

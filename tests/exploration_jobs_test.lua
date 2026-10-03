@@ -82,3 +82,26 @@ test('small exploration demands share finite quotas across eligible idle workers
   local a=assert(j:assign(w,{})); eq(a.quantity,2)
   local b=assert(j:assign(w,{})); eq(b.quantity,2); assert(a.workerId~=b.workerId)
 end)
+
+test('exploration planning shares registered depot fuel and farm protection with construction',function()
+  local jobs,state,workers,c=fixture();state.workers=workers
+  workers['99']={id=99,online=false,telemetry={depot={x=5,y=0,z=5}}}
+  c.fuel.stations={{position={x=10,y=0,z=5}}};c.farms={{sites={{x=20,y=0,z=5}},maxHeight=4}}
+  local E=require('autobuilder.resources.exploration');local original=E.plan;local checked=false
+  E.plan=function(sector,ctx)
+    for _,x in ipairs({5,10,20}) do assert(E.protected({x=x,y=0,z=5},ctx.protectedAreas),'registered infrastructure omitted from mining geometry') end
+    checked=true;return original(sector,ctx)
+  end
+  local ok,why=pcall(function() jobs:requestAcquisition('minecraft:coal',1,0,'protected');jobs:assign(workers,{}) end)
+  E.plan=original;assert(ok,why);assert(checked)
+end)
+
+test('distant infrastructure cannot exhaust exploration protection payload limits',function()
+  local jobs,state,workers,c=fixture();state.workers=workers;state.automation=state.automation or {};state.automation.projects={}
+  for i=1,140 do state.automation.projects['far'..i]={protectedBounds={min={x=1000+i,y=0,z=0},max={x=1000+i,y=2,z=2}}} end
+  jobs:requestAcquisition('minecraft:coal',1,0,'many-distant')
+  local j;for _=1,8 do j=jobs:assign(workers,{});if j then break end end
+  assert(j,'irrelevant distant protected areas prevented a local mission')
+  assert(#j.exploration.protectedAreas<=128)
+  for _,box in ipairs(j.exploration.protectedAreas) do assert(require('autobuilder.resources.exploration').overlaps(box,c.exploration.bounds)) end
+end)

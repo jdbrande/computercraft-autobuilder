@@ -229,7 +229,7 @@ function M.new(task,e,config,nav,save,mode)
         if not found and paired then return false,'paired door space changed during placement recovery' end
       end
       if matches and count==i.before-1 or (not found or mode=='prepare' and i.fluidBefore and found and Site.fluid(actual.name)) and count==i.before then
-        task.intent=nil;persist();if mode=='prepare' and nav.workDone then nav.workDone() end;return true
+        task.intent=nil;persist();if nav.workDone then nav.workDone() end;return true
       end
       return false,'ambiguous placement outcome; inspected block/inventory disagree with recorded intent'
     elseif i.kind=='dig' then
@@ -239,9 +239,9 @@ function M.new(task,e,config,nav,save,mode)
       end
       if not found then
         if sameInventory(i.inventory,inventory()) then return false,'dig target disappeared without observed inventory change' end
-        task.intent=nil; persist(); return true
+        task.intent=nil;persist();if nav.workDone then nav.workDone() end;return true
       end
-      if P.compare(i.block,found,actual) and sameInventory(i.inventory,inventory()) then task.intent=nil; persist(); return true end
+      if P.compare(i.block,found,actual) and sameInventory(i.inventory,inventory()) then task.intent=nil;persist();if nav.workDone then nav.workDone() end;return true end
       return false,'ambiguous dig outcome; target or inventory changed'
     end
     return false,'unknown construction intent'
@@ -335,7 +335,7 @@ function M.new(task,e,config,nav,save,mode)
       local empty
       for s=1,16 do if not reserved[s] and t.getItemCount(s)==0 then empty=s; break end end
       if not empty then return issue(b,'inventory_full','inventory full before repair dig',actual) end
-      if mode=='prepare' then
+      do
         local granted,why,denied=false,'controller mutation permission required'
         if nav.workGuard then granted,why,denied=nav.workGuard(b) end
         if not granted then
@@ -373,7 +373,7 @@ function M.new(task,e,config,nav,save,mode)
     -- Any observation made before placement belongs to the pre-mutation world.
     -- Recovery must inspect the actual generated pair, even after a power loss.
     task.pairResults=nil; task.supportApproved=nil
-    if mode=='prepare' then
+    do
       local granted,why,denied=false,'controller mutation permission required'
       if nav.workGuard then granted,why,denied=nav.workGuard(b) end
       if not granted then

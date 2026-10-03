@@ -167,7 +167,7 @@ function M.new(state,config,save)
     end
     if id then return {kind='anchor',workerId=id} end
   end
-  function self:reserve(job,worker,assign)
+  function self:reserve(job,worker,assign,preparationReady)
     if not config.chunkLoading.enabled then return {status='disabled'} end
     assert(U.shortString(job.id,160),'invalid loaded mission ID')
     local old=s.leases[job.id];local t=worker.telemetry
@@ -189,6 +189,10 @@ function M.new(state,config,save)
     if assign then
       local allowed,reason=require('autobuilder.core.protection').canOwn(state,job,worker.id)
       if not allowed then return nil,reason end
+      if job.requiresSite then
+        if not preparationReady then return nil,'preparation verifier is unavailable' end
+        allowed,reason=preparationReady(job);if not allowed then return nil,reason end
+      end
     end
     local lease={status='held',workerId=worker.id,area=area,providers=providers,origin={position=U.copy(t.position),depot=U.copy(t.depot)}}
     local before,owner,status=job.loadedArea,job.workerId,job.status

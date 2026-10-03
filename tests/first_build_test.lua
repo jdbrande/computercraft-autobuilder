@@ -1,9 +1,16 @@
 local U=require('autobuilder.core.util')
 local S=require('tests.support')
 local IS=require('tests.install_support')
-local function fixture()
+local function fixture(autoSite)
   local world=require('tests.build_world').new()
-  world.fuel=1000
+  world.fuel=6000
+  -- Both pilot origins have existing support; this fixture tests the shortcut,
+  -- with a finite allowance for the added survey and preparation travel.
+  if autoSite then
+    for x=0,7 do for z=2,9 do world.blocks[x..',1,'..z]={name='minecraft:stone',state={}} end end
+  else
+    for x=8,15 do for z=0,7 do world.blocks[x..',-1,'..z]={name='minecraft:stone',state={}} end end
+  end
   world.turtle.getFuelLevel=function() return world.fuel end
   for _,action in ipairs({'forward','up','down'}) do
     local move=world.turtle[action]
@@ -62,7 +69,7 @@ local function fixture()
     reboot=function() c=R.new(cc,ce); b=R.new(wc,we); return c,b end}
 end
 test('automatic first build clears terrain then builds and verifies across a clearing restart',function()
-  local f=fixture(); f.cc.build.autoSite=true
+  local f=fixture(true); f.cc.build.autoSite=true
   local Site=require('autobuilder.build.site'); local plan=Site.plan(f.world.pose)
   local K=require('autobuilder.core.pathfinding').key
   for _,pos in ipairs(plan.points) do
@@ -87,7 +94,7 @@ test('automatic first build clears terrain then builds and verifies across a cle
   end
   assert(f.c:command('2'))
   local restarted=false
-  for _=1,5000 do
+  for _=1,8000 do
     f.step()
     if not restarted and f.world.digs>5 then
       assert(f.c:command('3')); f.step(); f.c,f.b=f.reboot()
@@ -112,7 +119,7 @@ test('first build refuses missing settings, missing materials and unfueled build
   assert(not f.c:command('2')); eq(f.c.state.firstBuild,nil); eq(next(f.c.state.automation.jobs),nil)
 end)
 test('automatic site requires an updated builder and refuses occupied or protected cells before scheduling',function()
-  local f=fixture(); f.cc.build.autoSite=true
+  local f=fixture(true); f.cc.build.autoSite=true
   f.c.state.workers['8'].telemetry.capabilities.sitePreparation=nil
   local ok,err=f.c:command('2'); assert(not ok and err:find('update',1,true)); eq(f.c.state.firstBuild,nil)
   f.c.state.workers['8'].telemetry.capabilities.sitePreparation=true
@@ -124,7 +131,7 @@ test('automatic site requires an updated builder and refuses occupied or protect
   eq(next(f.c.state.automation.jobs),nil)
 end)
 test('site fuel recovery burns slot 15 fuel in place and continues the saved route',function()
-  local f=fixture(); f.cc.build.autoSite=true
+  local f=fixture(true); f.cc.build.autoSite=true
   f.world.turtle.refuel=function(n)
     eq(f.world.selected,15); local item=f.world.items[15]; eq(item.name,'minecraft:coal_block')
     item.count=item.count-n; f.world.fuel=f.world.fuel+800*n
@@ -134,10 +141,10 @@ test('site fuel recovery burns slot 15 fuel in place and continues the saved rou
   assert(f.c:command('2'))
   for _=1,200 do f.step(); local t=f.b.state.currentTask; if t and t.index and t.index>=8 then break end end
   local t=assert(f.b.state.currentTask); eq(t.type,'PREPARE_SITE')
-  f.world.fuel=200; f.world.items[15]={name='minecraft:coal_block',count=2}
+  f.world.fuel=200; f.world.items[15]={name='minecraft:coal_block',count=6}
   for _=1,200 do f.step(); if f.world.fuel>200 then break end end
   assert(f.world.fuel>200)
-  for _=1,4500 do
+  for _=1,8000 do
     f.step(); local p=f.c.state.automation.projects.first_cathedral_test
     if p and p.phase=='built' then break end
   end
@@ -147,7 +154,7 @@ end)
 test('first build bundles pilot, resupplies, verifies all cells and survives both restarts',function()
   local f=fixture(); assert(f.c:command('2')); assert(f.c:command('2'))
   local restarted=false
-  for _=1,3500 do
+  for _=1,7000 do
     f.step()
     if not restarted and f.world.places==1 then f.c,f.b=f.reboot(); restarted=true end
     local p=f.c.state.automation.projects.first_cathedral_test
@@ -240,7 +247,7 @@ test('startup ends the old runtime before setup and reloads saved settings on re
 end)
 test('a running pilot stays paused across reboot and resumes the same tasks',function()
   local f=fixture(); assert(f.c:command('2'))
-  for _=1,500 do f.step(); if f.world.places>0 then break end end
+  for _=1,6000 do f.step(); if f.world.places>0 then break end end
   assert(f.world.places>0); assert(f.c:command('3'))
   f.c,f.b=f.reboot(); local before=f.world.places
   for _=1,20 do f.step() end; eq(f.world.places,before)
@@ -256,7 +263,7 @@ test('missing stock during preparation shows an action without queuing mining or
 end)
 test('pilot supply failures keep replenishment manual and do not create fuel-stock mining',function()
   local f=fixture(); assert(f.c:command('2'))
-  for _=1,100 do
+  for _=1,6000 do
     f.step()
     if f.b.state.currentTask and f.b.state.currentTask.supplyRequest then break end
   end
@@ -276,4 +283,18 @@ test('pilot chooses the ready builder even if a lower-ID unconfigured builder is
   assert(f.c:command('2')); eq(f.c.state.firstBuild.workerId,8)
   for _=1,8 do f.step() end
   for _,j in pairs(f.c.state.automation.jobs) do eq(j.preferredWorker,8); if j.workerId then eq(j.workerId,8) end end
+end)
+
+
+test('first build hands off to the durable project pipeline when site surveying begins',function()
+  local f=fixture();assert(f.c:command('2'))
+  for _=1,50 do
+    f.step();local p=f.c.state.automation.projects.first_cathedral_test
+    if p and p.site then
+      assert(p.autoStart,'normal project did not retain automatic continuation')
+      assert(not f.c.state.firstBuild.autoStart,'shortcut kept repeating checks after handing off preparation')
+      eq(f.c.state.firstBuild.raw,nil);return
+    end
+  end
+  error('pilot did not begin its normal site pipeline')
 end)

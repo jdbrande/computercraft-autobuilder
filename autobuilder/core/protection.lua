@@ -31,8 +31,8 @@ function M.canOwn(state,job,owner)
   end
   return true
 end
-function M.areas(state,config,exceptProject)
-  local areas=E.protectedAreas(state,config,exceptProject)
+function M.areas(state,config,exceptProject,skipMiningBase)
+  local areas=E.protectedAreas(state,config,exceptProject,skipMiningBase)
   local function box(p,radius,below,above)
     if not U.position(p) then return end
     areas[#areas+1]={min={x=p.x-radius,y=p.y-below,z=p.z-radius},max={x=p.x+radius,y=p.y+above,z=p.z+radius}}
@@ -54,8 +54,17 @@ function M.areas(state,config,exceptProject)
 end
 function M.canModify(state,config,job,target)
   if not U.position(target) or not job or not job.workerId or job.status=='completed' or job.paused
-    or not E.box(job.bounds) or not P.inside(target,job.bounds) then return false,'mutation requires active owned work bounds' end
-  if E.protected(target,M.areas(state,config,job.project)) then return false,'target is registered protected infrastructure or another project' end
+    then return false,'mutation requires active owned work bounds' end
+  local bounds=job.type=='MINE' and job.miningArea or job.bounds
+  local owned=E.box(bounds) and P.inside(target,bounds)
+  if job.type=='MINE' and job.exploration then
+    local g=job.exploration;owned=E.box(g.bounds) and P.inside(target,g.bounds)
+    for _,p in ipairs(g.route or {}) do if U.distance(p,target)==0 then owned=true end end
+    for _,p in ipairs(g.exitRoute or {}) do if U.distance(p,target)==0 then owned=false end end
+    if E.protected(target,g.protectedAreas) then owned=false end
+  end
+  if not owned then return false,'mutation requires active owned work bounds' end
+  if E.protected(target,M.areas(state,config,job.project,job.type~='MINE')) then return false,'target is registered protected infrastructure or another project' end
   for _,w in pairs(state.workers or {}) do
     local at=w.telemetry and w.telemetry.position
     if w.id~=job.workerId and at and at.known and U.position(at) and U.distance(at,target)==0 then return false,'target occupied by worker '..w.id end

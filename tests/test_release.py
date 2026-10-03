@@ -121,8 +121,12 @@ class ReleaseTests(unittest.TestCase):
                 'serializeJSON': lambda val: json.dumps(to_python(val), sort_keys=True),
                 'unserializeJSON': lambda val: to_lua(json.loads(val)),
             })
-            responses = lua.table_from({BASE + '/' + p.relative_to(root).as_posix(): p.read_text()
-                                        for p in root.rglob('*') if p.is_file()})
+            # Local binary metadata is not a downloadable release artifact.
+            (root / 'autobuilder' / '.unrelated-binary').write_bytes(b'\x80\x00')
+            manifest = json.loads((root / 'manifest.json').read_text())
+            paths = ['manifest.json'] + [entry['path'] for entry in manifest['files']]
+            responses = lua.table_from({BASE + '/' + path: (root / path).read_text()
+                                        for path in paths})
             env.http = lua.eval("""function(responses) return {get=function(url)
                 local data=responses[url]; assert(data,'missing response '..url)
                 return {readAll=function() return data end,close=function() end,getResponseCode=function() return 200 end}

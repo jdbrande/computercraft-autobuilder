@@ -49,3 +49,16 @@ test('completed physical tranche schedules a durable supplemental storage shortf
   eq(root.status,'completed'); eq(root.progress.delivered,60)
   assert(j:progress(12,{jobId=child.id,phase='completed',delivered=10,held=0},100)); eq(root.progress.delivered,60)
 end)
+
+test('production-owned mining accepts its durable acquired-stock proof after supply consumption',function()
+  for _,mode in ipairs({'acquired','unconfirmed','unrelated','smaller','manual'}) do
+    local state={automation={requests={r={id='r',acquired=mode~='unconfirmed',targets={['minecraft:cobblestone']=mode=='smaller' and 0 or 1},mines={}}}}}
+    local q=require('autobuilder.core.jobs').new(state,function() return true end,function() return 1 end,7)
+    local j=q:submit('minecraft:cobblestone',1,0,mode~='manual' and 'r' or nil);j.workerId=12;j.status='running'
+    state.automation.requests.r.mines['minecraft:cobblestone']=mode=='unrelated' and 'different' or j.id
+    q=require('autobuilder.core.jobs').new(state,function() return true end,function() return 2 end,7)
+    assert(q:progress(12,{jobId=j.id,phase='completed',delivered=1,held=0},0))
+    if mode=='acquired' then eq(j.status,'completed');eq(j.childId,nil)
+    else eq(j.status,'blocked');assert(j.childId,'unproved or manual stock shortfall disappeared') end
+  end
+end)

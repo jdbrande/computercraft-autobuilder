@@ -25,11 +25,13 @@ function M.new(source,transform,sourceHash,options)
   local rotation=transform.rotation or 0;local mx,mz=transform.mirrorX==true,transform.mirrorZ==true
   local width,depth=size.x,size.z;if rotation%180~=0 then width,depth=depth,width end
   local bounds={min={x=origin.x-margin,y=minY,z=origin.z-margin},max={x=origin.x+width-1+margin,y=origin.y+size.y+1,z=origin.z+depth-1+margin}}
-  assert(U.position(bounds.min) and U.position(bounds.max) and origin.y-1>=minY and bounds.max.y<=maxY,'site exceeds dimension or world bounds')
   -- Keep run endpoints, not an expanded cell/region array. Random cell lookup is
   -- logarithmic in the existing run count; only requested column batches allocate.
-  local ends,palette={},{};local total=0
-  for i,run in ipairs(source.runs) do total=total+run.count;ends[i]={last=total,id=run.id};Cooperate.every(i) end
+  local ends,palette={},{};local total=0;local hasStructure=false
+  for i,run in ipairs(source.runs) do
+    total=total+run.count;ends[i]={last=total,id=run.id};hasStructure=hasStructure or not C.isAir(source.palette[run.id].name);Cooperate.every(i)
+  end
+  assert(U.position(bounds.min) and U.position(bounds.max) and origin.y-(hasStructure and 1 or 0)>=minY and bounds.max.y<=maxY,'site exceeds dimension or world bounds')
   for i,entry in ipairs(source.palette) do palette[i]={name=entry.name,state=T.state(entry.state,rotation,mx,mz)};Cooperate.every(i) end
   local nx,nz=width+margin*2,depth+margin*2
   local rx,rz=math.ceil(nx/regionSize),math.ceil(nz/regionSize)
@@ -73,10 +75,11 @@ function M.new(source,transform,sourceHash,options)
   local keys={};for key in pairs(overrides) do keys[#keys+1]=key end;table.sort(keys)
   for _,key in ipairs(keys) do identity[#identity+1]=key..'='..overrides[key] end
   local planId=require('autobuilder.install.sha256').digest(table.concat(identity,'|'));self.identity=planId
+  if not hasStructure and not next(overrides) then bounds.min.y=origin.y;self.bounds.min.y=origin.y end
   function self:region(index)
     integer(index,1,rx*rz,'invalid site region index')
     local x=(index-1)%rx;local z=math.floor((index-1)/rx)
-    local lo={x=bounds.min.x+x*regionSize,y=minY,z=bounds.min.z+z*regionSize}
+    local lo={x=bounds.min.x+x*regionSize,y=bounds.min.y,z=bounds.min.z+z*regionSize}
     local hi={x=math.min(lo.x+regionSize-1,bounds.max.x),y=bounds.max.y,z=math.min(lo.z+regionSize-1,bounds.max.z)}
     return {id=index,identity=planId,bounds={min=lo,max=hi},columns=(hi.x-lo.x+1)*(hi.z-lo.z+1)}
   end
@@ -86,7 +89,8 @@ function M.new(source,transform,sourceHash,options)
     for index=first,last do
       local x=r.bounds.min.x+(index-1)%w;local z=r.bounds.min.z+math.floor((index-1)/w)
       local inside=x>=origin.x and x<origin.x+width and z>=origin.z and z<origin.z+depth
-      columns[#columns+1]={x=x,z=z,foundationY=inside and (overrides[x..','..z] or origin.y-1) or nil,clearanceY=bounds.max.y,minY=inside and minY or origin.y}
+      local foundation=inside and (overrides[x..','..z] or hasStructure and origin.y-1) or nil
+      columns[#columns+1]={x=x,z=z,foundationY=foundation,clearanceY=bounds.max.y,minY=foundation and minY or origin.y}
     end
     return columns,last<r.columns and last+1 or nil
   end
@@ -94,6 +98,18 @@ function M.new(source,transform,sourceHash,options)
     local columns,nextCursor=self:columns(regionIndex,first,limit)
     return {type='SURVEY_SITE',clearanceY=bounds.max.y,bounds=self:region(regionIndex).bounds,
       siteSurvey={identity=planId,region=regionIndex,columns=columns}},nextCursor
+  end
+  function self:requiredRegions(blocks)
+    assert(type(blocks)=='table' and #blocks>0 and #blocks<=512,'bounded structural region required')
+    local x0,x1,z0,z1=math.huge,-math.huge,math.huge,-math.huge
+    for _,b in ipairs(blocks) do
+      assert(U.position(b) and b.x>=origin.x and b.x<origin.x+width and b.z>=origin.z and b.z<origin.z+depth,'structural region outside site footprint')
+      x0=math.min(x0,b.x);x1=math.max(x1,b.x);z0=math.min(z0,b.z);z1=math.max(z1,b.z)
+    end
+    x0=math.floor((math.max(bounds.min.x,x0-1)-bounds.min.x)/regionSize);x1=math.floor((math.min(bounds.max.x,x1+1)-bounds.min.x)/regionSize)
+    z0=math.floor((math.max(bounds.min.z,z0-1)-bounds.min.z)/regionSize);z1=math.floor((math.min(bounds.max.z,z1+1)-bounds.min.z)/regionSize)
+    assert((x1-x0+1)*(z1-z0+1)<=128,'too many preparation dependencies for one structural region')
+    local out={};for z=z0,z1 do for x=x0,x1 do out[#out+1]=z*rx+x+1 end end;return out
   end
   function self:work(regionIndex,evidence,stage,cursor,limit,fill)
     local verify=stage=='verify_clear' or stage=='verify_fill'

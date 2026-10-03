@@ -56,6 +56,7 @@ local function harness(w,task,kind,config)
   config=config or {minimumFuelReserve=0}; local saved
   local function save() saved=U.copy(task); return true end
   local nav=require('autobuilder.core.navigation').new(w.turtle,U.copy(w.pose),config,save)
+  nav.workGuard=function() return true end
   local ex=require('autobuilder.build.'..(kind or 'builder')).new(task,{turtle=w.turtle},config,nav,save)
   return ex,function() return saved end
 end
@@ -153,6 +154,7 @@ test('checkpoint failure before placement prevents a world mutation',function()
   local task={blocks={block('stone')}}
   local save=function() if task.intent then return false,'disk full' end; return true end
   local nav=require('autobuilder.core.navigation').new(w.turtle,U.copy(w.pose),{minimumFuelReserve=0},save)
+  nav.workGuard=function() return true end
   local ex=require('autobuilder.build.builder').new(task,{turtle=w.turtle},{},nav,save)
   pcall(function() run(ex) end); eq(w.places,0); ex:step(); eq(w.places,0)
 end)
@@ -188,4 +190,22 @@ test('construction yields immediately when a descent awaits a movement reservati
   end
   local ex=require('autobuilder.build.builder').new(task,{turtle=w.turtle},{},nav,function() return true end)
   run(ex); eq(task.phase,'blocked'); eq(afterDenied,0); eq(w.places,0)
+end)
+
+test('construction and repair require mutation permission even when movement is allowed',function()
+  for _,mode in ipairs({'build','repair'}) do
+    local w=world();w.items[1]={name='minecraft:stone',count=1}
+    if mode=='repair' then w.blocks['1,0,0']={name='minecraft:dirt',state={}} end
+    local task={blocks={block('stone')}}
+    local nav=require('autobuilder.core.navigation').new(w.turtle,U.copy(w.pose),{minimumFuelReserve=0},function() return true end)
+    nav.guard=function() return true end
+    local ex=require('autobuilder.build.builder').new(task,{turtle=w.turtle},{},nav,function() return true end,mode)
+    run(ex);eq(task.phase,'blocked');eq(w.digs,0);eq(w.places,0);assert(not task.intent)
+    local allowed=false;local released=0
+    nav.workGuard=function() return allowed,'movement reservation pending' end
+    nav.workDone=function() released=released+1 end
+    assert(ex:resume());run(ex);eq(w.digs,0);eq(w.places,0)
+    allowed=true;assert(ex:resume());run(ex);eq(task.phase,'completed');eq(w.places,1);eq(w.digs,mode=='repair' and 1 or 0)
+    eq(released,mode=='repair' and 2 or 1)
+  end
 end)

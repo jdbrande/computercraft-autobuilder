@@ -138,14 +138,19 @@ test('project completion waits for native worker home return cargo collection an
   local f=fixture();local C=require('tests.loaded_config')
   f.configs[7].build.enabled=true;f.configs[7].build.origin={x=6,y=0,z=5};f.configs[7]=C.load(f.configs[7]);f:reboot(7)
   f.configs[12].automation.building=true;f.configs[12].depot={x=2,y=1,z=0};f.configs[12]=C.load(f.configs[12]);f:reboot(12)
-  f.worlds[12].items[1]={name='minecraft:stone',count=4}
+  for x=6,7 do f.worlds[12].blocks[x..',-1,5']={name='minecraft:stone',state={}} end
   local bp={schema=1,size={x=2,y=1,z=1},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=2}},metadata={},requirements={['minecraft:stone']=2}}
   f.envs[7].textutils.unserializeJSON=f.envs[7].textutils.unserialize
   f.envs[7].fs.files['/settlement.json']=f.envs[7].textutils.serialize(bp)
   local app=f.apps[7];assert(app:command('build import /settlement.json settlement'));assert(app:command('build auto settlement'))
-  local settling=false;local rebooted=false;f.rejectDrop=true
-  for _=1,600 do
+  local settling=false;local rebooted=false;local loaded=false
+  for _=1,2000 do
     f:cycle();local p=f.apps[7].state.automation.projects.settlement
+    -- Stage this settlement fixture's starting cargo only after preparation,
+    -- which itself returns cargo between mutation batches.
+    if p.phase=='building' and not loaded then
+      f.worlds[12].items[1]={name='minecraft:stone',count=4};loaded=true;f.rejectDrop=true
+    end
     if p.phase=='settling' then settling=true end
     if settling and not rebooted then f:reboot(7);f:reboot(12);rebooted=true end
     local t=f.apps[12].state.currentTask

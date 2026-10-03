@@ -118,3 +118,12 @@ test('stable foundation fill displaces water or lava with a measured restart-saf
     eq(j.phase,'completed');eq(w.digs,0);eq(w.places,1);eq(w.blocks['1,0,0'].name,'minecraft:cobblestone');eq(w.items[1].count,1)
   end
 end)
+
+test('foundation verification refuses to certify support sealed beneath a retained floor',function()
+  local w,c,j,nav,new=fixture({{x=2,y=0,z=0,name='minecraft:stone',state={},support=true}},'verify')
+  for x=1,3 do for y=-1,1 do for z=-1,1 do w.blocks[x..','..y..','..z]={name='minecraft:stone',state={}} end end end
+  w.blocks['2,0,0']={name='minecraft:stone',state={}}
+  run(new(),200);eq(j.phase,'completed');eq(j.report.counts.correct or 0,0);eq(j.report.counts.inaccessible,1)
+  eq(j.report.entries[1].x,2);eq(j.report.entries[1].y,0);eq(j.report.entries[1].z,0)
+  assert(j.report.entries[1].reason);eq(w.digs,0);eq(w.places,0)
+end)

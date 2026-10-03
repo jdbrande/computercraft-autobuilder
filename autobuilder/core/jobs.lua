@@ -7,13 +7,13 @@ function M.new(state,save,clock,controllerId,config,chunks)
   state.jobs=state.jobs or {}; state.jobSequence=state.jobSequence or 0
   local self={state=state}
   local function persist() local ok,err=save(); assert(ok,err) end
-  local function create(item,quantity,stock,parent)
+  local function create(item,quantity,stock,parent,consumer)
     state.jobSequence=state.jobSequence+1
     local id='mine:'..controllerId..':'..math.floor(clock()*1000)..':'..state.jobSequence
     local job={id=id,type='MINE',item=item,target=quantity,quantity=math.max(0,quantity-stock),priority=1,
       status=stock>=quantity and 'completed' or 'queued',requiredCapabilities={mining=true},dependencies={},
       progress={delivered=0,held=0},retryCount=0,created=clock(),parent=parent and parent.id,
-      depth=parent and ((parent.depth or 0)+1) or 0,paused=parent and parent.paused or nil}
+      depth=parent and ((parent.depth or 0)+1) or 0,paused=parent and parent.paused or nil,consumer=parent and parent.consumer or consumer}
     state.jobs[id]=job; return job
   end
   local function finish(j)
@@ -31,11 +31,12 @@ function M.new(state,save,clock,controllerId,config,chunks)
     j.childId=child.id; j.quantity=j.quantity+child.quantity
     j.error='storage shortfall; queued '..child.id
   end
-  function self:submit(item,quantity,stock)
+  function self:submit(item,quantity,stock,consumer)
     if not Materials.get(item) or not U.integer(quantity) or quantity<1 or quantity>1000000 then return nil,'unsupported material or invalid quantity (1..1000000)' end
     if not U.integer(stock) or stock<0 then return nil,'live storage count required' end
+    if consumer~=nil and not U.shortString(consumer,160) then return nil,'invalid production consumer' end
     for _,j in pairs(state.jobs) do if j.item==item and j.status~='completed' then return nil,'an unfinished job already requests '..item end end
-    local j=create(item,quantity,stock); persist(); return j
+    local j=create(item,quantity,stock,nil,consumer); persist(); return j
   end
   state.exploration=state.exploration or {schema=1,sectors={},groups={},sequence=0}
   local exploration=state.exploration
@@ -91,8 +92,13 @@ function M.new(state,save,clock,controllerId,config,chunks)
             elseif t.status=='idle' and not t.task and not Coordination.workerBusy(state,wid) then
               local choices=E.candidates(exploration.sectors,config.exploration,g.item,home.exitRoute[#home.exitRoute] or home.depot)
               reason='Search envelope exhausted for '..g.item
-              local areas=E.protectedAreas(state,config)
-              for _,b in ipairs(home.protectedAreas) do areas[#areas+1]=b end
+              local areas={}
+              for _,b in ipairs(require('autobuilder.core.protection').areas(state,config)) do
+                if E.overlaps(b,config.exploration.bounds) then areas[#areas+1]=b end
+              end
+              for _,b in ipairs(home.protectedAreas) do
+                if E.overlaps(b,config.exploration.bounds) then areas[#areas+1]=b end
+              end
               for ci=cursor.sector,#choices do
                 if attempts>=4 then
                   planning[g.id]={worker=wi,sector=ci,reason=reason,waiting=waiting}
@@ -261,7 +267,12 @@ function M.new(state,save,clock,controllerId,config,chunks)
       if p.delivered<j.quantity then return false,'worker completed without its assigned quantity' end
       if stock then
         j.physicalComplete=true
-        if stock>=j.target then finish(j)
+        local request=j.consumer and ((state.automation or {}).requests or {})[j.consumer]
+        local root=j
+        for _=1,4 do if not root.parent then break end;root=state.jobs[root.parent] or root end
+        local acquired=request and request.acquired==true and not root.parent and (request.mines or {})[j.item]==root.id
+          and U.integer((request.targets or {})[j.item]) and request.targets[j.item]>=root.target
+        if stock>=j.target or acquired then finish(j)
         else j.status='blocked'; supplement(j,stock) end
       else j.status='blocked'; j.error='waiting for live storage to confirm requested stock' end
     elseif p.phase=='blocked' then j.status='blocked'; j.error=p.error or 'worker blocked'

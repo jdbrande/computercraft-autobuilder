@@ -46,7 +46,7 @@ local function fixture(options)
   local cc=U.copy(common); cc.build={enabled=true,origin={x=2,y=0,z=0}}
   if options.exploration then cc.exploration={enabled=true,base={x=0,y=0,z=0},bounds={min={x=16,y=0,z=0},max={x=103,y=0,z=1}},baseProtection={min={x=-12,y=-1,z=-2},max={x=8,y=3,z=2}},dimensionMinY=-64,dimensionMaxY=319} end
   f.controller=actor(7,cc)
-  local sources={{id=21,x=20,item='cobblestone',block='stone',count=4},
+  local sources={{id=21,x=20,item='cobblestone',block='stone',count=options.fill and 5 or 4},
     {id=22,x=40,item='sand',block='sand',count=1},{id=23,x=60,item='coal',block='coal_ore',count=2}}
   if options.exploration then sources[#sources+1]={id=26,x=84,item='cobblestone',block='stone',count=4} end
   local sharedBlocks={}
@@ -93,6 +93,9 @@ local function fixture(options)
   local cw=U.copy(common); cw.role='worker'; cw.controllerId=7; cw.initialPosition={x=-10,y=2,z=0,heading='north'}; cw.depot=U.copy(cw.initialPosition); cw.automation={crafting=true}
   f.craft=actor(24,cw,t); f.craft.slots=crafty.slots
   local w=require('tests.build_world').new(); w.blocks['0,1,0']={name=mc('chest'),state={}}
+  -- This production-chain fixture starts on solid ground; uneven terrain has
+  -- separate preparation coverage and must not consume these exact mining quotas.
+  for x=2,4 do w.blocks[x..','..(options.fill and x==3 and -2 or -1)..',0']={name=mc('stone'),state={}} end
   w.turtle.getItemSpace=function(slot) return 64-w.turtle.getItemCount(slot) end
   w.turtle.suckDown=function(n)
     assert(w.pose.x==0 and w.pose.y==2 and w.pose.z==0,'builder must physically return for supplies')
@@ -215,3 +218,23 @@ for _,scan in ipairs({true,false}) do
     for _,a in ipairs(f.miners) do eq(a.runtime.state.currentTask,nil); eq(a.world.pose.x,a.source.x) end
   end)
 end
+
+
+test('automatic preparation acquires additional foundation fill while structural production drains raw stock',function()
+  local f=fixture({fill=true,finiteFuel=true});local c=f.controller.runtime
+  assert(c:command('build import /chain.json fill_shortage'));assert(c:command('build auto fill_shortage'))
+  eq(next(f.inventories.stock),nil);eq(next(f.builder.world.items),nil)
+  for _=1,6000 do
+    f:step();local p=f.controller.runtime.state.automation.projects.fill_shortage
+    if p.phase=='built' and not f.builder.runtime.state.currentTask then break end
+  end
+  local p=f.controller.runtime.state.automation.projects.fill_shortage
+  local errors={p.phase,tostring(p.error)}
+  for _,r in pairs(f.controller.runtime.state.automation.requests) do errors[#errors+1]=r.status..':'..tostring(r.error) end
+  for id,a in pairs(f.actors) do local t=a.runtime.state.currentTask;if t then errors[#errors+1]=id..':'..t.phase..':'..tostring(t.error) end end
+  assert(p.phase=='built',table.concat(errors,'; '))
+  eq(f.stats.deposited[mc('cobblestone')],5);eq(f.stats.smelted[mc('stone')],4)
+  eq(f.stats.pulled[mc('cobblestone')],1);eq(f.builder.world.blocks['3,-1,0'].name,mc('cobblestone'))
+  eq(f.builder.world.places,4);eq(p.report.counts.correct,3)
+  for _,a in ipairs(f.miners) do assert(a.world.fuel>0 and a.world.fuel<1000) end
+end)

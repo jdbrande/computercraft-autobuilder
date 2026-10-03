@@ -107,3 +107,96 @@ test('preparation admission is rechecked after yielding chunk coverage observati
   local j=Q:submit('SURVEY_SITE',{siteSurvey={},clearanceY=4,bounds={min={x=60,y=0,z=0},max={x=65,y=4,z=4}}})
   assert(not Q:assign(s.workers),'yielding coverage observation invalidated admission');assert(not j.workerId)
 end)
+
+test('structural assignment requires current preparation evidence before acquiring a worker',function()
+  local c,s=fixture();s.automation.jobs={};s.automation.sequence=0
+  s.workers={['13']={id=13,online=true,telemetry={status='idle',capabilities={building=true}}}}
+  local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+  local j=Q:submit('BUILD',{project='own',requiresSite=true,blocks={{x=60,y=1,z=1,name='minecraft:stone',state={}}}}, {})
+  assert(not Q:assign(s.workers),'missing preparation verifier allowed construction')
+  Q.preparationReady=function() return false,'foundation region pending' end
+  assert(not Q:assign(s.workers));assert(not j.workerId)
+  Q.preparationReady=function() return true end;eq(Q:assign(s.workers).id,j.id)
+end)
+
+test('door mutation grants reserve generated halves atomically and reject occupied or protected upper cells',function()
+  local c,s,j=fixture();j.type='BUILD'
+  local lower={x=60,y=1,z=1,name='minecraft:oak_door',state={half='lower',facing='north',hinge='left',open='false',powered='false'}}
+  local upper=U.copy(lower);upper.y=2;upper.state.half='upper';j.blocks={lower,upper}
+  local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+  local from={x=60,y=1,z=2}
+  s.workers['99']={id=99,online=false,telemetry={position={x=60,y=2,z=1,known=true}}}
+  assert(not Q:reserve(13,j.id,from,lower,s.workers,true),'door generated into an offline worker')
+  eq(next(s.automation.cells),nil);s.workers['99']=nil
+  c.restrictedAreas={{min={x=60,y=2,z=1},max={x=60,y=2,z=1}}}
+  assert(not Q:reserve(13,j.id,from,lower,s.workers,true),'door generated into protected upper cell')
+  eq(next(s.automation.cells),nil);c.restrictedAreas={}
+  assert(Q:reserve(13,j.id,from,lower,s.workers,true))
+  eq(s.automation.cells['60,1,1'].jobId,j.id);eq(s.automation.cells['60,2,1'].jobId,j.id)
+  eq(s.automation.cells['60,1,2'].owner,13)
+end)
+
+test('generated door cells cannot escape owned bounds and failed grants restore every prior cell',function()
+  local c,s,j=fixture();j.type='BUILD';j.blocks={{x=60,y=1,z=1,name='minecraft:oak_door',state={half='lower',facing='north',hinge='left',open='false',powered='false'}}}
+  j.bounds={min={x=60,y=1,z=1},max={x=60,y=1,z=1}}
+  local fail=false
+  local Q=require('autobuilder.core.workflows').new(s,function() return not fail,'disk full' end,function() return 100 end,7,nil,c)
+  local from={x=60,y=1,z=2};local target=j.blocks[1]
+  assert(not Q:reserve(13,j.id,from,target,s.workers,true),'generated upper half escaped owned territory')
+  j.bounds.max.y=2;s.automation.cells['59,1,2']={owner=13,jobId=j.id};local before=U.copy(s.automation.cells);fail=true
+  assert(not pcall(Q.reserve,Q,13,j.id,from,target,s.workers,true))
+  assert(require('autobuilder.factory.factory').equal(before,s.automation.cells),'failed paired reservation changed traffic ownership')
+end)
+
+test('preparation gates require bounded project identity and valid structural task metadata',function()
+  local M=require('autobuilder.core.task_messages')
+  local job={id='task:7:1',type='BUILD',project='house',projectRun=0,requiresSite=true,blocks={{x=3,y=0,z=0,name='minecraft:stone',state={}}}}
+  assert(M.validate('task_assign',{job=job}))
+  for _,change in ipairs({{requiresSite='true'},{projectRun=-1},{projectRun=0.5},{project=string.rep('a',65)},{type='TRANSPORT'}}) do
+    local bad=U.copy(job);for key,value in pairs(change) do bad[key]=value end
+    assert(not M.validate('task_assign',{job=bad}),'invalid preparation gate accepted')
+  end
+  local bad=U.copy(job);bad.project=nil;assert(not M.validate('task_assign',{job=bad}))
+end)
+
+test('mining mutation grants enforce territory routes infrastructure and active preparation ownership',function()
+  local c,s=fixture();s.automation.jobs={}
+  local j={id='mine:7:1',type='MINE',workerId=13,status='running',miningArea={min={x=80,y=0,z=0},max={x=90,y=2,z=2}}};s.jobs[j.id]=j
+  local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+  assert(Q:reserve(13,j.id,{x=82,y=1,z=0},{x=83,y=1,z=0},s.workers,true),'owned mine cannot excavate')
+  assert(not Q:reserve(13,j.id,{x=79,y=1,z=0},{x=78,y=1,z=0},s.workers,true),'mine escaped assigned territory')
+  s.automation.jobs.prep={id='prep',type='PREPARE_REGION',siteWork={},workerId=14,status='running',bounds={min={x=85,y=0,z=0},max={x=87,y=2,z=2}}}
+  assert(not Q:reserve(13,j.id,{x=84,y=1,z=0},{x=85,y=1,z=0},s.workers,true))
+  j.exploration={bounds=U.copy(j.miningArea),route={{x=78,y=1,z=0},{x=79,y=1,z=0}},exitRoute={{x=77,y=1,z=0}},protectedAreas={}}
+  assert(Q:reserve(13,j.id,{x=77,y=1,z=0},{x=78,y=1,z=0},s.workers,true),'owned exploration route denied')
+  assert(not Q:reserve(13,j.id,{x=78,y=1,z=0},{x=77,y=1,z=0},s.workers,true),'traversal-only exit excavated')
+  j.exploration.protectedAreas={{min={x=78,y=1,z=0},max={x=78,y=1,z=0}}}
+  assert(not Q:reserve(13,j.id,{x=77,y=1,z=0},{x=78,y=1,z=0},s.workers,true),'immutable mission protection ignored')
+  j.exploration=nil;j.miningArea={min={x=49,y=0,z=0},max={x=51,y=2,z=0}}
+  assert(not Q:reserve(13,j.id,{x=49,y=1,z=0},{x=50,y=1,z=0},s.workers,true),'registered depot excavated')
+end)
+
+test('mining base exclusion allows authorized construction while retaining actual infrastructure protection',function()
+  local c,s,j=fixture();c.exploration.baseProtection={min={x=-5,y=-5,z=-5},max={x=100,y=30,z=10}}
+  local P=require('autobuilder.core.protection');j.type='BUILD'
+  assert(P.canModify(s,c,j,{x=60,y=1,z=1}),'mining exclusion incorrectly forbids building the base')
+  assert(not P.canModify(s,c,j,{x=0,y=1,z=0}),'construction exemption removed actual depot protection')
+  j.type='MINE';j.miningArea=U.copy(j.bounds)
+  assert(not P.canModify(s,c,j,{x=60,y=1,z=1}),'miner excavated the base exclusion')
+end)
+
+test('structural admission rechecks preparation proof at the final chunk ownership boundary',function()
+  for _,enabled in ipairs({false,true}) do
+    local c,s=fixture();s.automation.jobs={};s.automation.sequence=0
+    c.chunkLoading.enabled=enabled;c.chunkLoading.areas={{minX=3,maxX=4,minZ=0,maxZ=0}}
+    s.workers={['13']={id=13,online=true,telemetry={status='idle',capabilities={building=true,chunkCoverageV1=true},position={x=60,y=2,z=1,known=true},depot={x=60,y=2,z=1}}}}
+    local chunks=require('autobuilder.core.chunks').new(s,c,function() return true end)
+    local original=chunks.reserve;local ready=true
+    function chunks:reserve(j,w,assign,prepared) ready=false;return original(self,j,w,assign,prepared) end
+    local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,chunks,c)
+    Q.preparationReady=function() return ready,'region proof was lost during coverage check' end
+    local j=Q:submit('BUILD',{project='own',projectRun=0,requiresSite=true,blocks={{x=60,y=1,z=1,name='minecraft:stone',state={}}}}, {})
+    assert(not Q:assign(s.workers),'stale preparation proof acquired a structural owner')
+    assert(not j.workerId);assert(not (s.chunkLedger and s.chunkLedger.leases[j.id]))
+  end
+end)

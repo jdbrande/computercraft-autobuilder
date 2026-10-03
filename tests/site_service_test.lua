@@ -125,6 +125,7 @@ test('preparation waits for exact debris settlement and retains bounded defects 
   end
   eq(p.phase,'site_blocked');eq(p.site.work.blocked,1)
   assert(not service:prepared(p,plan,1));assert(service:prepared(p,plan,2))
+  assert(not service:readyFor(p,plan,{{x=100,y=2,z=100}}));assert(service:readyFor(p,plan,{{x=103,y=2,z=103}}),'unrelated blocked region withheld independent construction')
   local blocked=service:evidence(p,plan,1).preparation;assert(blocked.defects[1].reason);assert(blocked.defects[1].actual.name)
 end)
 
@@ -184,4 +185,65 @@ test('a saved prepared marker with unresolved defects is rejected as invalid evi
   record.preparation={status='prepared',stage='verified',cursor=1,sequence=2,failed=1,defects={},verifiedFill=true,verifiedClear=true}
   assert(require('autobuilder.core.checkpoint').new(e.fs,e.textutils,path):save(record))
   assert(not service:prepared(p,plan,1),'unresolved defects certified as prepared')
+end)
+
+local function completePreparation(q,plan)
+  for _,j in pairs(q.state.jobs) do if j.status~='completed' then
+    j.workerId=12;j.status='completed';j.completedAt=100
+    if j.type=='SURVEY_SITE' then
+      j.progress=#j.siteSurvey.columns;j.siteReport={identity=plan.identity,region=j.siteSurvey.region,observations={}}
+      for _,col in ipairs(j.siteSurvey.columns) do j.siteReport.observations[#j.siteReport.observations+1]={x=col.x,y=col.minY,z=col.z,status='empty',name='minecraft:air'} end
+    else j.progress=#j.blocks;j.report={counts={correct=#j.blocks},entries={}} end
+  end end
+end
+
+test('lost completed preparation proof reopens a bounded census and certifies each region exactly once',function()
+  local e,c,app,q,p,plan,service=surveyedFixture();service:startWork(p,plan)
+  for _=1,1000 do service:workTick(p,plan);completePreparation(q,plan);if p.site.work.status=='completed' then break end end
+  eq(p.site.work.preparedCount,plan.regionCount);p.phase='building'
+  local blocks={{x=103,y=2,z=103}};local region=plan:requiredRegions(blocks)[1]
+  local _,path=service:evidence(p,plan,region);e.fs.files[path]=nil;e.fs.files[path..'.bak']=nil
+  for _=1,3 do assert(not service:readyFor(p,plan,blocks)) end
+  eq(p.site.work.cursor,1);eq(p.site.work.status,'working');eq(p.phase,'building')
+  for _=1,1000 do
+    service:workTick(p,plan);completePreparation(q,plan)
+    if p.site.work.status=='completed' then break end
+  end
+  eq(p.site.work.completed,plan.regionCount);eq(p.site.work.preparedCount,plan.regionCount);eq(p.site.work.blocked,0)
+  assert(service:readyFor(p,plan,blocks));eq(p.phase,'building');eq(p.site.work.rechecking,nil)
+end)
+
+test('preparation proof recovery preserves all active owners and does not repeatedly reset its census',function()
+  local e,c,app,q,p,plan,service=surveyedFixture();service:startWork(p,plan)
+  for _=1,8 do service:workTick(p,plan) end
+  local held={};for id,j in pairs(q.state.jobs) do if j.type=='PREPARE_REGION' then j.workerId=12;j.status='running';held[id]=true end end
+  assert(next(held));local active=U.copy(p.site.work.active)
+  local blocks={{x=103,y=2,z=103}};local region=plan:requiredRegions(blocks)[1]
+  local _,path=service:evidence(p,plan,region);e.fs.files[path]=nil;e.fs.files[path..'.bak']=nil
+  assert(not service:readyFor(p,plan,blocks))
+  for key,a in pairs(active) do assert(p.site.work.active[key]);eq(p.site.work.active[key].region,a.region) end
+  service:workTick(p,plan);local cursor=p.site.work.cursor
+  assert(cursor>1);assert(not service:readyFor(p,plan,blocks));eq(p.site.work.cursor,cursor)
+  for id in pairs(held) do eq(q.state.jobs[id].status,'running');eq(q.state.jobs[id].workerId,12) end
+  for _=1,1200 do service:workTick(p,plan);completePreparation(q,plan);if p.site.work.status=='completed' then break end end
+  eq(p.site.work.completed,plan.regionCount);eq(p.site.work.preparedCount,plan.regionCount)
+end)
+test('fill selection requires enough stock or an available replenishment provider',function()
+ for _,amount in ipairs({1,30}) do
+  local e,c,app,q,p,plan,service=surveyedFixture()
+  app.mining.storage.counts={['minecraft:dirt']=amount}
+  app.state.workers['12'].telemetry.capabilities={mining=true}
+  app.state.workers['12'].telemetry.miningResources={'minecraft:cobblestone'}
+  service:startWork(p,plan)
+  local first
+  for _=1,150 do
+   service:workTick(p,plan)
+   for _,j in pairs(q.state.jobs) do if j.type=='PREPARE_REGION' and j.status~='completed' then
+    if j.siteWork.stage=='fill' then first=j;break end
+    j.workerId=12;j.status='completed';j.completedAt=100;j.progress=#j.blocks;j.report={counts={correct=#j.blocks},entries={}}
+   end end
+   if first then break end
+  end
+  assert(first,'no fill task');eq(first.blocks[1].name,amount==1 and 'minecraft:cobblestone' or 'minecraft:dirt')
+ end
 end)

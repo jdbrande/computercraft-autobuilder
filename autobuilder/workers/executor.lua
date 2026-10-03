@@ -241,10 +241,12 @@ function M.new(app,config,e,network,clock)
       elseif err and not tostring(err):find('movement reservation pending',1,true) then t.error=err; save() end
       return true
     end
-    -- Budget before beginning a route. Reservation yields during its descent
-    -- must not charge a second ascent and send an adequately fuelled turtle home.
+    -- Budget before beginning a route. Reservation yields during descent or at
+    -- the mutation stand must not charge a second ascent after arrival.
+    local mutation=s.motionReservation
+    local atMutation=mutation and mutation.work and mutation.jobId==t.id and U.distance(mutation.from,app.navigation.pose)==0
     if required and not t.surveyRoute and not t.surveyScanning and not t.moveRoute and not t.supportCheck and not t.pairCheck and not t.intent
-      and not (t.resupply and t.resupply.intent) and not t.fuelRecovery and not t.supplyRequest then
+      and not atMutation and not (t.resupply and t.resupply.intent) and not t.fuelRecovery and not t.supplyRequest then
       local fuel=e.turtle.getFuelLevel()
       if fuel~='unlimited' and fuel<required then
         local ok,err=refuelInPlace(math.max(config.mining.fuelTarget,required))
@@ -312,7 +314,10 @@ function M.new(app,config,e,network,clock)
       elseif t.missingItem and config.supply.inventory~='' and t.type~='CRAFT' then
         t.supplySequence=(t.supplySequence or 0)+1
         local needed=t.missingCount or 1
-        if t.blocks then
+        -- Preparation may retain suitable ground in every remaining cell. Only
+        -- the inspected shortage is proven; speculative supply can strand its
+        -- acquisition after the worker skips those already-correct supports.
+        if t.blocks and t.type~='PREPARE_REGION' then
           needed=0
           for index=t.index or 1,#t.blocks do
             local b=t.blocks[index]

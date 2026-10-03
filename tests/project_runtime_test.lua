@@ -3,6 +3,10 @@ local IS=require('tests.install_support')
 local function fixture(options)
   options=options or {}
   local w=require('tests.build_world').new(); w.items[1]={name='minecraft:stone',count=8}
+  -- Ordinary construction fixtures start on a finite support layer with a north
+  -- access trench for inspecting beneath retained structures.
+  -- Terrain-specific cases configure their own elevations and missing supports.
+  if not options.site then for x=1,9 do for z=0,9 do w.blocks[x..',-1,'..z]={name='minecraft:stone',state={}} end end end
   local storage=require('tests.managed_logistics_support').new()
   storage.inventories={stock={[1]={name='minecraft:stone',count=8}},home={},stage={}}
   if options.expansion then storage.size=1 end
@@ -74,7 +78,7 @@ test('build import analyze prepare start verify repair run through real controll
   assert(c:command('build prepare sample')); for _=1,3 do step() end
   eq(c.state.automation.projects.sample.phase,'ready'); assert(c:command('build start sample'))
   local restarted=false
-  for i=1,250 do
+  for i=1,1500 do
     step()
     if not restarted and w.places==1 then c,b=reboot(); restarted=true end
     if c.state.automation.projects.sample.phase=='built' and not b.state.currentTask then break end
@@ -84,9 +88,13 @@ test('build import analyze prepare start verify repair run through real controll
   for _=1,250 do step(); if c.state.automation.projects.sample.phase=='verified' and not b.state.currentTask then break end end
   eq(c.state.automation.projects.sample.report.counts.correct,2)
   w.blocks['2,0,0']=nil
+  w.blocks['2,-1,0']=nil;w.blocks['2,-2,0']={name='minecraft:stone',state={}}
+  local generation=c.state.automation.projects.sample.site.generation
   assert(c:command('build repair sample'))
-  for _=1,250 do step(); if c.state.automation.projects.sample.phase=='built' and not b.state.currentTask then break end end
-  eq(w.blocks['2,0,0'].name,'minecraft:stone'); eq(w.places,3)
+  for _=1,1500 do step(); if c.state.automation.projects.sample.phase=='built' and not b.state.currentTask then break end end
+  assert(c.state.automation.projects.sample.site.generation>generation,'new repair run reused old site evidence')
+  assert(c.state.automation.projects.sample.phase=='built',c.state.automation.projects.sample.phase..': '..tostring(c.state.automation.projects.sample.error))
+  eq(w.blocks['2,-1,0'].name,'minecraft:stone');eq(w.blocks['2,0,0'].name,'minecraft:stone');eq(w.places,4)
 end)
 test('build commands reject unsupported palette and modified imported data before placement',function()
   local w,ce,_,c=fixture()
@@ -106,7 +114,7 @@ test('build auto prepares stock and resumes through reboot without a separate st
   eq(w.places,0)
   assert(c.state.automation.requests[p.requestId].paused)
   c,b=reboot(); assert(c:command('build resume automatic'))
-  for _=1,300 do step(); if c.state.automation.projects.automatic.phase=='built' and not b.state.currentTask then break end end
+  for _=1,1500 do step(); if c.state.automation.projects.automatic.phase=='built' and not b.state.currentTask then break end end
   eq(c.state.automation.projects.automatic.phase,'built'); eq(w.places,2)
   assert(not c.state.automation.projects.automatic.autoStart)
 end)
@@ -114,11 +122,11 @@ local function airBlueprint()
   return {schema=1,size={x=2,y=1,z=1},palette={{name='minecraft:stone',state={}},{name='minecraft:air',state={}}},runs={{id=1,count=1},{id=2,count=1}},metadata={},requirements={['minecraft:stone']=1}}
 end
 local function awaitProject(c,b,step,phase)
-  for _=1,350 do
+  for _=1,1500 do
     step()
     if c.state.automation.projects.air.phase==phase and not b.state.currentTask then return end
   end
-  eq(c.state.automation.projects.air.phase,phase)
+  assert(c.state.automation.projects.air.phase==phase,c.state.automation.projects.air.phase..': '..tostring(c.state.automation.projects.air.error))
 end
 test('air-only projects prepare without production and clear then verify the volume',function()
   local bp=airBlueprint(); bp.runs={{id=2,count=2}}; bp.requirements={}
@@ -132,15 +140,15 @@ test('air-only projects prepare without production and clear then verify the vol
   assert(c:command('build start air')); awaitProject(c,b,step,'built')
   eq(w.digs,1); eq(w.places,0); eq(c.state.automation.projects.air.report.counts.correct,2)
 end)
-test('project verification includes occupied schematic air while analysis and gated repair preserve terrain',function()
+test('project verification reports occupied schematic air and repair prepares it without legacy clearSite',function()
   local w,ce,we,c,b,step=fixture({blueprint=airBlueprint()})
   w.blocks['2,0,0']={name='minecraft:stone',state={}}; w.blocks['3,0,0']={name='minecraft:dirt',state={}}
   assert(c:command('build import /example.json air')); assert(c:command('build analyze air')); eq(w.digs,0); eq(w.places,0)
   assert(c:command('build verify air')); assert(c:command('build analyze air')); eq(c.state.automation.projects.air.total,2); awaitProject(c,b,step,'needs_repair')
   eq(c.state.automation.projects.air.report.counts.wrong,1); eq(c.state.automation.projects.air.report.counts.correct,1)
   eq(#c.state.automation.projects.air.report.entries,1); eq(c.state.automation.projects.air.report.entries[1].status,'wrong')
-  assert(c:command('build repair air')); awaitProject(c,b,step,'needs_repair')
-  eq(w.digs,0); eq(w.blocks['3,0,0'].name,'minecraft:dirt'); assert(not c:command('build clear air'))
+  assert(c:command('build repair air')); awaitProject(c,b,step,'built')
+  eq(w.digs,1);eq(w.blocks['3,0,0'],nil);assert(not c:command('build clear air'))
 end)
 test('project clearSite repair clears schematic air and verifies every cell',function()
   local w,ce,we,c,b,step=fixture({blueprint=airBlueprint(),clearSite=true})
@@ -205,22 +213,26 @@ test('retired stream imports remain available until checkpoint backup no longer 
   c.state.automation.requests['request:99']={id='request:99',key='supply:old-job:minecraft:coal',status='completed'}
   c.state.automation.jobs['fuel-factory']={id='fuel-factory',key='request:99:op:1',status='completed'}
   local path=p.path
+  local sitePath='/autobuilder/data/sites/'..p.name
+  ce.fs.makeDir(sitePath);ce.fs.files[sitePath..'/proof']='durable preparation evidence'
   assert(c.automation.projects:retire(p.name))
   eq(c.state.automation.requests['request:99'],nil); eq(c.state.automation.jobs['fuel-factory'],nil)
   assert(ce.fs.exists(path),'backup still needs this import')
+  assert(ce.fs.exists(sitePath),'backup still needs preparation evidence')
   c.automation.projects:tick()
   assert(not ce.fs.exists(path))
+  assert(not ce.fs.exists(sitePath),'retired preparation evidence leaked')
   local statePath='/autobuilder/data/controller.state'
   ce.fs.files[statePath]='corrupt primary'
   local recovered,source=require('autobuilder.core.checkpoint').new(ce.fs,ce.textutils,statePath):load()
   assert(source:find('backup')); eq(recovered.automation.projects.old_batch,nil)
 end)
-test('project build without clearing finishes with an air-cell defect report',function()
+test('ordinary project preparation clears required air even when legacy clearSite is disabled',function()
   local w,ce,we,c,b,step=fixture({blueprint=airBlueprint()})
   w.blocks['3,0,0']={name='minecraft:dirt',state={}}
   assert(c:command('build import /example.json air')); assert(c:command('build prepare air')); for _=1,3 do step() end
-  assert(c:command('build start air')); awaitProject(c,b,step,'needs_repair')
-  eq(w.places,1); eq(w.digs,0); eq(c.state.automation.projects.air.report.counts.wrong,1)
+  assert(c:command('build start air')); awaitProject(c,b,step,'built')
+  eq(w.places,1); eq(w.digs,1); eq(c.state.automation.projects.air.report.counts.correct,2)
 end)
 test('project aggregation keeps exact report counts and omitted issue totals without correct-cell details',function()
   local w,ce,we,c=fixture({blueprint=airBlueprint()})
@@ -260,7 +272,7 @@ test('cathedral real runtimes prepare stocked materials build verify retire and 
     local w,ce,we,c,b,step,reboot=fixture(); env=ce
     assert(c:command('cathedral start 2 0 0'))
     local restarted=false
-    for _=1,700 do
+    for _=1,3000 do
       step()
       if not restarted and w.places==1 then c,b=reboot(); restarted=true end
       if c.state.automation.cathedral.status=='completed' and not b.state.currentTask then break end
@@ -308,7 +320,7 @@ test('native schematic shorthand resumes one automatic project across repeated c
   local ok,why=c:command('build /native.schem'); assert(ok,why)
   assert(c:command('build /native.schem')); eq(c.state.automation.requestSequence,1)
   c,b=reboot(); assert(c:command('build /native.schem')); eq(c.state.automation.requestSequence,1)
-  for _=1,350 do step(); if c.state.automation.projects.native.phase=='built' and not b.state.currentTask then break end end
+  for _=1,1500 do step(); if c.state.automation.projects.native.phase=='built' and not b.state.currentTask then break end end
   eq(c.state.automation.projects.native.phase,'built'); eq(w.places,2)
   local seq=c.state.automation.sequence
   assert(c:command('build /native.schem')); eq(c.state.automation.sequence,seq); eq(c.state.automation.requestSequence,1)
@@ -483,4 +495,71 @@ test('leveling runtime recovers both lost region files without abandoning excava
   assert(p.phase=='site_ready',p.phase..':'..tostring(p.error));assert(lost);eq(w.digs,1);eq(w.places,2)
   local surveys=0;for _,j in pairs(c.state.automation.jobs) do if j.type=='SURVEY_SITE' then surveys=surveys+1 end end;assert(surveys>=2)
   eq(w.blocks['2,0,0'].name,'minecraft:stone');assert(w.blocks['2,-1,0'] and w.blocks['3,-1,0']);assert(not w.blocks['2,1,0'])
+end)
+
+test('ordinary build auto prepares uneven terrain and fills foundations before structural placement',function()
+  local w,ce,we,c,b,step=fixture({site={minY=-2,maxY=15}})
+  w.blocks['2,1,0']={name='minecraft:dirt',state={}};w.blocks['2,-1,0']={name='minecraft:stone',state={}};w.blocks['3,-2,0']={name='minecraft:stone',state={}}
+  assert(c:command('build import /example.json automatic_site'));assert(c:command('build auto automatic_site'))
+  local structural=w.turtle.placeDown;local checked=false
+  w.turtle.placeDown=function(...)
+    if w.pose.y-1==0 and (w.pose.x==2 or w.pose.x==3) and w.pose.z==0 then
+      local task=b.state.currentTask
+      assert(task and task.type~='PREPARE_REGION');assert(w.blocks['2,-1,0'] and w.blocks['3,-1,0'],'builder started without level foundation')
+      assert(not w.blocks['2,1,0'],'builder started before excavation');checked=true
+    end
+    return structural(...)
+  end
+  for _=1,3500 do step();if c.state.automation.projects.automatic_site.phase=='built' and not b.state.currentTask then break end end
+  local p=c.state.automation.projects.automatic_site;assert(p.phase=='built',p.phase..':'..tostring(p.error));assert(checked);eq(w.digs,1)
+  eq(w.blocks['2,0,0'].name,'minecraft:stone');eq(w.blocks['3,0,0'].name,'minecraft:stone');eq(p.report.counts.correct,2)
+end)
+
+test('automatic construction builds an independent verified region while a distant preparation region is blocked',function()
+  local source={schema=1,size={x=32,y=1,z=1},palette={{name='minecraft:stone',state={}},{name='minecraft:air',state={}}},runs={{id=1,count=1},{id=2,count=30},{id=1,count=1}},metadata={},requirements={}}
+  local w,ce,we,c,b,step=fixture({blueprint=source,site={minY=-2,maxY=15}})
+  for x=2,33 do w.blocks[x..',-1,0']={name='minecraft:stone',state={}} end
+  w.blocks['30,0,0']={name='minecraft:bedrock',state={}}
+  assert(c:command('build import /example.json independent'));assert(c:command('build auto independent'))
+  for _=1,12000 do
+    step();local p=c.state.automation.projects.independent
+    if p.site and p.site.work and p.site.work.status=='completed' and w.blocks['2,0,0'] then break end
+  end
+  local p=c.state.automation.projects.independent
+  assert(w.blocks['2,0,0'],'distant blocked preparation withheld independent placement')
+  eq(w.blocks['2,0,0'].name,'minecraft:stone');assert(not w.blocks['33,0,0']);eq(w.blocks['30,0,0'].name,'minecraft:bedrock')
+  eq(p.site.work.blocked,1);eq(p.phase,'building');eq(p.issuedCount,1)
+  for _,id in ipairs(p.jobs) do assert(c.state.automation.jobs[id].type=='BUILD','preparation receipt entered structural phase accounting') end
+end)
+
+test('automatic final verification repairs a new defect across restart without replacing correct blocks',function()
+ local w,ce,we,c,b,step,reboot=fixture()
+ assert(c:command('build import /example.json self_repair'));assert(c:command('build auto self_repair'))
+ local damaged,restarted=false,false
+ for _=1,3500 do
+  step();local p=c.state.automation.projects.self_repair
+  if not damaged and p.phase=='verifying' and p.afterBuild then w.blocks['2,0,0']=nil;damaged=true end
+  if (p.repairAttempts or 0)==1 and not restarted then c,b=reboot();restarted=true end
+  if p.phase=='built' and not b.state.currentTask then break end
+ end
+ local p=c.state.automation.projects.self_repair
+ assert(damaged and restarted,'automatic repair did not persist its attempt');eq(p.phase,'built')
+ eq(p.repairAttempts,1);eq(#p.repairHistory,1);eq(p.repairHistory[1].counts.missing,1)
+ eq(p.report.counts.correct,2);eq(w.places,3);eq(w.digs,0)
+end)
+
+test('automatic final repair stops after three unsuccessful rounds and retains exact defects',function()
+ local w,ce,we,c,b,step=fixture()
+ assert(c:command('build import /example.json unstable'));assert(c:command('build auto unstable'))
+ local generation
+ for _=1,6000 do
+  step();local p=c.state.automation.projects.unstable
+  if p.phase=='verifying' and p.afterBuild and generation~=p.generation then generation=p.generation;w.blocks['2,0,0']=nil end
+  if p.phase=='needs_repair' and not b.state.currentTask then break end
+ end
+ local p=c.state.automation.projects.unstable;eq(p.phase,'needs_repair');eq(p.repairAttempts,3)
+ eq(#p.repairHistory,3);eq(p.report.counts.missing,1);eq(p.report.entries[1].x,2)
+ assert(p.error:find('3',1,true));local jobs=0;for _ in pairs(c.state.automation.jobs) do jobs=jobs+1 end
+ for _=1,20 do step() end
+ local later=0;for _ in pairs(c.state.automation.jobs) do later=later+1 end;eq(later,jobs);eq(w.places,5)
 end)

@@ -154,6 +154,12 @@ test('restored stationary placement needs whole mission coverage and preserves p
     cfg.chunkLoading.areas={{minX=1,maxX=1,minZ=0,maxZ=0}};w:workStep();eq(world.places,0);eq(w.state.currentTask.phase,'blocked')
     cfg.chunkLoading.areas={{minX=0,maxX=0,minZ=0,maxZ=0}}
     for _=1,5 do w:workStep() end
+    if not alreadyPlaced then
+      eq(world.places,0);eq(w.state.currentTask.phase,'blocked')
+      local r=assert(w.state.motionReservation);assert(r.work,'coverage alone authorized placement')
+      assert(w.automation:handle(7,{boot=1,sequence=9,type='task_grant',payload={jobId=r.jobId,target=r.target,work=true,granted=true}}))
+      for _=1,5 do w:workStep() end
+    end
     eq(w.state.currentTask.phase,'completed');eq(world.places,alreadyPlaced and 0 or 1);eq(w.state.currentTask.intent,nil)
   end
 end)

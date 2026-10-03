@@ -99,4 +99,46 @@ mutation, bounded excavation attempts, and exact no-drop/falling-block recovery.
 Reserved or unrelated inventory changes retain the journal. Known protected blocks
 and controller-denied targets become coordinate-specific defects so other cells
 continue. Workers exit the interior before releasing their task. Project batch
-scheduling, material/debris flow, fluid handling and verification gates follow.
+scheduling, material/debris flow and normal per-region construction gates now use
+these receipts. Losing completed proof reopens a bounded verification census while
+retaining physical ownership. Repairs start a fresh survey. Ordinary construction,
+repair and mining require the same mutation grants; generated door halves reserve
+both cells atomically. Exploration geometry includes registered infrastructure and
+filters irrelevant distant boxes before enforcing its protection-payload bound.
+
+Fluid containment, safe access to fully sealed foundations, the remaining legacy
+and renewable mutation paths and native acceptance remain unfinished. Automatic
+final defect repair is implemented and under regression validation. Eight-cell preparation batches currently favor bounded debris
+handling over travel throughput; workload scaling can tune that batch boundary.
+
+## Remaining mutation paths
+
+The same adjacent-cell work grant must cover the legacy pilot and managed farms.
+Authorize only immutable pilot waypoints or registered farm columns. Farm harvesting
+may change its own crop/trunk cells while preserving the base of renewable columns;
+its own farm registration must not prohibit that purpose. Other registered farms,
+soil, infrastructure, offline occupants and owned work remain protected. The pilot
+may clear its declared natural-terrain access above its own depot, but cannot use
+that exception to remove the depot container or another worker's home.
+
+Request mutation permission after inspection and before persisting a new physical
+intent. Release a grant after the journal reconciles. Existing physical intents
+retain their reconciliation path across reboots; an ordinary movement grant cannot
+authorize digging or replanting. Test delayed/denied permission, occupied farm cells,
+foreign sites, shared farm ownership and post-effect restart before expanding native
+acceptance. Reuse the current work reservation and task contract boundaries.
+
+## Automatic final repair
+
+A failed final verification after construction starts at most three automatic repair
+rounds. Each round persists a bounded defect summary with its new preparation
+generation, repeats the survey/preparation gate and runs the existing repair engine.
+Matching blocks remain in place. Restarting either runtime resumes that round and
+does not reset the attempt count. Recurring defects stop with their exact final
+report and a visible retry-limit explanation. Explicit `build verify` remains a
+read-only inspection; an explicit new repair request can begin a fresh retry budget.
+
+Fill selection compares unreserved stock with the survey's bounded possible fill
+volume and checks eligible acquisition workers. A small unreplenishable debris pile
+must not strand the project when another suitable fill is replenishable. This bound
+only chooses the material: physical inspection still determines supply quantities.

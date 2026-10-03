@@ -51,6 +51,7 @@ local function fixture(blocks)
     task=existing or task; config=config or {minimumFuelReserve=0}
     local function save() saved=U.copy(task); return true end
     local nav=require('autobuilder.core.navigation').new(t,U.copy(w.pose),config,save)
+    nav.workGuard=function() return true end
     if w.gated then nav.guard=function() if (w.allowance or 0)<1 then return false,'movement reservation pending' end; w.allowance=w.allowance-1; return true end end
     return require('autobuilder.build.builder').new(task,{turtle=t},config,nav,save,mode)
   end

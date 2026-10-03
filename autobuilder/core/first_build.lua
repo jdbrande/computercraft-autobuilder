@@ -214,6 +214,7 @@ function M.new(app,config,e)
         elseif p.phase=='ready' then
           local ready,issues=self:check(); assert(ready,issues[1])
           execute('start',NAME); s.view='guide'
+          f.autoStart=false;f.raw=nil;save()
         elseif p.phase=='building' or p.phase=='verifying' or p.phase=='built' or p.phase=='verified' or p.phase=='needs_repair' then
           f.autoStart=false; f.raw=nil; save()
         end

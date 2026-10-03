@@ -2,6 +2,7 @@ local U=require('autobuilder.core.util')
 local IS=require('tests.install_support')
 local function fixture()
   local w=require('tests.build_world').new()
+  for x=2,3 do w.blocks[x..',-1,0']={name='minecraft:stone',state={}} end
   local f={world=w,inventories={stock={[1]={name='minecraft:stone',count=32}},stage={},destination={}},stats={staged=0,pulled=0,dropped=0,supplyGrants=0,supplyDone=0,reservations=0},filter=nil}
   local locations={source={x=0,y=2,z=0,heading='east'},destination={x=6,y=2,z=0}}
   w.blocks['0,1,0']={name='minecraft:chest',state={}}; w.blocks['6,1,0']={name='minecraft:chest',state={}}
@@ -90,6 +91,12 @@ local function fixture()
     for _=1,3 do self:step() end
     eq(self.controller.state.automation.projects.supplied.phase,'ready')
     assert(self.controller:command('build start supplied'))
+    -- Complete the normal survey/preparation before injecting supply faults.
+    for _=1,1500 do
+      if self.controller.state.automation.projects.supplied.phase=='building' then return end
+      self:step()
+    end
+    error('supply fixture did not finish site preparation')
   end
   function f:complete(limit)
     for _=1,limit or 500 do
@@ -486,4 +493,23 @@ test('controller fallback restores issued pose claims and acknowledged settlemen
     eq(f.controller.state.automation.jobs[id].status,'completed');eq(f.stats.dropped,9);eq(f.stats.pulled,9)
     eq(f.worker.state.poseRecovery,nil);eq(f.controller.state.automation.jobs[id].poseRecovery.status,'settled')
   end
+end)
+
+test('preparation supplies only the inspected missing support instead of mining for uninspected matching ground',function()
+  local f=fixture();f.inventories.stock={};f.worker.config.supply.batch=64;f.controller.config.supply.batch=64
+  f.world.blocks['3,0,0']={name='minecraft:stone',state={}}
+  local j=f.controller.automation.queue:submit('PREPARE_REGION',{clearanceY=3,bounds={min={x=2,y=-1,z=0},max={x=3,y=3,z=0}},
+    siteWork={identity=string.rep('a',64),region=1,stage='fill'},blocks={
+      {x=2,y=0,z=0,name='minecraft:cobblestone',state={},support=true},{x=3,y=0,z=0,name='minecraft:cobblestone',state={},support=true}}},{})
+  local requested=false
+  for _=1,500 do
+    f:step();local t=f.worker.state.currentTask
+    if t and t.supplyRequest then
+      eq(t.supplyRequest.count,1)
+      if not requested then requested=true;f.inventories.stock[1]={name='minecraft:cobblestone',count=1} end
+    end
+    if j.status=='completed' and not t then break end
+  end
+  assert(requested);eq(j.status,'completed');eq(f.world.places,1);eq(f.world.blocks['3,0,0'].name,'minecraft:stone')
+  eq(next(f.controller.state.jobs),nil);eq(next(f.controller.state.automation.requests),nil)
 end)

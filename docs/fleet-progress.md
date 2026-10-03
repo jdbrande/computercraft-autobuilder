@@ -30,8 +30,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   623 Lua/18 Python, two native trials, final review fixes and release checks.
 - Current branch `milestone/0.23.0`: general automatic site preparation. Immutable
   geometry, project surveys, protected excavation/fill batches, debris collection
-  and `build level` verification are implemented. Normal construction gates, fluid
-  clearance, evidence recovery and native uneven-terrain acceptance remain.
+  and normal per-region construction gates are implemented, with missing-evidence
+  recovery. Shared protection for remaining roles, fluid clearance, sealed-support
+  access and native uneven-terrain acceptance remain in progress.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -77,7 +78,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 38–39: completion and failures | Verified projects and final inventory/logistics/worker settlement accepted0.22 | Broader bounded automatic retries and actionable project errors |
 | 41–42: dependency-ordered milestones | Exploration, dependency/provider graph and count ownership integrated | Implement remaining milestones using existing controller/executor boundaries |
 | 44: dynamic fleet scaling | Shared-material explorers and capability-based queues provide partial foundations | Demand/yield/travel/rate allocation, role minimum/maximum counts, bottleneck response, safe idle reassignment and scale-down; simulation and live miners/clearers/builders ramp-up |
-| 45: automatic site preparation and leveling | Immutable geometry, bounded survey/work contracts, protected native action journals, `build level` runtime with partial-floor retention, debris return and verified fill | Normal per-region construction gates, evidence recovery, flowing-fluid clearance and larger uneven-terrain live acceptance |
+| 45: automatic site preparation and leveling | Immutable geometry, bounded survey/work contracts, protected native action journals, `build level` runtime with partial-floor retention, debris return and verified fill | Shared protection for remaining roles, flowing-fluid clearance, sealed-support access and larger uneven-terrain live acceptance |
 
 ## Evidence and discovered bugs
 
@@ -553,3 +554,125 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   bounded owner/progress/time receipt and reconciles only after fresh worker telemetry
   no longer claims that task. Invalid prepared markers with unresolved defects are
   rejected. Preparation metadata is refused on unrelated task types.
+
+- Normal build/start now run preparation automatically and gate structural regions
+  on their own foundation/workspace evidence. Independent verified regions build
+  around a distant protected obstruction; air-only sources do not create foundations.
+  Preparation tasks remain separate from structural phase counts, and pause/resume
+  includes both. Missing completed proof reopens a bounded census without losing
+  active owners or double-counting regions (two new focused recovery cases pass).
+- Retirement regression reproduced leaked sidecar evidence; streamed project cleanup
+  now removes it after checkpoint backup advancement. A repair regression reproduced
+  reuse of stale site proof after ground changed; fresh repair surveys are under test.
+- Fixed-deposit and both scanner/inspection-only full production chains pass with
+  actual supporting terrain added to their fixtures. Supply and settlement fixtures
+  now retain their original fault boundaries after normal preparation. Full combined
+  gates follow; no new native Minecraft acceptance is claimed yet.
+
+- Repair resurvey now passes after a foundation is removed between runs. Inspection
+  beneath retained floors uses reachable side/below stands; a fully sealed support
+  remains an explicit inaccessible defect, with zero digging or placement, rather
+  than being certified from the floor above. Automatic access excavation remains
+  part of the unfinished general preparation work.
+- The Python gate found an ignored macOS `.DS_Store` being decoded by the installer
+  test's simulated HTTP fixture. The fixture now serves manifest-listed paths only,
+  with synthetic binary metadata coverage. All18 Python tests pass again; the local
+  metadata file was left untouched.
+
+- The combined Lua gate reached the legacy first-build shortcut and exposed its
+  assumption that `build start` immediately enters construction. A failing handoff
+  regression now transfers automatic continuation to the project as soon as start
+  succeeds. Pilot fixtures include existing foundation terrain and a finite6000
+  fuel allowance for added survey travel. Focused pilot validation is running;
+  the interrupted full gate is not counted as passing.
+
+- Shared mutation protection now reaches ordinary construction/repair and both miner
+  modes. Workers fail closed without a mutation grant. Controller grants derive door
+  upper halves from immutable block states and reserve both cells atomically; new
+  tests reject offline occupants, protected upper cells, territory escape and failed
+  checkpoint promotion. Mining grants cover only owned areas/routes, preserve exits,
+  and refuse other preparation work or registered infrastructure (55 focused tests).
+- Enabling these grants exposed a finite-fuel regression: waiting at the placement
+  stand recalculated an already-completed outward route and sent the builder home.
+  The existing exact-three-coal runtime case reproduced it. Mutation waits now retain
+  the route fuel budget while the turtle remains at the granted/requested stand;
+  the focused regression is running. Planner-side protection and other roles remain.
+
+- The exact-three-coal runtime regression passes after the mutation-wait fuel fix.
+  Exploration now uses shared depot/fuel/farm protection and filters only boxes
+  outside its search envelope before applying the128-box limit. Relevant boxes are
+  never truncated. Two failing planning cases now pass, including140 distant
+  projects; the combined protection/mining/exploration set passes73 tests.
+- A legacy exploration fixture had no declared exit through the newly protected
+  home access envelope. It now declares its actual clear adjacent exit, preserving
+  the original partial-delivery/reboot test. Pilot fixture terrain now matches only
+  the selected pilot origin, preventing the other fixture's foundation from becoming
+  an artificial obstruction. Pilot structural pause/supply fault limits include the
+  preparation phase; these longer runtime cases are still under validation.
+
+- All16 expanded first-build tests pass, including the preparation handoff, finite
+  fuel, structural pause/reboot and stock-only supply failures. Both exploration
+  construction variants pass with shared mutation grants. Chunk-only stationary
+  work now waits for a separate mutation grant while preserving an existing intent.
+- An additional full-chain fill shortage case reproduced a real over-request: the
+  worker counted an uninspected but already suitable support as another fill item.
+  It built successfully but settlement waited for the unnecessary acquisition.
+  Preparation now requests only its observed missing cell; the focused regression
+  fails against the prior executor (expected1, got2) and passes with the fix. Full
+  acquisition-to-settlement validation is still running.
+- New failing admission coverage also proved a preparation check could become stale
+  during chunk admission. Both enabled and disabled chunk paths now recheck proof
+  immediately before saving a new structural owner; owned retransmissions retain
+  their original contract. Focused protection/chunk suites pass.
+
+- The additional-fill chain exposed a second race: a fixed miner's final completion
+  arrived after its production consumer had already taken the delivered stock.
+  Production-created mining now records its consumer and accepts that consumer's
+  durable acquired-stock proof, tied to the original mining root and target. Manual,
+  unrelated, unconfirmed and smaller-demand consumers retain live-stock checks.
+  The new restart regression failed before the fix; focused mining/production tests
+  and the full fill→production→build→settlement chain now pass with exactly five
+  cobblestone deposited, four smelted and one used for foundation fill.
+- Current combined gate: all18 Python tests and release artifact checks pass; the
+  full Lua suite is running. A separate native preparation rig180–182 is being
+  brought up; its first configuration reused the supply chest as a private return
+  buffer and was correctly rejected. Separate front supply and below-home return
+  inventories fix that fixture error; no native acceptance is claimed yet.
+
+- Native preparation trial1 surveyed the uneven footprint, excavated dirt and
+  preserved controller ownership across a reboot during debris return. It then
+  exposed fill selection choosing two returned dirt blocks for three missing
+  support cells despite only a cobblestone miner being registered. Acquisition
+  correctly reported no eligible dirt worker. A new failing service regression
+  now passes with selection comparing available stock to the bounded possible
+  fill volume and checking replenishment eligibility. Actual requested quantities
+  remain inspection-driven. The isolated candidate passes the site-service suite;
+  the main full gate continues on the preceding unchanged code snapshot.
+  Failed-trial evidence is preserved under ignored `dist/live-site/trial-1/`;
+  the dedicated rig was reset for a fresh candidate trial, without supplied fill.
+
+- Native trial2 reached the default1 MB computer disk quota while checkpointing
+  debris settlement. Product journals were preserved and no cargo was manually
+  credited. The test world's computer quota is now8 MB; a world reload is needed
+  to activate it. General disk-footprint/archival handling remains an unfinished
+  fleet requirement, and this trial will not claim operation within the old quota.
+- Automatic final repair now passes two new RED→GREEN runtime cases: a missing
+  final block is repaired once across restart while matching blocks remain intact;
+  repeated external damage stops after three rounds with exact final defects. Each
+  round persists its bounded prior report and fresh survey generation. Explicit
+  verification stays read-only. Broader project regressions are running.
+
+- The complete pre-fill-selection/automatic-repair Lua snapshot passes694 tests;
+  all18 Python tests pass. Subsequent fill/provider changes pass73 focused tests,
+  and both new automatic-repair runtime regressions pass. The expanded project
+  suite is completing separately; the full current-tree gate remains required
+  before final milestone acceptance. Release generation/check and whitespace pass.
+- Trial2 resumed its saved preparation after the world reload with8 MB disk quota.
+  The controller selected cobblestone and automatically assigned explorer182 for
+  the fill shortage. Builder181 was restarted after its first physical fill while
+  waiting for that delivery. Native completion is still pending.
+
+- Expanded project runtime suite passes34 cases, including both new automatic
+  repair cases. Current Python rerun passes18; focused affected suites pass73.
+  Normal pipeline, shared construction/mining grants and these regressions are
+  ready for a checkpoint commit; the remaining0.23 work continues on this branch.

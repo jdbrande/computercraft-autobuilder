@@ -131,6 +131,11 @@ function M.new(state,save,clock,id,chunks,config)
       if j.logistics then allowed=j.logisticsReady==true and not M.factoryActive(state) end
       if j.managedFuel then allowed=j.fuelReady==true and not M.factoryActive(state) end
       if j.type=='CRAFT' then allowed=M.factoryCanRun(state,j) end
+      if j.requiresSite and not j.workerId and j.status=='queued' then
+        local prepared,why=false,'preparation verifier is unavailable'
+        if self.preparationReady then prepared,why=self.preparationReady(j) end
+        j.preparationError=why;allowed=allowed and prepared
+      end
       if allowed and j.status=='queued' and not j.workerId and j.requiredCapability and self:ready(j) and not j.paused then
         local conflict=false
         for _,other in ipairs(ordered) do if other.workerId and other.status~='completed' and intersects(j.bounds,other.bounds) then conflict=true end end
@@ -150,11 +155,15 @@ function M.new(state,save,clock,id,chunks,config)
             local lease,why
             local admission,reason=require('autobuilder.core.protection').canOwn(state,j,wid)
             if not admission then why=reason
-            elseif chunks then lease,why=chunks:reserve(j,workers[tostring(wid)],true) else lease={status='disabled'} end
+            elseif chunks then lease,why=chunks:reserve(j,workers[tostring(wid)],true,self.preparationReady) else lease={status='disabled'} end
             j.coverageError=why
             if lease then
               if lease.status~='disabled' then return j end
               admission,reason=require('autobuilder.core.protection').canOwn(state,j,wid)
+              if admission and j.requiresSite then
+                admission,reason=false,'preparation verifier is unavailable'
+                if self.preparationReady then admission,reason=self.preparationReady(j) end
+              end
               if admission then j.workerId=wid;j.status='assigned';persist();return j end
               j.coverageError=reason
             end
@@ -234,12 +243,16 @@ function M.new(state,save,clock,id,chunks,config)
     local j=s.jobs[jobId] or (state.jobs or {})[jobId]
     if not j or j.workerId~=owner or j.status=='completed' then return false,'reservation requires active task ownership' end
     if j.poseRecovery and j.poseRecovery.status=='held' then return false,'pose recovery owns movement cells' end
+    local targets={target}
     if work then
-      if not config or not ({BUILD=true,REPAIR=true,CLEAR=true,PREPARE_REGION=true})[j.type]
+      if not config or not ({BUILD=true,REPAIR=true,CLEAR=true,PREPARE_REGION=true,MINE=true})[j.type]
         or j.siteWork and j.siteWork.stage=='verify' then return false,'task cannot reserve physical changes' end
-      local planned=false;for _,b in ipairs(j.blocks or {}) do if U.distance(b,target)==0 then planned=true;break end end
-      if not planned then return false,'mutation target is not in the immutable task' end
-      local ok,why=require('autobuilder.core.protection').canModify(state,config,j,target);if not ok then return false,why end
+      if j.type~='MINE' then
+        local planned;for _,b in ipairs(j.blocks or {}) do if U.distance(b,target)==0 then planned=b;break end end
+        if not planned then return false,'mutation target is not in the immutable task' end
+        local placement=require('autobuilder.build.placement').plan(planned)
+        if placement and placement.pair and not placement.observeOnly then targets[#targets+1]=placement.pair end
+      end
     else
       for id,other in pairs(s.jobs) do
         if id~=jobId and other.workerId~=owner and other.workerId and other.status~='completed'
@@ -248,19 +261,23 @@ function M.new(state,save,clock,id,chunks,config)
           and require('autobuilder.core.pathfinding').inside(target,other.bounds) then return false,'active preparation region owned by '..id end
       end
     end
-    if chunks then local ok,why=chunks:allows(j,from,target);if not ok then return false,why end end
+    if chunks then for _,p in ipairs(targets) do local ok,why=chunks:allows(j,from,p);if not ok then return false,why end end end
     if U.distance(from,target)>1 then return false,'reservation requires adjacent position' end
-    local occupied=s.cells[key(target)]
-    if occupied and occupied.owner~=owner then return false,'position reserved by worker '..occupied.owner end
-    for _,w in pairs(workers or {}) do
-      local p=w.telemetry and w.telemetry.position
-      if w.id~=owner and p and p.known and key(p)==key(target) then return false,'worker occupies destination' end
+    for _,destination in ipairs(targets) do
+      if work then local ok,why=require('autobuilder.core.protection').canModify(state,config,j,destination);if not ok then return false,why end end
+      local occupied=s.cells[key(destination)]
+      if occupied and occupied.owner~=owner then return false,'position reserved by worker '..occupied.owner end
+      for _,w in pairs(workers or {}) do
+        local p=w.telemetry and w.telemetry.position
+        if w.id~=owner and p and p.known and key(p)==key(destination) then return false,'worker occupies destination' end
+      end
     end
     local before=U.copy(s.cells)
-    s.cells[key(from)]={owner=owner,jobId=jobId}; s.cells[key(target)]={owner=owner,jobId=jobId}
+    local keep={[key(from)]=true};s.cells[key(from)]={owner=owner,jobId=jobId}
+    for _,p in ipairs(targets) do keep[key(p)]=true;s.cells[key(p)]={owner=owner,jobId=jobId} end
     -- A fresh adjacent request confirms the worker's current position, also
     -- reconciling a lost previous movement-confirmation packet.
-    for k,cell in pairs(s.cells) do if cell.owner==owner and k~=key(from) and k~=key(target) then s.cells[k]=nil end end
+    for k,cell in pairs(s.cells) do if cell.owner==owner and not keep[k] then s.cells[k]=nil end end
     local ok,why=pcall(persist);if not ok then s.cells=before;error(why,0) end
     return true
   end
