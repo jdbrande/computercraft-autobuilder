@@ -973,17 +973,17 @@ config,counts,now)` derives bounded role diagnostics from authoritative jobs and
 acquisition demand. `Scaling.canAssign(state,config,job,worker,counts,now)` returns
 admission and a concrete reason. It never changes ownership.
 
-- [ ] Add failing tests for small/heavy/drained demand, all five configurable
+- [x] Add failing tests for small/heavy/drained demand, all five configurable
   minimum/maximum limits, multi-role equipment, observed zero-yield trips, travel
   costs and existing offline owners exceeding a reduced maximum.
-- [ ] Run the focused scaling tests and confirm the missing behavior fails.
-- [ ] Implement validated `scaling.roles.<role>.min/max` (default0/128, bounded by
+- [x] Run the focused scaling tests and confirm the missing behavior fails.
+- [x] Implement validated `scaling.roles.<role>.min/max` (default0/128, bounded by
   the fleet limit), active/idle/queue/work/rate diagnostics and useful targets.
   Minimums apply only to useful demand. Existing ownership always survives.
-- [ ] Add capped per-role completion metrics consumed in the same saved root as
+- [x] Add capped per-role completion metrics consumed in the same saved root as
   each job's sample marker. Count zero-yield trip duration as cost; never credit
   undelivered held stock. Test save rollback and restart without duplicate samples.
-- [ ] Run focused tests, document the estimate assumptions, and commit.
+- [x] Run focused tests, document the estimate assumptions, and commit.
 
 ### Task47: Shared dispatch and producer integration
 

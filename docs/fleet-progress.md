@@ -934,3 +934,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   yielding chunk check. Full final validation remains pending. Controller-only
   preparation/admission fixes were deployed to208/210 and both restarted while
   their independent native trials continued.
+
+- Isolated next branch`milestone/0.24.0` at`.worktrees/fleet-scaling` starts
+  requirement44 while0.23 final gates run in the main checkout. Its demand model
+  validates limits for all five roles, computes active/idle/queue/work/rate views,
+  accounts for travel and zero-yield searches, and records bounded physical-delivery
+  samples with atomic rollback and restart deduplication. Seven new focused
+  regressions and existing mining/coordination checks pass. Dispatch integration,
+  diagnostics, actual-runtime/native acceptance and final review are still pending;
+  no claim that scaling is active yet.

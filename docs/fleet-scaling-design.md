@@ -69,3 +69,19 @@ settlement. Operator-provided terrain/resources and loaded areas must remain exp
 fixture assumptions. After one whole-branch review/fix pass and full checks,
 integrate and continue the remaining forecasting, provider, placement, recovery,
 health/interface and larger-scale requirements.
+
+## Initial estimate policy
+
+The initial allocator uses a two-minute planning window. Bootstrap costs are eight
+seconds per mined item, four per hauled item, one per crafted item, two per prepared
+cell and three per structural cell. Mining adds the amortized round-trip distance
+of eligible workers' exit routes. These conservative estimates are replaced by the
+last32 physical completion samples per role; zero-yield trips contribute elapsed
+time but no items. Cumulative counts remain available for diagnostics. A restored
+old job without an assignment timestamp is excluded from rate samples.
+
+Desired counts are bounded by useful independent ready work, capable idle/active
+workers and configured0..128 role limits. They are estimates; final dispatch retains
+all existing material, station, tool, fuel, region and route checks. Home, fuel and
+rescue operations and temporary-access restoration bypass ordinary scale-down so
+changing a role maximum cannot strand an existing physical obligation.

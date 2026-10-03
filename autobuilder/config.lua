@@ -10,6 +10,7 @@ M.defaults={
   restrictedAreas={}, locations={}, capabilities={telemetry=true},
   maxWorkers=128, dedupLimit=512, dedupTTL=120,
   chunkLoading={enabled=true,anchor=false,areas={}},
+  scaling=require('autobuilder.core.scaling').defaults,
   storageInventories={}, providerPreferences={}, fuel=require('autobuilder.resources.fuel').defaults,
   furnaces={}, smeltingFuelItem='minecraft:coal', smeltingWaitSteps=600, turtleFuelReserveItems={['minecraft:coal']=64},
   craftingStation={buffer='',input='',output='',inputSide='up',outputSide='down'},
@@ -47,6 +48,7 @@ end
 function M.load(overrides)
   local c=U.copy(M.defaults); merge(c,overrides or {})
   require('autobuilder.core.chunks').validate(c)
+  require('autobuilder.core.scaling').validate(c.scaling)
   assert(require('autobuilder.resources.providers').validatePreferences(c.providerPreferences))
   assert(require('autobuilder.resources.fuel').validate(c.fuel,c))
   assert(c.role=='controller' or c.role=='worker','role must be controller or worker')
