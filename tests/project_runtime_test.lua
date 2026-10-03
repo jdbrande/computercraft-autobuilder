@@ -43,7 +43,7 @@ local function fixture(options)
     return e
   end
   local ce,we=env(7),env(12); we.turtle=w.turtle
-  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},turtleFuelReserveItems={},supply={inventory='stage',side='front'},logistics={nodes={{id='home',inventory='stock',position={x=-3,y=1,z=0},buffers={{inventory='home',position={x=0,y=2,z=0}}}}}},clearSite=options.clearSite or false,build={enabled=true,origin={x=2,y=0,z=0},regionSize=options.regionSize or 8,rotation=options.rotation or 0,mirrorX=options.mirrorX or false,site=options.site or {}},autoDepotExpansion={enabled=options.expansion~=nil,freeSlots=0},depotExpansion=options.expansion or {}})
+  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},turtleFuelReserveItems={},supply={inventory='stage',side='front'},logistics={nodes={{id='home',inventory='stock',position={x=-3,y=1,z=0},buffers={{inventory='home',position={x=0,y=2,z=0}}}}}},clearSite=options.clearSite or false,build={enabled=true,origin=options.origin or {x=2,y=0,z=0},regionSize=options.regionSize or 8,rotation=options.rotation or 0,mirrorX=options.mirrorX or false,site=options.site or {}},autoDepotExpansion={enabled=options.expansion~=nil,freeSlots=0},depotExpansion=options.expansion or {}})
   local wc=C.load({role='worker',controllerId=7,automation={building=true},clearSite=options.clearSite or false,minimumFuelReserve=0,depot=U.copy(w.pose),supply={inventory='stage',side='front'},initialPosition=U.copy(w.pose)})
   local R=require('autobuilder.core.runtime'); local c,b=R.new(cc,ce),R.new(wc,we)
   local blueprint={schema=1,size={x=2,y=1,z=1},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=2}},metadata={},requirements={['minecraft:stone']=2}}
@@ -707,4 +707,54 @@ test('cross-region preparation reaches a sealed interior region through the proj
   for x=1,5 do for z=-1,3 do for y=-2,-1 do assert(w.blocks[x..','..y..','..z],'ground left excavated') end end end
   for x=2,4 do for z=0,2 do eq(w.blocks[x..',0,'..z].name,'minecraft:stone') end end
   eq(w.places,w.digs+1)
+end)
+
+test('external water inflow is contained outside the working volume before fresh preparation and construction',function()
+  local source={schema=1,size={x=1,y=1,z=1},palette={{name='minecraft:glass',state={}}},runs={{id=1,count=1}},metadata={},requirements={['minecraft:glass']=1}}
+  local w,ce,we,c,b,step,reboot=fixture({origin={x=6,y=0,z=0},site={minY=-1,maxY=10},blueprint=source,
+    stock={[1]={name='minecraft:glass',count=1},[2]={name='minecraft:stone',count=64}}})
+  w.items={}
+  for x=4,8 do for z=-2,2 do w.blocks[x..',-1,'..z]={name='minecraft:stone',state={}} end end
+  w.blocks['3,0,0']={name='minecraft:water',state={level='0'}}
+  w.blocks['4,0,0']={name='minecraft:water',state={level='1'}}
+  local place=w.turtle.placeDown
+  w.turtle.placeDown=function()
+    local key=w.pose.x..','..(w.pose.y-1)..','..w.pose.z
+    if w.blocks[key] and w.blocks[key].name=='minecraft:water' then w.blocks[key]=nil end
+    return place()
+  end
+  assert(c:command('build import /example.json inflow'));assert(c:command('build auto inflow'))
+  local restarted=false;local reappeared=0
+  for _=1,18000 do
+    if w.blocks['4,0,0'].name=='minecraft:water' and not w.blocks['5,0,0'] then
+      w.blocks['5,0,0']={name='minecraft:water',state={level='2'}};reappeared=reappeared+1
+    end
+    step()
+    local p=c.state.automation.projects.inflow
+    if not restarted and p.site and p.site.barrier and w.blocks['4,0,-2'] then c,b=reboot();restarted=true end
+    if p.phase=='built' and not b.state.currentTask then break end
+  end
+  local p=c.state.automation.projects.inflow
+  assert(p.phase=='built',ce.textutils.serialize({phase=p.phase,error=p.error,site=p.site,worker=b.state.currentTask}))
+  assert(restarted);assert(reappeared>=8);eq(p.site.barrier.status,'verified');assert(p.site.work.containmentRecheck)
+  eq(w.blocks['3,0,0'].name,'minecraft:water');eq(w.blocks['6,0,0'].name,'minecraft:glass');assert(not w.blocks['5,0,0'])
+  for x=4,8 do for z=-2,2 do if x==4 or x==8 or z==-2 or z==2 then
+    for y=0,1 do eq(w.blocks[x..','..y..','..z].name,'minecraft:stone') end
+  end end end
+  eq(p.report.counts.correct,1);eq(c.state.automation.supply,nil)
+end)
+
+test('project settlement and retirement wait through gaps between retaining barrier child jobs',function()
+  local w,ce,we,c,b,step=fixture()
+  assert(c:command('build import /example.json boundary'));assert(c:command('build auto boundary'))
+  for _=1,1600 do step();if c.state.automation.projects.boundary.phase=='built' then break end end
+  local p=c.state.automation.projects.boundary;eq(p.phase,'built')
+  p.phase='settling';p.site.work.status='working'
+  p.site.barrier={status='working',stage='fill',cursor=0,sequence=2,height=2,fill='minecraft:stone',failed=0,defects={}}
+  step();eq(p.site.barrier.stage,'verify')
+  eq(p.phase,'settling');assert(p.error:find('preparation',1,true))
+  p.phase='verified'
+  local ok,why=c.automation.projects:retire('boundary')
+  assert(not ok and why:find('preparation',1,true),'project retired its unfinished retaining barrier')
+  assert(c.state.automation.projects.boundary)
 end)

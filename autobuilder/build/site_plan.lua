@@ -154,6 +154,27 @@ function M.new(source,transform,sourceHash,options)
     end
     return nil,'retained schematic leaves no bounded access shaft within the project margin'
   end
+  function self:barrier(height,cursor,limit,fill,verify,region)
+    integer(height,bounds.max.y,maxY,'invalid retaining barrier height')
+    integer(limit,1,512,'barrier batch must be 1..512');self:region(region)
+    assert(require('autobuilder.build.site_work').containmentMaterial(fill),'barrier requires stable nonflammable fill')
+    local envelope={min={x=bounds.min.x-1,y=bounds.min.y,z=bounds.min.z-1},max={x=bounds.max.x+1,y=height,z=bounds.max.z+1}}
+    assert(U.position(envelope.min) and U.position(envelope.max),'retaining barrier exceeds world bounds')
+    local base=origin.y;for _,foundation in pairs(overrides) do base=math.min(base,foundation+1) end
+    local w,d=nx+2,nz+2;local levels=height-base;local perimeter=2*w+2*d-4;local total=levels*perimeter
+    integer(cursor,1,total,'invalid barrier cursor')
+    local blocks={};local last=math.min(total,cursor+limit-1)
+    for index=cursor,last do
+      local col=math.floor((index-1)/levels);local x,z
+      if col<w then x=col;z=0
+      elseif col<w+d-2 then x=w-1;z=col-w+1
+      elseif col<2*w+d-2 then x=2*w+d-3-col;z=d-1
+      else x=0;z=perimeter-col end
+      blocks[#blocks+1]={x=envelope.min.x+x,y=base+(index-1)%levels,z=envelope.min.z+z,name=fill,state={}}
+    end
+    return {type='PREPARE_REGION',blocks=blocks,bounds=envelope,clearanceY=height,
+      siteWork={identity=planId,region=region,stage=verify and 'verify' or 'fill'}},last<total and last+1 or nil,total
+  end
   function self:requiredRegions(blocks)
     assert(type(blocks)=='table' and #blocks>0 and #blocks<=512,'bounded structural region required')
     local x0,x1,z0,z1=math.huge,-math.huge,math.huge,-math.huge

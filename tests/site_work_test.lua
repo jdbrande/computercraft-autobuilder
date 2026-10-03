@@ -314,3 +314,14 @@ test('completed access work resumes its fixed shaft exit after a horizontal rese
   nav.guard=function() return true end;ex=new();assert(ex:resume());run(ex)
   eq(j.phase,'completed');eq(U.distance(w.pose,j.siteAccess.entry),0);assert(not j.moveRoute)
 end)
+
+test('native world fixture permits turtle movement through water and lava while retaining solid collisions',function()
+  local w=require('tests.build_world').new()
+  w.blocks['0,2,-1']={name='minecraft:water',state={}}
+  w.blocks['0,3,-1']={name='minecraft:lava',state={}}
+  assert(w.turtle.forward());eq(w.pose.z,-1)
+  assert(w.turtle.up());eq(w.pose.y,3)
+  assert(w.turtle.down());eq(w.pose.y,2)
+  w.blocks['0,2,-2']={name='minecraft:stone',state={}}
+  assert(not w.turtle.forward());eq(w.pose.z,-1)
+end)

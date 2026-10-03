@@ -492,3 +492,70 @@ test('cross-region access holds its envelope between jobs drains existing owners
   end
   assert(saw);eq(p.phase,'site_ready');assert(not p.site.accessLease);assert(service:prepared(p,plan,foreign))
 end)
+
+test('persistent external inflow builds a verified retaining barrier before a fresh preparation census',function()
+  local e,c,app,q,p,plan,service,production=surveyedFixture();service:startWork(p,plan)
+  local barrierJobs,restored=0,false;local reopened=false
+  for _=1,6000 do
+    service:workTick(p,plan)
+    if p.site.work.containmentRecheck then reopened=true end
+    for _,j in pairs(q.state.jobs) do if j.status~='completed' then
+      j.workerId=12;j.status='completed';j.completedAt=100
+      if j.type=='SURVEY_SITE' then
+        j.progress=#j.siteSurvey.columns;j.siteReport={identity=plan.identity,region=j.siteSurvey.region,observations={}}
+        for _,col in ipairs(j.siteSurvey.columns) do j.siteReport.observations[#j.siteReport.observations+1]={x=col.x,z=col.z,y=col.minY,status='empty',name='minecraft:air'} end
+      else
+        j.progress=#j.blocks;j.report={counts={correct=j.progress},entries={}}
+        if j.key:find(':barrier:',1,true) then
+          barrierJobs=barrierJobs+1;assert(not service:readyFor(p,plan,{{x=103,y=2,z=103}}))
+          assert(not pcall(service.start,service,p,plan),'fresh survey abandoned active barrier ownership')
+          for _,b in ipairs(j.blocks) do assert(not require('autobuilder.core.pathfinding').inside(b,plan.bounds)) end
+          if not restored then service=require('autobuilder.build.site_service').new(app,c,e,q,production);restored=true end
+        elseif j.siteWork.region==1 and (j.siteWork.stage=='clear' or j.siteWork.stage=='verify') and not reopened then
+          j.progress=j.progress-1;j.report.counts.correct=j.progress;j.report.counts.unsupported=1
+          j.report.entries={{x=j.blocks[1].x,y=j.blocks[1].y,z=j.blocks[1].z,status='unsupported',actual={name='minecraft:water',state={level='1'}},reason='continuous external inflow'}}
+        end
+      end
+    end end
+    if p.site.work.status=='completed' then break end
+  end
+  assert(barrierJobs>0,'external inflow never received automatic containment');assert(restored and reopened)
+  eq(p.site.barrier.status,'verified');eq(p.phase,'site_ready');assert(service:prepared(p,plan,1))
+  assert(p.protectedBounds.min.x<plan.bounds.min.x);assert(service:evidence(p,plan,1).containmentRechecked)
+  local outside=p.protectedBounds.min.x;service:start(p,plan);eq(p.protectedBounds.min.x,outside)
+end)
+
+test('retaining barrier preserves receipts through failed checkpoints and keeps exact protected-cell blockers',function()
+  local e,c,app,q,p,plan,service,production=surveyedFixture();service:startWork(p,plan)
+  local fault=false;local blocked
+  for _=1,6500 do
+    local barrier=p.site.barrier
+    if barrier and barrier.jobId and q.state.jobs[barrier.jobId].status=='completed' and not fault then
+      local job=q.state.jobs[barrier.jobId];local save=app.save
+      function app:save() return false,'barrier checkpoint unavailable' end
+      assert(not pcall(service.workTick,service,p,plan));assert(job.report,'failed checkpoint discarded barrier receipt')
+      eq(p.site.barrier.jobId,job.id);app.save=save;fault=true
+      service=require('autobuilder.build.site_service').new(app,c,e,q,production)
+    else service:workTick(p,plan) end
+    for _,j in pairs(q.state.jobs) do if j.status~='completed' then
+      j.workerId=12;j.status='completed';j.completedAt=100
+      if j.type=='SURVEY_SITE' then
+        j.progress=#j.siteSurvey.columns;j.siteReport={identity=plan.identity,region=j.siteSurvey.region,observations={}}
+        for _,col in ipairs(j.siteSurvey.columns) do j.siteReport.observations[#j.siteReport.observations+1]={x=col.x,z=col.z,y=col.minY,status='empty',name='minecraft:air'} end
+      else
+        j.progress=#j.blocks;j.report={counts={correct=j.progress},entries={}}
+        local isBarrier=j.key:find(':barrier:',1,true)
+        if isBarrier and j.siteWork.stage=='verify' and not blocked or not isBarrier and j.siteWork.region==1 and (j.siteWork.stage=='clear' or j.siteWork.stage=='verify') then
+          j.progress=j.progress-1;j.report.counts.correct=j.progress;j.report.counts.unsupported=1
+          local b=j.blocks[1];j.report.entries={{x=b.x,y=b.y,z=b.z,status='unsupported',actual={name=isBarrier and 'minecraft:chest' or 'minecraft:water'},reason=isBarrier and 'protected storage' or 'external inflow'}}
+          if isBarrier then blocked=U.copy(j.report.entries[1]) end
+        end
+      end
+    end end
+    if p.site.work.status=='completed' then break end
+  end
+  assert(fault and blocked);eq(p.site.barrier.status,'blocked');eq(p.phase,'site_blocked')
+  eq(p.site.barrier.defects[1].x,blocked.x);assert(p.error:find('protected storage',1,true))
+  assert(service:prepared(p,plan,2),'protected boundary withheld unrelated dry regions')
+  local before=q.state.sequence;for _=1,20 do service:workTick(p,plan) end;eq(q.state.sequence,before)
+end)

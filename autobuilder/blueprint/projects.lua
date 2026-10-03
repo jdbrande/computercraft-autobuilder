@@ -148,8 +148,14 @@ function M.new(app,config,e,queue,production)
     p.siteRequired=nil
     p.repairAttempts=nil;p.repairHistory=nil
   end
+  local function preparationPending(p)
+    local site=p.site
+    return site and (next(site.active or {}) or site.status=='surveying' or p.levelAfterSurvey or site.accessLease
+      or site.barrier and site.barrier.status=='working'
+      or site.work and (site.work.status~='completed' or (site.work.blocked or 0)>0))
+  end
   local function settle(p,work,requests)
-    local why;local active={}
+    local why=preparationPending(p) and 'Waiting for site preparation and access restoration' or nil;local active={}
     if app.chunks then app.chunks:reconcile() end
     for rid in pairs(requests) do
       local r=s.requests[rid]
@@ -431,6 +437,7 @@ function M.new(app,config,e,queue,production)
   function self:retire(name,advance)
     local p=project(name)
     assert(p.phase=='built' or p.phase=='verified','Only verified projects can be retired')
+    if preparationPending(p) then return false,'Waiting for site preparation and access restoration' end
     local linkedWork,requests=linked(p,true);local remove,returns={},{}
     local prefix='project:'..name..':'
     for id,r in pairs(s.returns or {}) do

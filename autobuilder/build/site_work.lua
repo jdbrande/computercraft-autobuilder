@@ -4,6 +4,11 @@ local E=require('autobuilder.resources.exploration')
 local R=require('autobuilder.workers.resupply')
 local F=require('autobuilder.factory.factory')
 local M={}
+M.fillMaterials={'minecraft:cobblestone','minecraft:dirt','minecraft:cobbled_deepslate','minecraft:netherrack','minecraft:andesite','minecraft:diorite','minecraft:granite','minecraft:stone'}
+function M.containmentMaterial(name)
+  for _,item in ipairs(M.fillMaterials) do if name==item then return true end end
+  return false
+end
 local vegetation={}
 for name in ('grass short_grass fern dead_bush vine glow_lichen dandelion poppy blue_orchid allium azure_bluet red_tulip orange_tulip white_tulip pink_tulip oxeye_daisy cornflower lily_of_the_valley wither_rose brown_mushroom red_mushroom'):gmatch('%S+') do vegetation['minecraft:'..name]=true end
 local drops={}

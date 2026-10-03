@@ -31,6 +31,7 @@ function M.new(app,config,e,queue,production)
     if record.preparationRetries~=nil and (not U.integer(record.preparationRetries) or record.preparationRetries<0 or record.preparationRetries>3)
       or record.retryPending~=nil and type(record.retryPending)~='boolean'
       or record.fluidRechecked~=nil and type(record.fluidRechecked)~='boolean'
+      or record.containmentRechecked~=nil and type(record.containmentRechecked)~='boolean'
       or record.retryHistory~=nil and (type(record.retryHistory)~='table' or #record.retryHistory>3) then return nil,'invalid preparation retry evidence' end
     if record.retryPending and (type(w)~='table' or w.status~='blocked' or w.stage~='verified' or not record.preparationRetries or record.preparationRetries<1) then
       return nil,'invalid pending preparation retry'
@@ -51,13 +52,21 @@ function M.new(app,config,e,queue,production)
     return record,path
   end
   function self:start(p,plan)
+    assert(not p.site or not p.site.barrier or p.site.barrier.status~='working','site still owns retaining barrier work')
     assert(not p.site or not next(p.site.active),'site still owns active survey work')
     assert(not p.site or not p.site.work or not next(p.site.work.active),'site still owns active preparation work')
     assert(not E.conflicts(app.state,plan.bounds),'Site overlaps owned exploration territory; wait for miners to return')
+    local protection=U.copy(plan.bounds)
+    if p.site and p.site.identity==plan.identity and p.site.barrier and E.box(p.protectedBounds) then
+      for _,axis in ipairs({'x','y','z'}) do
+        protection.min[axis]=math.min(protection.min[axis],p.protectedBounds.min[axis])
+        protection.max[axis]=math.max(protection.max[axis],p.protectedBounds.max[axis])
+      end
+    end
     F.commit(p,save,function()
       p.generation=p.generation+1
       p.site={identity=plan.identity,generation=p.generation,projectRun=p.run or 0,cursor=1,completed=0,blocked=0,active={},status='surveying'}
-      p.protectedBounds=U.copy(plan.bounds);p.phase='surveying';p.completed=0;p.total=plan.columnCount;p.error=nil
+      p.protectedBounds=protection;p.phase='surveying';p.completed=0;p.total=plan.columnCount;p.error=nil
     end)
   end
   function self:tick(p,plan)
@@ -113,7 +122,7 @@ function M.new(app,config,e,queue,production)
   end
   local function fillMaterial(required)
     local counts=app.mining and app.mining.storage.counts or {};local best,bestCount,bestAvailable
-    for _,item in ipairs({'minecraft:cobblestone','minecraft:dirt','minecraft:cobbled_deepslate','minecraft:netherrack','minecraft:andesite','minecraft:diorite','minecraft:granite','minecraft:stone'}) do
+    for _,item in ipairs(require('autobuilder.build.site_work').fillMaterials) do
       local available=production.ledger:view(item,counts).available
       local provider=require('autobuilder.resources.providers').select(item,config,{available=available,required=math.max(1,required),workers=app.state.workers})
       local useful=available>=required or provider and provider.available
@@ -130,6 +139,7 @@ function M.new(app,config,e,queue,production)
     end)
   end
   function self:prepared(p,plan,region)
+    if p.site and p.site.barrier and p.site.barrier.status=='working' then return false,'retaining barrier is not verified' end
     if p.site and p.site.accessLease and E.overlaps(p.site.accessLease.bounds,plan:region(region).bounds) then return false,'foundation access restoration remains owned' end
     local record,why=self:evidence(p,plan,region)
     if not record then return false,why end
@@ -137,6 +147,7 @@ function M.new(app,config,e,queue,production)
     return work and work.status=='prepared' and work.stage=='verified' and work.verifiedFill==true and work.verifiedClear==true or false
   end
   function self:readyFor(p,plan,blocks)
+    if p.site and p.site.barrier and p.site.barrier.status=='working' then return false,'retaining barrier is not verified' end
     if not p.site or p.site.identity~=plan.identity or not p.site.work then return false,'site preparation has not started' end
     for _,region in ipairs(plan:requiredRegions(blocks)) do
       local lease=p.site.accessLease
@@ -146,7 +157,7 @@ function M.new(app,config,e,queue,production)
         local w=p.site.work
         F.commit(p,save,function()
           if not w.rechecking then
-            w.cursor=1;w.completed=0;w.blocked=0;w.preparedCount=0;w.firstDefect=nil;w.rechecking=true
+            w.cursor=1;w.completed=0;w.blocked=0;w.preparedCount=0;w.firstDefect=nil;w.fluidBlocked=0;w.rechecking=true
             for _,a in pairs(w.active) do a.countInAudit=false end
           end
           w.status='working'
@@ -221,6 +232,7 @@ function M.new(app,config,e,queue,production)
     record.preparationRetries=math.max(a.preparationRetries or 0,prior and prior.preparationRetries or 0)
     record.retryHistory=U.copy(prior and prior.retryHistory or {})
     record.fluidRechecked=a.fluidRechecked or prior and prior.fluidRechecked or nil
+    record.containmentRechecked=a.containmentRechecked or p.site.work.containmentRecheck or prior and prior.containmentRechecked or nil
     local orphanJobs={}
     for _,old in pairs(s.jobs) do if old.key and old.key:sub(1,#prefix)==prefix and old.siteAccess then orphanJobs[#orphanJobs+1]=old end end
     if #orphanJobs>0 then
@@ -241,6 +253,10 @@ function M.new(app,config,e,queue,production)
         F.commit(p,save,function() a.recovery=nil;a.fluidRetry=nil;a.error=nil end);return true
       end
       return recoverEvidence(p,plan,a)
+    end
+    if p.site.work.containmentRecheck and record.preparation and record.preparation.status=='blocked'
+      and record.preparation.fluids and not record.containmentRechecked then
+      F.commit(p,save,function() a.fluidRetry=true;a.fluidRechecked=true;a.containmentRechecked=true;a.preparationRetries=0 end);return true
     end
     if p.site.work.fluidRecheck and record.preparation and record.preparation.status=='blocked'
       and record.preparation.fluids and not record.fluidRechecked then
@@ -303,7 +319,9 @@ function M.new(app,config,e,queue,production)
           p.site.work.completed=p.site.work.completed+1;p.site.work.blocked=p.site.work.blocked+(work.status=='blocked' and 1 or 0)
           p.site.work.preparedCount=(p.site.work.preparedCount or 0)+(work.status=='prepared' and 1 or 0)
           if work.status=='blocked' and not p.site.work.firstDefect then p.site.work.firstDefect=U.copy(work.defects[1]) end
-          if work.status=='blocked' and work.fluids then p.site.work.needsFluidRecheck=true end
+          if work.status=='blocked' and work.fluids then
+            p.site.work.needsFluidRecheck=true;p.site.work.fluidBlocked=(p.site.work.fluidBlocked or 0)+1
+          end
         end
         p.site.work.active[tostring(a.region)]=nil
       end);return true
@@ -392,9 +410,46 @@ function M.new(app,config,e,queue,production)
     work.jobId=j.id;work.nextCursor=nextCursor;assert(cp:save(record))
     a.error=nil;return true
   end
+  local function barrierTick(p,plan)
+    local b=p.site.barrier
+    if b.lastJob then
+      local old=s.jobs[b.lastJob]
+      if old and old.report then assert(save());old.report=nil;old.blocks=nil;assert(save()) end
+    end
+    if b.jobId then
+      local j=assert(s.jobs[b.jobId],'retaining barrier ownership missing')
+      if j.status~='completed' then return end
+      assert(j.report and j.report.counts,'retaining barrier lacks physical receipt')
+      local waiting={}
+      if j.siteWork.stage~='verify' and not cargoSettled(p,j,waiting) then p.error=waiting.error;assert(save());return end
+      F.commit(p,save,function()
+        for status,n in pairs(j.report.counts) do if status~='correct' then b.failed=b.failed+n end end
+        collectDefects(b,j.report)
+        b.lastJob=j.id;b.jobId=nil;b.sequence=b.sequence+1
+        if not j.report.counts.inventory_full or j.report.counts.inventory_full==0 then b.cursor=b.nextCursor or 0 end
+        b.nextCursor=nil;p.error=nil
+      end);return
+    end
+    if b.cursor==0 then
+      F.commit(p,save,function()
+        if b.stage=='fill' then b.stage='verify';b.cursor=1;b.failed=0;b.defects={};b.omitted=nil
+        else
+          b.status=b.failed==0 and 'verified' or 'blocked'
+          if b.status=='verified' then
+            local w=p.site.work;w.containmentRecheck=true;w.cursor=1;w.completed=0;w.blocked=0;w.preparedCount=0;w.firstDefect=nil;w.fluidBlocked=0
+          else p.site.work.firstDefect=U.copy(b.defects[1]) end
+        end
+      end);return
+    end
+    local payload,nextCursor=plan:barrier(b.height,b.cursor,8,b.fill,b.stage=='verify',1)
+    payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
+    local j=queue:submit('PREPARE_REGION',payload,{},p.name..':site:'..p.site.generation..':barrier:'..b.sequence)
+    F.commit(p,save,function() b.jobId=j.id;b.nextCursor=nextCursor end)
+  end
   function self:workTick(p,plan)
     assert(p.site and p.site.identity==plan.identity and p.site.work,'preparation geometry missing or changed')
     if p.paused or p.site.work.status=='completed' then return end
+    if p.site.barrier and p.site.barrier.status=='working' then barrierTick(p,plan);return end
     local work=p.site.work;local active=0;for _ in pairs(work.active) do active=active+1 end
     if not p.site.accessLease then
       for _,a in pairs(work.active) do
@@ -420,7 +475,16 @@ function M.new(app,config,e,queue,production)
       if work.needsFluidRecheck and not work.fluidRecheck then
         F.commit(p,save,function()
           work.fluidRecheck=true;work.fluidFirstDefect=U.copy(work.firstDefect)
-          work.cursor=1;work.completed=0;work.blocked=0;work.preparedCount=0;work.firstDefect=nil
+          work.cursor=1;work.completed=0;work.blocked=0;work.preparedCount=0;work.firstDefect=nil;work.fluidBlocked=0
+        end);return
+      end
+      if work.fluidRecheck and (work.fluidBlocked or 0)>0 and not p.site.barrier then
+        local payload,_,required=plan:barrier(p.protectedBounds.max.y,1,1,'minecraft:cobblestone',false,1)
+        if E.conflicts(app.state,payload.bounds) then p.error='Retaining barrier overlaps owned mining territory; waiting for return';assert(save());return end
+        local fill=fillMaterial(required)
+        F.commit(p,save,function()
+          p.protectedBounds=U.copy(payload.bounds)
+          p.site.barrier={status='working',stage='fill',cursor=1,sequence=1,height=payload.clearanceY,fill=fill,failed=0,defects={}}
         end);return
       end
       F.commit(p,save,function()

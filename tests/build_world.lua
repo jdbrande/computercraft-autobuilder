@@ -46,7 +46,12 @@ local function world()
     end
   end
   for action,suffix in pairs({forward='',up='Up',down='Down'}) do
-    t[action]=function() local p=target(suffix); if w.blocks[P.key(p)] then return false,'blocked' end; w.pose.x,w.pose.y,w.pose.z=p.x,p.y,p.z; return true end
+    t[action]=function()
+      local p=target(suffix);local block=w.blocks[P.key(p)]
+      -- CC:Tweaked TurtleMoveCommand / WorldUtil.isEmptyBlock permit liquids.
+      if block and block.name~='minecraft:water' and block.name~='minecraft:lava' then return false,'blocked' end
+      w.pose.x,w.pose.y,w.pose.z=p.x,p.y,p.z;return true
+    end
   end
   t.turnRight=function() w.pose.heading=order[index[w.pose.heading]%4+1]; return true end
   t.turnLeft=function() w.pose.heading=order[(index[w.pose.heading]-2)%4+1]; return true end

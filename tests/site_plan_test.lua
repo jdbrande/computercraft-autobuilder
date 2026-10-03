@@ -199,3 +199,25 @@ test('interior foundation access declares its cross-region tunnel envelope insid
   end
   assert(crossed)
 end)
+
+test('external fluid barrier fills only outside required workspace in bounded verifiable batches',function()
+  local data={schema=1,size={x=3,y=1,z=3},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=9}},metadata={},requirements={}}
+  local p=plan(data,{origin={x=10,y=0,z=10}},{margin=1,minY=-4,maxY=15})
+  local cursor,seen,total=1,{},0
+  repeat
+    local job,nextCursor,count=p:barrier(2,cursor,8,'minecraft:cobblestone',false,1)
+    assert(job);eq(count,48);assert(#job.blocks<=8);assert(require('autobuilder.build.site_work').validContract(job))
+    for _,b in ipairs(job.blocks) do
+      assert(not require('autobuilder.core.pathfinding').inside(b,p.bounds),'barrier plugged requested working air')
+      assert(require('autobuilder.core.pathfinding').inside(b,job.bounds));assert(b.y>=0 and b.y<2)
+      local key=require('autobuilder.core.pathfinding').key(b);assert(not seen[key]);seen[key]=true;total=total+1
+    end
+    cursor=nextCursor
+  until not cursor
+  eq(total,48)
+  local verify=p:barrier(2,1,8,'minecraft:cobblestone',true,1);eq(verify.siteWork.stage,'verify')
+  assert(not pcall(p.barrier,p,16,1,8,'minecraft:cobblestone',false,1))
+  assert(not pcall(p.barrier,p,2,1,8,'minecraft:sand',false,1))
+  assert(not pcall(p.barrier,p,2,1,8,'minecraft:oak_planks',false,1))
+  assert(not verify.blocks[1].support,'flammable generic support could satisfy containment')
+end)

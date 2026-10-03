@@ -880,3 +880,37 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   pass, along with the focused preparation/construction/protection tests. Fresh full
   current-tree validation is running. Native206/207 automatic access is running on
   the preceding within-region snapshot; it is not evidence for the later lease/guard.
+
+- Foundation access implementation committed at`282b9dc`. The earlier access
+  snapshot passed735 Lua tests (before cross-region access/vertical-guard changes);
+  the newer ownership snapshot remains running. Current Python suite18/18 passes.
+  Native206/207 has opened/restored multiple shafts and recovered a controller
+  reboot during debris return; final acceptance is still pending.
+- External-inflow containment now has failing-then-passing geometry/controller
+  checks: bounded stable-fill perimeter outside required working air, fill/verify
+  receipts, protected-cell defects, failed-checkpoint recovery and a fresh regional
+  census only after verified containment. A new survey cannot abandon active wall
+  work, and later survey generations preserve the physical barrier's protection.
+- The actual inflow runtime reached a complete wall but exposed a simulator error:
+  the fixture treated water/lava as solid movement obstacles. CC:Tweaked1.120.0
+  TurtleMoveCommand and WorldUtil explicitly allow liquid movement. The fixture
+  regression failed before correction and passes afterward; solid collisions remain.
+  The complete inflow runtime is rerunning. Native containment remains pending.
+
+- The access/ownership snapshot at`282b9dc` passed739 Lua tests, including
+  cross-region runtime and atomic vertical worker guards. The newer containment
+  snapshot is running;18 Python tests and release/diff checks pass.
+- The corrected actual inflow runtime passes: an external source remains present,
+  the outer barrier verifies, fresh preparation drains working air, and the glass
+  target builds/verifies after both runtimes reboot. Barrier fill is restricted to
+  known nonflammable materials and verified by exact name, so existing flammable
+  generic support cannot certify a lava barrier.
+- A settlement regression reproduced `built` between barrier batches. Settlement
+  and retirement now share a pending-preparation/access check; the regression
+  failed before the fix and passes afterward. Updated this controller-only module
+  on206/208/210 and rebooted them without changing physical job contracts.
+- Native trials now running independently:206/207 within-region hidden support,
+  208/209 cross-region hidden support,210/211 external inflow containment. The first
+  trial recovered an earlier controller reboot and a worker reboot at a confirmed
+  shaft entrance between child jobs, with project pause/resume. No final native
+  acceptance is claimed yet. Four loaded chunks per fixture; no world backups.

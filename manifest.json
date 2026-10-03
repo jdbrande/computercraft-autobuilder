@@ -107,7 +107,7 @@
       "version": "0.23.0"
     },
     {
-      "bytes": 28554,
+      "bytes": 29071,
       "path": "autobuilder/blueprint/projects.lua",
       "roles": [
         "controller",
@@ -117,7 +117,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "f2e386c55ec93f9bb3350da30e97ab1eb314986c8f7aaf1495d533ceab305e3d",
+      "sha256": "9edb03191e4800b78df44e9d81f071a884f7f8174c3fbb46a88e31f8ba495e60",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/blueprint/projects.lua",
       "version": "0.23.0"
     },
@@ -257,7 +257,7 @@
       "version": "0.23.0"
     },
     {
-      "bytes": 14483,
+      "bytes": 15935,
       "path": "autobuilder/build/site_plan.lua",
       "roles": [
         "controller",
@@ -267,12 +267,12 @@
         "logger",
         "courier"
       ],
-      "sha256": "820edee2913b728877ef242a58ec7f56aa2aa537ab4df51817c1a0fc4b91a84a",
+      "sha256": "234f40fe2e5006e0e5f1ead8b69a58a37cefaaa95ac9d95d23267b67edd2b0a8",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/build/site_plan.lua",
       "version": "0.23.0"
     },
     {
-      "bytes": 28329,
+      "bytes": 32282,
       "path": "autobuilder/build/site_service.lua",
       "roles": [
         "controller",
@@ -282,7 +282,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "b249e231d1fc263627ef6be2f5b823cab7eba353ae9b8a8bf14d0de84f2ae2b5",
+      "sha256": "bb74c7383409bf564ac9bdc243ec2aa20ce85713d5f1d7473d8be12d089f7ea4",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/build/site_service.lua",
       "version": "0.23.0"
     },
@@ -302,7 +302,7 @@
       "version": "0.23.0"
     },
     {
-      "bytes": 8791,
+      "bytes": 9120,
       "path": "autobuilder/build/site_work.lua",
       "roles": [
         "controller",
@@ -312,7 +312,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "1e1185cdd3651c82218d33c4fe0f173785c256bad756b228648eff21fe137bc6",
+      "sha256": "5c1cb098f3e14cbc6cf93f43a891fa3b6bcc7b8d2fa7f2d058024a95d59c1de3",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/build/site_work.lua",
       "version": "0.23.0"
     },

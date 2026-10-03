@@ -297,3 +297,18 @@ and supply. Verify the barrier before a fresh bounded survey/preparation pass; d
 not let retry recovery forget that containment was already attempted. Continuously
 changing or inaccessible surroundings retain explicit bounded blockers. This is the
 next implementation task after the foundation-access acceptance boundary.
+
+The containment controller is now implemented. It starts after both bounded local
+draining and the one cross-region reconsideration fail. A successful barrier gets
+one fresh census and the existing local retry budget; a blocked barrier retains
+its exact defect. Only known nonflammable fill names are allowed, and wall cells
+require the selected exact material rather than generic support (which could be
+wood). Completed outer-wall protection survives a later survey generation.
+Settlement and retirement both wait for unfinished preparation/access, including
+the moments between barrier child jobs. Geometry, controller checkpoint/blocker
+checks and the actual external-inflow runtime pass; native acceptance is running.
+
+The fluid-motion fixture correction follows the installed CC:Tweaked version's
+[move command](https://raw.githubusercontent.com/cc-tweaked/CC-Tweaked/v1.20.1-1.120.0/projects/common/src/main/java/dan200/computercraft/shared/turtle/core/TurtleMoveCommand.java)
+and [liquid predicate](https://raw.githubusercontent.com/cc-tweaked/CC-Tweaked/v1.20.1-1.120.0/projects/common/src/main/java/dan200/computercraft/shared/util/WorldUtil.java).
+Its test permits liquid movement while retaining solid collisions.
