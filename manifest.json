@@ -567,7 +567,7 @@
       "version": "0.27.0"
     },
     {
-      "bytes": 10112,
+      "bytes": 10679,
       "path": "autobuilder/core/navigation.lua",
       "roles": [
         "controller",
@@ -577,7 +577,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "41c63fda23f5ed7426c886300ee1acff187692205a2de0a288819339a0f7dc83",
+      "sha256": "c3d97d227394b2660c51b8064226dbd534cc6add08ca062d7a5647db3661b113",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/navigation.lua",
       "version": "0.27.0"
     },

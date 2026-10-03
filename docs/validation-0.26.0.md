@@ -1,7 +1,8 @@
 # 0.26.0 mission fuel forecast validation
 
 Status: native acceptance and focused regressions passed; complete Lua gate and
-ordered integration remain pending. Final implementation: `90fd4c0`.
+ordered integration remain pending. Fuel implementation: `90fd4c0`, followed by the shared0.24 physical-detour
+correction and its navigation/two-worker regressions.
 
 ## Automated evidence
 
