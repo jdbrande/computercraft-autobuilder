@@ -202,3 +202,38 @@ test('traffic home requests never displace offline busy paused or already home w
     eq(n,mode=='idle' and 1 or 0)
   end
 end)
+
+
+test('controller drains a queued network burst in bounded turns without losing or reordering packets',function()
+  local R=require('autobuilder.core.runtime');local e=env(1);local timer=0;local blocked=false
+  local processed,turnCount={},0
+  e.os.startTimer=function() timer=timer+1;return timer end;e.os.cancelTimer=function() end
+  e.os.pullEvent=function(filter)
+    turnCount=0
+    while true do local ev={coroutine.yield(filter)};if not filter or ev[1]==filter then return table.unpack(ev) end end
+  end
+  e.sleep=function() e.os.pullEvent('sleep') end
+  e.peripheral.call=function() if blocked then blocked=false;e.os.pullEvent('task_complete') end;return true end
+  local send=e.rednet.send;e.rednet.send=function(to,m,p)
+    if m.type=='ack' then turnCount=turnCount+1;assert(turnCount<=8,'unbounded message burst exceeded CraftOS turn budget');processed[#processed+1]=to end
+    return send(to,m,p)
+  end
+  e.parallel={waitForAny=function(...)
+    local threads,filters={},{}
+    for i,fn in ipairs({...}) do threads[i]=coroutine.create(fn);local ok,f=coroutine.resume(threads[i]);assert(ok,f);filters[i]=f end
+    local function broadcast(ev)
+      for i,co in ipairs(threads) do if not filters[i] or filters[i]==ev[1] then
+        local ok,f=coroutine.resume(co,table.unpack(ev));assert(ok,f);filters[i]=f;if coroutine.status(co)=='dead' then return true end
+      end end
+    end
+    local telemetry={label='Worker',status='idle',position={known=false},fuel=1000,inventory={used=0,slots=16},capabilities={telemetry=true}}
+    local function packet(id) return {'rednet_message',id,{version=1,id=id..':1:1',sender=id,boot=1,sequence=1,type='register',payload=telemetry},'autobuilder.v1'} end
+    blocked=true;broadcast(packet(2))
+    for id=3,22 do broadcast(packet(id)) end
+    broadcast({'task_complete'})
+    for _=1,30 do if #processed==21 then break end;e.now=e.now+0.1;broadcast({'timer',timer}) end
+    eq(#processed,21);for i,id in ipairs(processed) do eq(id,i+1) end
+    assert(broadcast({'char','q'}))
+  end}
+  local app=R.run(cfg('controller'),e);for id=2,22 do assert(app.state.workers[tostring(id)]) end
+end)

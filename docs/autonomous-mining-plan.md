@@ -1015,12 +1015,12 @@ operator docs and progress ledger.
 - [x] Add `fleet status`/role-limit commands and concise role counts, queue depth,
   estimated work, delivery rate, limiting resource and bounded scaling-decision history.
   Reuse existing command/event logging and configuration persistence.
-- [ ] Add actual controller/miner/worker runtime scenarios that start with one
+- [x] Add actual controller/miner/worker runtime scenarios that start with one
   suitable turtle, register more during heavy mixed demand, prove multiple miners,
   clearers and builders contribute, and finish with idle settled workers.
 - [x] Include slower supply/processing, zero-yield searches, changed limits and
   controller/worker restarts. Confirm no duplicated physical work, stock or claims.
-- [ ] Run the focused/runtime checks, document supported tuning and commit.
+- [x] Run the focused/runtime checks, document supported tuning and commit.
 
 ### Task49: Native scaling acceptance and integration
 
