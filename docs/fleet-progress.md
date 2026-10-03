@@ -1081,3 +1081,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   the change and passes after, preserving all21 packets in order. Runtime/navigation
   checks pass. Controller212 was restarted from its saved files with this fix; no
   worker ownership or cargo was reset. Final full-suite evidence will use this source.
+
+- Final0.24 full gate failed1/786 tests: the48-block ramp/drain fixture stalled at
+ 46 blocks. Retained state identified builder14 blocked by a chest encountered
+  inside a traffic detour. The earlier focused pass did not exercise that ordering.
+  A deterministic regression reproduced a terminal physical-obstruction error.
+  Navigation now persists the inspected cell as bounded detour evidence and retries
+  without digging. The regression passes across reboot; an actual two-worker
+  runtime with opposing routes and station chests also passes. This is a release
+  blocker corrected before restarting the full gate, not a waived flaky test.
