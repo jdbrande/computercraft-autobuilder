@@ -289,15 +289,26 @@ function M.new(state,save,clock,controllerId,config,chunks)
     if j.status=='completed' or j.physicalComplete then return true end
     if p.delivered<j.progress.delivered then return false,'stale progress' end
     if j.exploration then
-      if not E.report(p.exploration) or p.exploration.cursor>193 or p.delivered<0 then return false,'invalid exploration result' end
+      if not E.report(p.exploration,j.exploration) or p.exploration.cursor>193 or p.delivered<0 then return false,'invalid exploration result' end
       if p.phase=='completed' and (not p.exploration.result or p.held~=0 or stock==nil) then return false,'exploration completion needs unloaded inventory and live stock' end
+      local previous=U.copy(j);local sectorId=j.exploration.sectorId
+      local sector=U.copy(exploration.sectors[sectorId]);local group=exploration.groups[j.exploration.groupId]
+      local priorGroup=U.copy(group)
       if p.phase=='completed' then
-        assert(E.record(exploration.sectors,j,p.exploration)); j.physicalComplete=true; j.status='completed'; j.error=nil
+        assert(E.record(exploration.sectors,j,p.exploration,p.delivered)); j.physicalComplete=true; j.status='completed'; j.error=nil
       elseif p.phase=='blocked' then j.status='blocked'; j.error=p.error
       else j.status='running' end
       j.progress={delivered=p.delivered,held=p.held,phase=p.phase,exploration=E.cleanReport(p.exploration)}
       if j.physicalComplete then j.physicalCompletedAt=j.physicalCompletedAt or clock() end
-      self:refreshAcquisition(j.exploration.groupId,stock or 0); persist(); return true
+      self:refreshAcquisition(j.exploration.groupId,stock or 0)
+      local ok,why=pcall(persist)
+      if not ok then
+        for k in pairs(j) do j[k]=nil end;for k,v in pairs(previous) do j[k]=v end
+        exploration.sectors[sectorId]=sector
+        for k in pairs(group) do group[k]=nil end;for k,v in pairs(priorGroup) do group[k]=v end
+        error(why,0)
+      end
+      return true
     end
     j.progress={delivered=p.delivered,held=p.held,phase=p.phase}
     if p.phase=='completed' then

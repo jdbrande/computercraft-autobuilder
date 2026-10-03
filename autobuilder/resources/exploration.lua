@@ -190,13 +190,33 @@ function M.geometry(g)
   return P.key(p)==P.key(g.entry)
 end
 local results={quota=true,survey_exhausted=true,cargo=true,fuel=true,paused=true,route_blocked=true}
-function M.report(r)
+local evidenceKinds={clear=true,liquid=true,blocked=true,protected=true}
+local function validEvidence(p)
+  return U.position(p) and evidenceKinds[p.kind]==true and (p.name==nil or U.shortString(p.name,128))
+    and (p.reason==nil or U.shortString(p.reason,128))
+end
+local function ownedEvidence(p,g)
+  if not g or P.inside(p,g.bounds) or g.depot and U.distance(p,g.depot)==0 then return true end
+  for _,route in ipairs({g.route or {},g.exitRoute or {}}) do
+    for _,q in ipairs(route) do if U.distance(p,q)==0 then return true end end
+  end
+  return false
+end
+function M.report(r,g)
   return type(r)=='table' and (r.result==nil or results[r.result]==true)
     and U.integer(r.cursor) and r.cursor>=1 and r.cursor<=193
     and U.integer(r.clearedRouteCount) and r.clearedRouteCount>=0 and r.clearedRouteCount<=1024
     and M.list(r.observations,64,function(p) return U.position(p) and U.shortString(p.name,128) end)
+    and (r.evidence==nil or M.list(r.evidence,64,function(p) return validEvidence(p) and ownedEvidence(p,g) end))
 end
 local function point(p) return {x=p.x,y=p.y,z=p.z} end
+function M.addEvidence(progress,p,kind,name,reason)
+  local entry=point(p);entry.kind=kind;entry.name=name;entry.reason=reason
+  assert(validEvidence(entry),'invalid physical mining evidence')
+  local entries=progress.evidence or {};progress.evidence=entries
+  for i=#entries,1,-1 do if P.key(entries[i])==P.key(entry) then table.remove(entries,i) end end
+  entries[#entries+1]=entry;if #entries>64 then table.remove(entries,1) end
+end
 local function box(b) return {min=point(b.min),max=point(b.max)} end
 function M.cleanHome(h)
   local out={depot=point(h.depot),exitRoute={},protectedAreas={}}
@@ -215,12 +235,22 @@ end
 function M.cleanReport(r)
   local out={result=r.result,cursor=r.cursor,clearedRouteCount=r.clearedRouteCount,observations={}}
   for _,p in ipairs(r.observations) do local v=point(p); v.name=p.name; out.observations[#out.observations+1]=v end
+  if r.evidence then out.evidence={};for _,p in ipairs(r.evidence) do M.addEvidence(out,p,p.kind,p.name,p.reason) end end
   return out
 end
-function M.record(records,trip,report)
-  if not M.report(report) then return nil,'invalid exploration progress' end
+function M.record(records,trip,report,delivered)
+  delivered=delivered or (trip.progress or {}).delivered or 0
+  if not U.integer(delivered) or delivered<0 then return nil,'invalid delivered yield' end
+  if not M.report(report,trip.exploration) then return nil,'invalid exploration progress' end
   local g=trip.exploration; local r=records[g.sectorId] or {surveys={},observations={}}; records[g.sectorId]=r
   r.surveys=r.surveys or {}; r.observations=r.observations or {}
+  r.outcomes=r.outcomes or {}
+  local h=r.outcomes[trip.item] or {trips=0,delivered=0,successful=0,empty=0,inaccessible=0}
+  r.outcomes[trip.item]=h;h.trips=h.trips+1;h.delivered=h.delivered+delivered
+  if delivered>0 then h.successful=h.successful+1 end
+  if report.result=='survey_exhausted' and delivered==0 then h.empty=h.empty+1 end
+  if report.result=='route_blocked' then h.inaccessible=h.inaccessible+1 end
+  h.lastResult=report.result
   local visited=coverage(r.surveys[trip.item])
   for k,p in pairs(coverage({bounds=g.bounds,cursor=report.cursor,surveyed=g.surveyed})) do visited[k]=p end
   local keys={}; for k in pairs(visited) do keys[#keys+1]=k end; table.sort(keys)
@@ -230,6 +260,7 @@ function M.record(records,trip,report)
   for _,p in ipairs(report.observations) do if P.inside(p,g.bounds) then positions[P.key(p)]={x=p.x,y=p.y,z=p.z,name=p.name} end end
   local keys={}; for k in pairs(positions) do keys[#keys+1]=k end; table.sort(keys)
   r.observations={}; for i=math.max(1,#keys-63),#keys do r.observations[#r.observations+1]=positions[keys[i]] end
+  for _,p in ipairs(report.evidence or {}) do M.addEvidence(r,p,p.kind,p.name,p.reason) end
   return true
 end
 function M.protectedAreas(state,config,exceptProject,skipMiningBase,purpose)

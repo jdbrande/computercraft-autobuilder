@@ -228,3 +228,45 @@ test('miners need separate mutation permission and resume a delayed grant withou
   assert(not m:step());eq(#w.dug,0);eq(w.blocks['2,0,0'],'minecraft:iron_ore')
   allowed=true;assert(m:resume());assert(m:step());eq(#w.dug,1);eq(released,1)
 end)
+
+
+test('explorers retain bounded inspection and scanner resource sightings with reconciled clear travel',function()
+  for _,scanner in ipairs({false,true}) do
+    local w=W.new();if not scanner then w.peripheral.getType=function() return nil end end
+    w.blocks['3,1,1']='minecraft:iron_ore'
+    local m=explorer(w);assert(run(m,w,2000));eq(m.task.delivered,1)
+    local found=false;for _,p in ipairs(m.task.explorationProgress.observations) do
+      if p.name=='minecraft:iron_ore' and p.x==3 and p.y==1 and p.z==1 then found=true end
+    end
+    assert(found,'resource sighting lost');local clear={}
+    for _,p in ipairs(m.task.explorationProgress.evidence or {}) do if p.kind=='clear' then clear[require('autobuilder.core.pathfinding').key(p)]=true end end
+    assert(clear['1,0,0'] and clear['3,1,1'] and clear['0,0,0'],'reconciled travel evidence missing')
+    assert(require('autobuilder.resources.exploration').report(m.task.explorationProgress,m.task.exploration))
+  end
+end)
+
+test('explorers retain liquid protected and failed-dig evidence without inventing cleared cells',function()
+  for _,case in ipairs({{name='minecraft:water',kind='liquid'},{name='minecraft:lava',kind='liquid'},
+    {name='minecraft:stone',waterlogged=true,kind='liquid'},{name='minecraft:bedrock',kind='protected'},
+    {name='minecraft:stone',failed=true,kind='blocked'}}) do
+    local w=W.new();w.blocks['1,0,0']=case.name
+    if case.waterlogged then local inspect=w.turtle.inspect;w.turtle.inspect=function()
+      local ok,b=inspect();if ok then b.state.waterlogged=true end;return ok,b
+    end end
+    if case.failed then w.turtle.dig=function() return false,'tool cannot dig this block' end end
+    local m=explorer(w);assert(run(m,w,2000));eq(#w.dug,0)
+    local found;for _,p in ipairs(m.task.explorationProgress.evidence or {}) do if p.x==1 and p.y==0 and p.z==0 then found=p end end
+    assert(found,'obstruction evidence missing');eq(found.kind,case.kind);eq(found.name,case.name);assert(found.reason)
+  end
+end)
+
+test('exploration clear evidence follows movement reconciliation and excludes reservation denial',function()
+  local w=W.new();local base=explorer(w);local task=U.copy(base.task)
+  task.phase='return';task.trail={{x=0,y=0,z=0}};task.pendingMove={from={x=0,y=0,z=0},to={x=1,y=0,z=0},kind='work'}
+  w.pose.x=1;local m=explorer(w,task,nil,U.copy(w.pose));assert(m:step())
+  local found=false;for _,p in ipairs(task.explorationProgress.evidence or {}) do if p.x==1 and p.kind=='clear' then found=true end end
+  assert(found,'reconciled move was not retained')
+  w=W.new();m=explorer(w);w.turtle.forward=function() return false,'movement reservation pending: worker occupies destination' end
+  local ok=run(m,w);assert(not ok);eq(w.pose.x,0)
+  for _,p in ipairs(m.task.explorationProgress.evidence or {}) do assert(p.x~=1,'denied move became geological evidence') end
+end)

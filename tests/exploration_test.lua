@@ -69,3 +69,35 @@ test('exploration routes avoid protected claims and deny insufficient return fue
   context.availableFuel=100; context.activeJobs={{workerId=2,status='running',exploration={bounds=sector.bounds,route={}}}}
   local _,why=E.plan(sector,context); assert(why:find('owned'))
 end)
+
+test('exploration physical evidence is bounded validated cleaned and optional for older workers',function()
+  local E=require('autobuilder.resources.exploration');local N=require('autobuilder.core.mining_messages')
+  local r={cursor=1,clearedRouteCount=0,observations={}}
+  assert(E.report(r))
+  for _,kind in ipairs({'clear','liquid','blocked','protected'}) do
+    r.evidence={{x=1,y=0,z=0,kind=kind,name='minecraft:water',reason='observed obstacle',unexpected='discard'}}
+    assert(E.report(r));local clean=N.clean('mine_progress',{jobId='mine:1',phase='work',delivered=0,held=0,exploration=r})
+    eq(clean.exploration.evidence[1].kind,kind);eq(clean.exploration.evidence[1].unexpected,nil)
+  end
+  for _,entry in ipairs({{x=1,y=0,z=0,kind='invented'},{x=1.5,y=0,z=0,kind='clear'},
+    {x=1,y=0,z=0,kind='blocked',reason=string.rep('x',129)},{x=1,y=0,z=0,kind='liquid',name=string.rep('x',129)}}) do
+    r.evidence={entry};assert(not E.report(r),'malformed physical evidence accepted')
+  end
+  r.evidence={[2]={x=1,y=0,z=0,kind='clear'}};assert(not E.report(r))
+  r.evidence={};for i=1,65 do r.evidence[i]={x=i,y=0,z=0,kind='clear'} end;assert(not E.report(r))
+end)
+
+test('sector physical evidence stays inside owned geometry and retains only bounded latest observations',function()
+  local E=require('autobuilder.resources.exploration')
+  local g={sectorId='0,0,0',bounds={min={x=0,y=0,z=0},max={x=7,y=2,z=7}},route={{x=-1,y=0,z=0}},exitRoute={{x=-2,y=0,z=0}}}
+  local r={cursor=1,clearedRouteCount=0,observations={},evidence={{x=99,y=0,z=0,kind='clear'}}};local records={}
+  assert(not E.record(records,{item='minecraft:coal',exploration=g},r));eq(next(records),nil)
+  for _,x in ipairs({-2,-1,0,7}) do r.evidence={{x=x,y=0,z=0,kind='blocked',reason='solid obstacle'}};assert(E.record(records,{item='minecraft:coal',exploration=g},r)) end
+  eq(#records['0,0,0'].evidence,4)
+  local progress={}
+  for i=1,70 do E.addEvidence(progress,{x=i,y=0,z=0},'blocked','minecraft:stone','blocked path') end
+  eq(#progress.evidence,64);eq(progress.evidence[1].x,7)
+  E.addEvidence(progress,{x=70,y=0,z=0},'clear');eq(#progress.evidence,64);eq(progress.evidence[64].kind,'clear')
+  r.evidence={{x=-1,y=0,z=0,kind='clear'}};assert(E.record(records,{item='minecraft:coal',exploration=g},r))
+  local seen;for _,p in ipairs(records['0,0,0'].evidence) do if p.x==-1 then seen=p end end;eq(seen.kind,'clear')
+end)

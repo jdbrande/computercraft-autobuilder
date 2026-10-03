@@ -1058,3 +1058,15 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   evidence, hazards, route history, density/yield ranking and explicit safe sector
   retries. Tasks50–52 record implementation and native acceptance. No0.25 implementation
   or acceptance is claimed yet;0.24 scaling native/final validation remains active.
+
+- Task50 implementation now retains at most64 physical evidence cells per trip/sector,
+  optional on the existing protocol for older workers. Inspection and scanner sightings
+  persist alongside liquids, protected/failed digs and clear movement reconciled through
+  the existing journal. Reservation denial never becomes geological evidence. Focused
+  tests cover waterlogged blocks, movement recovery, sparse/oversized/out-of-contract
+  evidence and retained ore sightings after excavation.
+- A failing checkpoint regression exposed premature in-memory completion of exploration
+  trips. Progress now rolls back the trip, sector history and acquisition together on
+  failed save. Material-specific actual yield, successful/empty/inaccessible trip counts
+  survive reboot and ignore duplicate terminal reports. Exploration, miner and mining
+  runtime focused suites pass; this is implementation evidence, not0.25 acceptance.

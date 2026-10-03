@@ -1055,12 +1055,12 @@ core/jobs.lua; exploration/miner/mining-runtime tests.
 entries `{x,y,z,kind,name?,reason?}`; existing `E.report`, `E.cleanReport`, `E.record`
 validate, clean and merge evidence within the immutable trip geometry.
 
-- [ ] Add failing protocol cases for legacy reports, each supported kind, sparse or
+- [x] Add failing protocol cases for legacy reports, each supported kind, sparse or
   oversized lists, names/reasons, and out-of-contract coordinates. Implement cleaning.
-- [ ] Add failing actual-miner cases for inspection/scanner sightings, liquid and
+- [x] Add failing actual-miner cases for inspection/scanner sightings, liquid and
   waterlogged obstacles, protected/failed paths and reconciled clear travel. Record
   evidence through existing checkpoints without repeating ambiguous physical actions.
-- [ ] Add failing duplicate/restart/save-failure tests for per-sector actual yield,
+- [x] Add failing duplicate/restart/save-failure tests for per-sector actual yield,
   successful/empty/inaccessible outcomes, searched coverage and bounded evidence.
   Implement atomic terminal accounting and preserve older checkpoints. Commit.
 
