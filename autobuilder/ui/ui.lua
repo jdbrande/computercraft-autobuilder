@@ -70,6 +70,7 @@ function M.draw(term,state,agent,page,input)
         local m=r.materials[name]
         add(item(name)..' '..m.count..'/'..m.target..' '..(m.workerId and 'turtle '..m.workerId or m.status))
         if m.workers and #m.workers>0 then local ids={}; for _,id in ipairs(m.workers) do ids[#ids+1]=tostring(id) end; add('Turtles '..table.concat(ids,', ')) end
+        if m.provider then add('Source '..m.provider) end
         if m.error then add(m.error) end
       end
       if r.error then add(r.error) end

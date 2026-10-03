@@ -13,6 +13,9 @@ function M.new(app,config,e,network,clock)
   function self:command(line)
     local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
     if args[1]=='production' or args[1]=='8' then app.state.view='production'; return true,'Material team: different workers gather each missing resource'
+    elseif args[1]=='resource' then
+      assert(#args==2,'Usage: resource <namespaced-item>')
+      return true,production:describe(args[2])
     elseif args[1]=='cathedral' then return cathedral:command(args)
     elseif args[1]=='build' then return projects:command(args)
     elseif args[1]=='request' then

@@ -378,3 +378,44 @@ test('planner rejects malformed recipes and bounded expansion before producing a
   local cycle={get=function(item) return {kind='craft',yield=1,ingredients={[item=='a' and 'b' or 'a']=1}} end}
   assert(not pcall(P.expand,{a=1},{a=1},{recipes=cycle}),'stock must not hide an invalid recipe cycle')
 end)
+
+test('production honors available farm preference and preserves its offline owner across restart',function()
+  local app,p,q,config,h=productionFixture(); local item=mc('dirt')
+  config.farms={{item=item,base={x=20,y=0,z=0}}}
+  config.providerPreferences={[item]={'farm','mining'}}
+  app.state.workers['2']=miningWorker(2,item,40)
+  app.state.workers['3']={id=3,online=true,telemetry={capabilities={farming=true}}}
+  local r=p:request({[item]=4}); p:tick()
+  local material=r.materials[item]; local id=material.jobId
+  eq(material.provider,'farm:'..item..':1'); eq(q.state.jobs[id].type,'FARM'); eq(next(app.state.jobs),nil)
+  q.state.jobs[id].status='running'; q.state.jobs[id].workerId=3
+  app.state.workers['3'].online=false; app:save(); app.state=U.copy(app.saved)
+  config.providerPreferences={[item]={'mining'}}; config.farms={}
+  q=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,function() return 0 end,1)
+  p=require('autobuilder.core.production_service').new(app,config,h,q); r=q.state.requests[r.id]; p:tick()
+  eq(r.materials[item].jobId,id); eq(r.materials[item].workerId,3)
+  eq(r.materials[item].provider,'farm:'..item..':1'); eq(q.state.jobs[id].farm.base.x,20)
+  eq(next(app.state.jobs),nil)
+end)
+
+test('production falls back to online mining then retains ownership when preferred farm arrives',function()
+  local app,p,q,config=productionFixture(); local item=mc('dirt')
+  config.farms={{item=item,base={x=20,y=0,z=0}}}; config.providerPreferences={[item]={'farm','mining'}}
+  app.state.workers['2']=miningWorker(2,item,40)
+  local r=p:request({[item]=4}); p:tick(); local id=r.mines[item]
+  eq(r.materials[item].provider,'mining:'..item); assert(id)
+  app.state.workers['3']={id=3,online=true,telemetry={capabilities={farming=true}}}; p:tick()
+  eq(r.materials[item].jobId,id); eq(next(q.state.jobs),nil)
+end)
+
+test('resource summary reports current physical stock separately from planned demand and output',function()
+  local app,p,q,config,h=productionFixture({[1]={name=mc('oak_log'),count=2}})
+  local r=p:request({[mc('oak_planks')]=4}); p:tick()
+  h.inventories.store[2]={name=mc('oak_planks'),count=1}
+  local summary=p:describe(mc('oak_planks'))
+  assert(summary:find('stock=1',1,true),summary); assert(summary:find('required=4',1,true),summary)
+  assert(summary:find('planned=4',1,true),summary); assert(summary:find('deficit=4',1,true),summary)
+  assert(summary:find('crafting:minecraft:oak_planks',1,true),summary)
+  eq(next(q.state.jobs),nil); eq(r.operation,1)
+  assert(p:describe('mod:unknown'):find('No configured provider',1,true))
+end)

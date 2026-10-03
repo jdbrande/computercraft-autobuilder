@@ -1,6 +1,7 @@
 local U=require('autobuilder.core.util')
 local Coordination=require('autobuilder.core.workflows')
 local Materials=require('autobuilder.resources.materials')
+local Providers=require('autobuilder.resources.providers')
 local M={}
 function M.new(app,config,e,queue)
   local s=queue.state; s.requestSequence=s.requestSequence or 0
@@ -46,7 +47,7 @@ function M.new(app,config,e,queue)
   local function progress(r,item,target)
     r.materials=r.materials or {}
     local prior=r.materials[item] or {}
-    local material={count=app.mining.storage:getCount(item) or 0,target=target,status='queued',jobId=prior.jobId,workerId=prior.workerId}
+    local material={count=app.mining.storage:getCount(item) or 0,target=target,status='queued',jobId=prior.jobId,workerId=prior.workerId,provider=prior.provider}
     r.materials[item]=material; return material
   end
   local function blocked(material,reason)
@@ -57,7 +58,18 @@ function M.new(app,config,e,queue)
     r.acquisitions=r.acquisitions or {}
     local groupId=r.acquisitions[item]
     local legacy=r.mines[item] and app.state.jobs[r.mines[item]]
-    if Materials.get(item) and (groupId or (config.exploration or {}).enabled) and not (legacy and legacy.status~='completed') and (groupId or count<target) then
+    local harvest=r.harvests[item] and s.jobs[r.harvests[item]]
+    local provider
+    -- Durable jobs keep their source and saved geometry even when configuration
+    -- or online eligibility changes. Only unowned demand selects a new source.
+    if legacy and legacy.status~='completed' then provider={type='mining',id='mining:'..item}
+    elseif groupId then provider={type='exploration',id='exploration:'..item}
+    elseif harvest and harvest.status~='completed' then
+      local kind=harvest.type=='HARVEST' and 'tree_farm' or 'farm'
+      provider={type=kind,id=material.provider or kind..':'..item,farm=harvest.farm}
+    else provider=Providers.select(item,config,{available=count,required=target,workers=app.state.workers,acquisitionOnly=true}) end
+    material.provider=provider and provider.id or nil
+    if provider and provider.type=='exploration' then
       local group=groupId and app.state.exploration.groups[groupId]
       if not group then
         local why; group,why=app.mining.jobs:requestAcquisition(item,target,count,r.id..':'..item)
@@ -72,7 +84,7 @@ function M.new(app,config,e,queue)
       material.error=group.error; return false
     end
     if count>=target then material.status='ready'; return true end
-    if Materials.get(item) then
+    if provider and provider.type=='mining' then
       local id=r.mines[item]; local existing=id and app.state.jobs[id]
       if not existing or existing.status=='completed' then
         local job,why=app.mining.jobs:submit(item,target,count)
@@ -88,9 +100,8 @@ function M.new(app,config,e,queue)
       if not hasWorker('mining',item) then return blocked(material,'No online mining worker eligible for '..item) end
       return false
     end
-    local farm,kind
-    for _,f in ipairs(config.treeFarms or {}) do if f.item==item then farm=f; kind='HARVEST'; break end end
-    if not farm then for _,f in ipairs(config.farms or {}) do if f.item==item then farm=f; kind='FARM'; break end end end
+    local farm=provider and provider.farm
+    local kind=provider and (provider.type=='tree_farm' and 'HARVEST' or 'FARM')
     if farm then
       local prior=r.harvests[item] and s.jobs[r.harvests[item]]
       if not prior or prior.status=='completed' then
@@ -226,6 +237,26 @@ function M.new(app,config,e,queue)
       end
       r.status='completed'; r.error=nil; save()
     end
+  end
+  function self:describe(item)
+    assert(U.shortString(item,128),'Usage: resource <namespaced-item>')
+    local ok,err=self:refresh()
+    local lines={item..' stock='..(ok and tostring(app.mining.storage:getCount(item) or 0) or 'unknown ('..tostring(err)..')')}
+    local requests={}
+    for _,r in pairs(s.requests) do
+      if r.plan and r.plan.graph and r.plan.graph.nodes[item] then requests[#requests+1]=r end
+    end
+    table.sort(requests,function(a,b) return tonumber(a.id:match('%d+'))<tonumber(b.id:match('%d+')) end)
+    for _,r in ipairs(requests) do
+      local node=r.plan.graph.nodes[item]; local material=(r.materials or {})[item]
+      lines[#lines+1]=r.id..' '..r.status..' required='..node.required..' initial='..node.available..
+        ' planned='..node.produced..' deficit='..node.deficit..' missing='..node.missing..
+        ' provider='..tostring(material and material.provider or node.provider and node.provider.id or node.error)
+    end
+    local candidates=Providers.candidates(item,config)
+    for _,p in ipairs(candidates) do if p.type~='storage' then lines[#lines+1]='candidate='..p.id end end
+    if #candidates==1 then lines[#lines+1]='No configured provider for '..item end
+    return table.concat(lines,'; ')
   end
   local function execute(job)
     local allowed,why=Coordination.factoryCanRun(app.state,job)

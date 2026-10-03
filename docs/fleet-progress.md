@@ -26,8 +26,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 4: logical roles | Miners, builders, Crafty workers, furnace controller, managed farms and courier executor | More harvest/processor adapters, fleet-level logistics/rescue; optional scouting |
 | 5: automatic registration | Installer, discovery/setup sharing, reconnect and capabilities | Single fleet install flow, equipment/software negotiation, automatic eligibility |
 | 6: schematic analyzer | JSON and desktop Sponge converter, transforms, supported-state classification | Native binary import, supported block entities/fluids/redstone analysis, required tools |
-| 7: recursive dependency graph | Recursive planner with surplus and reserve accounting | In progress: explicit aggregated nodes and operation edges; bounded expansion |
-| 8: provider registry | Acquisition paths hard-coded in production | In progress: deterministic configured candidates, availability/preferences, durable selection |
+| 7: recursive dependency graph | Aggregated nodes, shared stock/surplus, operation edges, bounded expansion; 417 Lua tests | Final review and live confirmation in progress |
+| 8: provider registry | Deterministic candidates, availability/preferences, durable acquisition selection | Final review and live confirmation in progress |
 | 9: autonomous mining | Accepted 0.12.0 with four live explorers | Preserve during later pipeline integration |
 | 10: mining intelligence | Surveys, observed resources, protection, routes and exhaustion | Persist hazard/inaccessibility/density evidence and apply ranking |
 | 11: fuel management | Finite mission/return budgets, reserved fuel and some builder refueling | Configurable fuel providers, fleet forecasting, stations/distribution/rescue |
@@ -95,3 +95,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   shared intermediates retain producer dependencies. Focused red-green cases and
   full Lua suite passed 413/413. Node available is original physical stock,
   reserved fuel is explicit demand, and planned output remains separate.
+
+- Task 11: provider routing and `resource ITEM` command pass focused regressions
+  and the 417-test Lua suite. Final release-artifact suite is running. Python
+  suite passed all 16 using `.venv/bin/python` (system Python skips Lua bootstrap).
+  Real test controller is acquiring four cobblestone for four new stone bricks;
+  graph separates two initial bricks from planned output. Reboot was necessary
+  to load changed eagerly required modules; lazy planner had loaded immediately.

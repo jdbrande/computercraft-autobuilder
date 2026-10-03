@@ -265,3 +265,12 @@ test('legacy planned fuel budget is not enlarged when restoring without lane met
   f.c:save(); f.c=Runtime.new(f.cc,f.ce); f.ce.packets={}
   f:finish(); eq(f.h:count(mc('coal')),2); eq(f.h:count(mc('stone_bricks')),8)
 end)
+
+test('resource command exposes request dependency graph without issuing physical actions',function()
+  local f=fixture(); f:request(); f.c.automation.production:tick()
+  local transfers=f.h.transfers
+  local ok,summary=f.c.automation:command('resource minecraft:stone_bricks')
+  assert(ok,'resource command missing'); assert(summary:find('required=8',1,true),summary)
+  assert(summary:find('planned=8',1,true),summary); eq(f.h.transfers,transfers)
+  assert(not pcall(f.c.automation.command,f.c.automation,'resource'))
+end)
