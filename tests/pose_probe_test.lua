@@ -72,3 +72,55 @@ test('pose controls reject changed identity and premature completion acknowledge
   assert(not f.driver:handle('task_pose_grant',{jobId=r.jobId,sequence=r.sequence,origin={x=9,y=64,z=8},granted=true}))
   f:step();eq(f.forward,0)
 end)
+
+test('backup recovery restores probe heading evidence before its mandatory backtrack',function()
+  local f=fixture();f:step();f:grant();f:step();eq(f.forward,1)
+  assert(f.driver:observe(U.copy(f.actual)));eq(f.app.state.poseRecovery.stage,'return')
+  f.app.state.position.heading=nil;f.app.state.position.known=false;f.app.state.position.uncertain=true;f.app:save();f:boot(true)
+  for _=1,6 do f:step() end
+  eq(f.back,1);eq(f.app.state.position.heading,'east');f:ack();assert(f.recovered)
+end)
+
+test('workers without a configured depot retain the probe round trip fuel reserve',function()
+  local f=fixture();f.config.depot=nil;f:step();f:grant()
+  for _=1,8 do f:step() end;f:ack();eq(f.forward,1);eq(f.back,1);eq(f.fuel,98)
+  f=fixture();f.config.depot=nil;f.fuel=1;f:step();f:grant();f:step();eq(f.forward,0)
+end)
+
+test('mining only workers accept matching pose controls without enabling generic effects',function()
+  local f=fixture();f.app.state.currentTask.type='MINE';f.config.mining.enabled=true;f.config.automation.enabled=false
+  f:step();local r=assert(f.app.state.poseRecovery)
+  local executor=require('autobuilder.workers.executor').new(f.app,f.config,{}, {send=function() return true end},function() return f.now end)
+  f.app.poseRecovery=f.driver
+  local function control(sender,kind,sequence)
+    return executor:handle(sender,{boot=1,sequence=sequence,type=kind,payload={jobId=r.jobId,sequence=r.sequence,origin=U.copy(r.origin),granted=true}})
+  end
+  assert(not control(8,'task_pose_grant',1));assert(control(7,'task_pose_grant',2),'mining pose grant rejected')
+  for _=1,8 do f:step() end
+  assert(control(7,'task_pose_ack',3));assert(f.recovered);eq(f.app.state.poseRecovery,nil)
+end)
+
+test('settled physical recovery retries its durable receipt even after GPS disappears',function()
+  local f=fixture();f:step();f:grant();for _=1,6 do f:step() end
+  eq(f.app.state.poseRecovery.stage,'settling');local before=#f.packets
+  f.noGPS=true;f:step();assert(#f.packets>before,'settled receipt incorrectly depends on another GPS fix')
+  eq(f.packets[#f.packets].kind,'task_pose_done');f:ack();assert(f.app.state.poseReceipt)
+end)
+
+test('restored probe heading does not bypass validation of a pending backtrack journal',function()
+  local f=fixture();f:step();f:grant();f:step();assert(f.driver:observe(U.copy(f.actual)))
+  local p=f.app.state.position;p.heading=nil;p.pending={action='back',from={x=9,y=64,z=8,heading='east'},to={x=6,y=64,z=8,heading='east'}};p.uncertain=true
+  assert(not f.driver:observe(U.copy(f.actual)));eq(f.back,0);assert(p.pending);eq(p.heading,nil)
+end)
+
+test('a new controller acknowledgement revokes an unexecuted old grant and fences delayed controls',function()
+  local f=fixture();f:step();f:grant();f.app.state.controllerBoot=1
+  local messages={};local network={send=function(_,_,kind,p) messages[#messages+1]={kind=kind,p=p};return true,'request' end}
+  local agent=require('autobuilder.workers.agent').new(f.app.state,f.config,network,S.turtle(),function() return f.app:save() end)
+  assert(agent:tick(f.now));assert(agent:handle(7,{type='ack',boot=2,payload={requestId='request'}},f.now))
+  eq(f.app.state.controllerBoot,2);assert(not f.app.state.poseRecovery.granted,'old controller grant survived new boot acknowledgement')
+  local ex=require('autobuilder.workers.executor').new(f.app,f.config,{},network,function() return f.now end);f.app.poseRecovery=f.driver
+  local r=f.app.state.poseRecovery
+  assert(not ex:handle(7,{boot=1,sequence=100,type='task_pose_grant',payload={jobId=r.jobId,sequence=r.sequence,origin=r.origin,granted=true}}),'delayed old controller grant was accepted')
+  eq(agent:telemetry().controllerBoot,2)
+end)

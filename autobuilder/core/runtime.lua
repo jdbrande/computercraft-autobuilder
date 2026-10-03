@@ -59,6 +59,10 @@ function M.new(config,e)
   self.chunks=require('autobuilder.core.chunks').new(state,config,function() return self:save() end)
   if config.role=='controller' then
     if source:find('backup') then state.assignmentRecovery=true end
+    for _,worker in pairs(state.workers) do
+      local recovery=worker.telemetry and worker.telemetry.poseRecovery
+      if recovery and recovery.granted and recovery.stage~='settled' then state.assignmentRecovery=true end
+    end
     self.registry=require('autobuilder.workers.workers').new(state,config,function() return self:save() end)
   else
     state.controllerId=config.controllerId
@@ -176,6 +180,8 @@ function M.new(config,e)
         end
         self:report('DEBUG','Worker message rejected: '..tostring(why)); return false,why
       end
+      local restored,reason=self.automation:restorePose(state.workers[tostring(sender)])
+      if not restored then state.assignmentRecovery=true;self:save();self:report('WARN','Pose ownership reconciliation: '..tostring(reason)) end
       local sent,reason=network:send(sender,'ack',{requestId=m.id})
       if not sent then self:report('WARN',reason) end
       return sent,reason

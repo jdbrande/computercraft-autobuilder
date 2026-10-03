@@ -64,11 +64,11 @@ function M.new(turtle,pose,config,save)
     for _=1,(turns==3 and 1 or turns) do local ok,err=step(turns==3 and 'turnLeft' or 'turnRight'); if not ok then return false,err end end
     return true
   end
-  function self:reconcile(fix,heading)
+  function self:reconcile(fix,heading,validateJournal)
     if not U.position(fix) or (heading and not U.heading(heading)) then return false,'invalid pose' end
     local before=U.copy(pose)
     local intent=pose.pending
-    if intent and not heading then
+    if intent and (not heading or validateJournal) then
       local turn=intent.action=='turnLeft' or intent.action=='turnRight'
       local from=intent.from or (turn and pose)
       local to=intent.to or (turn and pose)

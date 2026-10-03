@@ -190,6 +190,7 @@ function M.new(state,save,clock,id,chunks,config)
     persist(); return true
   end
   function self:reserve(owner,jobId,from,target,workers)
+    if state.assignmentRecovery then return false,'controller backup ownership reconciliation pending' end
     local j=s.jobs[jobId] or (state.jobs or {})[jobId]
     if not j or j.workerId~=owner or j.status=='completed' then return false,'reservation requires active task ownership' end
     if j.poseRecovery and j.poseRecovery.status=='held' then return false,'pose recovery owns movement cells' end
@@ -212,11 +213,12 @@ function M.new(state,save,clock,id,chunks,config)
     change();local ok,why=pcall(persist)
     if not ok then j.poseRecovery=prior;s.cells=cells;error(why,0) end
   end
-  function self:reservePose(owner,jobId,sequence,origin,workers)
+  function self:reservePose(owner,jobId,sequence,origin,workers,restoring)
+    if state.assignmentRecovery and not restoring then return false,'controller backup ownership reconciliation pending' end
     local j=s.jobs[jobId] or (state.jobs or {})[jobId]
     local cells=M.poseCells(origin)
     if not config or not cells or not U.integer(sequence) or sequence<1 or sequence>9007199254740991 then return false,'invalid pose reservation' end
-    if not j or j.workerId~=owner or j.status=='completed' or j.paused then return false,'pose recovery requires active unpaused ownership' end
+    if not j or j.workerId~=owner or j.status=='completed' or j.paused and not restoring then return false,'pose recovery requires active unpaused ownership' end
     local old=j.poseRecovery
     if old and (sequence<old.sequence or sequence==old.sequence and (old.status~='held' or U.distance(old.origin,origin)~=0)
       or sequence~=old.sequence and old.status=='held') then return false,'changed or stale pose reservation' end

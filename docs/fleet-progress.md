@@ -21,8 +21,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Managed logistics completed:563 Lua/18 Python tests, native two-courier
   restocking, one final review/fix pass and release checks passed.
 - Managed logistics integrated/pushed at `d877f95`.
-- Current branch `milestone/0.20.0`: interrupted movement and heading recovery,
-  followed by every remaining row.
+- Interrupted movement/heading recovery accepted:589 Lua/18 Python tests, two
+  native interrupted-action/fallback trials and final review fixes. Integrating0.20.
+- Next: capacity-aware crafting batches, followed by every remaining row.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -37,7 +38,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 
 | Requirements | Current evidence | Remaining acceptance |
 | --- | --- | --- |
-| 1–2, 40, 43: complete fleet and hands-off pipeline | Small autonomous chain live-verified in 0.12.0 | Concurrent mixed-material large fleet, binary schematic entry, automatic recovery, safe final return |
+| 1–2, 40, 43: complete fleet and hands-off pipeline | Small autonomous chain live-verified in 0.12.0 | Concurrent mixed-material large fleet, broader automatic recovery, safe final return |
 | 3: coordination, persistence, physical accounting, capabilities | Existing queues, journals and validated worker telemetry | Extend the same guarantees to all new providers/reservations |
 | 4: logical roles | Miners, builders, Crafty workers, furnace controller, managed farms and courier executor | More harvest/processor adapters, fleet-level logistics/rescue; optional scouting |
 | 5: automatic registration | Installer, discovery/setup sharing, reconnect and capabilities | Single fleet install flow, equipment/software negotiation, automatic eligibility |
@@ -382,3 +383,16 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   stone, empty buffers/turtle,1978 finite fuel. Claims released; computers shut down
   and force loading removed. No operator pose/stock/fuel correction. Whole-branch
   review and final release gate follow; all broader requirements remain active.
+
+- Final0.20 review found four Important fallback/configuration defects. Regressions
+  reproduced then fixed missing controller claims, cleared worker backtrack heading,
+  mining-only control refusal and absent-depot crashes. Additional cases protect
+  settlement receipts, telemetry cleaning and delayed old-controller grants.
+  Native fallback retest delivered another9 stone after corrupting only both primary
+  checkpoints at exact recovery boundaries: controller backup had no claim; worker
+  backup held return-stage evidence. Final source46stone+7dirt/destination18stone,
+  empty buffers/turtle,1936 fuel. Native fixtures shut down and tickets removed.
+
+- Final0.20 gate:589 Lua/18 Python tests; release generation/check and whitespace
+  validation passed. Four Important review findings fixed with regressions; no
+  re-review. Both native rigs were shut down and all test loading tickets removed.

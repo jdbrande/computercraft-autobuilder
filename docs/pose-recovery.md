@@ -31,7 +31,12 @@ from fresh GPS rather than repeating it. Claims stay owned during disconnects.
 Paused jobs stay paused. Disabled worker automation performs no generic task or probe
 effects. Recovery resumes only pose-related blocked work, preserving cargo, supply,
 excavation and placement journals. Controller and worker both retain the original
-job identity. Lost recovery grants and settlement acknowledgements are retried.
+job identity. Lost recovery grants and settlement acknowledgements are retried, including after
+GPS disappears once physical return is settled. Mining-only workers can recover
+without enabling generic automation. Controller fallback restores reported probe
+claims before allowing conflicting movement; worker fallback restores only heading
+evidence consistent with its recorded probe path. Old controller grants are fenced
+after reconnect. A worker keeps its latest settlement receipt for reconciliation.
 
 A probe requires all four possible cells to be reservable, even though it physically
 uses only the forward cell. It cannot dig or turn through an obstruction. It does not

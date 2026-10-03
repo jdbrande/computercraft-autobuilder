@@ -12,7 +12,8 @@ function M.new(app,config,e,network,clock,gps)
   end
   local function enabled()
     local t=s.currentTask
-    return t and not t.paused and (t.type=='MINE' and (config.mining.enabled or t.exploration) or t.type~='MINE' and config.automation.enabled)
+    local mining=t and (not t.type or t.type=='MINE')
+    return t and not t.paused and (mining and (config.mining.enabled or t.exploration) or not mining and config.automation.enabled)
   end
   function self:needed()
     local p=s.position
@@ -30,6 +31,7 @@ function M.new(app,config,e,network,clock,gps)
     if kind=='task_pose_grant' and r.stage=='ready' then
       r.granted=p.granted==true;s.poseError=not r.granted and (p.reason or 'waiting for controller pose reservation') or nil;save();return true
     elseif kind=='task_pose_ack' and r.stage=='settling' then
+      s.poseReceipt={jobId=r.jobId,sequence=r.sequence,origin=U.copy(r.origin),stage='settled',granted=true}
       s.poseRecovery=nil;s.motionReservation=nil;s.poseError=nil;save();app:poseRecovered();return true
     end
     return false,'unexpected pose response'
@@ -51,7 +53,7 @@ function M.new(app,config,e,network,clock,gps)
       if distance~=0 and require('autobuilder.core.gps').heading(r.origin,fix)~=r.heading then
         return errorStatus('GPS backtrack fix differs from its recorded probe path')
       end
-      local ok,why=app.navigation:reconcile(fix);if not ok then return errorStatus(why) end
+      local ok,why=app.navigation:reconcile(fix,r.heading,true);if not ok then return errorStatus(why) end
       if distance==0 then r.stage='settling';save() end
       return true
     elseif distance~=0 then return errorStatus('GPS pose recovery origin changed before probe or settlement') end
@@ -68,7 +70,7 @@ function M.new(app,config,e,network,clock,gps)
       end
     end
     local fuel=e.turtle.getFuelLevel()
-    local need=2+U.distance(r.origin,config.depot)+(config.minimumFuelReserve or 100)
+    local need=2+(config.depot and U.distance(r.origin,config.depot) or 0)+(config.minimumFuelReserve or 100)
     if fuel~='unlimited' and (not U.finite(fuel) or fuel<need) then return false,'pose probe needs fuel for forward, backtrack and return reserve' end
     if e.turtle.inspect() then return false,'pose probe front obstructed; clear the accessible recovery cell' end
     return true
@@ -78,6 +80,7 @@ function M.new(app,config,e,network,clock,gps)
     if clock()-last<config.heartbeatInterval then return true end;last=clock()
     local r=s.poseRecovery
     if r and (not s.currentTask or s.currentTask.id~=r.jobId) then return errorStatus('pose recovery task ownership changed') end
+    if r and r.stage=='settling' then send('task_pose_done',r);return true end
     local fix,why=gps:locate();if not fix then return errorStatus(why or 'GPS unavailable') end
     if not r then
       local ok,err=app.navigation:reconcile(fix);if not ok then return errorStatus(err) end

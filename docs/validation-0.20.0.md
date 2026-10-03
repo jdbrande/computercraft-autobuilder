@@ -6,9 +6,9 @@ recovery, rescue, registration and project settlement remain separate required w
 
 ## Automated evidence
 
-Pre-review final gate:581 Lua/18 Python tests passed, including refusal-display
-validation. Release0.20.0 generation/check and git diff --check passed. Whole-branch
-review is next.
+Final gate:589 Lua/18 Python tests passed. Release0.20.0 generation/check and
+`git diff --check` passed. One whole-branch review and its consolidated fix pass
+are complete; the four findings and native fallback retest are recorded below.
 
 Regressions first failed, then passed for unexpected GPS relocation, malformed
 translation envelopes, preservation after failed saves, uncertain turns, saved
@@ -67,6 +67,44 @@ under `dist/live-pose/` includes setup/response, continuous states, each post-ef
 cut record, unresolved GPS-outage state, final snapshots, independent world reads,
 result and cleanup. The audit observes normal runtime state and routes operator input
 through the normal event boundary; it is not terminal-input reliability acceptance.
+
+## Final review and fallback retest
+
+Four Important findings were reproduced and fixed in one review pass:
+
+- Controller fallback could forget an issued probe claim. Validated worker recovery
+  telemetry restores claims before backup scheduling or movement is allowed. A
+  durable worker settlement receipt reconciles a controller snapshot from before the
+  acknowledgement. Fresh controller-generation acknowledgements revoke unexecuted
+  old grants; the barrier waits for their echoed generation before reopening work.
+  Delayed grants from the old controller cannot cross that boundary.
+- Worker fallback deliberately clears heading. A return-stage probe now restores its
+  measured heading while still validating any pending backtrack movement journal.
+- Mining-only workers accept their owned recovery controls even when generic
+  automation is disabled; unrelated generic effects remain disabled.
+- Optional depots no longer cause a nil-index exception during probe fuel checks.
+  The forward/backtrack reserve still applies when no home is configured.
+
+Additional regressions cover malformed/cyclic extra telemetry, lost settlement
+acknowledgement followed by GPS loss, acknowledged-settlement fallback and delayed
+old-controller grants. No physical journal is discarded to unblock a worker.
+
+A second native run raised the destination target from9 to18 and automatically
+scheduled one more nine-stone haul using the remaining source stock. Test wrappers
+corrupted only the primary controller checkpoint immediately after actually sending
+a recovery grant, and the primary worker checkpoint before the native backtrack.
+Both loaded their existing normal fallback checkpoints. The captured controller
+fallback explicitly contained **no probe claim**; the worker fallback contained the
+return stage at the adjacent cell with its previously measured north heading, which
+runtime startup deliberately invalidates before recovery.
+
+The original second job recovered and completed in33.80 seconds. Independent world
+reads confirmed source46 stone plus7 dirt, destination18 stone, empty private buffers
+and turtle, and1936 fuel. All jobs/hauls completed and claims settled/released. The
+same six computers and all fixture/observer force-load tickets were shut down/removed
+again. Evidence is retained in `dist/live-pose/fallback-*` and its two audit records.
+The final controller-generation fencing refinement follows this native retest and is
+covered by an actual runtime delayed-packet/fallback regression.
 
 ## Limits
 

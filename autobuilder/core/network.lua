@@ -7,10 +7,13 @@ local Chunks=require('autobuilder.core.chunks')
 local E=require('autobuilder.resources.exploration')
 local function telemetry(p)
   if not short(p.label) or not short(p.status) then return false end
+  if p.controllerBoot~=nil and (not U.integer(p.controllerBoot) or p.controllerBoot<1 or p.controllerBoot>9007199254740991) then return false end
   for _,field in ipairs({'fuelRequired','fuelLimit'}) do
     if p[field]~=nil and (not U.integer(p[field]) or p[field]<1 or p[field]>100000000) then return false end
   end
   if p.chunkAnchor~=nil and not Chunks.validAnchor(p.chunkAnchor) then return false end
+  if p.poseRecovery~=nil and (not TaskMessages.validPoseReport(p.poseRecovery)
+    or p.poseRecovery.stage~='settled' and p.poseRecovery.jobId~=p.task) then return false end
   if p.depot~=nil and not U.position(p.depot) then return false end
   if p.explorationHome~=nil and not E.home(p.explorationHome) then return false end
   local pos=p.position
@@ -90,11 +93,12 @@ function M.new(hw,config,id,boot)
     -- Copy only validated fields: ignore unknown, potentially cyclic network data.
     local p=message.payload; local clean={}
     if message.type=='register' or message.type=='heartbeat' then
-      clean={label=p.label,status=p.status,fuel=p.fuel,task=p.task,fuelRequired=p.fuelRequired,fuelLimit=p.fuelLimit,
+      clean={controllerBoot=p.controllerBoot,label=p.label,status=p.status,fuel=p.fuel,task=p.task,fuelRequired=p.fuelRequired,fuelLimit=p.fuelLimit,
         inventory={used=p.inventory.used,slots=16},capabilities=U.copy(p.capabilities),
         position={known=p.position.known,heading=p.position.heading,source=p.position.source}}
       if p.position.known then clean.position.x,clean.position.y,clean.position.z=p.position.x,p.position.y,p.position.z end
       if p.chunkAnchor then clean.chunkAnchor={provider=p.chunkAnchor.provider,x=p.chunkAnchor.x,z=p.chunkAnchor.z} end
+      clean.poseRecovery=TaskMessages.poseReport(p.poseRecovery)
       if p.depot then clean.depot={x=p.depot.x,y=p.depot.y,z=p.depot.z} end
       clean.miningResources=U.copy(p.miningResources)
       if p.explorationHome then clean.explorationHome=E.cleanHome(p.explorationHome) end

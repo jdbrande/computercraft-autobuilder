@@ -815,9 +815,9 @@ worker probes once with persistent intent and derives heading from actual GPS de
 
 ### Task34: Native interrupted-action acceptance and integration
 
-- [ ] Build real GPS fixture; inject post-effect reboot for translations/turns and
+- [x] Build real GPS fixture; inject post-effect reboot for translations/turns and
   verify automatic original-task completion with actual world/inventory evidence.
-- [ ] Record limits and failures, regression-test fixes, update commands/status/docs.
+- [x] Record limits and failures, regression-test fixes, update commands/status/docs.
   Run full Lua/Python/release checks, one whole-branch review/fix pass, integrate/push.
-- [ ] Continue final settlement, continuous supply, scaling/site preparation and all
+- [x] Continue final settlement, continuous supply, scaling/site preparation and all
   other unfinished fleet requirements without a milestone handoff.

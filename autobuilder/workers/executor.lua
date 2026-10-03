@@ -104,7 +104,11 @@ function M.new(app,config,e,network,clock)
     if r then send('task_position',{jobId=r.jobId,from=r.from,target=r.target}); s.motionReservation=nil; save() end
   end
   function self:handle(sender,m)
-    if sender~=config.controllerId or not config.automation.enabled then return false,'automation controller mismatch or disabled' end
+    local task=s.currentTask
+    local miningPose=(m.type=='task_pose_grant' or m.type=='task_pose_ack') and task and (not task.type or task.type=='MINE')
+      and (config.mining.enabled or task.exploration)
+    if sender~=config.controllerId or not config.automation.enabled and not miningPose then return false,'automation controller mismatch or disabled' end
+    if m.boot<(s.controllerBoot or 0) then return false,'stale controller generation' end
     local previous=s.lastTaskControl
     if previous and (m.boot<previous.boot or (m.boot==previous.boot and m.sequence<=previous.sequence)) then return false,'stale task control' end
     s.lastTaskControl={boot=m.boot,sequence=m.sequence}; save()

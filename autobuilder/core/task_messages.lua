@@ -23,6 +23,15 @@ local function quantities(map)
   end
   return true
 end
+function M.validPoseReport(p)
+  return type(p)=='table' and U.shortString(p.jobId,100) and U.integer(p.sequence) and p.sequence>=1
+    and p.sequence<=9007199254740991 and U.position(p.origin) and type(p.granted)=='boolean'
+    and ({ready=true,probe=true,['return']=true,settling=true,settled=true})[p.stage]==true
+end
+function M.poseReport(p)
+  if not p then return nil end
+  return {jobId=p.jobId,sequence=p.sequence,origin={x=p.origin.x,y=p.origin.y,z=p.origin.z},stage=p.stage,granted=p.granted==true}
+end
 function M.validate(kind,p)
   if type(p)~='table' or not bounded(p,0,{}, {n=0,bytes=0}) then return false,'oversized or malformed task payload' end
   if kind=='task_assign' then

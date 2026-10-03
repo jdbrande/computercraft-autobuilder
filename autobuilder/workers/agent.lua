@@ -17,7 +17,8 @@ function M.new(state,config,network,turtle,save,chunkProbe)
       and math.max(config.fuel.target,config.mining.fuelTarget,task.requiredFuel or 0) or nil
     local limit=turtle.getFuelLimit and turtle.getFuelLimit() or nil
     if limit=='unlimited' then limit=nil end
-    return {chunkAnchor=chunkProbe and chunkProbe() or nil,fuelRequired=need,fuelLimit=limit,label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,
+    return {controllerBoot=state.controllerBoot,poseRecovery=require('autobuilder.core.task_messages').poseReport(state.poseRecovery or state.poseReceipt),
+      chunkAnchor=chunkProbe and chunkProbe() or nil,fuelRequired=need,fuelLimit=limit,label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,
       position={known=p.known==true,x=p.x,y=p.y,z=p.z,heading=p.heading,source=p.source or 'unknown'},
       fuel=turtle.getFuelLevel(),depot=U.copy(config.depot),inventory={used=used,slots=16},
       miningResources=config.mining and config.mining.enabled and U.copy(config.mining.resources or {}) or nil,
@@ -46,6 +47,12 @@ function M.new(state,config,network,turtle,save,chunkProbe)
   function self:handle(sender,m,now)
     if sender~=config.controllerId then return false,'not configured controller' end
     if m.type=='ack' and pending[m.payload.requestId] then
+      if m.boot and m.boot<(state.controllerBoot or 0) then return false,'stale controller acknowledgement' end
+      if m.boot and m.boot~=(state.controllerBoot or 0) then
+        state.controllerBoot=m.boot
+        if state.poseRecovery and state.poseRecovery.stage=='ready' then state.poseRecovery.granted=false end
+        local ok,why=save();if not ok then return false,why end
+      end
       pending[m.payload.requestId]=nil; lastAck=now; self.connected=true; return true
     elseif m.type=='register_required' then lastRegister=-math.huge; self.connected=false; return true end
     return false,'unexpected or stale controller response'

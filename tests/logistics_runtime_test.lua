@@ -439,3 +439,51 @@ test('GPS heading probe recovers a courier turn across both controller and worke
   eq(f.controller.state.automation.jobs[id].status,'completed');eq(f.stats.pulled,9);eq(f.stats.dropped,9)
   eq(f.worker.state.poseRecovery,nil);eq(f.controller.state.automation.jobs[id].poseRecovery.status,'settled')
 end)
+
+test('controller fallback restores issued pose claims and acknowledged settlement before conflicting motion',function()
+  for _,cut in ipairs({'grant','ack','delayed'}) do
+    local f=fixture();f.inventories.stage[1]={name='minecraft:stone',count=9}
+    f.we.gps={locate=function() return f.world.pose.x,f.world.pose.y,f.world.pose.z end};f:reboot(false,true)
+    local original=f.world.turtle.turnRight;local interrupted=false
+    f.world.turtle.turnRight=function()
+      local ok,why=original();if ok and not interrupted then interrupted=true;error('power loss after turn') end;return ok,why
+    end
+    f.world.turtle.back=function()
+      local p=f.world.pose;local d=({north={0,-1},east={1,0},south={0,1},west={-1,0}})[p.heading]
+      p.x=p.x-d[1];p.z=p.z-d[2];return true
+    end
+    local ok,id=f.controller:command('transport minecraft:stone 9 source destination');assert(ok,id)
+    for _=1,200 do f:step();if interrupted then break end end
+    assert(interrupted);f:reboot(false,true);assert(f.worker:updateGPS())
+    local rebooted=false;local delayed
+    if cut=='delayed' then f.filter=function(packet)
+      if packet.m.type=='task_pose_grant' and not delayed then delayed=U.copy(packet);return false end
+    end end
+    for _=1,350 do
+      f:step();local r=f.worker.state.poseRecovery
+      local ready=cut=='grant' and r and r.granted and r.stage=='ready'
+        or cut=='ack' and f.worker.state.poseReceipt or cut=='delayed' and delayed and r and not r.granted
+      if ready and not rebooted then
+        local origin=U.copy((r or f.worker.state.poseReceipt).origin)
+        f.ce.fs.files['/autobuilder/data/controller.state']='corrupt';f:reboot(true,false);rebooted=true
+        assert(f.controller.state.assignmentRecovery)
+        local q=f.controller.automation.queue
+        q.state.jobs.other={id='other',workerId=13,status='running',type='RETURN_HOME',loadedArea=U.copy(q.state.jobs[id].loadedArea)}
+        f.controller.state.chunkLedger.leases.other={status='held',workerId=13,area=U.copy(q.state.jobs[id].loadedArea)}
+        assert(not q:reserve(13,'other',origin,{x=origin.x+1,y=origin.y,z=origin.z},{}),'fallback allowed motion before claim recovery')
+        q.state.jobs.other=nil;f.controller.state.chunkLedger.leases.other=nil
+        if cut=='delayed' then
+          f.ce.now=f.ce.now+10;f.we.now=f.ce.now;f.worker:tick();f:pump(f.we,f.controller);f.controller:tick()
+          assert(f.controller.state.assignmentRecovery,'backup barrier cleared before controller-generation echo')
+          f:pump(f.ce,f.worker);eq(f.worker.state.controllerBoot,f.controller.state.boot)
+          assert(not f.worker:receive(delayed.m.sender,delayed.m,delayed.protocol),'late old grant crossed generation fence')
+          assert(not f.worker.state.poseRecovery.granted);f.filter=nil
+        end
+      end
+      if f.controller.state.automation.jobs[id].status=='completed' then break end
+    end
+    assert(rebooted,'fallback checkpoint window not exercised: '..cut)
+    eq(f.controller.state.automation.jobs[id].status,'completed');eq(f.stats.dropped,9);eq(f.stats.pulled,9)
+    eq(f.worker.state.poseRecovery,nil);eq(f.controller.state.automation.jobs[id].poseRecovery.status,'settled')
+  end
+end)

@@ -12,6 +12,19 @@ function M.new(app,config,e,network,clock)
   local infrastructure=require('autobuilder.core.infrastructure').new(app,config,e,queue)
   local self={queue=queue,production=production,fuel=fuel,rescue=rescue,projects=projects,infrastructure=infrastructure,cathedral=cathedral}; local last=-math.huge
   local function send(owner,kind,payload) return network:send(owner,kind,payload) end
+  function self:restorePose(worker)
+    local p=worker.telemetry and worker.telemetry.poseRecovery
+    if not p or not p.granted then return true end
+    local j=queue.state.jobs[p.jobId] or (app.state.jobs or {})[p.jobId]
+    if p.stage=='settled' then
+      if not j or not j.poseRecovery or j.poseRecovery.status=='settled' then return true end
+      return queue:finishPose(worker.id,p.jobId,p.sequence,p.origin)
+    end
+    if j and j.workerId==worker.id and j.poseRecovery and j.poseRecovery.status=='settled'
+      and j.poseRecovery.sequence==p.sequence and U.distance(j.poseRecovery.origin,p.origin)==0 and p.stage=='settling' then return true end
+    if not worker.online then return false,'waiting for recovery owner to reconnect' end
+    return queue:reservePose(worker.id,p.jobId,p.sequence,p.origin,app.state.workers,true)
+  end
   function self:command(line)
     local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
     if args[1]=='fuel' then app.state.view='fuel'; return true,fuel:describe()
@@ -101,6 +114,9 @@ function M.new(app,config,e,network,clock)
       local ready=true
       for _,w in pairs(app.state.workers) do
         if not w.online then ready=false end
+        if w.online and not self:restorePose(w) then ready=false end
+        local pose=w.telemetry and w.telemetry.poseRecovery
+        if pose and pose.stage=='ready' and w.telemetry.controllerBoot~=app.state.boot then ready=false end
         local task=w.telemetry and w.telemetry.task
         if task then
           local j=queue.state.jobs[task] or (app.state.jobs or {})[task]

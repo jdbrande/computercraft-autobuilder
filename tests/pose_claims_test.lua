@@ -64,3 +64,16 @@ test('pose request protocol validates bounded identity coordinates and exact gra
   p.reason={};assert(not P.validate('task_pose_grant',p),'malformed refusal reason accepted');p.reason=nil
   p.origin.x=0/0;assert(not P.validate('task_pose_grant',p))
 end)
+
+test('recovery heartbeat evidence is bounded and cleans unknown fields before restoring ownership',function()
+  local S=require('tests.support');local cfg=require('tests.loaded_config').load({role='worker',controllerId=7})
+  local state={id=12,position={known=true,x=8,y=64,z=8},currentTask={id='task:7:1',type='MINE'},
+    poseRecovery={jobId='task:7:1',sequence=1,stage='probe',granted=true,origin=point()}}
+  local payload=require('autobuilder.workers.agent').new(state,cfg,{},S.turtle(),function() return true end):telemetry()
+  local msg={version=1,id='12:1:1',sender=12,boot=1,sequence=1,type='register',payload=payload}
+  local N=require('autobuilder.core.network');assert(N.validate(12,msg));payload.poseRecovery.extra=payload
+  local clean=assert(N.new({},cfg,7,1):accept(12,msg,cfg.protocol,100));eq(clean.payload.poseRecovery.extra,nil)
+  payload.poseRecovery.sequence=0;assert(not N.validate(12,msg));payload.poseRecovery.sequence=1
+  payload.poseRecovery.jobId='other';assert(not N.validate(12,msg));payload.poseRecovery.jobId=payload.task
+  payload.poseRecovery.stage='unknown';assert(not N.validate(12,msg))
+end)
