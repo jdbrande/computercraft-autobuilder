@@ -52,7 +52,25 @@ end
 -- the ordinary route; movement still uses navigation's reservations/protection.
 function M.overheadPoints(task,nav,turtle,config,target,height)
   local pose=nav.pose; local departure=pose; local points={}
-  if turtle and turtle.inspectUp and pose.y<height then
+  local access=task.siteAccess;local fromIndex,toIndex
+  if access then
+    height=math.max(height,access.entry.y)
+    local function point(i) return i==0 and access.entry or access.cells[i] end
+    for i=0,#access.cells do
+      if U.distance(pose,point(i))==0 then fromIndex=i end
+      if U.distance(target,point(i))==0 then toIndex=i end
+    end
+    if fromIndex and toIndex then
+      local step=fromIndex<toIndex and 1 or -1
+      for i=fromIndex+step,toIndex,step do points[#points+1]=U.copy(point(i)) end
+      return points
+    end
+    if fromIndex then
+      for i=fromIndex-1,0,-1 do points[#points+1]=U.copy(point(i)) end
+      departure=access.entry
+    end
+  end
+  if not fromIndex and turtle and turtle.inspectUp and pose.y<height then
     local ok,occupied=pcall(turtle.inspectUp)
     if not ok then return nil,'cannot inspect construction departure clearance' end
     if occupied then
@@ -74,8 +92,10 @@ function M.overheadPoints(task,nav,turtle,config,target,height)
     end
   end
   points[#points+1]={x=departure.x,y=height,z=departure.z}
-  points[#points+1]={x=target.x,y=height,z=target.z}
-  points[#points+1]={x=target.x,y=target.y,z=target.z}
+  local arrival=toIndex and access.entry or target
+  points[#points+1]={x=arrival.x,y=height,z=arrival.z}
+  points[#points+1]={x=arrival.x,y=arrival.y,z=arrival.z}
+  if toIndex then for i=1,toIndex do points[#points+1]=U.copy(access.cells[i]) end end
   return points
 end
 -- Persist the route stages: reservation waits must not restart an overhead ascent.

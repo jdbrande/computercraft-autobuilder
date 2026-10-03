@@ -247,3 +247,119 @@ test('fill selection requires enough stock or an available replenishment provide
   assert(first,'no fill task');eq(first.blocks[1].name,amount==1 and 'minecraft:cobblestone' or 'minecraft:dirt')
  end
 end)
+
+test('failed preparation verification resurveys fresh epochs across restart and stops after three retries',function()
+  for _,persistent in ipairs({false,true}) do
+    local e,c,app,q,p,plan,service,production=surveyedFixture();service:startWork(p,plan)
+    local surveys=0;local firstEpoch;local replayed=false
+    for _=1,2400 do
+      service:workTick(p,plan)
+      for _,j in pairs(q.state.jobs) do if j.status~='completed' then
+        j.workerId=12;j.status='completed';j.completedAt=100
+        if j.type=='SURVEY_SITE' then
+          surveys=surveys+1;eq(j.siteSurvey.region,1)
+          j.progress=#j.siteSurvey.columns;j.siteReport={identity=plan.identity,region=1,observations={}}
+          for _,col in ipairs(j.siteSurvey.columns) do j.siteReport.observations[#j.siteReport.observations+1]={x=col.x,z=col.z,y=col.minY,status='empty',name='minecraft:air'} end
+        else
+          local defect=j.siteWork.region==1 and j.siteWork.stage=='verify' and (persistent or surveys==0)
+          j.progress=#j.blocks-(defect and 1 or 0);j.report={counts={correct=j.progress},entries={}}
+          if defect then
+            j.report.counts.missing=1;j.report.entries={{x=j.blocks[1].x,y=j.blocks[1].y,z=j.blocks[1].z,status='missing',reason='ground changed after work'}}
+            firstEpoch=firstEpoch or j.key
+          elseif j.siteWork.region==1 and surveys>0 then assert(j.key~=firstEpoch,'retry reused a physical work ID') end
+        end
+      end end
+      local record=service:evidence(p,plan,1)
+      if record and record.retryPending and not replayed then
+        local save=app.save
+        function app:save() return false,'retry root checkpoint lost' end
+        assert(not pcall(service.workTick,service,p,plan))
+        app.save=save
+        service=require('autobuilder.build.site_service').new(app,c,e,q,production);replayed=true
+      end
+      if p.phase=='site_ready' or p.phase=='site_blocked' then break end
+    end
+    eq(surveys,persistent and 3 or 1);assert(replayed)
+    eq(p.phase,persistent and 'site_blocked' or 'site_ready')
+    local record=assert(service:evidence(p,plan,1));eq(record.preparationRetries,surveys)
+    assert(record.retryHistory[1].defect.reason)
+    eq(service:prepared(p,plan,1),not persistent);assert(service:prepared(p,plan,2))
+    local before=q.state.sequence;for _=1,10 do service:workTick(p,plan) end;eq(q.state.sequence,before)
+  end
+end)
+
+test('malformed pending retry evidence is rejected without crashing recovery',function()
+  local e,c,app,q,p,plan,service=surveyedFixture()
+  local original,path=service:evidence(p,plan,1)
+  for _,value in ipairs({true,'bad',{},-1}) do
+    local record=U.copy(original);record.retryPending=true;record.preparationRetries=value
+    record.preparation={status='blocked',stage='verified'}
+    assert(require('autobuilder.core.checkpoint').new(e.fs,e.textutils,path):save(record))
+    assert(not service:evidence(p,plan,1))
+  end
+  local record=U.copy(original);record.retryPending=true;record.preparationRetries=1;record.preparation=true
+  assert(require('autobuilder.core.checkpoint').new(e.fs,e.textutils,path):save(record))
+  assert(not service:evidence(p,plan,1))
+end)
+
+test('observed fluid schedules a complete sealing pass before removing temporary solids',function()
+  local e,c,app,q,p,plan,service=surveyedFixture();service:startWork(p,plan)
+  local wet,sealed,cleared=false,false,false;local sealCells=0
+  for _=1,1000 do
+    service:workTick(p,plan)
+    for _,j in pairs(q.state.jobs) do if j.type=='PREPARE_REGION' and j.status~='completed' then
+      j.workerId=12;j.status='completed';j.completedAt=100;j.progress=#j.blocks;j.report={counts={correct=#j.blocks},entries={}}
+      if j.siteWork.region==1 then
+        if j.siteWork.stage=='clear' and not wet then
+          wet=true;j.progress=j.progress-1;j.report.counts.correct=j.progress;j.report.counts.unsupported=1
+          j.report.entries={{x=j.blocks[1].x,y=j.blocks[1].y,z=j.blocks[1].z,status='unsupported',actual={name='minecraft:water',state={level='0'}},reason='fluid needs sealing'}}
+        elseif j.siteWork.stage=='seal' then
+          assert(not cleared);sealed=true;sealCells=sealCells+#j.blocks
+        elseif j.siteWork.stage=='clear' and sealed then
+          cleared=true
+          local record=service:evidence(p,plan,1);local _,_,expected=plan:work(1,record,'seal',1,1,'minecraft:dirt');eq(sealCells,expected)
+        elseif j.siteWork.stage=='fill' then assert(sealed and cleared,'foundation phase skipped fluid clearance') end
+      end
+    end end
+    if p.phase=='site_ready' then break end
+  end
+  assert(wet and sealed and cleared);eq(p.phase,'site_ready');assert(service:prepared(p,plan,1))
+end)
+
+test('cross-region fluid stabilization revisits an early failed region after later sources are sealed',function()
+ for _,persistent in ipairs({false,true}) do
+  local e,c,app,q,p,plan,service,production=surveyedFixture();service:startWork(p,plan)
+  local sourceSealed=false;local earlyBlocked=false;local restarted=false;local surveys=0
+  for _=1,4500 do
+    service:workTick(p,plan)
+    local first=service:evidence(p,plan,1)
+    if first and first.preparation and first.preparation.status=='blocked' and not first.retryPending and first.preparationRetries==3 then earlyBlocked=true end
+    for _,j in pairs(q.state.jobs) do if j.status~='completed' and not (j.siteWork and j.siteWork.region==plan.regionCount and not earlyBlocked) then
+      j.workerId=12;j.status='completed';j.completedAt=100
+      if j.type=='SURVEY_SITE' then
+        if j.siteSurvey.region==1 then surveys=surveys+1 end
+        j.progress=#j.siteSurvey.columns;j.siteReport={identity=plan.identity,region=j.siteSurvey.region,observations={}}
+        for _,col in ipairs(j.siteSurvey.columns) do j.siteReport.observations[#j.siteReport.observations+1]={x=col.x,z=col.z,y=col.minY,status='empty',name='minecraft:air'} end
+      else
+        j.progress=#j.blocks;j.report={counts={correct=j.progress},entries={}}
+        local r,stage=j.siteWork.region,j.siteWork.stage
+        if r==plan.regionCount and stage=='seal' then sourceSealed=true end
+        if (r==1 and (not sourceSealed or persistent) or r==plan.regionCount and not sourceSealed) and (stage=='clear' or stage=='verify') then
+          j.progress=j.progress-1;j.report.counts.correct=j.progress;j.report.counts.unsupported=1
+          j.report.entries={{x=j.blocks[1].x,y=j.blocks[1].y,z=j.blocks[1].z,status='unsupported',actual={name='minecraft:water',state={level='1'}},reason='adjacent fluid inflow'}}
+        end
+      end
+    end end
+    if p.site.work.fluidRecheck and not restarted then
+      service=require('autobuilder.build.site_service').new(app,c,e,q,production);restarted=true
+      local save=app.save;function app:save() return false,'post-fluid checkpoint unavailable' end
+      assert(not pcall(service.workTick,service,p,plan));app.save=save
+    end
+    if p.phase=='site_ready' or p.phase=='site_blocked' then break end
+  end
+  assert(earlyBlocked,'case did not reach the early retry limit');assert(sourceSealed,'later source was never sealed')
+  assert(restarted);eq(p.phase,persistent and 'site_blocked' or 'site_ready');eq(service:prepared(p,plan,1),not persistent)
+  eq(surveys,persistent and 7 or 4);assert(service:evidence(p,plan,1).fluidRechecked)
+  local sequence=q.state.sequence;for _=1,20 do service:workTick(p,plan) end;eq(q.state.sequence,sequence)
+ end
+end)

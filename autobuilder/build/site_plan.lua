@@ -99,6 +99,39 @@ function M.new(source,transform,sourceHash,options)
     return {type='SURVEY_SITE',clearanceY=bounds.max.y,bounds=self:region(regionIndex).bounds,
       siteSurvey={identity=planId,region=regionIndex,columns=columns}},nextCursor
   end
+  function self:access(regionIndex,target,clearanceY)
+    local P=require('autobuilder.core.pathfinding');local r=self:region(regionIndex)
+    if not U.position(target) or not P.inside(target,r.bounds) or self:wanted(target)
+      or not U.integer(clearanceY) or clearanceY<bounds.max.y or clearanceY>maxY
+      or clearanceY-target.y>128 then return nil,'no bounded generic foundation access' end
+    local columns=self:columns(regionIndex,1,64);local foundation=false
+    for _,c in ipairs(columns) do if c.x==target.x and c.z==target.z and c.foundationY==target.y then foundation=true end end
+    if not foundation then return nil,'access target is not a generic foundation' end
+    local function removable(p)
+      if p.y~=target.y or not P.inside(p,r.bounds) or U.distance(p,target)==0 then return false end
+      local wanted=self:wanted(p);return not wanted or C.isAir(wanted.name)
+    end
+    table.sort(columns,function(a,b)
+      local da,db=math.abs(a.x-target.x)+math.abs(a.z-target.z),math.abs(b.x-target.x)+math.abs(b.z-target.z)
+      return da<db or da==db and (a.x<b.x or a.x==b.x and a.z<b.z)
+    end)
+    for _,c in ipairs(columns) do
+      local shaft={x=c.x,y=target.y,z=c.z};local clear=removable(shaft)
+      if clear then for y=target.y+1,clearanceY-1 do
+        local wanted=self:wanted({x=c.x,y=y,z=c.z})
+        if wanted and not C.isAir(wanted.name) then clear=false;break end
+      end end
+      if clear then for _,stand in ipairs(P.neighbors(target)) do if removable(stand) then
+        local path=P.find(shaft,stand,removable,64)
+        if path and clearanceY-target.y+#path<=128 then
+          local cells={};for y=clearanceY-1,target.y,-1 do cells[#cells+1]={x=c.x,y=y,z=c.z} end
+          for _,cell in ipairs(path) do cells[#cells+1]=cell end
+          return {entry={x=c.x,y=clearanceY,z=c.z},cells=cells,stand=U.copy(stand),target=U.copy(target)}
+        end
+      end end end
+    end
+    return nil,'retained schematic leaves no access shaft within the owned region'
+  end
   function self:requiredRegions(blocks)
     assert(type(blocks)=='table' and #blocks>0 and #blocks<=512,'bounded structural region required')
     local x0,x1,z0,z1=math.huge,-math.huge,math.huge,-math.huge
@@ -113,7 +146,8 @@ function M.new(source,transform,sourceHash,options)
   end
   function self:work(regionIndex,evidence,stage,cursor,limit,fill)
     local verify=stage=='verify_clear' or stage=='verify_fill'
-    local clearing=stage=='clear' or stage=='verify_clear'
+    local sealing=stage=='seal'
+    local clearing=stage=='clear' or stage=='verify_clear' or sealing
     assert(clearing or stage=='fill' or stage=='verify_fill','invalid preparation stage')
     integer(cursor,1,262145,'invalid preparation cursor');integer(limit,1,512,'preparation batch must be 1..512')
     assert(type(evidence)=='table' and evidence.identity==planId and evidence.region==regionIndex
@@ -121,7 +155,7 @@ function M.new(source,transform,sourceHash,options)
     local survey=self:survey(regionIndex,1,64);survey.clearanceY=evidence.clearanceY;survey.bounds.max.y=evidence.clearanceY
     for _,c in ipairs(survey.siteSurvey.columns) do c.clearanceY=evidence.clearanceY end
     assert(require('autobuilder.build.site_survey').validReport(survey,evidence.report,true),'invalid preparation survey evidence')
-    if not clearing then assert(C.family(fill)=='cube' and C.classify(fill,{})=='SUPPORTED','fill must be a supported stable cube') end
+    if not clearing or sealing then assert(C.family(fill)=='cube' and C.classify(fill,{})=='SUPPORTED','fill must be a supported stable cube') end
     local ranges={};local total=0
     for i,c in ipairs(survey.siteSurvey.columns) do
       local observed=evidence.report.observations[i]
@@ -145,7 +179,9 @@ function M.new(source,transform,sourceHash,options)
       while position<=r.last and #blocks<limit do
         local y=clearing and r.high-(position-r.first) or r.low+(position-r.first)
         local p={x=r.column.x,y=y,z=r.column.z};local wanted=self:wanted(p)
-        if clearing then
+        if sealing then
+          p.name=fill;p.state={};blocks[#blocks+1]=p
+        elseif clearing then
           p.name='minecraft:air';p.state={}
           if wanted and not C.isAir(wanted.name) then p.retain={name=wanted.name,state=wanted.state} end
           blocks[#blocks+1]=p
@@ -159,7 +195,7 @@ function M.new(source,transform,sourceHash,options)
     end end
     if #blocks==0 then return nil,nil,total end
     local payload={type='PREPARE_REGION',blocks=blocks,bounds=survey.bounds,clearanceY=evidence.clearanceY,
-      siteWork={identity=planId,region=regionIndex,stage=verify and 'verify' or clearing and 'clear' or 'fill'}}
+      siteWork={identity=planId,region=regionIndex,stage=verify and 'verify' or sealing and 'seal' or clearing and 'clear' or 'fill'}}
     return payload,position<=total and position or nil,total
   end
   return self

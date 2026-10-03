@@ -27,9 +27,16 @@ function M.new(app,config,e,queue,production)
       or not Survey.validReport(contract(plan,region,record.clearanceY),record.report,true) then return nil,'invalid site evidence' end
     local w=record.preparation
     if record.recovery~=nil and (not U.integer(record.recovery) or record.recovery<0) then return nil,'invalid site recovery generation' end
+    if record.preparationRetries~=nil and (not U.integer(record.preparationRetries) or record.preparationRetries<0 or record.preparationRetries>3)
+      or record.retryPending~=nil and type(record.retryPending)~='boolean'
+      or record.fluidRechecked~=nil and type(record.fluidRechecked)~='boolean'
+      or record.retryHistory~=nil and (type(record.retryHistory)~='table' or #record.retryHistory>3) then return nil,'invalid preparation retry evidence' end
+    if record.retryPending and (type(w)~='table' or w.status~='blocked' or w.stage~='verified' or not record.preparationRetries or record.preparationRetries<1) then
+      return nil,'invalid pending preparation retry'
+    end
     if w~=nil then
       if type(w)~='table' or not ({working=true,prepared=true,blocked=true})[w.status]
-        or not ({clear=true,fill=true,verify_fill=true,verify_clear=true,verified=true})[w.stage]
+        or not ({clear=true,seal=true,fill=true,verify_fill=true,verify_clear=true,verified=true})[w.stage]
         or not U.integer(w.sequence) or w.sequence<1 or not U.integer(w.cursor) or w.cursor<0 or w.cursor>262145
         or not U.integer(w.failed) or w.failed<0 or type(w.defects)~='table' or #w.defects>64
         or w.epoch~=nil and (not U.integer(w.epoch) or w.epoch<0)
@@ -171,7 +178,7 @@ function M.new(app,config,e,queue,production)
     end
     return true
   end
-  local function recoverEvidence(p,plan,a)
+  local function recoverEvidence(p,plan,a,prior)
     local prefix=p.name..':site:'..p.site.generation..':'..a.region..':work:'
     local owners={};local epoch=a.recoveries or 0
     for _,j in pairs(s.jobs) do if j.key and j.key:sub(1,#prefix)==prefix then
@@ -205,8 +212,11 @@ function M.new(app,config,e,queue,production)
       end);j.siteReport=nil;j.siteSurvey.columns=nil;assert(save());return true
     end
     local record={identity=plan.identity,region=a.region,jobId=j.id,clearanceY=j.clearanceY,report=U.copy(j.siteReport),recovery=a.recoveries}
+    record.preparationRetries=math.max(a.preparationRetries or 0,prior and prior.preparationRetries or 0)
+    record.retryHistory=U.copy(prior and prior.retryHistory or {})
+    record.fluidRechecked=a.fluidRechecked or prior and prior.fluidRechecked or nil
     local cp=store(p,plan,a.region);assert(cp:save(record));assert(cp:save(record))
-    F.commit(p,save,function() a.recovery=nil;a.error=nil end)
+    F.commit(p,save,function() a.recovery=nil;a.fluidRetry=nil;a.error=nil end)
     j.siteReport=nil;j.siteSurvey.columns=nil
     for _,old in pairs(s.jobs) do if old.key and old.key:sub(1,#prefix)==prefix then old.blocks=nil;old.report=nil end end
     assert(save());return true
@@ -215,6 +225,26 @@ function M.new(app,config,e,queue,production)
     local record,why=self:evidence(p,plan,a.region)
     if not record then a.error='Site evidence unavailable: '..tostring(why);return recoverEvidence(p,plan,a) end
     local cp=store(p,plan,a.region)
+    if a.fluidRetry then
+      if a.recovery and record.recovery and record.recovery>=(a.recoveries or 0) then
+        F.commit(p,save,function() a.recovery=nil;a.fluidRetry=nil;a.error=nil end);return true
+      end
+      return recoverEvidence(p,plan,a)
+    end
+    if p.site.work.fluidRecheck and record.preparation and record.preparation.status=='blocked'
+      and record.preparation.fluids and not record.fluidRechecked then
+      F.commit(p,save,function() a.fluidRetry=true;a.fluidRechecked=true;a.preparationRetries=0 end);return true
+    end
+    if record.retryPending then
+      if (a.preparationRetries or 0)<record.preparationRetries then
+        F.commit(p,save,function() a.preparationRetries=record.preparationRetries end);return true
+      end
+      return recoverEvidence(p,plan,a,record)
+    end
+    -- Region evidence can commit before its older root acknowledges the survey.
+    if a.recovery and record.recovery and record.recovery>=(a.recoveries or 0) then
+      F.commit(p,save,function() a.recovery=nil;a.error=nil end);return true
+    end
     if not record.preparation then
       record.preparation={status='working',stage='clear',cursor=1,sequence=1,epoch=record.recovery or 0,defects={},failed=0}
       for _,o in ipairs(record.report.observations) do if o.status=='blocked' then
@@ -247,6 +277,7 @@ function M.new(app,config,e,queue,production)
           p.site.work.completed=p.site.work.completed+1;p.site.work.blocked=p.site.work.blocked+(work.status=='blocked' and 1 or 0)
           p.site.work.preparedCount=(p.site.work.preparedCount or 0)+(work.status=='prepared' and 1 or 0)
           if work.status=='blocked' and not p.site.work.firstDefect then p.site.work.firstDefect=U.copy(work.defects[1]) end
+          if work.status=='blocked' and work.fluids then p.site.work.needsFluidRecheck=true end
         end
         p.site.work.active[tostring(a.region)]=nil
       end);return true
@@ -254,7 +285,7 @@ function M.new(app,config,e,queue,production)
     if not work.fill and work.stage~='clear' then
       -- This bounds possible demand without crediting unseen support. Selection
       -- may prefer replenishable stock; actual supply still follows inspection.
-      local _,_,required=plan:work(a.region,record,'fill',1,1,'minecraft:cobblestone')
+      local _,_,required=plan:work(a.region,record,work.stage=='seal' and 'seal' or 'fill',1,1,'minecraft:cobblestone')
       work.fill=fillMaterial(required);assert(cp:save(record));return true
     end
     if work.jobId then
@@ -263,6 +294,11 @@ function M.new(app,config,e,queue,production)
       assert(j.report and type(j.report.counts)=='table','preparation task lacks durable inspection receipt')
       if j.siteWork.stage~='verify' and not cargoSettled(p,j,a) then return false end
       local failed=0;for status,n in pairs(j.report.counts) do if status~='correct' then failed=failed+n end end
+      if j.siteWork.stage=='clear' then
+        for _,entry in ipairs(j.report.entries or {}) do
+          if entry.actual and require('autobuilder.build.site_work').fluid(entry.actual.name) then work.fluids=true end
+        end
+      end
       if failed>0 then collectDefects(work,j.report);work.failed=work.failed+failed end
       local retry=j.report.counts.inventory_full and j.report.counts.inventory_full>0
       work.lastJob=j.id;work.lastReceipt={owner=j.workerId,at=j.completedAt or 0,progress=j.progress};work.jobId=nil;work.sequence=work.sequence+1
@@ -272,11 +308,24 @@ function M.new(app,config,e,queue,production)
       assert(cp:save(record));return true
     end
     if work.cursor==0 then
-      if work.stage=='clear' then work.stage='fill'
+      if work.stage=='clear' then work.stage=work.fluids and not work.sealed and 'seal' or 'fill'
+      elseif work.stage=='seal' then work.sealed=true;work.stage='clear'
       elseif work.stage=='fill' then work.stage='verify_fill';work.failed=0;work.defects={};work.omitted=nil
       elseif work.stage=='verify_fill' then work.verifiedFill=work.failed==0;work.stage='verify_clear'
       elseif work.stage=='verify_clear' then
         work.verifiedClear=work.failed==0;work.stage='verified';work.status=work.verifiedFill and work.verifiedClear and 'prepared' or 'blocked'
+        local retryable=false
+        for _,defect in ipairs(work.defects) do
+          local actual=defect.actual
+          if not actual or require('autobuilder.build.site_work').drops(actual,config)
+            or require('autobuilder.build.site_work').fluid(actual.name) then retryable=true end
+        end
+        if work.status=='blocked' and retryable and math.max(record.preparationRetries or 0,a.preparationRetries or 0)<3 then
+          record.preparationRetries=math.max(record.preparationRetries or 0,a.preparationRetries or 0)+1
+          record.retryHistory=record.retryHistory or {}
+          record.retryHistory[#record.retryHistory+1]={failed=work.failed,defect=U.copy(work.defects[1])}
+          record.retryPending=true
+        end
       else error('unknown preparation stage') end
       work.cursor=1;assert(cp:save(record));return true
     end
@@ -300,6 +349,15 @@ function M.new(app,config,e,queue,production)
     local waiting;for _,a in pairs(work.active) do waiting=waiting or a.error end
     if waiting~=p.error then p.error=waiting;assert(save()) end
     if work.cursor>plan.regionCount and not next(work.active) then
+      -- A slow neighboring region may remove inflow only after an early region
+      -- exhausted its retries. Reconsider wet failures once after all owners
+      -- drain, using the same bounded census and fresh-survey recovery path.
+      if work.needsFluidRecheck and not work.fluidRecheck then
+        F.commit(p,save,function()
+          work.fluidRecheck=true;work.fluidFirstDefect=U.copy(work.firstDefect)
+          work.cursor=1;work.completed=0;work.blocked=0;work.preparedCount=0;work.firstDefect=nil
+        end);return
+      end
       F.commit(p,save,function()
         work.status='completed';work.rechecking=nil
         if p.phase=='preparing_site' then p.phase=work.blocked==0 and 'site_ready' or 'site_blocked' end

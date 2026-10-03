@@ -52,7 +52,7 @@ function M.validate(kind,p)
     if j.managedFuel and (j.type~='REFUEL' or type(j.station)~='table' or not U.position(j.station.position)
       or not U.integer(j.fuelTarget) or j.fuelTarget<1 or j.fuelTarget>100000000) then return false,'invalid managed fuel assignment' end
     if j.type=='FUEL_STATION' then return false,'controller-only task' end
-    if j.siteWork~=nil and j.type~='PREPARE_REGION' or j.siteSurvey~=nil and j.type~='SURVEY_SITE' then return false,'site metadata requires its matching task type' end
+    if (j.siteWork~=nil or j.siteAccess~=nil) and j.type~='PREPARE_REGION' or j.siteSurvey~=nil and j.type~='SURVEY_SITE' then return false,'site metadata requires its matching task type' end
     if j.type=='SURVEY_SITE' and not require('autobuilder.build.site_survey').validContract(j) then return false,'invalid site survey assignment' end
     if j.type=='PREPARE_REGION' and not require('autobuilder.build.site_work').validContract(j) then return false,'invalid region preparation assignment' end
     if j.type=='PREPARE_SITE' then

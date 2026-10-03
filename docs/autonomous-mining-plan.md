@@ -928,6 +928,13 @@ requirements until all acceptance below passes.
   fluids. Drain finite debris batches through home collection without losing region
   progress. Test hills, holes/caves, water/lava, occupied volumes and interruptions.
 
+Implemented and accepted subsets: journaled excavation/fill, mined fill acquisition,
+debris return, three bounded preparation retries, and finite one-region water/lava
+sealing/clearance. Native basins recover all temporary fill. Fresh optional scanner
+proof for sealed generic support is undergoing native validation. Finish cross-region
+fluid stabilization and safe access to missing sealed support before marking the
+general preparation scope complete. Keep scan absence/name-only exact-state limits.
+
 ### Task45: Verified regions, normal pipeline and native acceptance
 
 - [x] Require verified foundations/clearance before dependent builders, allow unaffected
@@ -935,7 +942,7 @@ requirements until all acceptance below passes.
 - [x] Add registered per-worker supply endpoints using existing batch journals,
   endpoint identity checks and private-inventory validation, so separate home
   depots can supply independent construction workers without shared idle stands.
-- [ ] Run actual multiworker runtime and native uneven-terrain survey→level→fill→clear→
+- [x] Run actual multiworker runtime and native uneven-terrain survey→level→fill→clear→
   verify→build acceptance. Record counts, retained infrastructure, restarts and limits.
 - [ ] Complete Lua/Python/release gates and one final whole-branch review/fix pass;
   document/integrate/push, then continue dynamic role scaling and all remaining scope.

@@ -19,6 +19,10 @@ function M.new(task,e,config,nav,save,mode)
   local reserved={[config.fuelSlot or 15]=true,[16]=true}
   for _,s in ipairs(config.reservedSlots or {}) do reserved[s]=true end
   if mode=='prepare' then reserved=require('autobuilder.workers.resupply').reserved(config) end
+  local scanner
+  if mode=='prepare' and config.scanner and e.peripheral then
+    scanner=require('autobuilder.resources.scanner').new(e,config.scanner,function() return e.os.epoch('utc')/1000 end)
+  end
   local function persist()
     local ok,value,err=pcall(save)
     if not ok or not value then fault='construction checkpoint failed: '..tostring(ok and err or value); error(fault,0) end
@@ -262,6 +266,10 @@ function M.new(task,e,config,nav,save,mode)
     if task.phase=='blocked' then return false,task.error end
     local pose=nav.pose
     if not pose or not pose.known or pose.pending or pose.uncertain or not U.heading(pose.heading) then return blocked('trusted position and heading required','inaccessible') end
+    if scanner then
+      local ok,why=scanner:recover()
+      if not ok then return blocked('tool recovery failed: '..tostring(why),'hardware') end
+    end
     if task.clearSite or task.type=='CLEAR' then
       if mode~='repair' or config.clearSite~=true then return blocked('site clearing is not enabled','unsupported') end
       for _,b in ipairs(task.blocks) do if not C.isAir(b.name) then return blocked('clear tasks must explicitly target air cells','unsupported') end end
@@ -275,7 +283,8 @@ function M.new(task,e,config,nav,save,mode)
     task.phase='work'; local b=task.blocks[task.recheck and task.deferred[task.recheck] or task.index]
     if restricted(b) then return issue(b,'inaccessible','target is in a restricted area') end
     local p,why=P.plan(b)
-    if mode=='prepare' and task.siteApproach then p=task.siteApproach end
+    if mode=='prepare' and task.siteAccess and p then p=Site.approach(task.siteAccess,b,p)
+    elseif mode=='prepare' and task.siteApproach then p=task.siteApproach end
     if not p then return issue(b,'unsupported',why) end
     if p.pair and restricted(p.pair) then return issue(b,'inaccessible','paired door cell is in a restricted area') end
     if restricted(p.stand) then return issue(b,'inaccessible','placement stand is in a restricted area') end
@@ -290,7 +299,7 @@ function M.new(task,e,config,nav,save,mode)
     local ok,err=move(p.stand)
     if not ok then
       if tostring(err):find('reservation',1,true) then return blocked(err,'inaccessible') end
-      if mode=='prepare' and not task.intent and not awaitingMovement(err) then
+      if mode=='prepare' and not task.siteAccess and not task.intent and not awaitingMovement(err) then
         local choices={{x=-1,y=0,z=0,heading='east'},{x=1,y=0,z=0,heading='west'},
           {x=0,y=0,z=-1,heading='south'},{x=0,y=0,z=1,heading='north'},{x=0,y=-1,z=0,heading='north'}}
         local index=(task.siteApproachIndex or 0)+1;local offset=choices[index]
@@ -299,6 +308,19 @@ function M.new(task,e,config,nav,save,mode)
           task.siteApproach={stand={x=b.x+offset.x,y=b.y+offset.y,z=b.z+offset.z},direction=offset.y==-1 and 'up' or 'forward',heading=offset.heading,item=p.item}
           return persist()
         end
+        if scanner and b.support then
+          -- Names suffice only for generic stable support. Never infer air or
+          -- exact schematic state from missing/name-only scanner observations.
+          scanner:invalidate()
+          local blocks,why,_,category=scanner:scan(pose)
+          if category=='hardware' then return blocked(why,'hardware') end
+          for _,observed in ipairs(blocks or {}) do
+            if observed.x==b.x and observed.y==b.y and observed.z==b.z and Site.support(observed.name) then
+              return record(b,'correct','fresh scanner support observation',{name=observed.name})
+            end
+          end
+          if why then err=tostring(err)..'; '..tostring(why) end
+        end
       end
       return issue(b,'inaccessible',err)
     end
@@ -306,6 +328,9 @@ function M.new(task,e,config,nav,save,mode)
     local found,actual,inspectError=inspect(p)
     if inspectError then return issue(b,'inaccessible',inspectError) end
     ok,err=recover(b,p,found,actual); if not ok then return blocked(err,'ambiguous') end
+    if mode=='prepare' and task.siteWork.stage=='seal' and (not found or not Site.fluid(actual.name)) then
+      return record(b,'correct',nil,actual)
+    end
     local matches,reason=matchesBlock(b,found,actual)
     if matches then
       if p.pair then
@@ -322,7 +347,8 @@ function M.new(task,e,config,nav,save,mode)
     if mode=='verify' or mode=='prepare' and task.siteWork.stage=='verify' then return record(b,found and 'wrong' or 'missing',reason,actual) end
     if task.recheck then return blocked('final connected block verification failed: '..tostring(reason),'wrong') end
     if p.observeOnly then return blocked('upper door half must be generated by a matching lower half','unsupported') end
-    local replaceFluid=mode=='prepare' and task.siteWork.stage=='fill' and found and Site.fluid(actual.name)
+    local replaceFluid=mode=='prepare' and (task.siteWork.stage=='fill' or task.siteWork.stage=='seal') and found and Site.fluid(actual.name)
+    if replaceFluid and (config.protectedBlocks or {})[actual.name] then return issue(b,'unsupported','fluid block is protected',actual) end
     if found and not replaceFluid then
       if mode~='repair' and mode~='prepare' then return issue(b,'wrong','existing block differs; explicit repair required',actual) end
       local classification=C.classify(actual.name,actual.state)

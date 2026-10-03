@@ -8,7 +8,7 @@ local function fixture(options)
   -- Terrain-specific cases configure their own elevations and missing supports.
   if not options.site then for x=1,9 do for z=0,9 do w.blocks[x..',-1,'..z]={name='minecraft:stone',state={}} end end end
   local storage=require('tests.managed_logistics_support').new()
-  storage.inventories={stock={[1]={name='minecraft:stone',count=8}},home={},stage={}}
+  storage.inventories={stock=options.stock or {[1]={name='minecraft:stone',count=8}},home={},stage={}}
   if options.expansion then storage.size=1 end
   w.blocks['0,1,0']={name='minecraft:chest',state={}}
   w.blocks['0,2,-1']={name='minecraft:chest',state={}}
@@ -562,4 +562,100 @@ test('automatic final repair stops after three unsuccessful rounds and retains e
  assert(p.error:find('3',1,true));local jobs=0;for _ in pairs(c.state.automation.jobs) do jobs=jobs+1 end
  for _=1,20 do step() end
  local later=0;for _ in pairs(c.state.automation.jobs) do later=later+1 end;eq(later,jobs);eq(w.places,5)
+end)
+
+test('preparation automatically resurveys changed foundation and resumes construction across retry reboot',function()
+  local w,ce,we,c,b,step,reboot=fixture()
+  assert(c:command('build import /example.json retry_ground'));assert(c:command('build auto retry_ground'))
+  local removed,restarted=false,false
+  for _=1,2500 do
+    local t=b.state.currentTask
+    if not removed and t and t.siteWork and t.siteWork.stage=='verify' and t.blocks[1].support then
+      w.blocks['2,-1,0']=nil;w.blocks['2,-2,0']={name='minecraft:stone',state={}};removed=true
+    end
+    step()
+    for _,j in pairs(c.state.automation.jobs) do
+      if j.type=='SURVEY_SITE' and j.key:find(':resurvey:',1,true) and not restarted then c,b=reboot();restarted=true;break end
+    end
+    if c.state.automation.projects.retry_ground.phase=='built' then break end
+  end
+  assert(removed and restarted);eq(c.state.automation.projects.retry_ground.phase,'built')
+  eq(w.places,3);eq(w.blocks['2,-1,0'].name,'minecraft:stone');eq(w.blocks['3,-1,0'].name,'minecraft:stone')
+  eq(w.blocks['2,0,0'].name,'minecraft:stone');eq(w.blocks['3,0,0'].name,'minecraft:stone')
+  local surveys=0;for _,j in pairs(c.state.automation.jobs) do if j.type=='SURVEY_SITE' then surveys=surveys+1 end end
+  eq(surveys,2);eq(c.state.automation.projects.retry_ground.report.counts.correct,2)
+end)
+
+
+test('automatic preparation seals a finite fluid source then clears temporary fill and builds across reboot',function()
+  for _,fluid in ipairs({'minecraft:water','minecraft:lava'}) do
+    local source={schema=1,size={x=2,y=1,z=1},palette={{name='minecraft:glass',state={}}},runs={{id=1,count=2}},metadata={},requirements={['minecraft:glass']=2}}
+    local w,ce,we,c,b,step,reboot=fixture({blueprint=source,stock={[1]={name='minecraft:glass',count=2},[2]={name='minecraft:stone',count=2}}})
+    w.items={};w.blocks['2,0,0']={name=fluid,state={level='0'}};w.blocks['3,0,0']={name=fluid,state={level='1'}}
+    local place=w.turtle.placeDown;local plugged=false
+    w.turtle.placeDown=function()
+      local key=w.pose.x..','..(w.pose.y-1)..','..w.pose.z
+      if w.blocks[key] and w.blocks[key].name==fluid then
+        assert(w.items[w.selected].name=='minecraft:stone');w.blocks[key]=nil
+        if key=='2,0,0' then plugged=true;w.blocks['3,0,0']=nil end -- finite flow decays after its source is sealed
+      end
+      return place()
+    end
+    assert(c:command('build import /example.json drain'));assert(c:command('build auto drain'))
+    local restarted=false
+    for _=1,3000 do
+      step()
+      if plugged and not restarted then c,b=reboot();restarted=true end
+      if c.state.automation.projects.drain.phase=='built' then break end
+    end
+    assert(restarted);eq(c.state.automation.projects.drain.phase,'built');eq(c.state.automation.projects.drain.report.counts.correct,2)
+    eq(w.places,3);eq(w.digs,1);eq(w.blocks['2,0,0'].name,'minecraft:glass');eq(w.blocks['3,0,0'].name,'minecraft:glass')
+    local seals=0;for _,j in pairs(c.state.automation.jobs) do if j.siteWork and j.siteWork.stage=='seal' then seals=seals+1 end end
+    assert(seals>0);eq(c.state.automation.supply,nil)
+  end
+end)
+
+test('cross-region preparation reopens exhausted fluid work after a delayed source removal across reboot',function()
+  local source={schema=1,size={x=9,y=1,z=1},palette={{name='minecraft:glass',state={}}},runs={{id=1,count=9}},metadata={},requirements={['minecraft:glass']=9}}
+  local w,ce,we,c,b,step,reboot=fixture({blueprint=source,site={minY=-2,maxY=15},stock={[1]={name='minecraft:glass',count=9},[2]={name='minecraft:stone',count=16}}})
+  w.items={};for x=2,10 do w.blocks[x..',-1,0']={name='minecraft:stone',state={}};w.blocks[x..',0,0']={name='minecraft:water',state={level=x==10 and '0' or '1'}} end
+  local sourceActive=true;local place=w.turtle.placeDown
+  w.turtle.placeDown=function()
+    local key=w.pose.x..','..(w.pose.y-1)..','..w.pose.z
+    if w.blocks[key] and w.blocks[key].name=='minecraft:water' then
+      w.blocks[key]=nil
+      if key=='10,0,0' then sourceActive=false end
+    end
+    return place()
+  end
+  local exhausted,restarted=false,false
+  local queue=c.automation.queue;local submit=queue.submit
+  function queue:submit(kind,payload,...)
+    local j=submit(self,kind,payload,...)
+    if j.siteWork and j.siteWork.region==2 and not exhausted then j.paused=true end
+    return j
+  end
+  assert(c:command('build import /example.json connected_water'));assert(c:command('build auto connected_water'))
+  for _=1,16000 do
+    local p=c.state.automation.projects.connected_water
+    if p.site and p.site.work then
+      -- Delay the second region as if its worker/route were unavailable. The
+      -- first region must exhaust its initial retry budget before inflow stops.
+      for _,j in pairs(c.state.automation.jobs) do if j.siteWork and j.siteWork.region==2 and not j.workerId then j.paused=not exhausted end end
+      if p.site.work.blocked>0 then exhausted=true end
+      if p.site.work.fluidRecheck and not restarted then c,b=reboot();restarted=true end
+    end
+    step()
+    for x=2,9 do
+      local key=x..',0,0';local current=w.blocks[key]
+      if sourceActive and not current then w.blocks[key]={name='minecraft:water',state={level='1'}}
+      elseif not sourceActive and current and current.name=='minecraft:water' then w.blocks[key]=nil end
+    end
+    if c.state.automation.projects.connected_water.phase=='built' then break end
+  end
+  local p=c.state.automation.projects.connected_water
+  assert(exhausted and restarted and not sourceActive,'cross-region recovery path was not exercised')
+  assert(p.phase=='built',p.phase..': '..tostring(p.error));eq(p.report.counts.correct,9)
+  for x=2,10 do eq(w.blocks[x..',0,0'].name,'minecraft:glass') end
+  eq(c.state.automation.supply,nil);assert(not b.state.currentTask)
 end)

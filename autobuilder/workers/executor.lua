@@ -28,6 +28,7 @@ function M.new(app,config,e,network,clock)
     end
     for index=task.siteSurvey and (task.progress or 0)+1 or task.index or 1,#targets do
       local plan=not task.siteSurvey and require('autobuilder.build.placement').plan(targets[index])
+      if plan and task.siteAccess then plan=require('autobuilder.build.site_work').approach(task.siteAccess,targets[index],plan) end
       local stand=plan and plan.stand or targets[index]
       local outward=math.abs(pose.x-stand.x)+math.abs(pose.z-stand.z)
       local returning=math.abs(home.x-stand.x)+math.abs(home.z-stand.z)
@@ -36,7 +37,8 @@ function M.new(app,config,e,network,clock)
       -- Include both overhead ascents, the work stand and the depot descent.
       -- Eight extra moves cover the builder's bounded side-approach offsets.
       local fallback=stand.y<targets[index].y and 2*(height-stand.y) or 0
-      required=math.max(required,outward+returning+(height-pose.y)+(height-home.y)+2*(height-stand.y)+fallback+8+config.minimumFuelReserve)
+      local access=task.siteAccess and 4*#task.siteAccess.cells or 0 -- exit/reentry and the return through the owned shaft
+      required=math.max(required,outward+returning+(height-pose.y)+(height-home.y)+2*(height-stand.y)+fallback+access+8+config.minimumFuelReserve)
     end
     return required
   end
@@ -160,7 +162,7 @@ function M.new(app,config,e,network,clock)
         end
       end
       if t and (t.siteWork or j.siteWork) then
-        for _,field in ipairs({'siteWork','blocks','bounds','clearanceY'}) do
+        for _,field in ipairs({'siteWork','siteAccess','blocks','bounds','clearanceY'}) do
           if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed region preparation assignment' end
         end
       end
@@ -179,6 +181,7 @@ function M.new(app,config,e,network,clock)
       if t then return t.id==j.id,'worker already has a task' end
       if j.logistics and (not config.capabilities.logisticsV1 or not require('autobuilder.storage.nodes').validContract(j)) then return false,'invalid managed transport assignment' end
       local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',PREPARE_REGION='siteWorkV1',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
+      if j.siteAccess then cap='siteAccessV1' end
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end
       if j.privateStation and not require('autobuilder.factory.stations').matches(j.privateStation,config,s.id) then return false,'private crafting station does not match worker configuration' end
       s.currentTask=U.copy(j); s.currentTask.phase='setup';

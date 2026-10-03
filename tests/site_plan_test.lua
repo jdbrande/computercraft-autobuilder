@@ -85,6 +85,28 @@ local function workPlan(source,options)
   return plan,record
 end
 
+test('foundation access routes stay within owned terrain and preserve every schematic cell',function()
+  local data={schema=1,size={x=3,y=1,z=3},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=9}},metadata={},requirements={}}
+  local p=plan(data,{origin={x=10,y=0,z=10}},{margin=1,minY=-4,maxY=15})
+  local target={x=11,y=-1,z=11}
+  local route=assert(p:access(1,target,2));eq(U.distance(route.stand,target),1)
+  eq(route.entry.y,2);assert(#route.cells>3 and #route.cells<=128)
+  local previous=route.entry;local seen={}
+  for _,cell in ipairs(route.cells) do
+    eq(U.distance(previous,cell),1);assert(require('autobuilder.core.pathfinding').inside(cell,p:region(1).bounds))
+    assert(not p:wanted(cell),'access would remove a retained schematic cell')
+    assert(U.distance(cell,target)>0,'access route destroys its own target')
+    local key=cell.x..','..cell.y..','..cell.z;assert(not seen[key]);seen[key]=true;previous=cell
+  end
+  eq(U.distance(previous,route.stand),0)
+  assert(not p:access(1,{x=9,y=-1,z=9},2),'workspace is not a foundation target')
+  assert(not p:access(1,{x=11,y=0,z=11},2),'explicit floor became generic access target')
+  local sealed=plan(data,{origin={x=10,y=0,z=10}},{margin=0,minY=-4,maxY=15})
+  assert(not sealed:access(1,target,2),'sealed footprint invented an exterior access lease')
+  local deep=plan(data,{origin={x=10,y=0,z=10}},{margin=1,minY=-4,maxY=319})
+  assert(not deep:access(1,target,200),'unbounded access route accepted')
+end)
+
 test('survey-derived work clears hills while preserving planned states and fills actual depressions',function()
   local source={schema=1,size={x=2,y=2,z=1},palette={{name='minecraft:air',state={}},{name='minecraft:oak_log',state={axis='x'}}},
     runs={{id=2,count=1},{id=1,count=3}},metadata={},requirements={}}
@@ -145,4 +167,16 @@ test('an air-only schematic clears its requested volume without inventing an unr
   local j=plan:survey(1,1,64);assert(not j.siteSurvey.columns[1].foundationY);eq(j.siteSurvey.columns[1].minY,5)
   local evidence={identity=plan.identity,region=1,clearanceY=j.clearanceY,report={identity=plan.identity,region=1,observations={{x=10,y=5,z=10,name='minecraft:stone',status='surface'}}}}
   eq(plan:work(1,evidence,'fill',1,8,'minecraft:cobblestone'),nil)
+end)
+
+test('fluid sealing covers the bounded clearance volume with stable temporary blocks',function()
+  local source={schema=1,size={x=2,y=2,z=1},palette={{name='minecraft:air',state={}},{name='minecraft:glass',state={}}},
+    runs={{id=2,count=1},{id=1,count=3}},metadata={},requirements={}}
+  local plan,record=workPlan(source)
+  local j,nextCursor,total=plan:work(1,record,'seal',1,4,'minecraft:cobblestone')
+  eq(total,6);eq(nextCursor,5);eq(j.siteWork.stage,'seal');eq(#j.blocks,4)
+  for _,b in ipairs(j.blocks) do eq(b.name,'minecraft:cobblestone');assert(not b.retain and not b.support) end
+  assert(require('autobuilder.build.site_work').validContract(j))
+  j,nextCursor=plan:work(1,record,'seal',nextCursor,4,'minecraft:cobblestone');eq(#j.blocks,2);eq(nextCursor,nil)
+  assert(not pcall(plan.work,plan,1,record,'seal',1,4,'minecraft:sand'))
 end)

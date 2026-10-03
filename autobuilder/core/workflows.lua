@@ -107,7 +107,10 @@ function M.new(state,save,clock,id,chunks,config)
     local j=U.copy(payload or {}); j.id='task:'..id..':'..s.sequence; j.type=kind
     j.key=dedup; j.status='queued'; j.progress=0; j.dependencies=U.copy(deps or {}); j.retryCount=0
     j.created=clock(); j.requiredCapability=caps[kind]
-    if j.type=='PREPARE_REGION' then assert(require('autobuilder.build.site_work').validContract(j),'invalid preparation region contract') end
+    if j.type=='PREPARE_REGION' then
+      assert(require('autobuilder.build.site_work').validContract(j),'invalid preparation region contract')
+      if j.siteAccess then j.requiredCapability='siteAccessV1' end
+    end
     if j.blocks and #j.blocks>0 and j.type~='PREPARE_REGION' then
       j.bounds={min={x=math.huge,y=math.huge,z=math.huge},max={x=-math.huge,y=-math.huge,z=-math.huge}}
       for _,b in ipairs(j.blocks) do for _,a in ipairs({'x','y','z'}) do j.bounds.min[a]=math.min(j.bounds.min[a],b[a]); j.bounds.max[a]=math.max(j.bounds.max[a],b[a]) end end

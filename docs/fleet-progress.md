@@ -31,8 +31,11 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Current branch `milestone/0.23.0`: general automatic site preparation. Immutable
   geometry, project surveys, protected excavation/fill batches, debris collection
   and normal per-region construction gates are implemented, with missing-evidence
-  recovery. Shared protection for remaining roles, fluid clearance, sealed-support
-  access and native uneven-terrain acceptance remain in progress.
+  recovery and bounded preparation retries. Shared mutation protection, native
+  multiworker uneven-terrain construction and finite water/lava drainage have
+  acceptance evidence. Sealed-support scanning is under native validation;
+  cross-region fluid stabilization, missing sealed-support access and final
+  milestone verification/review remain in progress.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -752,3 +755,99 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   resumed its original saved ownership and staged cargo; journals were not reset.
   These two post-snapshot fixes pass79 focused regression/coordination/logistics and
   managed-runtime cases. A full final current-tree gate remains required.
+
+- Checkpoint commit `b3c4774` records independent supplies, traffic detours, courier
+  home return and the two native-discovered recovery fixes. Current work adds
+  bounded preparation retries: fresh region surveys/work epochs after failed
+  verification, at most three retries, preserved defects and settled prior owners.
+  Focused service tests and an actual foundation-change/reboot/build runtime pass.
+  Native multiworker preparation has verified10/12 regions and construction began
+  in a ready region while remaining preparation continued. Acceptance is pending.
+
+- Native multiworker trial reached`built` with10/10 correct, all12 prepared regions,
+  two concurrent builder/preparation owners, four logs returned, two mined fill
+  cells and one retained cobblestone surplus. All workers returned empty; final
+  fuel191/192/193/194=7448/7424/7908/7974. Both miners participated, but only193
+  delivered material and mining was not proven concurrent. Independent world checks
+  and cleanup passed. Permanent scope/failures: [multiworker acceptance](validation-multiworker-preparation.md).
+- Fluid sealing now has failing-then-passing executor, geometry and service tests:
+  replace only fluid cells with stable temporary fill, preserve dry blocks/air,
+  retain placement journals across reboot, then clear the entire sealed region.
+  Explicitly protected fluids remain untouched. Runtime pocket drainage and
+  cross-region/external-flow containment remain in progress.
+
+- The combined preparation retry service/project set passes49 cases. Fluid executor,
+  geometry and orchestration checks pass; actual runtime cases drain finite water
+  and lava flows, recover a reboot after sealing, clear the temporary block and
+  build/verify both glass cells with exact placement/dig counts. Native isolated
+  basins200/201(water) and202/203(lava) are now running with finite fuel and supplied
+  reusable cobblestone. No native fluid acceptance is claimed yet.
+
+- Both native finite basins reached `built`; independent commands confirmed all48
+  clearance cells (four glass,44 air), exactly16 reusable cobblestone returned per
+  network, empty private chests and idle home workers. Final fuel201=7416,203=7348.
+  All four computers shut down and12 test tickets removed. Permanent evidence and
+  scope: [finite fluid acceptance](validation-fluid-preparation.md). Operator-built
+  containment means external-flow/cross-region drainage remains unfinished.
+- Fresh optional scanner proof now covers generic support sealed below retained
+  structure, after inspection approaches fail. Missing/fluid observations do not
+  certify support, and failed tool restoration retains the task without a receipt.
+  The new regression failed before implementation;51 affected tests pass. Native
+  retained-floor scanner acceptance is starting; missing sealed support still needs
+  an automatic access/fill solution.
+
+- Native sealed-support acceptance passed: four fresh scanner observations across
+  fill/verification, two retained glass,60 independently confirmed stone cells,
+  restored pickaxe and scanner slot, unchanged fill stock and home-idle worker.
+  Fuel7416→6658. Cleanup and pause-setting restoration passed. Permanent evidence:
+  [sealed support acceptance](validation-sealed-support.md).
+- A delayed neighboring fluid-source regression reproduced a region remaining
+  blocked after its local retry limit even once the source was removed. One bounded
+  reconsideration pass after all initial region owners drain now resurveys those
+  fluid failures. The17-case service suite passes, including controller recreation,
+  failed checkpoints and permanent inflow stopping after eight preparation attempts.
+  Actual cross-region runtime/native acceptance is still required. The earlier full
+  suite snapshot remains running; it does not include this later reconsideration.
+
+- The fluid/scanner full snapshot finished with721/722 Lua tests passing. Its only
+  failure was the two-builder test's incidental timing assertion: both workers built
+  all ten correct blocks, but tiny two-block jobs completed sequentially as regions
+  became ready. A diagnostic reproduced that schedule. The test now deliberately
+  delays one builder's startup and requires the other to receive independent BUILD
+  work before releasing it; overlap remains mandatory. That regression and a wider
+  actual cross-region fluid runtime are running. The18-test Python suite passed.
+  A fresh full gate is required after these fixes; this snapshot is not accepted.
+- Native cross-region basin204/205 is running with nine glass targets, a far-end
+  water source,32 reusable cobblestone and12000 starting fuel across two preparation
+  regions. Six chunks are operator-loaded. No acceptance result is claimed yet.
+
+- The delayed-source actual runtime passed: nine glass across two preparation regions,
+  exhausted initial fluid retries, later source sealing, one reconsideration pass and
+  controller/worker reboot all complete with nine verified blocks and no supply lease.
+- The two-builder timing regression now passes with a slow departure from a private
+  depot after supply settlement. An initial fixture attempt held a turtle in the work
+  area and correctly blocked another worker's destination; the corrected fixture
+  holds only at home. Both preparation and BUILD overlap remain required assertions.
+  A fresh full Lua gate is running;18 Python tests and release/diff checks pass.
+- Began missing-support access geometry. A failing-then-passing case plans a bounded
+  connected shaft/tunnel under a retained3×3 floor, refuses exterior/unowned shafts,
+  invalid targets and paths over128 cells. Physical contracts, route-aware travel,
+  excavation/fill/restoration and owned verification receipt integration remain next.
+
+- Native two-region water trial204/205 passed: nine verified glass and57 independently
+  checked air cells, all32 temporary cobblestone returned, empty private chests, no
+  active jobs/supply, worker idle at home with10676/12000 fuel. Both computers stopped,
+  all six tickets removed and pause-on-focus-loss restored. Details are appended to
+  [fluid acceptance](validation-fluid-preparation.md). The delayed-source retry path
+  remains simulation evidence; this native run did not exhaust its initial retries.
+
+- Access worker execution now passes87 focused geometry/preparation/construction,
+  logistics and protection cases. Contracts require a contiguous owned route and
+  matching work cells; existing dig/place journals open a shaft/tunnel, fill/verify
+  hidden support and restore ground without disturbing a protected retained floor.
+  Physical dig/place reboot cases preserve exact two digs/three placements and stock.
+  Shared travel exits/reenters the recorded shaft and resumes a pending return step.
+  Fuel admission includes the detour. `siteAccessV1` prevents older workers receiving
+  access tasks, and duplicate assignments cannot change/remove the owned route.
+  Controller access orchestration and final proof/restoration accounting remain to
+  implement; no normal build currently creates these access tasks automatically.

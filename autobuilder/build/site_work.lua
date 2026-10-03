@@ -54,11 +54,43 @@ local function state(block)
   for k,v in pairs(block.state) do count=count+1;if count>32 or not U.shortString(k,64) or not U.shortString(v,128) then return false end end
   return true
 end
+local function accessCells(j)
+  local a=j.siteAccess;local P=require('autobuilder.core.pathfinding')
+  if type(a)~='table' or not U.position(a.entry) or not U.position(a.target) or not U.position(a.stand)
+    or a.entry.y~=j.clearanceY or not P.inside(a.entry,j.bounds) or not P.inside(a.target,j.bounds)
+    or a.target.y~=a.stand.y or U.distance(a.target,a.stand)~=1 or type(a.cells)~='table' then return nil end
+  local n=0;for k in pairs(a.cells) do if not U.integer(k) or k<1 or k>128 then return nil end;n=n+1 end
+  if n==0 then return nil end
+  local seen,previous={},a.entry
+  for i=1,n do
+    local p=a.cells[i]
+    if not U.position(p) or not P.inside(p,j.bounds) or p.y>=j.clearanceY or U.distance(p,previous)~=1
+      or U.distance(p,a.target)==0 or seen[P.key(p)] then return nil end
+    if previous.y>a.target.y then
+      if p.x~=a.entry.x or p.z~=a.entry.z or p.y~=previous.y-1 then return nil end
+    elseif p.y~=a.target.y then return nil end
+    seen[P.key(p)]=true;previous=p
+  end
+  if U.distance(previous,a.stand)~=0 then return nil end
+  return seen
+end
+function M.approach(access,b,plan)
+  local stand
+  if U.distance(b,access.target)==0 then stand=access.stand
+  else for i,p in ipairs(access.cells) do if U.distance(b,p)==0 then stand=i==1 and access.entry or access.cells[i-1];break end end end
+  assert(stand,'work cell is outside its validated access route')
+  plan.stand=U.copy(stand)
+  plan.direction=b.y<stand.y and 'down' or b.y>stand.y and 'up' or 'forward'
+  if plan.direction=='forward' then plan.heading=b.x>stand.x and 'east' or b.x<stand.x and 'west' or b.z>stand.z and 'south' or 'north' end
+  return plan
+end
 function M.validContract(j)
   if type(j)~='table' or j.type~='PREPARE_REGION' or not E.box(j.bounds) or not U.integer(j.clearanceY) or j.clearanceY>j.bounds.max.y then return false end
   local s=j.siteWork
   if type(s)~='table' or type(s.identity)~='string' or #s.identity~=64 or not s.identity:match('^[a-f0-9]+$')
-    or not U.integer(s.region) or s.region<1 or not ({clear=true,fill=true,verify=true})[s.stage] then return false end
+    or not U.integer(s.region) or s.region<1 or not ({clear=true,fill=true,seal=true,verify=true})[s.stage] then return false end
+  local access=j.siteAccess and accessCells(j)
+  if j.siteAccess~=nil and (not access or s.stage=='seal') then return false end
   if type(j.blocks)~='table' then return false end
   local count,seen=0,{}
   for key in pairs(j.blocks) do if not U.integer(key) or key<1 or key>512 then return false end;count=count+1 end
@@ -69,7 +101,11 @@ function M.validContract(j)
     local key=b.x..','..b.y..','..b.z;if seen[key] then return false end;seen[key]=true
     if b.support~=nil and type(b.support)~='boolean' or b.retain~=nil and not state(b.retain) then return false end
     local air=C.isAir(b.name)
-    if s.stage=='clear' and not air or s.stage=='fill' and air then return false end
+    if access then
+      local target=U.distance(b,j.siteAccess.target)==0
+      if b.retain or not target and not access[key] or target and (air or not b.support) then return false end
+    end
+    if s.stage=='clear' and not air or (s.stage=='fill' or s.stage=='seal') and air then return false end
     if not air and (C.family(b.name)~='cube' or C.classify(b.name,b.state)~='SUPPORTED' or b.retain~=nil) then return false end
     if air and b.support then return false end
   end

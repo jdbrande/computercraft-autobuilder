@@ -106,10 +106,65 @@ repair and mining require the same mutation grants; generated door halves reserv
 both cells atomically. Exploration geometry includes registered infrastructure and
 filters irrelevant distant boxes before enforcing its protection-payload bound.
 
-Fluid containment, safe access to fully sealed foundations and multiworker native
-acceptance remain unfinished. Shared mutation protection now includes legacy clearing
+External-flow containment and safe access to missing fully sealed foundations remain
+unfinished. Multiworker native acceptance now has a permanent intermediate report.
+Shared mutation protection now includes legacy clearing
 and managed harvesting. Automatic final repair passes runtime regression tests. Eight-cell preparation batches currently favor bounded debris
 handling over travel throughput; workload scaling can tune that batch boundary.
+
+Generic support hidden beneath retained structure may use a fresh optional Geo Scanner
+observation after all non-destructive inspection approaches fail. A positively
+observed stable support name is sufficient for generic fill/verification; absent
+scan entries never prove air, and name-only observations cannot certify exact
+schematic states. Invalidate the scan cache before every such proof. Restore the
+pickaxe after each scan and before resumed preparation; failed restoration blocks
+the task without granting a support receipt. Missing hardware retains an explicit
+inaccessible defect. Excavating/restoring access to a missing sealed cell remains
+required work for inspection-only workers.
+
+After every region drains its initial work, reconsider fluid-blocked regions once.
+A distant slow region can remove inflow after an earlier region exhausted its three
+local retries. Reuse the bounded region census; keep already verified regions and
+non-fluid blockers unchanged. Fluid failures receive a fresh survey/work epoch and
+another bounded local retry budget. Persist this one-time pass and its prior defect,
+and preserve its marker across sidecar recovery. Continuous external inflow therefore
+still stops after at most eight preparation attempts per affected region. This
+reconsideration does not construct a boundary wall or certify unobserved terrain.
+
+## Next access boundary
+
+For a missing foundation beneath retained structure, plan a temporary inspection
+shaft/tunnel within the same owned preparation region. The route must avoid every
+non-air schematic cell; a matching floor is never permission to remove that floor.
+Only ordinary removable terrain may open the route, with the existing mutation
+grants and inventory journals. Plan explicit adjacent approach stands for horizontal
+work beneath a retained ceiling. Keep each route bounded, contiguous and immutable.
+
+Reuse preparation clear/fill tasks: open the access cells, inspect/fill the missing
+support, restore temporary ground in reverse order, then repeat normal verification.
+The access description must survive debris return, supply travel, worker exit and
+reboot. Extend their shared overhead route helper to leave a recorded tunnel through
+its shaft before ascending; a one-cell side exit does not suffice for an interior
+foundation. Fuel admission must include that detour. No prepared-region receipt may
+be issued while a temporary access cell still needs restoration. Protected terrain
+or a footprint with no permissible bounded access retains an exact blocked report.
+
+Required checks before implementation acceptance: an inspection-only turtle reaching
+an interior missing foundation beneath a retained floor; fill and exact retained
+structure verification; debris/full-inventory and material return through the tunnel;
+partial excavation/placement checkpoints; blocked exit; protected access refusal;
+and resumed ownership across both controller and worker restart. Native acceptance
+must inspect the restored ground and retained structure independently.
+
+The geometry helper now plans a shaft and horizontal route of at most128 cells
+inside one region, reusing bounded pathfinding and rejecting every retained schematic
+cell. This helper alone does not execute access. The worker contract still needs
+explicit adjacent approach stands and route-aware supply/exit travel. Foundation
+verification must occur while the tunnel is open; restoring it would otherwise make
+the same inspection inaccessible again. Retain that fresh target receipt only within
+the owned preparation epoch, require verified restoration before certification, and
+discard it on a new survey/work epoch. Never promote a plan or an uncompleted access
+sequence into foundation proof.
 
 ## Remaining mutation paths
 
@@ -169,3 +224,23 @@ restart; every step still requires normal reservations, coverage, protection and
 fuel. At most16 excluded traffic cells are retained per waypoint. Failure to find
 a bounded route remains visible and does not permit digging or entering a denied
 cell. This does not establish arbitrary-maze routing or unlimited deadlock recovery.
+
+Preparation retry policy: a failed final region verification may schedule up to
+three fresh read-only surveys and preparation passes. Keep its prior defect summary
+and retry count in the region sidecar and active ownership metadata. Re-survey only
+after every prior physical owner has completed and its debris has settled. Use a
+new work epoch, keep the immutable schematic identity, and never certify that
+region or schedule dependent construction between attempts. Other regions continue.
+A checkpoint failure or ambiguous physical action remains owned and cannot be
+converted into a completed task to unlock a retry. Exhausted retries leave the
+exact final defects visible. This policy is separate from final structural repair.
+
+Fluid execution increment: when an excavation report finds water/lava, use the
+existing fill material and journaled placement to seal fluid cells across that
+region's clearance volume, without altering air or non-fluid blocks. Finish that
+seal pass before clearing the temporary solids. This drains finite pockets whose
+sources lie inside the covered region and recovers the temporary material through
+ordinary debris collection. Fresh verification and the bounded re-survey policy
+handle later changes; persistent external inflow stays a precise blocker. Coordinated
+containment across fluid regions and externally fed boundaries remains required
+before general fluid preparation can be accepted.

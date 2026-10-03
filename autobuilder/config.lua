@@ -107,6 +107,7 @@ function M.load(overrides)
   c.capabilities.sitePreparation=c.capabilities.building and true or nil
   c.capabilities.siteSurveyV1=c.capabilities.building and true or nil
   c.capabilities.siteWorkV1=c.capabilities.building and true or nil
+  c.capabilities.siteAccessV1=c.capabilities.building and true or nil
   require('autobuilder.factory.stations').validate(c)
   require('autobuilder.storage.nodes').validate(c)
   c.capabilities.isolatedCraftingV1=c.capabilities.crafting and c.craftingStation.buffer~='' and true or nil

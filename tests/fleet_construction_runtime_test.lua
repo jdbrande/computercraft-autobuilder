@@ -92,7 +92,24 @@ local function fixture()
     self.now=self.now+1;for _,e in pairs(self.envs) do e.now=self.now end
     for _,id in ipairs({12,13}) do self.apps[id]:tick() end;self:pump()
     self.apps[7]:tick();self:pump();self.apps[7]:workStep()
-    for _,id in ipairs({12,13}) do self.apps[id]:workStep() end;self:pump()
+    -- A two-block batch can finish before another region becomes ready. Model
+    -- one slow departure after supply settles at its private home, so overlap
+    -- admission is deterministic without obstructing the preparation workspace
+    -- or retaining the shared supply lease.
+    local held,builders=self.heldBuilder,0
+    if not self.buildOverlapExercised then
+      for _,id in ipairs({12,13}) do
+        local task=self.apps[id].state.currentTask
+        if task and task.type=='BUILD' then
+          builders=builders+1
+          if not held and U.distance(self.worlds[id].pose,homes[id])==0 and not task.supplyRequest
+            and not self.apps[7].state.automation.supply and F.count(self.worlds[id].items,'minecraft:stone')>0 then held=id end
+        end
+      end
+      if builders==2 then self.buildOverlapExercised=true;held=nil end
+    end
+    self.heldBuilder=held
+    for _,id in ipairs({12,13}) do if id~=held then self.apps[id]:workStep() end end;self:pump()
     local active={}
     for _,j in pairs(self.apps[7].state.automation.jobs) do
       if j.workerId then self.owners[j.type]=self.owners[j.type] or {};self.owners[j.type][j.workerId]=true end
@@ -114,7 +131,7 @@ test('two construction workers prepare and build through private supplies with l
   end
   local p=f.apps[7].state.automation.projects.fleet
   assert(p.phase=='built',f.envs[7].textutils.serialize({project=p,workers={f.apps[12].state.currentTask,f.apps[13].state.currentTask},jobs=f.apps[7].state.automation.jobs}))
-  assert(restarted);eq(p.report.counts.correct,10)
+  assert(restarted);assert(f.buildOverlapExercised,'second builder was never admitted beside a slow first builder');eq(p.report.counts.correct,10)
   for _,kind in ipairs({'SURVEY_SITE','PREPARE_REGION','BUILD'}) do
     assert(f.owners[kind][12] and f.owners[kind][13],'both workers did not participate in '..kind)
   end
