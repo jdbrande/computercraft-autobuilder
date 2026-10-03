@@ -15,8 +15,8 @@ resource minecraft:stone_bricks
 `stock` is the current measured wired inventory total. Each saved request shows
 `required` (aggregate demand), `initial` (physical stock at planning time),
 `planned` (future output), `deficit` (demand beyond initial stock), `missing`
-(unfulfilled raw acquisition), and `provider`. These are request snapshots, not
-inventory reservations. Completed request snapshots remain visible. A failed
+(unfulfilled raw acquisition), and `provider`. These graph fields are request snapshots. The first line additionally reports
+[durable inventory ownership](inventory-ownership.md) and live available stock. Completed request snapshots remain visible. A failed
 inventory read reports unknown stock rather than treating stale counts as current.
 The production screen also shows the source selected for each acquisition.
 
@@ -50,7 +50,8 @@ changes. Bringing another provider online never steals that work. Newly unowned
 demand can select again. A never-assigned queued job may be retired durably when
 its source has no eligible worker and another source becomes executable. Paused
 jobs and worker telemetry claiming the old task prevent replacement. The factory remains exclusive in this milestone; parallel
-consumers and durable stock reservations are subsequent work.
+consumers still require independent staging; durable stock reservations now gate
+new factory jobs.
 
 The graph is saved with production requests. `plan.graph.nodes[item]` contains
 `required`, `available` (initial physical stock), `produced`, `deficit`, `missing`,

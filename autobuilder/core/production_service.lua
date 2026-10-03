@@ -319,11 +319,19 @@ function M.new(app,config,e,queue)
   function self:describe(item)
     assert(U.shortString(item,128),'Usage: resource <namespaced-item>')
     local ok,err=self:refresh()
-    local lines={item..' stock='..(ok and tostring(app.mining.storage:getCount(item) or 0) or 'unknown ('..tostring(err)..')')}
-    local requests={}
+    local lines={}
+    local requests={}; local demand=0
     for _,r in pairs(s.requests) do
-      if r.plan and r.plan.graph and r.plan.graph.nodes[item] then requests[#requests+1]=r end
+      if r.plan and r.plan.graph and r.plan.graph.nodes[item] then
+        requests[#requests+1]=r
+        if r.status~='completed' then demand=demand+r.plan.graph.nodes[item].required end
+      end
     end
+    local v=self.ledger:view(item,ok and app.mining.storage.counts or nil,demand)
+    local function value(n) return n==nil and 'unknown' or tostring(n) end
+    lines[1]=item..' stock='..value(v.physical)..' available='..value(v.available)..' reserved='..v.reserved..
+      ' transit='..v.transit..' expected='..v.expected..' demand='..v.demand
+    if not ok then lines[#lines+1]=tostring(err) end
     table.sort(requests,function(a,b) return tonumber(a.id:match('%d+'))<tonumber(b.id:match('%d+')) end)
     for _,r in ipairs(requests) do
       local node=r.plan.graph.nodes[item]; local material=(r.materials or {})[item]

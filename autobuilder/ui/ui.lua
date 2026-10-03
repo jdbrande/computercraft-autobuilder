@@ -61,6 +61,8 @@ function M.draw(term,state,agent,page,input)
       line(c.completedBlocks..'/'..c.root.totalBlocks..' blocks verified')
       if c.error then add(c.error) end
     else line('MATERIAL TEAM'); add('Miners gather different missing materials at the same time. Type setup miner on each mining turtle.') end
+    local claims=0; for _,lease in pairs((state.inventoryLedger or {}).leases or {}) do if lease.status=='held' then claims=claims+1 end end
+    if claims>0 then add('Inventory claims: '..claims..' | resource <item>') end
     local requests={}; for _,r in pairs(a.requests or {}) do if r.status~='completed' then requests[#requests+1]=r end end
     table.sort(requests,function(x,y) return x.id<y.id end)
     for _,r in ipairs(requests) do

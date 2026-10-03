@@ -128,3 +128,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   logistics focused suites and full 429-test Lua suite passed. Legacy checkpoint
   fixtures now omit modern ledger grants as well as modern jobs. Live furnace
   acceptance is running and has reported actual partial delivery under its claim.
+
+- Task14 initial gate: resource ownership view regression passed; full Lua suite
+  430/430, Python16/16 and release artifact check passed. Live furnace/Crafty
+  request made four additional bricks from staged raw inputs; both claims showed
+  measured withdrawals/deliveries and released. Reboot retained released state;
+  independent chest inspection confirmed ten bricks. Final branch review pending.

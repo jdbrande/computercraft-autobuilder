@@ -466,3 +466,13 @@ test('ungranted furnace task makes no physical transfer and recovers from unavai
   p:tick(); p:step(); assert(job.production); eq(job.production.loaded,1)
   local lease=app.state.inventoryLedger.leases[job.id]; eq(lease.withdrawn[mc('cobblestone')],1)
 end)
+
+test('resource status distinguishes measured stock from reservations and expected output',function()
+  local app,p,q,config,h=productionFixture({[1]={name=mc('stone'),count=4}})
+  app.state.workers['9']={id=9,online=true,telemetry={capabilities={crafting=true}}}
+  local r=p:request({[mc('stone_bricks')]=4}); p:tick(); p:tick()
+  local text=p:describe(mc('stone'))
+  assert(text:find('stock=4 available=0 reserved=4 transit=0 expected=0 demand=4',1,true),text)
+  text=p:describe(mc('stone_bricks'))
+  assert(text:find('stock=0 available=0 reserved=0 transit=0 expected=4 demand=4',1,true),text)
+end)
