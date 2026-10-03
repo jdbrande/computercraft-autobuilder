@@ -285,6 +285,8 @@ function M.new(app,config,e,network,clock)
       end
       local m=miner()
       if s.currentTask.exploration and not config.mining.enabled then m:requestReturn() end
+      if s.currentTask.phase=='blocked' and s.motionReservation and s.motionReservation.granted
+        and s.motionReservation.jobId==s.currentTask.id and tostring(s.currentTask.error):find('movement reservation pending',1,true) then m:resume() end
       if s.currentTask.phase=='blocked' then return true end
       local ok,err=m:step(); s.status=s.currentTask.phase
       if not ok then app:report('WARN','Mining job '..s.currentTask.id..': '..tostring(err)) end

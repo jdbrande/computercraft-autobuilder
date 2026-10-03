@@ -6,6 +6,17 @@ function M.preparation(job)
   return job and (job.siteSurvey~=nil or job.siteWork~=nil or job.type=='PREPARE_SITE')
 end
 function M.canOwn(state,job,owner)
+  if not job.workerId and E.box(job.bounds) then
+    for name,project in pairs((state.automation or {}).projects or {}) do
+      local site=project.site;local lease=site and site.accessLease
+      if lease and E.overlaps(lease.bounds,job.bounds) then
+        local work=job.siteAccess and job.siteWork or job.siteSurvey
+        if job.project~=name or not work or work.identity~=site.identity or work.region~=lease.region then
+          return false,'foundation access restoration owns preparation region '..lease.region
+        end
+      end
+    end
+  end
   if job.type=='FARM' or job.type=='HARVEST' then
     for id,other in pairs((state.automation or {}).jobs or {}) do
       if id~=job.id and other.workerId and other.status~='completed' and other.farm then

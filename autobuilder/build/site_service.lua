@@ -153,7 +153,7 @@ function M.new(app,config,e,queue,production)
       local lease=p.site.accessLease
       if lease and E.overlaps(lease.bounds,plan:region(region).bounds) then return false,'foundation access restoration owns preparation region '..region end
       local record,why=self:evidence(p,plan,region)
-      if not record then
+      if not record or p.site.work.status=='completed' and (not record.preparation or record.preparation.status=='working') then
         local w=p.site.work
         F.commit(p,save,function()
           if not w.rechecking then
@@ -164,7 +164,7 @@ function M.new(app,config,e,queue,production)
           local active=0;for _ in pairs(w.active) do active=active+1 end
           if not w.active[tostring(region)] and active<4 then w.active[tostring(region)]={region=region,countInAudit=false} end
         end)
-        return false,'preparation region '..region..' needs evidence recovery: '..tostring(why)
+        return false,'preparation region '..region..' needs evidence recovery: '..tostring(record and 'unfinished backup' or why)
       end
       if not record.preparation or record.preparation.status~='prepared' then return false,'preparation region '..region..' is not verified' end
     end
@@ -314,6 +314,10 @@ function M.new(app,config,e,queue,production)
       a.error='Foundation access restoration requires recovery; region remains owned';return false
     end
     if work.status~='working' then
+      -- Both sidecar generations must contain terminal proof before the root
+      -- stops advancing this region. Older unfinished backups still reconcile
+      -- through readyFor when restored against a completed root.
+      assert(cp:save(record))
       F.commit(p,save,function()
         if a.countInAudit~=false then
           p.site.work.completed=p.site.work.completed+1;p.site.work.blocked=p.site.work.blocked+(work.status=='blocked' and 1 or 0)
@@ -366,7 +370,7 @@ function M.new(app,config,e,queue,production)
         F.commit(p,save,function() p.site.accessLease={region=a.region,target=U.copy(route.target),bounds=U.copy(route.bounds or plan:region(a.region).bounds)} end)
         return true
       end
-      for _,other in pairs(s.jobs) do if other.status~='completed' and other.bounds and E.overlaps(lease.bounds,other.bounds) then
+      for _,other in pairs(s.jobs) do if other.workerId and other.status~='completed' and other.bounds and E.overlaps(lease.bounds,other.bounds) then
         a.error='Waiting for existing task '..other.id..' to leave the foundation access envelope';return false
       end end
       local payload=Access.payload(work,plan,a.region,record.clearanceY)

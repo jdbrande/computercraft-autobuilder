@@ -234,8 +234,7 @@ function M.new(config,e)
     if not state.currentTask or state.currentTask.phase=='completed' then return true end
     local generic=state.currentTask.type and state.currentTask.type~='MINE'
     if not generic and state.currentTask.phase=='blocked' then
-      if state.motionReservation and state.motionReservation.granted and tostring(state.currentTask.error):find('movement reservation pending',1,true) and self.mining.miner then self.mining.miner:resume()
-      else return true end
+      if not (state.motionReservation and state.motionReservation.granted and tostring(state.currentTask.error):find('movement reservation pending',1,true)) then return true end
     end
     self.busy=true; self.motionVersion=self.motionVersion+1
     local service=generic and self.automation or self.mining

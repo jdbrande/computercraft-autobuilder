@@ -228,6 +228,27 @@ test('preparation proof recovery preserves all active owners and does not repeat
   for _=1,1200 do service:workTick(p,plan);completePreparation(q,plan);if p.site.work.status=='completed' then break end end
   eq(p.site.work.completed,plan.regionCount);eq(p.site.work.preparedCount,plan.regionCount)
 end)
+test('completed root recovers a valid unfinished backup and terminal evidence is promoted before retirement',function()
+  local e,c,app,q,p,plan,service,production=surveyedFixture();service:startWork(p,plan)
+  local blocks={{x=103,y=2,z=103}};local region=plan:requiredRegions(blocks)[1];local previous,path
+  for _=1,1200 do
+    service:workTick(p,plan);completePreparation(q,plan)
+    local record,at=service:evidence(p,plan,region)
+    if record and record.preparation and record.preparation.stage=='verify_clear' then previous=e.fs.files[at];path=at end
+    if p.site.work.status=='completed' then break end
+  end
+  assert(previous);eq(p.site.work.status,'completed');assert(service:readyFor(p,plan,blocks))
+  e.fs.files[path]='corrupt'
+  eq(service:evidence(p,plan,region).preparation.status,'prepared','terminal evidence was not promoted')
+  -- A root from the previous release can retain an older, valid backup.
+  e.fs.files[path..'.bak']=previous
+  service=require('autobuilder.build.site_service').new(app,c,e,q,production)
+  eq(service:evidence(p,plan,region).preparation.status,'working')
+  assert(not service:readyFor(p,plan,blocks));eq(p.site.work.status,'working')
+  for _=1,1200 do service:workTick(p,plan);completePreparation(q,plan);if p.site.work.status=='completed' then break end end
+  eq(p.site.work.completed,plan.regionCount);eq(p.site.work.preparedCount,plan.regionCount)
+  assert(service:readyFor(p,plan,blocks));eq(p.site.work.rechecking,nil)
+end)
 test('fill selection requires enough stock or an available replenishment provider',function()
  for _,amount in ipairs({1,30}) do
   local e,c,app,q,p,plan,service=surveyedFixture()
@@ -476,10 +497,17 @@ test('cross-region access holds its envelope between jobs drains existing owners
   for _=1,8 do service:workTick(p,plan) end
   for _,j in pairs(q.state.jobs) do assert(not j.siteAccess,'access began before the existing owner drained') end
   q.state.jobs.foreign.status='completed'
+  local queued={id='queued',type='BUILD',project=p.name,status='queued',bounds=U.copy(lease.bounds)}
+  q.state.jobs.queued=queued
+  local protection=require('autobuilder.core.protection')
+  assert(not protection.canOwn(app.state,queued,13),'queued build admitted into active access lease')
+  queued.type='PREPARE_REGION';queued.siteWork={region=foreign,identity=plan.identity}
+  assert(not protection.canOwn(app.state,queued,13),'queued preparation admitted between access child jobs')
   local saw=false
   for _=1,1200 do
     service:workTick(p,plan)
-    for _,j in pairs(q.state.jobs) do if j.status~='completed' then
+    for _,j in pairs(q.state.jobs) do if j.status~='completed' and j~=queued then
+      if j.siteAccess then assert(protection.canOwn(app.state,j,12),'access lease rejected its own task') end
       j.workerId=12;j.status='completed';j.completedAt=100;j.progress=#j.blocks;j.report={counts={correct=j.progress},entries={}}
       if j.siteAccess then
         saw=true;assert(p.site.accessLease);assert(require('autobuilder.build.site_work').validContract(j))
@@ -491,6 +519,7 @@ test('cross-region access holds its envelope between jobs drains existing owners
     if p.phase=='site_ready' then break end
   end
   assert(saw);eq(p.phase,'site_ready');assert(not p.site.accessLease);assert(service:prepared(p,plan,foreign))
+  assert(not queued.workerId);assert(protection.canOwn(app.state,queued,13),'released access lease still fenced queued work')
 end)
 
 test('persistent external inflow builds a verified retaining barrier before a fresh preparation census',function()

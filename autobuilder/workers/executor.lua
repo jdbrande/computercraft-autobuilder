@@ -16,6 +16,10 @@ function M.new(app,config,e,network,clock)
   local function save() return app:save() end
   local function send(kind,payload) return network:send(config.controllerId,kind,payload) end
   local function generic() return s.currentTask and s.currentTask.type and s.currentTask.type~='MINE' end
+  local function miningEnabled()
+    local t=s.currentTask
+    return t and (not t.type or t.type=='MINE') and (config.mining.enabled or t.exploration)
+  end
   local function constructionFuel(task,origin)
     local home=config.depot; local pose=origin or app.navigation.pose
     if not construction[task.type] or not U.position(home) or not U.position(pose) then return nil end
@@ -99,9 +103,10 @@ function M.new(app,config,e,network,clock)
     end
   end
   local function reserve(from,target,work)
-    if work and (s.poseRecovery or not s.currentTask or not config.automation.enabled) then return false,'mutation requires active enabled task ownership' end
+    local enabled=config.automation.enabled or miningEnabled()
+    if work and (s.poseRecovery or not s.currentTask or not enabled) then return false,'mutation requires active enabled task ownership' end
     if s.poseRecovery then return app.poseRecovery:guard(from,target) end
-    if not s.currentTask or not config.automation.enabled then return true end
+    if not s.currentTask or not enabled then return true end
     local r=s.motionReservation; local id=s.currentTask.id
     if r and r.jobId==id and (r.work==true)==(work==true) and U.distance(r.target,target)==0 then
       if r.granted then return true end
@@ -128,10 +133,8 @@ function M.new(app,config,e,network,clock)
     if r then send('task_position',{jobId=r.jobId,from=r.from,target=r.target}); s.motionReservation=nil; save() end
   end
   function self:handle(sender,m)
-    local task=s.currentTask
-    local miningPose=(m.type=='task_pose_grant' or m.type=='task_pose_ack') and task and (not task.type or task.type=='MINE')
-      and (config.mining.enabled or task.exploration)
-    if sender~=config.controllerId or not config.automation.enabled and not miningPose then return false,'automation controller mismatch or disabled' end
+    local miningControl=(m.type=='task_pose_grant' or m.type=='task_pose_ack' or m.type=='task_grant') and miningEnabled()
+    if sender~=config.controllerId or not config.automation.enabled and not miningControl then return false,'automation controller mismatch or disabled' end
     if m.boot<(s.controllerBoot or 0) then return false,'stale controller generation' end
     local previous=s.lastTaskControl
     if previous and (m.boot<previous.boot or (m.boot==previous.boot and m.sequence<=previous.sequence)) then return false,'stale task control' end

@@ -68,8 +68,23 @@ test('worker mutation reservations cannot consume movement grants or bypass disa
   end
   assert(not grant(nil),'movement grant authorized mutation');assert(grant(true));assert(app.navigation.workGuard(target))
   assert(not app.navigation.guard(w.pose,target),'mutation grant authorized movement');assert(not grant(true));assert(grant(nil))
-  c.automation.enabled=false;assert(not app.navigation.workGuard(target))
+  c.automation.enabled=false;c.mining.enabled=true;assert(not app.navigation.workGuard(target))
+  assert(not grant(nil),'enabled mining admitted generic task control')
   c.automation.enabled=true;app.state.currentTask=nil;assert(not app.navigation.workGuard(target))
+end)
+
+test('access lease admission is rechecked after yielding coverage and allows its recovery survey',function()
+  local c,s=fixture();s.automation.jobs={};s.automation.sequence=0;s.workers={['13']={id=13,online=true,telemetry={status='idle',capabilities={building=true}}}}
+  local bounds={min={x=60,y=0,z=0},max={x=65,y=4,z=4}}
+  local site={identity=string.rep('a',64)};s.automation.projects.own.site=site
+  local chunks={reserve=function() site.accessLease={bounds=U.copy(bounds),region=1};return {status='disabled'} end}
+  local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,chunks,c)
+  local j=Q:submit('VERIFY',{project='own',blocks={{x=60,y=1,z=1,name='minecraft:stone',state={}}}})
+  assert(not Q:assign(s.workers),'lease acquired during yielding coverage was ignored');assert(not j.workerId)
+  local P=require('autobuilder.core.protection')
+  local recovery={type='SURVEY_SITE',project='own',bounds=bounds,clearanceY=4,siteSurvey={identity=site.identity,region=1}}
+  assert(P.canOwn(s,recovery,13));recovery.siteSurvey.region=2;assert(not P.canOwn(s,recovery,13))
+  site.accessLease=nil;assert(P.canOwn(s,j,13))
 end)
 
 test('independent workers can use a clear overhead plane without entering preparation work cells',function()

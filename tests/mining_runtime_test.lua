@@ -55,6 +55,24 @@ test('GPS fix started before mining motion is discarded when it returns',functio
   we.gps.locate=function() worker.motionVersion=worker.motionVersion+1; worker.state.position.x=4; return 0,0,0 end
   assert(worker:updateGPS()); eq(worker.state.position.x,4)
 end)
+test('mining-only worker receives mutation grants and completes acquisition across restart',function()
+  local w,ce,we,c,worker,cc,wc=fixture();wc.automation.enabled=false
+  worker=require('autobuilder.core.runtime').new(wc,we);w.stock['minecraft:raw_iron']=2
+  for x=2,6 do w.blocks[x..',0,0']='minecraft:iron_ore' end
+  worker:tick();pump(we,c);pump(ce,worker)
+  local ok,id=c:command('mine minecraft:raw_iron 5');assert(ok,id)
+  local rebooted,grants=false,0
+  for i=1,500 do
+    ce.now=100+i;we.now=ce.now;w.time=ce.now
+    c:tick();pump(ce,worker);worker:tick();worker:workStep()
+    for _,packet in ipairs(we.packets) do if packet.message.type=='task_reserve' and packet.message.payload.work then grants=grants+1 end end
+    pump(we,c);pump(ce,worker)
+    if grants>0 and not rebooted then worker=require('autobuilder.core.runtime').new(wc,we);rebooted=true end
+    if c.state.jobs[id].status=='completed' and not worker.state.currentTask then break end
+  end
+  assert(grants>0,'mining-only worker requested no mutation grants');assert(rebooted)
+  eq(c.state.jobs[id].status,'completed');eq(w.stock['minecraft:raw_iron'],5);eq(worker.state.currentTask,nil);eq(w.pose.x,0)
+end)
 test('controller mine command rejects missing storage and malformed input',function()
   local _,ce,_,_,_,cc=fixture(); cc.storageInventories={}
   local c=require('autobuilder.core.runtime').new(cc,ce)

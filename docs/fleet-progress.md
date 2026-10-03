@@ -34,8 +34,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   recovery and bounded preparation retries. Shared mutation protection, native
   multiworker uneven-terrain construction and finite water/lava drainage have
   acceptance evidence. Sealed-support scanning and cross-region fluid drainage passed native validation;
-  automatic missing sealed-support access and final
-  milestone verification/review remain in progress.
+  automatic missing sealed-support access passed its first native trial. The
+  single final review found three bugs; its consolidated regression-backed fix
+  pass and the remaining native/final test gates are in progress.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -81,7 +82,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 38–39: completion and failures | Verified projects and final inventory/logistics/worker settlement accepted0.22 | Broader bounded automatic retries and actionable project errors |
 | 41–42: dependency-ordered milestones | Exploration, dependency/provider graph and count ownership integrated | Implement remaining milestones using existing controller/executor boundaries |
 | 44: dynamic fleet scaling | Shared-material explorers and capability-based queues provide partial foundations | Demand/yield/travel/rate allocation, role minimum/maximum counts, bottleneck response, safe idle reassignment and scale-down; simulation and live miners/clearers/builders ramp-up |
-| 45: automatic site preparation and leveling | Immutable geometry, bounded survey/work contracts, protected native action journals, `build level` runtime with partial-floor retention, debris return and verified fill | Shared protection for remaining roles, flowing-fluid clearance, sealed-support access and larger uneven-terrain live acceptance |
+| 45: automatic site preparation and leveling | Shared mutation protection, uneven-terrain multiworker and finite fluid native trials, scanner proof and automatic hidden-foundation access; bounded external-inflow containment in simulation | Native cross-region access and external-inflow containment, consolidated review corrections and final release gates |
 
 ## Evidence and discovered bugs
 
@@ -914,3 +915,22 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   trial recovered an earlier controller reboot and a worker reboot at a confirmed
   shaft entrance between child jobs, with project pause/resume. No final native
   acceptance is claimed yet. Four loaded chunks per fixture; no world backups.
+- Native206/207 automatic hidden-foundation acceptance passed:9 retained floor
+  blocks verified,100 independently checked world coordinates, one net cobblestone
+  consumed, restored ground, empty private inventories and idle worker at home.
+  Both computers are shut down and their four force-load tickets removed. See
+  [foundation access acceptance](validation-foundation-access.md).
+- The single final0.23 review found three reproducible bugs: queued unowned builds
+  deadlocked an access lease; a valid unfinished backup could strand a completed
+  preparation root; and mining-only workers could neither request nor accept new
+  mutation grants. The consolidated fix pass drains actual owners while fencing
+  new overlapping admission, promotes terminal sidecar evidence and recovers older
+  unfinished backups, and applies task-specific mining enablement to grants.
+- The mining-only restart regression also exposed a saved granted reservation
+  waiting forever for an unconstructed miner executor. Resume now runs after the
+  mining service restores its engine and validates the saved configuration.
+  Focused mining/service/protection tests pass, including restart, current backup
+  promotion, older backup recovery and an admission lease acquired during a
+  yielding chunk check. Full final validation remains pending. Controller-only
+  preparation/admission fixes were deployed to208/210 and both restarted while
+  their independent native trials continued.
