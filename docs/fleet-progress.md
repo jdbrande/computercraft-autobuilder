@@ -1130,3 +1130,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   confirmed nine stored cobblestone (eight mined plus one explicit preload), empty
   home cargo and1,846 finite fuel. Both computers are off and their eight test chunks
   are unloaded. See validation-0.25.0.md. Complete Lua gates remain running.
+
+- Final0.25 clean-source gate completed:802 Lua tests,18 Python tests, release
+  verification and whitespace checks pass. Native acceptance is complete.
+  Integration remains ordered behind the still-running0.24 native scaling trial.
