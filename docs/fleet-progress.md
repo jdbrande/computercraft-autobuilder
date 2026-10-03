@@ -85,3 +85,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 
 - Milestone 1 released and independently reviewed; next implementation task is
   provider registry configuration/selection with focused red-green tests.
+
+- Task 9: provider registry/configuration selection implemented. Four focused tests
+  passed after the missing-module failure; full Lua suite passed 410/410. Defaults
+  preserve legacy providers, preferences are validated, stock/online availability
+  guide selection. Runtime provider dispatch and graph accounting remain next.

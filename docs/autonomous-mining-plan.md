@@ -383,15 +383,15 @@ context accepts `available`, `required`, `workers`, `acquisitionOnly`.
 lists. `config.providerPreferences` defaults to `{}`. Supported types: storage,
 exploration, mining, tree_farm, farm, crafting, smelting.
 
-- [ ] Add literal candidate/selection cases for iron, glass, oak logs, two farms,
+- [x] Add literal candidate/selection cases for iron, glass, oak logs, two farms,
   stocked demand, configured type preference, offline fallback, and no provider.
   Reject duplicate/unknown types, sparse arrays, invalid item/counts; verify
   returned descriptors cannot mutate config. Run and observe missing module failure.
-- [ ] Implement registry over existing material/recipe/farm definitions. Require
+- [x] Implement registry over existing material/recipe/farm definitions. Require
   compatible resource-filtered mining capabilities; absence of a workers context
   means availability unknown, not all workers offline. Fall back to best configured
   candidate when none currently available so recovery remains possible.
-- [ ] Add and validate the config field. Register tests in the complete suite.
+- [x] Add and validate the config field. Register tests in the complete suite.
   Run focused tests and full Lua suite; expected zero failures. Commit.
 
 ### Task 10: Explicit aggregated dependency graph
