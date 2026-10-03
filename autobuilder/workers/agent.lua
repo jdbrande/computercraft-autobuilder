@@ -14,7 +14,9 @@ function M.new(state,config,network,turtle,save)
     local need=config.fuel and config.fuel.enabled and task and not task.paused
       and require('autobuilder.workers.fuel_recovery').needsFuel(task)
       and math.max(config.fuel.target,config.mining.fuelTarget,task.requiredFuel or 0) or nil
-    return {fuelRequired=need,fuelLimit=turtle.getFuelLimit and turtle.getFuelLimit() or nil,label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,
+    local limit=turtle.getFuelLimit and turtle.getFuelLimit() or nil
+    if limit=='unlimited' then limit=nil end
+    return {fuelRequired=need,fuelLimit=limit,label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,
       position={known=p.known==true,x=p.x,y=p.y,z=p.z,heading=p.heading,source=p.source or 'unknown'},
       fuel=turtle.getFuelLevel(),depot=config.fuel and config.fuel.enabled and U.copy(config.depot) or nil,inventory={used=used,slots=16},
       miningResources=config.mining and config.mining.enabled and U.copy(config.mining.resources or {}) or nil,

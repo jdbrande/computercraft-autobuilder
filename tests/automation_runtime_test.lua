@@ -347,6 +347,74 @@ test('native runtime protocol refuels an empty turtle through a claimed station 
   assert(not f.rejections,table.concat(f.rejections or {},'; '))
 end)
 
+local function stationRefuelRegression(target,stock)
+  local f=fixture(); local h=f.h; local turtle=f.we.turtle
+  h.inventories.fuel={}; h.inventories.store[2].count=64; turtle.fuel=0
+  turtle.inspectUp=function() return true,{name=mc('chest')} end
+  turtle.suckUp=function(n)
+    for slot,stack in pairs(h.inventories.fuel) do
+      local moved=math.min(n,stack.count)
+      h.slots[h.selected]={name=stack.name,count=moved}; stack.count=stack.count-moved
+      if stack.count==0 then h.inventories.fuel[slot]=nil end
+      return moved>0
+    end
+    return false
+  end
+  turtle.refuel=function(n)
+    local item=h.slots[h.selected]; if not item or item.name~=mc('coal') then return false end
+    local used=math.min(n,item.count); turtle.fuel=turtle.fuel+used*80
+    item.count=item.count-used; if item.count==0 then h.slots[h.selected]=nil end
+    return true
+  end
+  local C=require('autobuilder.config')
+  f.cc.fuel={enabled=true,low=80,target=target,stations={{id='home',workerId=12,inventory='fuel',position={x=0,y=64,z=0},targetItems=stock}}}
+  f.wc.fuel={enabled=true,low=80,target=target}; f.wc.depot={x=0,y=64,z=0}
+  f.cc=C.load(f.cc); f.wc=C.load(f.wc)
+  f.c=Runtime.new(f.cc,f.ce); f.w=Runtime.new(f.wc,f.we)
+  for i=1,180 do
+    f:step()
+    if i==18 then f.c=Runtime.new(f.cc,f.ce); f.w=Runtime.new(f.wc,f.we) end
+  end
+  eq(turtle.fuel,math.ceil(target/80)*80); eq(f.w.state.currentTask,nil)
+  local refuels=0
+  for _,job in pairs(f.c.state.automation.jobs) do
+    if job.type=='REFUEL' then refuels=refuels+1; eq(job.status,'completed') end
+    if job.type=='FUEL_STATION' and job.status=='completed' then eq(f.c.state.inventoryLedger.leases[job.id].status,'released') end
+  end
+  assert(refuels>=1); assert(not require('autobuilder.core.workflows').workerBusy(f.c.state,12))
+  assert(not f.rejections,table.concat(f.rejections or {},'; '))
+  eq(next(h.slots),nil)
+  -- Run the real crafting engine after refueling, using distinct input and fuel chests.
+  turtle.suckUp=function(n)
+    for slot,item in pairs(h.inventories.input) do
+      h.slots[h.selected]={name=item.name,count=1}; h.inventories.input[slot]=nil; return true
+    end
+    return false
+  end
+  h.inventories.store[3]={name=mc('stone'),count=4}
+  local task={item=mc('stone_bricks'),quantity=4}
+  local engine=require('autobuilder.factory.crafting').new(task,f.we,f.wc,function() return true end)
+  local status,why
+  for _=1,40 do status,why=engine:step(); if status=='complete' or status=='blocked' then break end end
+  eq(status,'complete'); eq(h.crafts,1)
+end
+
+test('default station refuel leaves a Crafty turtle empty for its next craft',function()
+  stationRefuelRegression(1000,16)
+end)
+test('small fuel station releases and replenishes finite batches across reboot until target',function()
+  stationRefuelRegression(1000,2)
+end)
+
+test('unlimited native fuel limits register workers with automatic fuel disabled',function()
+  local f=fixture()
+  f.we.turtle.getFuelLevel=function() return 'unlimited' end
+  f.we.turtle.getFuelLimit=function() return 'unlimited' end
+  assert(f.w:tick()); f:pump(f.we,f.c)
+  assert(f.c.state.workers['12'],'unlimited worker registration rejected')
+  assert(not f.rejections,table.concat(f.rejections or {},'; '))
+end)
+
 test('fleet runtime rescues a stranded worker and resumes its original task across lost receipts and reboot',function()
   local f=fixture(); local h=f.h; local courier=f.we.turtle
   local ve=environment(13); ve.peripheral=f.we.peripheral

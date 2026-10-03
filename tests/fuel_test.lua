@@ -51,3 +51,17 @@ test('fuel containers are never dropped without a verified container and NBT fue
   assert(not inv:refuel(1000,true))
   item={name=mc('coal'),count=1,nbt='protected'}; assert(not inv:refuel(1000,false))
 end)
+
+test('managed station returns the final fuel container before releasing the worker',function()
+  local level=0; local item={name=mc('lava_bucket'),count=1}; local returns=0; local chest=false
+  local t={getFuelLevel=function() return level end,getFuelLimit=function() return 20000 end,
+    getItemCount=function() return item and item.count or 0 end,getItemDetail=function() return item end,
+    select=function() return true end,inspectDown=function() return chest,{name=mc('chest')} end,
+    refuel=function() item={name=mc('bucket'),count=1}; level=level+1000; return true end,
+    dropDown=function() returns=returns+1; item=nil; return true end}
+  local inv=require('autobuilder.storage.inventory').new(t,{fuel=Fuel.defaults})
+  local ok,why=inv:refuel(1000,true,true)
+  assert(not ok and why:find('container'),'returned bucket released without a safe return chest')
+  eq(returns,0); chest=true
+  assert(inv:refuel(1000,true,true)); eq(returns,1); eq(item,nil); eq(level,1000)
+end)

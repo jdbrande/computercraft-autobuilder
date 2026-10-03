@@ -207,3 +207,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   coal (8 consumed,12 remaining). Live `fuel` status showed all stations2/2.
   Computers110–115 were shut down and27 force-load tickets removed. Evidence and
   scope: [0.15.0 acceptance](validation-0.15.0.md). Whole-branch review next.
+
+- Whole-branch fuel review found three Important defects. Four regressions failed
+  first, then passed: unlimited-fuel telemetry registration; default16-coal station
+  leaving fuel in Crafty slots; two-coal station stalling below target; and final
+  lava-container cleanup before managed release. Refuel now pulls one item at a
+  time and returns containers safely; durable finite batches release/replenish until
+  the measured target. Full suites and native16/2-coal station retest are running.
+- Final fuel gate:470 Lua and16 Python tests passed; release artifacts and whitespace
+  verified. Native default16/small2 station retest completed automatically: both
+  workers160→1040 fuel, one/six batches, empty turtle inventories, all jobs complete.
+  Final review defects are regression-covered; integration into main is next.

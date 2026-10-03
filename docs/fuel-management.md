@@ -59,7 +59,10 @@ observation, not an estimate of items still present while a consumer owns it.
 
 Station filling reserves source stock, checks native slot/item capacity and saves
 an intent before transferring. The receiving worker cannot consume the chest until
-filling reconciles. Offline owners retain their assignments and station ownership.
+filling reconciles. Each managed refuel consumes a finite station batch and releases
+the chest for replenishment. The controller repeats batches until measured fuel
+reaches the target, even when `targetItems` is small or fuel estimates differ from
+native values. Offline owners retain their assignments and station ownership.
 
 A stranded worker freezes at a confirmed pose without losing its original task.
 A suitable idle courier reserves its station pickup, verifies the recipient's
@@ -75,7 +78,10 @@ Configured energy values guide quantity estimates; actual `getFuelLevel` determi
 readiness. Defaults cover coal/charcoal80, coal blocks800 and lava buckets1000.
 Override `fuel.values` and `fuel.returns` for supported modded fuels. Ordinary
 refueling uses slot15 and never burns arbitrary building inventory. Returned
-containers remain there until a verified depot container accepts them. Rescue fuel
+containers must be unloaded into a verified chest below the depot before a managed
+refuel job releases its worker. For a Crafty station, keep this return chest distinct
+from crafting input/output (use front/up sides as appropriate). Ordinary in-field
+refueling retains containers until depot return. Rescue fuel
 is consumed from measured receiving slots; returned buckets remain in inventory.
 
 Chunk loading is still a separate milestone. Keep the whole mission loaded. Routes

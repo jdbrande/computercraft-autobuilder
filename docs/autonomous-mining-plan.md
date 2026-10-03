@@ -538,7 +538,7 @@ executor; add rescue service tests and full-chain recovery scenario.
 
 - [x] Expose fleet fuel budgets, station stock, waiting deliveries and recovery
   status with actionable errors; document exact setup and configurable providers.
-- [ ] Run full Lua/Python/release checks and native zero-fuel depot plus stranded
+- [x] Run full Lua/Python/release checks and native zero-fuel depot plus stranded
   worker acceptance. Review branch, fix demonstrated bugs with regressions,
   integrate and continue to remaining parallel factory/schematic/chunk/recovery
   requirements without a routine approval pause.

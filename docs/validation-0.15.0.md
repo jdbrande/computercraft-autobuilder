@@ -6,7 +6,7 @@ integrated milestone in the larger [fleet requirements](fleet-requirements.md).
 
 ## Automated evidence
 
-Pre-review gate:466 Lua tests and all16 Python tests passed. Release generation,
+Final gate:470 Lua tests and all16 Python tests passed. Release generation,
 `python3 tools/release.py --check` and `git diff --check` passed. Tests exercise real runtime/controller/worker modules with simulated
 hardware, including finite fuel, partial deliveries, unrelated inventory changes,
 missing/full stations, failed checkpoints, offline ownership, duplicate receipts,
@@ -73,6 +73,32 @@ down and all27 test force-load tickets removed after verification. The rig remai
 for inspection. The harness submits operator test work
 at runtime boundaries and observes state; it does not substitute simulated turtle
 or inventory APIs for live worker actions.
+
+## Final review regressions and native station retest
+
+The independent whole-branch review found three Important correctness defects.
+All were reproduced before fixes. Native unlimited fuel limits are now omitted
+from numeric telemetry, so workers register even with fuel disabled. Refueling
+pulls one item at a time, preventing surplus coal from blocking the next Crafty
+job. Managed refueling also requires the final returned container to be unloaded
+safely. Small stations use durable finite consumption batches: the consumer
+releases the chest between fills and continues until measured fuel reaches target.
+Offline consumers still retain ownership. Simulations cover actual refuel → craft,
+two-item repeated batches across controller/worker reboot and safe bucket cleanup.
+
+A final native retest used the existing controller110 and depot workers113/115.
+Both started with160 fuel; the target was raised to1000. Station113 held16 coal;
+station115 held2. The operator set shared source stock to64 coal. Worker113
+completed one batch, worker115 six batches. Both reached1040 measured fuel with
+empty turtle inventories; all jobs completed and stations replenished to16/2.
+Independent world inspection confirmed both fuel values and inventories. This
+retest is separate from the original20-coal rescue accounting above. Evidence is
+under ignored `dist/live-fuel/review/`.
+
+The player was found on the death screen before this retest. The operator harness
+respawned the player and selected spectator mode for continued development. The
+observer chunk and test-station chunk were temporarily force-loaded. The three
+test computers were shut down and both tickets removed afterward.
 
 ## Limits and remaining requirements
 

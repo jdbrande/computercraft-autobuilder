@@ -23,8 +23,9 @@ function M.new(app,config,e,queue,production,clock)
     -- including while offline. Never reconcile a fill against a moving endpoint.
     if refuel and refuel.workerId then return end
     local worker=app.state.workers[tostring(station.workerId)]; local t=worker and worker.telemetry
+    if not refuel and t and type(t.fuel)=='number' and row.goal and t.fuel>=row.goal then row.goal=nil; assert(save()) end
     if not refuel and worker and worker.online and t and t.status=='idle' and not t.task
-      and t.capabilities and t.capabilities.fuelV1 and type(t.fuel)=='number' and t.fuel<config.fuel.low
+      and t.capabilities and t.capabilities.fuelV1 and type(t.fuel)=='number' and t.fuel<(row.goal or config.fuel.low)
       and not Q.workerBusy(app.state,worker.id) then
       assert(t.position and t.position.known and U.position(t.depot),'fuel worker needs a known position and depot')
       assert(U.distance(t.depot,station.position)==0,'fuel station does not match worker depot')
@@ -35,7 +36,7 @@ function M.new(app,config,e,queue,production,clock)
       assert(required<=t.fuel,'worker needs remote fuel rescue')
       refuel=queue:submit('REFUEL',{managedFuel=true,fuelReady=false,preferredWorker=worker.id,
         fuelTarget=config.fuel.target,station=U.copy(station)}, {}, 'fuel-worker:'..station.id..':'..tostring(row.refuel or 'first'))
-      row.refuel=refuel.id; assert(save())
+      row.refuel=refuel.id; row.goal=config.fuel.target; assert(save())
     end
     if active(row.fill) then return end
     local item=station.item or config.fuel.item

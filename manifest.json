@@ -312,7 +312,7 @@
       "version": "0.15.0"
     },
     {
-      "bytes": 8035,
+      "bytes": 8201,
       "path": "autobuilder/core/fuel_service.lua",
       "roles": [
         "controller",
@@ -322,7 +322,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "9c4948dabaa3461a0de8a6bf44d22814725a595b677e115300307d2d01a26f5e",
+      "sha256": "1aa244d9893cef4f35a74de669640b46dc8e3b02497437447718bd2ec0ca737a",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/fuel_service.lua",
       "version": "0.15.0"
     },
@@ -941,7 +941,7 @@
       "version": "0.15.0"
     },
     {
-      "bytes": 3730,
+      "bytes": 4106,
       "path": "autobuilder/storage/inventory.lua",
       "roles": [
         "controller",
@@ -951,7 +951,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "eae223c2d0475347adc03546bcc0fcfe640d444e1fbca7246bd51c1f997ca2f2",
+      "sha256": "306080d0f5f031ce15827a9efcde25e71866e436faf4e5baae915b3bcb46703f",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/storage/inventory.lua",
       "version": "0.15.0"
     },
@@ -1016,7 +1016,7 @@
       "version": "0.15.0"
     },
     {
-      "bytes": 3127,
+      "bytes": 3194,
       "path": "autobuilder/workers/agent.lua",
       "roles": [
         "controller",
@@ -1026,7 +1026,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "a61e4cd6a881b202f6932ceb09082c459d3539b4dbb778d3bc9b260917af9578",
+      "sha256": "dbd37d799117782b59375bf6037652afd79646145c845420997ad5139b60d92f",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/workers/agent.lua",
       "version": "0.15.0"
     },
@@ -1046,7 +1046,7 @@
       "version": "0.15.0"
     },
     {
-      "bytes": 16673,
+      "bytes": 16687,
       "path": "autobuilder/workers/executor.lua",
       "roles": [
         "controller",
@@ -1056,7 +1056,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "58f52cb703252ef049e81605121ba886c84a62e2e8777314fe8955f7ec3a548a",
+      "sha256": "3a5ebf0b5c799e2daa2fea8b242734918f5c54078841a72fc68fe6597e9b49ca",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/workers/executor.lua",
       "version": "0.15.0"
     },

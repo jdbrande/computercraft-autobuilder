@@ -253,7 +253,7 @@ function M.new(app,config,e,network,clock)
       local routes=require('autobuilder.workers.resupply')
       local travel=t.type=='REFUEL' and routes.stationTravel or routes.travel
       local ok,err=travel(t.homeRoute,t,app.navigation,config.depot,save,e.turtle,config)
-      if ok and t.type=='REFUEL' then ok,err=require('autobuilder.storage.inventory').new(e.turtle,config):refuel(t.fuelTarget or config.mining.fuelTarget,true) end
+      if ok and t.type=='REFUEL' then ok,err=require('autobuilder.storage.inventory').new(e.turtle,config):refuel(t.fuelTarget or config.mining.fuelTarget,true,t.managedFuel) end
       t.phase=ok and 'completed' or 'blocked'; t.error=err; t.progress=ok and 1 or 0; save(); return true
     end
     local result,err=engine():step()

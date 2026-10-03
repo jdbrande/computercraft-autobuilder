@@ -42,19 +42,25 @@ function M.new(turtle,config)
     if not ok then return nil,err or 'deposit failed' end
     return moved
   end
-  function self:refuel(target,atDepot)
+  function self:refuel(target,atDepot,managedBatch)
     assert(U.integer(target) and target>=0 and target<=100000000,'invalid refuel target')
     local fuel=turtle.getFuelLevel()
-    if fuel=='unlimited' or fuel>=target then return true end
+    if fuel=='unlimited' or fuel>=target and not managedBatch then return true end
     if turtle.getFuelLimit and target>turtle.getFuelLimit() then return false,'requested fuel exceeds turtle capacity' end
     local slot=config.fuelSlot or 15
     for _=1,2048 do
-      if turtle.getFuelLevel()>=target then return true end
-      if turtle.getItemCount(slot)==0 and atDepot then
-        local found,b=turtle.inspectUp()
-        if found and containers[b.name] then turtle.select(slot); turtle.suckUp(64) end
-      end
       local item=turtle.getItemDetail(slot)
+      if turtle.getFuelLevel()>=target and not (managedBatch and item and Fuel.returned(item.name,config)) then return true end
+      if not item and atDepot then
+        local found,b=turtle.inspectUp()
+        if found and containers[b.name] then
+          turtle.select(slot); turtle.suckUp(1)
+          -- A managed job owns one finite station batch. Its completion releases
+          -- the chest for a durable refill before the next consumption job.
+          if managedBatch and turtle.getItemCount(slot)==0 then return true end
+        end
+      end
+      item=turtle.getItemDetail(slot)
       if item and Fuel.returned(item.name,config) then
         if not atDepot or item.nbt then return false,'returned fuel container must be unloaded at the depot' end
         local found,block=turtle.inspectDown()
