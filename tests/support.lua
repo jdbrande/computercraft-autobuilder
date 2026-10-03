@@ -30,6 +30,7 @@ function M.fs()
     files[b], files[a] = files[a], nil
   end
   function api.open(p, mode)
+    mode=mode:gsub('b','')
     if fault.open == p then return nil, 'disk full' end
     if mode == 'r' and not files[p] then return nil, 'missing' end
     local buf = mode == 'a' and (files[p] or '') or ''

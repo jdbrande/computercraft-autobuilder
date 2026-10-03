@@ -255,3 +255,63 @@ test('project import refuses a volume occupied by an exploration claim',function
   c.state.jobs.claim.physicalComplete=true
   assert(c:command('build import /example.json safe')); assert(c.state.automation.projects.safe.protectedBounds)
 end)
+
+test('native schematic import reads binary once and stores immutable normalized JSON',function()
+  local w,ce,_,c=fixture(); local N=require('tests.native_support'); local raw=N.file('sponge-v3.gz')
+  ce.fs.files['/native.schem']=raw
+  local open=ce.fs.open; local reads=0
+  ce.fs.open=function(path,mode)
+    local h,why=open(path,mode)
+    if path=='/native.schem' then
+      eq(mode,'rb'); reads=reads+1
+      local close=h.close; h.close=function() close(); ce.fs.files[path]='changed after snapshot' end
+    end
+    return h,why
+  end
+  local ok,why=c:command('build import /native.schem native'); assert(ok,why); eq(reads,1)
+  local p=c.state.automation.projects.native
+  eq(p.sourceHash,require('autobuilder.install.sha256').digest(raw))
+  local bp=assert(ce.textutils.unserializeJSON(ce.fs.files[p.path])); eq(bp.metadata.sourceVersion,3)
+  eq(bp.requirements['minecraft:oak_log'],2); eq(w.places,0); eq(next(c.state.automation.jobs),nil)
+  assert(c:command('build analyze native')); eq(c.state.automation.projects.native.airCells,2)
+end)
+
+test('native schematic shorthand resumes one automatic project across repeated commands and reboot',function()
+  local w,ce,we,c,b,step,reboot=fixture(); local N=require('tests.native_support')
+  ce.fs.files['/native.schem']=N.fixture({width=2,length=1,palette={{'minecraft:stone',0}},data='\0\0'})
+  local ok,why=c:command('build /native.schem'); assert(ok,why)
+  assert(c:command('build /native.schem')); eq(c.state.automation.requestSequence,1)
+  c,b=reboot(); assert(c:command('build /native.schem')); eq(c.state.automation.requestSequence,1)
+  for _=1,350 do step(); if c.state.automation.projects.native.phase=='built' and not b.state.currentTask then break end end
+  eq(c.state.automation.projects.native.phase,'built'); eq(w.places,2)
+  local seq=c.state.automation.sequence
+  assert(c:command('build /native.schem')); eq(c.state.automation.sequence,seq); eq(c.state.automation.requestSequence,1)
+  ce.fs.files['/native.schem']=N.fixture({width=3,length=1,palette={{'minecraft:stone',0}},data='\0\0\0'})
+  local accepted,reason=c:command('build /native.schem')
+  assert(not accepted and reason:find('changed',1,true),reason); eq(c.state.automation.sequence,seq)
+end)
+
+test('native shorthand rejects corrupt or unsupported schematics before issuing work',function()
+  local w,ce,_,c=fixture(); local N=require('tests.native_support')
+  ce.fs.files['/bad.schem']=N.fixture():sub(1,-2)
+  assert(not c:command('build /bad.schem')); eq(next(c.state.automation.projects),nil)
+  ce.fs.files['/entity.schem']=N.fixture({extra={N.tag(9,'Entities','\10'..N.uint(1,4)..'\0')}})
+  local ok,why=c:command('build /entity.schem')
+  assert(not ok and why:find('Unsupported',1,true),why)
+  eq(next(c.state.automation.requests),nil); eq(next(c.state.automation.jobs),nil); eq(w.places,0); eq(w.digs,0)
+end)
+
+test('JSON import persists the same single file snapshot that passed validation',function()
+  local _,ce,_,c=fixture(); local original=ce.fs.files['/example.json']; local open=ce.fs.open; local reads=0
+  ce.fs.open=function(path,mode)
+    local h,why=open(path,mode)
+    if path=='/example.json' then
+      reads=reads+1; local close=h.close
+      h.close=function() close(); ce.fs.files[path]='invalid source changed after validation' end
+    end
+    return h,why
+  end
+  assert(c:command('build import /example.json snapshot')); eq(reads,1)
+  local p=c.state.automation.projects.snapshot; eq(ce.fs.files[p.path],original)
+  assert(c:command('build analyze snapshot'))
+end)

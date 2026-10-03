@@ -674,9 +674,9 @@ before any physical effect; raw NBT detection belongs to Task24.
 **Files:** schematic loader, projects/command help, import/runtime regressions,
 operator documentation, `docs/validation-0.17.0.md`, progress ledger, release.
 
-- [ ] Add failing binary import/shorthand/duplicate/reboot/source-change tests,
+- [x] Add failing binary import/shorthand/duplicate/reboot/source-change tests,
   ensuring invalid files or unsupported analysis cannot start physical work.
-- [ ] Implement binary read/immutable JSON normalization and `.schem` shorthand;
+- [x] Implement binary read/immutable JSON normalization and `.schem` shorthand;
   retain existing JSON behavior. Run focused/full Lua and Python tests.
 - [ ] Run native gzip-schematic construction/verification and independent world
   inspection. Fix discovered bugs with regressions. Document exact evidence and

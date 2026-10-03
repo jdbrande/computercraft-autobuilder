@@ -1,6 +1,20 @@
 # Importing blueprints
 
-Run the converter on a desktop with Python 3 (no third-party packages):
+Copy a Sponge v2/v3 `.schem` to the controller. With `build.enabled=true` and the
+origin configured, run `build /house.schem` to import and start automatic material
+preparation/construction. To inspect first, use `build import /house.schem house`,
+`build analyze house`, then `build auto house`. Repeating the shorthand preserves
+the same project across restarts; changed source bytes or an existing unrelated
+name require `build import /house.schem new_name`.
+
+Import reads one binary snapshot, validates the whole structure, and saves an
+immutable JSON copy. Corrupt data creates no project; unsupported entities or
+block metadata remain analyzable but prevent automatic physical work. Native gzip
+supports one member and rejects trailing/concatenated members, corrupt headers,
+CRC32 and size mismatches. Expansion is bounded while decoding and yields on
+CraftOS. It bundles licensed [LibDeflate](../autobuilder/vendor/README.md).
+
+The desktop converter remains available with Python3 (no third-party packages):
 
 ```sh
 python3 tools/schem_converter.py house.schem house.json
@@ -24,7 +38,7 @@ truncation, duplicate compound keys/indices, invalid block properties, unknown
 palette references, overlong varints and trailing NBT data are rejected. The parser
 requires a local palette; legacy numeric block registries are not supported.
 
-The converter retains Minecraft DataVersion for inspection; it does not migrate
+Both import paths retain Minecraft DataVersion for inspection; they do not migrate
 block names between game versions. Entity, block entity NBT and biome restoration
 are unsupported. Their presence produces explicit strings in `metadata.issues`.
 This includes sign text, inventories and other per-position NBT. These issues must
@@ -49,8 +63,13 @@ Unsupported acquisition and placement families must be reported by the planner.
 ## Lua API
 
 - `schematic.validate(data)` returns `data` or `nil, error`.
-- `schematic.load(fs, codec, path)` reads bounded JSON and validates it. Codec must
-  supply `unserializeJSON(raw)` (CC:Tweaked textutils) or `decode(raw)`.
+- `schematic.load(fs, codec, path)` reads bounded binary bytes, decodes `.schem`
+  through the native Sponge parser or validates JSON, and returns `data, error,
+  sourceBytes`. JSON needs `unserializeJSON(raw)` or `decode(raw)`; native project
+  normalization needs `serializeJSON(data)` (CC:Tweaked textutils).
+- `sponge.decode(bytes)` returns validated schema1 or raises a format diagnostic.
+- `nbt.decode(bytes)` returns typed nodes. Unused long/float/double values and long
+  arrays remain exact raw bytes; numeric schematic fields retain their tag kinds.
 - `blueprint.blocks(data, origin, rotation, mirrorX, mirrorZ)` returns a dense array
   of absolute `{x,y,z,name,state}` records, skipping all air variants. It asserts on
   invalid input. The default origin is zero and default rotation is zero.
@@ -80,10 +99,11 @@ prove turtle access, supported placement, or that a region can safely be built.
 
 ```sh
 .venv/bin/python tests/run.py
-python3 -m unittest discover -s tests -p 'test_*.py'
+.venv/bin/python -m unittest discover -s tests -p 'test_*.py'
 ```
 
 The converter tests create actual binary NBT fixtures for both versions and exercise
 the command-line interface, malformed inputs and decompression limits. Lua tests
 cover schema validation, transforms, material counts and support ordering. These are
-desktop simulations; live CC:Tweaked placement must still be checked in Minecraft.
+desktop simulations. Native import/placement evidence is recorded separately in
+[0.17 acceptance](validation-0.17.0.md).

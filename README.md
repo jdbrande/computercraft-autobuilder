@@ -249,7 +249,26 @@ workers. Unknown materials remain special acquisition requirements. To try produ
 without mining, preload raw ingredients and fuel into source storage. The reserved
 coal quantity above remains unavailable to recipes; supply additional smelting fuel.
 
-Convert a Sponge v2/v3 `.schem` on the desktop using Python's standard library:
+Copy a Sponge v2/v3 `.schem` directly into the controller filesystem. With
+`build.enabled` and the build origin configured, start the normal automatic pipeline:
+
+```text
+build /house.schem
+```
+
+The controller parses raw/gzip NBT, saves a validated JSON snapshot and plans all
+materials before work starts. Repeating the command reports the same project;
+changed source bytes require a new project name. To inspect before starting:
+
+```text
+build import /house.schem house
+build analyze house
+build auto house
+```
+
+Bounds, source offsets and unsupported entity/biome data are documented in
+[Importing blueprints](docs/blueprints.md). Desktop conversion is also available
+using Python's standard library:
 
 ```sh
 python3 tools/schem_converter.py house.schem house.json

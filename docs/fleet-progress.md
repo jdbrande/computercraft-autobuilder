@@ -13,8 +13,8 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Capacity and parallel factory completed:492 Lua/16 Python tests, native
   two-Crafty acceptance and regression-backed final review fixes.
 - Capacity/parallel factory integrated and pushed at `345b833`.
-- Current branch: `milestone/0.17.0`. Task23: bounded native gzip decoder, followed
-  by typed Sponge import and native construction acceptance; chunk loading next.
+- Current branch: `milestone/0.17.0`. Task25 native acceptance passed; final
+  whole-branch review remains before integration. Chunk-loading support is next.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -33,7 +33,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 3: coordination, persistence, physical accounting, capabilities | Existing queues, journals and validated worker telemetry | Extend the same guarantees to all new providers/reservations |
 | 4: logical roles | Miners, builders, Crafty workers, furnace controller, managed farms and courier executor | More harvest/processor adapters, fleet-level logistics/rescue; optional scouting |
 | 5: automatic registration | Installer, discovery/setup sharing, reconnect and capabilities | Single fleet install flow, equipment/software negotiation, automatic eligibility |
-| 6: schematic analyzer | JSON and desktop Sponge converter, transforms, supported-state classification | Native binary import, supported block entities/fluids/redstone analysis, required tools |
+| 6: schematic analyzer | Native/desktop Sponge v2/v3 import, bounded gzip/NBT, transforms and supported-state classification | Supported block entities/fluids/redstone analysis, required tools and broader placement adapters |
 | 7: recursive dependency graph | Aggregated nodes, shared stock/surplus, operation edges, bounded expansion; 417 Lua tests | Accepted 0.13.0; preserve during later integration |
 | 8: provider registry | Deterministic candidates, availability/preferences, durable acquisition selection | Accepted 0.13.0; preserve during later integration |
 | 9: autonomous mining | Accepted 0.12.0 with four live explorers | Preserve during later pipeline integration |
@@ -271,3 +271,13 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   native/Python differential checks, full503 Lua tests and18 Python tests. Required
   air/states/offsets and recomputed quantities survive; unsupported metadata is
   explicit. Import command integration and native acceptance are next.
+
+- Task25: four import/runtime regressions failed then passed. Single-snapshot import
+  fixes existing JSON validation/save races. Repeated native shorthand/reboot does
+  not duplicate work. Full507 Lua/18 Python and release checks passed.
+- Native130/131 acceptance: gzip v3 input built/verified3 blocks plus cleared air;
+  a16-block follow-up survived controller reboot, all16 independently confirmed.
+  Repeating shorthand retained7 jobs/2 requests. Both projects built, worker idle
+  with1791 fuel and one recovered dirt. Final home return/unload remains required.
+  Test computers shut down; observer/rig force loading removed. See
+  [0.17 acceptance](validation-0.17.0.md). Whole-branch review next.

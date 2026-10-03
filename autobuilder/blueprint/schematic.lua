@@ -1,4 +1,4 @@
--- Compact JSON blueprint validation. Never trust requirements supplied by a file.
+-- Compact JSON validation and native Sponge loading. Never trust supplied material counts.
 local M={MAX_BLOCKS=262144,MAX_BYTES=32*1024*1024,MAX_PALETTE=65536}
 local function integer(v,low,high)
   return type(v)=='number' and v==math.floor(v) and v>=low and v<=high
@@ -68,19 +68,20 @@ function M.validate(d)
   return d
 end
 function M.load(fs,codec,path)
-  local ok,result,err=pcall(function()
+  local ok,result,err,snapshot=pcall(function()
     if type(path)~='string' or #path==0 then return nil,'invalid blueprint path' end
     if fs.getSize and fs.getSize(path)>M.MAX_BYTES then return nil,'blueprint byte limit exceeded' end
-    local h,e=fs.open(path,'r'); if not h then return nil,e or 'cannot open blueprint' end
+    local h,e=fs.open(path,'rb'); if not h then return nil,e or 'cannot open blueprint' end
     local readOK,raw=pcall(h.readAll); local closeOK,closeErr=pcall(h.close)
     if not readOK then return nil,raw end
     if not closeOK then return nil,closeErr end
     if type(raw)~='string' or #raw>M.MAX_BYTES then return nil,'blueprint byte limit exceeded' end
+    if path:lower():match('%.schem$') then return require('autobuilder.blueprint.sponge').decode(raw),nil,raw end
     local decode=codec.unserializeJSON or codec.decode
     if not decode then return nil,'JSON decoder unavailable' end
-    return M.validate(decode(raw))
+    local value,why=M.validate(decode(raw)); return value,why,raw
   end)
   if not ok then return nil,tostring(result) end
-  return result,err
+  return result,err,snapshot
 end
 return M

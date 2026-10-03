@@ -8,7 +8,7 @@ function M.new(app,config,e,queue,production)
   local s=queue.state; local cache={}; local self={}
   local function save() return app:save() end
   local function project(name)
-    local p=s.projects[name or s.currentProject]; assert(p,'Unknown project; use build import <converted.json> [name]'); return p
+    local p=s.projects[name or s.currentProject]; assert(p,'Unknown project; use build import <file.schem|file.json> [name]'); return p
   end
   local function data(p)
     local raw=IO.read(e.fs,p.path); assert(Hash.digest(raw)==p.hash,'Imported blueprint changed; import under a new name')
@@ -104,19 +104,37 @@ function M.new(app,config,e,queue,production)
   end
   function self:command(args,importTransform)
     local action=args[2]; local name=args[3]
+    if action and action:lower():match('%.schem$') then
+      assert(#args==2,'Usage: build <file.schem>; configure build origin before starting')
+      assert(config.build.enabled,'Set build.enabled=true and configure the build origin first')
+      local title=(action:match('([^/]+)$') or ''):gsub('%.[^.]+$','')
+      local existing=s.projects[title]
+      if existing then
+        local source,why,raw=require('autobuilder.blueprint.schematic').load(e.fs,e.textutils,action); assert(source,why)
+        assert(existing.sourceHash==Hash.digest(raw),'Schematic source changed or project name is already used; import under a new name')
+        if existing.phase~='imported' and existing.phase~='analyzed' then return self:command({'build','status',title}) end
+      else self:command({'build','import',action,title},importTransform) end
+      return self:command({'build','auto',title})
+    end
     if action=='import' then
-      assert(name and not name:match('%.schem$'),'Convert .schem on your desktop first: tools/schem_converter.py input.schem output.json')
-      local source,err=require('autobuilder.blueprint.schematic').load(e.fs,e.textutils,name); assert(source,err)
-      local title=args[4] or name:match('([^/]+)%.json$'); assert(title and title:match('^[%w_-]+$') and #title<=64,'Invalid project name')
+      assert(name,'Usage: build import <file.schem|file.json> [name]')
+      local source,err,snapshot=require('autobuilder.blueprint.schematic').load(e.fs,e.textutils,name); assert(source,err)
+      local title=args[4] or (name:match('([^/]+)$') or ''):gsub('%.[^.]+$',''); assert(title and title:match('^[%w_-]+$') and #title<=64,'Invalid project name')
       assert(not s.projects[title],'Project exists; import under a new name')
       local transform=importTransform and require('autobuilder.config').load({build=importTransform}).build or config.build
       local protection=E.projectBounds(transform,source.size)
       assert(not E.conflicts(app.state,protection),'Project conflicts with owned exploration territory; wait for miners to return')
-      local raw=IO.read(e.fs,name); local path=config.blueprintDir..'/'..title..'.json'
+      local raw=snapshot
+      if name:lower():match('%.schem$') then
+        assert(e.textutils.serializeJSON,'JSON encoder unavailable')
+        raw=e.textutils.serializeJSON(source)
+        assert(type(raw)=='string' and #raw<=require('autobuilder.blueprint.schematic').MAX_BYTES,'Normalized blueprint byte limit exceeded')
+      end
+      local path=config.blueprintDir..'/'..title..'.json'
       if e.fs.exists(path) then assert(IO.read(e.fs,path)==raw,'Blueprint destination already exists with different content')
       else IO.write(e.fs,path..'.tmp',raw); e.fs.move(path..'.tmp',path) end
       local transform=importTransform and require('autobuilder.config').load({build=importTransform}).build or config.build
-      local p={protectedBounds=protection,name=title,path=path,hash=Hash.digest(raw),phase='imported',transform=U.copy(transform),jobs={},regionJobs={},generation=0}
+      local p={protectedBounds=protection,name=title,path=path,hash=Hash.digest(raw),sourceHash=Hash.digest(snapshot),phase='imported',transform=U.copy(transform),jobs={},regionJobs={},generation=0}
       s.projects[title]=p; s.currentProject=title; save(); return true,'Imported '..title
     end
     local p=project(name); s.currentProject=p.name
