@@ -319,3 +319,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   restores the prior phase before recovery. Independent world checks confirmed
   both AP tickets expired; observer force loading removed. Integrating0.18 and
   continuing required logistics without a milestone pause.
+
+- Task29: five node/protection regressions failed first, then passed. Full suite538
+  Lua tests passed. Registered stocks and private courier stands are protected;
+  active endpoint identities survive restart and configuration cannot adopt an
+  orphan private lease. Task30 reserved transport execution follows.

@@ -14,6 +14,7 @@ M.defaults={
   furnaces={}, smeltingFuelItem='minecraft:coal', smeltingWaitSteps=600, turtleFuelReserveItems={['minecraft:coal']=64},
   craftingStation={buffer='',input='',output='',inputSide='up',outputSide='down'},
   craftingStations={},craftingBatchSize=2,
+  logistics={batchSize=64,nodes={}},
   automation={enabled=true,building=false,crafting=false,courier=false,logging=false,farming=false},
   build={enabled=false,autoSite=false,origin={x=0,y=64,z=0},rotation=0,mirrorX=false,mirrorZ=false,regionSize=8},
   blueprintDir='/autobuilder/blueprints', clearSite=false,
@@ -36,7 +37,7 @@ local function merge(dst,src)
     assert(dst[k]~=nil or k=='controllerId' or k=='initialPosition' or k=='depot' or k=='label' or k=='entry' or k=='bounds' or k=='x' or k=='y' or k=='z' or k=='min' or k=='max', 'Unknown config key: '..tostring(k))
     if type(v)=='table' and type(dst[k])=='table' then
       -- These maps/lists are user-defined rather than schema objects.
-      if k=='areas' or k=='values' or k=='returns' or k=='stations' or k=='providerPreferences' or k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
+      if k=='nodes' or k=='areas' or k=='values' or k=='returns' or k=='stations' or k=='providerPreferences' or k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
         or k=='craftingStations' or k=='furnaces' or k=='turtleFuelReserveItems' or k=='treeFarms' or k=='farms' or k=='depotExpansion' then dst[k]=U.copy(v)
       else merge(dst[k],v) end
     else dst[k]=U.copy(v) end
@@ -103,6 +104,7 @@ function M.load(overrides)
   for _,k in ipairs({'building','crafting','courier','logging','farming'}) do c.capabilities[k]=c.automation.enabled and c.automation[k] or nil end
   c.capabilities.sitePreparation=c.capabilities.building and true or nil
   require('autobuilder.factory.stations').validate(c)
+  require('autobuilder.storage.nodes').validate(c)
   c.capabilities.isolatedCraftingV1=c.capabilities.crafting and c.craftingStation.buffer~='' and true or nil
   assert(U.position(c.build.origin) and ({[0]=true,[90]=true,[180]=true,[270]=true})[c.build.rotation],'invalid build transform')
   assert(type(c.build.enabled)=='boolean' and type(c.build.autoSite)=='boolean' and type(c.build.mirrorX)=='boolean' and type(c.build.mirrorZ)=='boolean','invalid build flags')

@@ -747,9 +747,9 @@ below. Reuse count/capacity ledgers and private transfer journals; no dependenci
 and physical exclusion boxes. Saved jobs use `logistics={source=node,
 destination=node,pickup=buffer,drop=buffer}` immutable snapshots.
 
-- [ ] Add/run failing dense bounded schema, inventory alias, protected stock/stand,
+- [x] Add/run failing dense bounded schema, inventory alias, protected stock/stand,
   saved rebind/removal and unrelated-node edit tests. Expected missing contract.
-- [ ] Implement validated node configuration and held-job protections; reuse existing
+- [x] Implement validated node configuration and held-job protections; reuse existing
   station ownership guard. Run focused/full Lua tests; expected pass. Commit.
 
 ### Task 30: Reserved finite transport batches and measured receipts

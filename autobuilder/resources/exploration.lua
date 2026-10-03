@@ -234,6 +234,7 @@ function M.record(records,trip,report)
 end
 function M.protectedAreas(state,config)
   local boxes=U.copy(config.restrictedAreas or {})
+  for _,b in ipairs(require('autobuilder.storage.nodes').protected(config,state)) do boxes[#boxes+1]=b end
   for _,p in pairs((state.automation or {}).projects or {}) do
     if p.protectedBounds then boxes[#boxes+1]=U.copy(p.protectedBounds)
     elseif config.exploration.enabled then error('exploration requires project protection migration') end
