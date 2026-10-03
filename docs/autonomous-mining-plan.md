@@ -796,9 +796,9 @@ and acting outside a saved loaded grant. Preserve every physical engine journal.
 heading remains operator override. Executor/miner poseRecovered resumes only recorded
 pose-related blocks after a complete trusted pose.
 
-- [ ] Add failing from/to/unexpected GPS, turn heading, checkpoint failure, interrupted
+- [x] Add failing from/to/unexpected GPS, turn heading, checkpoint failure, interrupted
   task resume, unrelated block, pause and disabled-policy saved-grant regressions.
-- [ ] Implement bounded reconciliation and shared runtime pose-block lifecycle. Run
+- [x] Implement bounded reconciliation and shared runtime pose-block lifecycle. Run
   focused/full tests; commit completed recovery foundation.
 
 ### Task33: Durable guarded heading probe

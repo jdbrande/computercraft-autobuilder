@@ -261,10 +261,12 @@ function M.new(app,config,e,network,clock)
     end
     function self:resumeFuelTask() return miner():resume() end
     function self:poseRecovered()
-      if config.mining.enabled and s.currentTask and (not s.currentTask.type or s.currentTask.type=='MINE') and s.currentTask.phase=='blocked'
-        and s.currentTask.error=='trusted position and heading required' and U.heading(s.position.heading) then
+      if (config.mining.enabled or s.currentTask and s.currentTask.exploration) and s.currentTask and not s.currentTask.paused
+        and (not s.currentTask.type or s.currentTask.type=='MINE') and s.currentTask.phase=='blocked'
+        and (s.currentTask.poseBlocked or s.currentTask.error=='trusted position and heading required')
+        and s.position.known and not s.position.pending and not s.position.uncertain and U.heading(s.position.heading) then
         local ok,err=miner():resume()
-        if ok then s.status=s.currentTask.phase else app:report('WARN',err) end
+        if ok then s.currentTask.poseBlocked=nil;s.status=s.currentTask.phase;save() else app:report('WARN',err) end
       end
     end
     function self:step()

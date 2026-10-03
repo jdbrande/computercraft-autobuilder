@@ -36,8 +36,11 @@ and reboots; duplicate requests must exactly match the saved sequence and origin
 After a durable grant, inspect forward without digging. Require finite movement and
 return fuel, an unpaused task and enabled service. Persist probe intent before one
 native forward move. Locate GPS again; reuse core.gps.heading(origin,fix) to infer
-heading only from exactly one horizontal block. Persist the recovered pose, report
-the observed position to release unused cells, then resume the original engine.
+heading only from exactly one horizontal block. Persist the recovered heading and return stage, then use journaled navigation to
+backtrack to the origin under the same claim. Confirm origin with GPS, report the
+settled position to release unused cells, then resume the original engine. Returning
+to origin preserves miner trail and pending-move journals. A reboot during backtrack
+reconciles the ordinary translation intent before any further move.
 
 A reboot after the physical step but before its receipt uses the saved origin and
 fresh GPS; it must not repeat the probe. If fresh GPS is still at the origin, no

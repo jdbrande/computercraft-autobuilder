@@ -66,11 +66,36 @@ function M.new(turtle,pose,config,save)
   end
   function self:reconcile(fix,heading)
     if not U.position(fix) or (heading and not U.heading(heading)) then return false,'invalid pose' end
+    local before=U.copy(pose)
+    local intent=pose.pending
+    if intent and not heading then
+      local turn=intent.action=='turnLeft' or intent.action=='turnRight'
+      local from=intent.from or (turn and pose)
+      local to=intent.to or (turn and pose)
+      local valid=U.position(from) and U.position(to)
+      if valid and turn then valid=U.distance(from,to)==0
+      elseif valid then
+        local dx,dy,dz=to.x-from.x,to.y-from.y,to.z-from.z
+        local v=vectors[from.heading]
+        valid=intent.action=='up' and dx==0 and dy==1 and dz==0
+          or intent.action=='down' and dx==0 and dy==-1 and dz==0
+          or v and (intent.action=='forward' or intent.action=='back') and dy==0
+            and dx==v[1]*(intent.action=='back' and -1 or 1) and dz==v[2]*(intent.action=='back' and -1 or 1)
+      end
+      if not valid or U.distance(fix,from)~=0 and U.distance(fix,to)~=0 then
+        return false,'GPS fix does not match the movement journal; inspect turtle and confirm pose'
+      end
+    end
     -- GPS can resolve a translation, but cannot resolve a turn interrupted by reboot.
     if pose.pending and pose.pending.action:find('turn') and not heading then pose.heading=nil end
     pose.x,pose.y,pose.z=fix.x,fix.y,fix.z
     pose.heading=heading or pose.heading; pose.known=true; pose.pending=nil; pose.uncertain=nil
-    local ok,err=persist(); if not ok then pose.uncertain=true end; return ok,err
+    local ok,err=persist()
+    if not ok then
+      for k in pairs(pose) do pose[k]=nil end;for k,v in pairs(before) do pose[k]=v end
+      pose.uncertain=true
+    end
+    return ok,err
   end
   function self:goTo(target)
     if type(target)=='string' then target=(config.locations or {})[target] end

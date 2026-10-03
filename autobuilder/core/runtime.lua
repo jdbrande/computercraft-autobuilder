@@ -99,6 +99,7 @@ function M.new(config,e)
     state.position.source='manual'; state.status=state.currentTask and (state.currentTask.phase or 'task_paused') or 'idle'
     restoreCoverage()
     if self.mining.poseRecovered then self.mining:poseRecovered() end
+    if self.automation.poseRecovered then self.automation:poseRecovered() end
     self:report('INFO','Operator confirmed position and heading'); return self:save()
   end
   function self:updateGPS()
@@ -111,10 +112,12 @@ function M.new(config,e)
     if fix then
       local changed=p.known and (p.x~=fix.x or p.y~=fix.y or p.z~=fix.z)
       if changed then self:report('WARN','GPS corrected local position') end
-      local ok,why=self.navigation:reconcile(fix); if not ok then return false,why end
+      local ok,why=self.navigation:reconcile(fix)
+      if not ok then state.gpsError=why;state.status='recovery_required';self:save();return false,why end
       p.source='gps'; p.lastFix=clock(); state.gpsError=nil
       restoreCoverage()
       if self.mining.poseRecovered then self.mining:poseRecovered() end
+      if self.automation.poseRecovered then self.automation:poseRecovered() end
       if state.status=='recovery_required' and U.heading(p.heading) then state.status=state.currentTask and 'task_paused' or 'idle' end
     else
       p.source=p.known and 'local' or 'unknown'
@@ -172,6 +175,7 @@ function M.new(config,e)
     if self.busy or self.gpsRequested or self.quitRequested then return true end
     if not self.agent then return self.automation:step() end
     local task=state.currentTask
+    if task and task.type and task.type~='MINE' and not config.automation.enabled then return true end
     if task and task.phase~='completed' then
       local covered,why=require('autobuilder.core.chunks').execution(config,state)
       if not covered then
@@ -212,6 +216,9 @@ function M.new(config,e)
     local service=generic and self.automation or self.mining
     local ok,result,err=pcall(service.step,service)
     self.busy=false
+    if state.currentTask and state.currentTask.phase=='blocked' and (state.position.pending or state.position.uncertain) then
+      state.currentTask.poseBlocked=true;self:save()
+    end
     if not ok then error(result,0) end
     return result,err
   end

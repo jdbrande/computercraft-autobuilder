@@ -372,3 +372,36 @@ test('underside verification budgets its fallback descent and escapes safely for
     if following=='RETURN_HOME' then eq(f.world.pose.x,0); eq(f.world.pose.y,2) else eq(f.world.places,1) end
   end
 end)
+
+test('GPS recovery resumes an interrupted courier move without replacing its cargo ownership',function()
+  local f=fixture();f.inventories.stage[1]={name='minecraft:stone',count=9}
+  f.we.gps={locate=function() return f.world.pose.x,f.world.pose.y,f.world.pose.z end}
+  f:reboot(false,true)
+  local original=f.world.turtle.up;local interrupted=false
+  f.world.turtle.up=function()
+    local ok,why=original()
+    if ok and f.stats.pulled==9 and not interrupted then interrupted=true;error('power lost after actual upward move') end
+    return ok,why
+  end
+  local ok,id=f.controller:command('transport minecraft:stone 9 source destination');assert(ok,id)
+  for _=1,200 do f:step();if interrupted then break end end
+  assert(interrupted);assert(f.worker.state.position.pending);eq(f.stats.pulled,9)
+  f:reboot(true,true);assert(f.worker:updateGPS())
+  for _=1,300 do f:step();if f.controller.state.automation.jobs[id].status=='completed' then break end end
+  eq(f.controller.state.automation.jobs[id].status,'completed');eq(f.stats.pulled,9);eq(f.stats.dropped,9)
+  eq(f.inventories.destination[1].count,9)
+end)
+
+test('pose recovery keeps paused and unrelated courier blocks intact',function()
+  for _,mode in ipairs({'paused','unrelated','disabled'}) do
+    local f=fixture();f.inventories.stage[1]={name='minecraft:stone',count=9}
+    local ok,id=f.controller:command('transport minecraft:stone 9 source destination');assert(ok,id)
+    for _=1,20 do f:step();if f.worker.state.currentTask then break end end
+    local pulled=f.stats.pulled
+    local t=f.worker.state.currentTask;t.phase='blocked';t.error='destination container missing';t.poseBlocked=mode~='unrelated' or nil
+    t.paused=mode=='paused';if mode=='disabled' then f.worker.config.automation.enabled=false end
+    f.we.gps={locate=function() return f.world.pose.x,f.world.pose.y,f.world.pose.z end};f.worker:save();f:reboot(false,true)
+    if mode=='disabled' then f.worker.config.automation.enabled=false end
+    assert(f.worker:updateGPS());eq(f.worker.state.currentTask.phase,'blocked');eq(f.stats.pulled,pulled)
+  end
+end)

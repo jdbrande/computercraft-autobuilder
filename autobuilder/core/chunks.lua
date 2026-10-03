@@ -98,7 +98,7 @@ function M.execution(config,state)
   local job=state.currentTask;local c=config.chunkLoading
   if not job then return true end
   if (job.loadedArea or c and c.enabled) and (not state.position or not state.position.known
-    or not U.position(state.position) or state.position.pending or state.position.uncertain) then
+    or not U.position(state.position) or not U.heading(state.position.heading) or state.position.pending or state.position.uncertain) then
     return false,'MISSION_BLOCKED_UNLOADED_AREA: execution pose unknown or uncertain'
   end
   if c and c.anchor then return false,'MISSION_BLOCKED_UNLOADED_AREA: stationary chunk anchor' end
@@ -194,7 +194,7 @@ function M.new(state,config,save)
     return U.copy(lease)
   end
   function self:allows(job,from,target)
-    if not config.chunkLoading.enabled then return true end
+    if not config.chunkLoading.enabled and not job.loadedArea then return true end
     local lease=s.leases[job.id]
     if not lease then
       -- Upgraded/backup jobs keep physical ownership. Only explicit assurances

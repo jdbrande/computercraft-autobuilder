@@ -69,6 +69,17 @@ function M.new(app,config,e,network,clock)
     s.currentTask.fuelRecovery=nil
     return resumeTask()
   end
+  function self:poseRecovered()
+    local t=s.currentTask;local p=s.position
+    if generic() and t.poseBlocked and not t.paused and config.automation.enabled
+      and p.known and U.heading(p.heading) and not p.pending and not p.uncertain then
+      if t.phase=='blocked' then
+        local ok,why=resumeTask();if not ok then return false,why end
+      end
+      t.poseBlocked=nil;s.status=t.phase;return save()
+    end
+    return true
+  end
   local function recoverSupplyReceipt()
     local t=s.currentTask
     if t and t.lastSupply and t.supplyReceiptId and not t.supplyRequest then

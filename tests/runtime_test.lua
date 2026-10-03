@@ -170,3 +170,11 @@ test('controller scheduling survives its timer being consumed by a yielding peri
   eq(app.state.workers['2'].online,false) -- periodic expiration still runs
   assert(app.state.workers['3'],'network packet was discarded during a yielding peripheral call')
 end)
+
+test('disabled worker automation retains an active return task without physical effects',function()
+  local R=require('autobuilder.core.runtime');local e=env(12);e.turtle.fuel=1000
+  local c=require('tests.loaded_config').load({role='worker',controllerId=7,automation={enabled=false},
+    initialPosition={x=3,y=64,z=0,heading='west'},depot={x=0,y=64,z=0},minimumFuelReserve=0})
+  local w=R.new(c,e);w.state.currentTask={id='task:7:1',type='RETURN_HOME',phase='work'};w:save()
+  w:workStep();eq(e.turtle.calls,0);eq(w.state.currentTask.phase,'work')
+end)

@@ -358,3 +358,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   with actionable status. Final563 Lua/18 Python, release generation/check and diff
   checks passed. Native trial predates these admission fixes. Integrating0.19 and
   continuing movement recovery without a milestone handoff.
+
+- Task32:571 Lua tests passed. GPS only reconciles pending translations at their
+  journaled endpoints; unexpected fixes retain ownership and evidence. Interrupted
+  turns require heading recovery. Failed persistence restores the journal. Actual
+  courier runtime recovers a post-effect upward interruption and delivers9 items
+  exactly once; paused/unrelated blocks are preserved. Regression also fixed disabled
+  worker automation executing a saved task and retained saved chunk boundaries after
+  policy opt-out. Atomic heading-probe claims are the next implementation step.
