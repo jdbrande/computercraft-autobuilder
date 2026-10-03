@@ -3,6 +3,7 @@
 Development direction: [full fleet requirements](docs/fleet-requirements.md) and
 [milestone 1 autonomous exploration design](docs/autonomous-mining-design.md).
 The full fleet roadmap remains in progress. The current release behavior is documented below.
+See the [0.12.0 acceptance report](docs/validation-0.12.0.md) for automated and live Minecraft results.
 
 **Automatic exploration:** [configure explorers](docs/autonomous-mining.md) with
 `setup exploration` on the controller and `setup miner explore` on miners.
@@ -89,7 +90,7 @@ The project is hosted at [jdbrande/computercraft-autobuilder](https://github.com
 The commands below use that repository. To prepare a fork, change the raw URL with:
 
 ```sh
-python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.11.0
+python3 tools/release.py --base https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main --version 0.12.0
 ```
 
 Publish `installer.lua`, `update.lua`, `startup.lua`, `manifest.json`, and
