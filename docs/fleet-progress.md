@@ -1070,3 +1070,16 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   failed save. Material-specific actual yield, successful/empty/inaccessible trip counts
   survive reboot and ignore duplicate terminal reports. Exploration, miner and mining
   runtime focused suites pass; this is implementation evidence, not0.25 acceptance.
+
+- Task51 now ranks candidate sectors by retained material density, average physical
+  yield and hazard count before distance ties. Route planning avoids retained negative
+  cells and prefers confirmed clear direct steps while preserving current protection,
+  leases, fuel and bounded search. Sector diagnostics expose coordinates and outcome
+  counts; explicit retry preserves delivery history and refuses active/offline ownership.
+  Retry checkpoint failures restore prior coverage and evidence.
+- Both scanner and inspection-only actual-runtime autonomous-chain scenarios pass with
+  controller/worker restarts. Their sector delivery totals equal independently simulated
+  physical deposits; confirmed travel and resource sightings survive the restarts.
+  The separate native219/220 learning fixture is running with2,000 finite fuel, a staged
+  protected obstacle, empty first sector and six stone blocks beyond it. Eight chunks
+  are explicitly loaded. Native acceptance and final review/gates remain pending.

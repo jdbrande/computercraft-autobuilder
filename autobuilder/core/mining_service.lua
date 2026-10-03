@@ -43,7 +43,13 @@ function M.new(app,config,e,network,clock)
       local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
       if args[1]=='exploration' then
         assert((config.exploration or {}).enabled,'Run setup exploration on the controller first')
-        if args[2]=='status' or args[2]==nil then s.view='exploration'; return true,'Exploration '..(s.exploration.paused and 'paused' or 'enabled') end
+        if args[2]=='status' or args[2]==nil then s.view='exploration';s.explorationLines=nil; return true,'Exploration '..(s.exploration.paused and 'paused' or 'enabled') end
+        if args[2]=='sector' or args[2]=='retry' then
+          assert(#args==3,'Usage: exploration '..args[2]..' <sectorId>')
+          local r=s.exploration.sectors[args[3]];if not r then return false,'unknown exploration sector' end
+          if args[2]=='retry' then local ok,why=self.jobs:retrySector(args[3]);if not ok then return false,why end end
+          s.explorationLines=E.describe(args[3],r);s.view='exploration';return true,table.concat(s.explorationLines,'; ')
+        end
         if args[2]=='pause' or args[2]=='resume' then
           local previous=s.exploration.paused; s.exploration.paused=args[2]=='pause'
           local ok,err=save(); if not ok then s.exploration.paused=previous; return false,err end
@@ -59,7 +65,7 @@ function M.new(app,config,e,network,clock)
           local ok,err=save(); if not ok then s.exploration.bounds=previous; return false,err end
           config.exploration.bounds=chosen.bounds; s.view='exploration'; return true,'Expanded search boundary; keep the entire area loaded and within modem range'
         end
-        return false,'exploration status|expand <radius>|pause|resume'
+        return false,'exploration status|sector <id>|retry <id>|expand <radius>|pause|resume'
       elseif args[1]=='mine' then
         if #args~=3 then return false,'Usage: mine minecraft:raw_iron 100' end
         local ok,err=self:refresh(); if not ok then return false,err end

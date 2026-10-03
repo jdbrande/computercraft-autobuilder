@@ -183,3 +183,20 @@ test('sector history separates empty search from inaccessible routes and retains
   trip.item='minecraft:cobblestone';assert(E.record(records,trip,{result='quota',cursor=2,observations={},clearedRouteCount=0},5))
   eq(records[trip.exploration.sectorId].outcomes['minecraft:cobblestone'].delivered,5);eq(r.delivered,0)
 end)
+
+
+test('sector retry preserves history and refuses active offline-owned territory and failed checkpoints',function()
+  local fail=false;local jobs,s,w=fixture(function() return not fail,'disk full' end)
+  jobs:requestAcquisition('minecraft:coal',1,0,'retry');local trip=assert(jobs:assign(w,{}));local id=trip.exploration.sectorId
+  s.exploration.sectors[id]={surveys={['minecraft:coal']={exhausted=true,cursor=193,bounds=U.copy(trip.exploration.bounds)}},
+    observations={{x=trip.exploration.entry.x,y=trip.exploration.entry.y,z=trip.exploration.entry.z,name='minecraft:coal_ore'}},
+    outcomes={['minecraft:coal']={trips=1,delivered=0,successful=0,empty=0,inaccessible=1}},
+    evidence={{x=trip.exploration.entry.x,y=trip.exploration.entry.y,z=trip.exploration.entry.z,kind='liquid'}}}
+  assert(not jobs:retrySector(id));w[tostring(trip.workerId)].online=false;assert(not jobs:retrySector(id))
+  trip.physicalComplete=true;trip.status='completed';fail=true
+  assert(not jobs:retrySector(id));assert(s.exploration.sectors[id].surveys['minecraft:coal'].exhausted)
+  eq(#s.exploration.sectors[id].evidence,1)
+  fail=false;assert(jobs:retrySector(id));local r=s.exploration.sectors[id]
+  eq(next(r.surveys),nil);eq(#r.evidence,0);eq(#r.observations,1);eq(r.outcomes['minecraft:coal'].inaccessible,1)
+  assert(not jobs:retrySector('unknown'));eq(trip.workerId,1)
+end)

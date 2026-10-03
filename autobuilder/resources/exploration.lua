@@ -70,20 +70,47 @@ function M.candidates(records,c,item,start)
       sector.surveyed={}
       local visited=coverage(survey); local keys={}; for k in pairs(visited) do keys[#keys+1]=k end; table.sort(keys)
       for _,k in ipairs(keys) do if P.inside(visited[k],sector.bounds) then sector.surveyed[#sector.surveyed+1]=U.copy(visited[k]) end end
-      sector.known=false
-      for _,p in ipairs(r.observations or {}) do if material.blocks[p.name] and P.inside(p,sector.bounds) then sector.known=true; break end end
+      local seen,matching=0,0
+      for _,p in ipairs(r.observations or {}) do if P.inside(p,sector.bounds) then
+        seen=seen+1;if material.blocks[p.name] then matching=matching+1 end
+      end end
+      sector.known=matching>0;sector.density=matching/math.max(1,seen,#sector.surveyed)
+      local outcome=(r.outcomes or {})[item] or {}
+      sector.yield=(outcome.delivered or 0)/math.max(1,outcome.trips or 0);sector.hazards=0
+      for _,p in ipairs(r.evidence or {}) do if p.kind~='clear' and P.inside(p,sector.bounds) then sector.hazards=sector.hazards+1 end end
       sector.distance=U.distance(start,sector.bounds.min)
       result[#result+1]=sector
     end
   end
   table.sort(result,function(a,b)
     if a.known~=b.known then return a.known end
+    if a.density~=b.density then return a.density>b.density end
+    if a.yield~=b.yield then return a.yield>b.yield end
+    if a.hazards~=b.hazards then return a.hazards<b.hazards end
     if a.distance~=b.distance then return a.distance<b.distance end
     local ay=math.abs(a.bounds.min.y-(material.suggestedY or start.y)); local by=math.abs(b.bounds.min.y-(material.suggestedY or start.y))
     if ay~=by then return ay<by end
     if a.x~=b.x then return a.x<b.x end; if a.y~=b.y then return a.y<b.y end; return a.z<b.z
   end)
   return result
+end
+function M.describe(id,r)
+  local lines={'Sector '..id..' sightings='..#(r.observations or {})..' evidence='..#(r.evidence or {})}
+  local items={};for item in pairs(r.surveys or {}) do items[item]=true end;for item in pairs(r.outcomes or {}) do items[item]=true end
+  local ordered={};for item in pairs(items) do ordered[#ordered+1]=item end;table.sort(ordered)
+  for _,item in ipairs(ordered) do
+    local h=(r.outcomes or {})[item] or {};local survey=(r.surveys or {})[item];local searched=0
+    for _ in pairs(coverage(survey)) do searched=searched+1 end
+    local matching=0;local material=Materials.get(item)
+    for _,p in ipairs(r.observations or {}) do if material and material.blocks[p.name] then matching=matching+1 end end
+    local density=matching/math.max(1,#(r.observations or {}),searched)
+    lines[#lines+1]=item..' density='..string.format('%.3f',density)..' searched='..searched..' delivered='..(h.delivered or 0)
+    lines[#lines+1]='trips='..(h.trips or 0)..' successful='..(h.successful or 0)..' empty='..(h.empty or 0)..' inaccessible='..(h.inaccessible or 0)..' last='..(h.lastResult or 'unknown')
+  end
+  for _,p in ipairs(r.evidence or {}) do
+    lines[#lines+1]=P.key(p)..' '..p.kind..(p.name and ' '..p.name or '')..(p.reason and ': '..p.reason or '')
+  end
+  return lines
 end
 function M.protected(p,boxes)
   for _,box in ipairs(boxes or {}) do if P.inside(p,box) then return true end end
@@ -103,8 +130,12 @@ function M.plan(sector,ctx)
       claims[#claims+1]=g
     end
   end
+  local clear,hazards={},{}
+  for _,r in pairs(ctx.records or {}) do for _,p in ipairs(r.evidence or {}) do
+    if p.kind=='clear' then clear[P.key(p)]=true else hazards[P.key(p)]=true end
+  end end
   local function allowed(p)
-    if not P.inside(p,envelope) or M.protected(p,ctx.protectedAreas) then return false end
+    if hazards[P.key(p)] or not P.inside(p,envelope) or M.protected(p,ctx.protectedAreas) then return false end
     for _,g in ipairs(claims) do
       if P.inside(p,g.bounds) then return false end
       for _,r in ipairs(g.route) do if P.key(r)==P.key(p) then return false end end
@@ -140,13 +171,14 @@ function M.plan(sector,ctx)
   if lower>limit then return nil,'route exceeds travel limit' end
   if ctx.availableFuel~='unlimited' and ctx.availableFuel<lower*2+c.minimumFuelReserve+c.mining.returnMargin+2 then return nil,'insufficient round-trip fuel' end
   local route={}; local position=U.copy(start)
-  for _,axis in ipairs({'x','y','z'}) do
-    while position[axis]~=entry[axis] do
-      position[axis]=position[axis]+(entry[axis]>position[axis] and 1 or -1)
-      if not allowed(position) then route=nil; break end
-      route[#route+1]=U.copy(position)
-    end
-    if not route then break end
+  while U.distance(position,entry)>0 do
+    local chosen
+    for _,axis in ipairs({'x','y','z'}) do if position[axis]~=entry[axis] then
+      local p={x=position.x,y=position.y,z=position.z};p[axis]=p[axis]+(entry[axis]>p[axis] and 1 or -1)
+      if allowed(p) and (not chosen or clear[P.key(p)] and not clear[P.key(chosen)]) then chosen=p end
+    end end
+    if not chosen then route=nil;break end
+    route[#route+1]=chosen;position=chosen
   end
   local why
   -- ponytail: bounded detour search; a failed candidate gives the next sector a turn.

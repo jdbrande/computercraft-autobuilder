@@ -1071,12 +1071,12 @@ existing exploration commands/UI and tests.
 **Interfaces:** `E.candidates` retains deterministic bounds and adds observed density,
 prior delivery and hazard costs; `E.plan` consumes bounded known route obstacles.
 
-- [ ] Add failing choice/route tests for useful dense sectors, empty and inaccessible
+- [x] Add failing choice/route tests for useful dense sectors, empty and inaccessible
   sectors, stale clear paths, liquid avoidance and current protected/owned boundaries.
   Preserve finite planning budgets and existing fuel/coverage admission.
-- [ ] Add sector status and unowned-sector retry using existing commands. Reproduce
+- [x] Add sector status and unowned-sector retry using existing commands. Reproduce
   rejection of active/offline-owned sector resets and persistence failure rollback.
-- [ ] Run inspection/scanner full-chain runtime scenarios across restart and compare
+- [x] Run inspection/scanner full-chain runtime scenarios across restart and compare
   physical receipts with retained learning. Document commands/limits and commit.
 
 ### Task52: Native intelligent exploration acceptance and integration
