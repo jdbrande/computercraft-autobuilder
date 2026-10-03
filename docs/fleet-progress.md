@@ -6,7 +6,8 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 ## Current work
 
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
-- Resource dependency/provider milestone accepted; next: durable inventory ownership.
+- Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
+- Current branch: `milestone/0.14.0`, durable inventory ownership.
 - Next: implement durable inventory ownership, then fuel
   delivery/rescue in dependency order. Continue through all rows below.
 - No external blocker is currently established. Missing implementation is remaining
@@ -111,3 +112,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   shut down and force-load tickets removed. See [0.13.0 acceptance](validation-0.13.0.md).
 - Deferred minor: missing farm/logging workers show generic acquisition waits;
   address with worker-health/status requirements, retaining existing recovery.
+
+- Inventory ownership design selected: durable count grants plus measured
+  cumulative receipts, keeping factory exclusivity until independent station
+  staging/slot journals exist. Tasks 12–14 define implementation and acceptance.

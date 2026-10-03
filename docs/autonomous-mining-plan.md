@@ -438,3 +438,53 @@ summary of selected/candidate providers and current graph demand/stock/deficit.
   acceptance where useful, record exact fixture/limitations. Request final branch
   review, fix reproduced important issues with regressions, commit/integrate and
   continue to inventory ownership and fuel automation without an approval pause.
+
+## Continued execution: inventory ownership prerequisite
+
+**Spec:** [inventory ownership design](inventory-ownership-design.md), fleet
+requirements 11–15. Preserve factory exclusivity until dedicated staging exists.
+
+### Task 12: Durable inventory ledger and logical views
+
+**Files:** create `autobuilder/storage/ledger.lua`, `tests/ledger_test.lua`;
+modify `tests/run.lua`.
+
+**Interfaces:** `Ledger.new(state,save)` stores `state.inventoryLedger`;
+`reserve(id,inputs,outputs,physical,options)` atomically grants or returns nil/reason;
+`receipt(id,withdrawn,delivered,transit)` applies cumulative measured counters;
+`release(id)` requires completed outputs and empty transit; `cancel(id)` only
+retires unstarted claims. `view(item,physical,demand)` returns physical, available,
+reserved, transit, expected, demand; protected reserve passed during grants.
+
+- [ ] Add failing cases for competing multi-item claims, duplicate/changed IDs,
+  malformed counts, partial/duplicate receipts, offline restart, release/cancel
+  guards, unknown physical stock, and rollback on failed/throwing checkpoint.
+- [ ] Implement bounded maps and transactional persistent mutations; no hardware
+  effects or automatic lease expiration. Run focused and full Lua tests; commit.
+
+### Task 13: Factory reservation gates and physical receipts
+
+**Files:** modify `autobuilder/core/production_service.lua`,
+`autobuilder/core/workflows.lua`, `autobuilder/core/automation_service.lua`,
+`autobuilder/factory/factory.lua`, `autobuilder/factory/crafting.lua`,
+`autobuilder/workers/executor.lua`, `autobuilder/core/task_messages.lua`;
+add regressions to production/runtime/logistics tests.
+
+- [ ] Add failing runtime cases for competing queued claims, no assignment/action
+  before grant, partial withdrawal/output reports, delayed duplicates, reboot and
+  stock shortfall recovery. Preserve exclusive legacy saved jobs.
+- [ ] Declare exact inputs/outputs for new factory tasks; grant before dispatch or
+  furnace action. Journal crafting withdrawals and send bounded cumulative counts;
+  reconcile furnace counters and release only after physical completion. Keep the
+  existing factory barrier. Run focused/full suites and commit.
+
+### Task 14: Reservation status and acceptance
+
+**Files:** update resource command/UI, README, progress and acceptance documentation;
+regenerate release artifacts.
+
+- [ ] Show distinct physical/available/reserved/transit/expected/project demand
+  values without counting forecasts as stock. Add command regression assertions.
+- [ ] Run full Lua/Python/release checks and live furnace/Crafty acceptance. Review
+  whole branch, fix reproduced important findings with regressions, integrate and
+  continue directly to station staging, fuel distribution and rescue.
