@@ -780,3 +780,44 @@ production invokes step under its inventory lock and synchronizes central receip
   correct bugs with regression tests and document results/limits.
 - [x] Run all Lua/Python/release checks, one whole-branch review/fix pass. Update
   running progress, integrate/push and continue all unfinished requirements.
+
+## Milestone0.20: automatic pose recovery
+
+Spec: [pose recovery design](pose-recovery-design.md). Native inline execution.
+Review focus: accepting unexpected GPS relocation, replaying a probe after physical
+success, clearing another worker's traffic cells, resuming unrelated/paused work,
+and acting outside a saved loaded grant. Preserve every physical engine journal.
+
+### Task32: Evidence-bounded reconciliation and task resumption
+
+**Files:** navigation/runtime, worker executor/mining service, chunk guard,
+`tests/pose_recovery_test.lua` and runtime regressions.
+**Interfaces:** navigation.reconcile(fix,heading) validates pending geometry; explicit
+heading remains operator override. Executor/miner poseRecovered resumes only recorded
+pose-related blocks after a complete trusted pose.
+
+- [ ] Add failing from/to/unexpected GPS, turn heading, checkpoint failure, interrupted
+  task resume, unrelated block, pause and disabled-policy saved-grant regressions.
+- [ ] Implement bounded reconciliation and shared runtime pose-block lifecycle. Run
+  focused/full tests; commit completed recovery foundation.
+
+### Task33: Durable guarded heading probe
+
+**Files:** recovery driver, workflows/automation, task protocol/runtime, tests.
+**Interfaces:** one atomic recovery-cell grant keyed by owner/task/sequence/origin;
+worker probes once with persistent intent and derives heading from actual GPS delta.
+
+- [ ] Add failing all-neighbor ownership, exact duplicate, coverage/protection,
+  competing worker, checkpoint rollback and reboot tests. Implement atomic claims.
+- [ ] Add failing physical probe/reboot/no-GPS/no-fuel/obstacle/receipt tests and
+  actual runtime task continuation; implement driver and validated protocol.
+- [ ] Run focused/full tests and fix regressions. Commit complete autonomous recovery.
+
+### Task34: Native interrupted-action acceptance and integration
+
+- [ ] Build real GPS fixture; inject post-effect reboot for translations/turns and
+  verify automatic original-task completion with actual world/inventory evidence.
+- [ ] Record limits and failures, regression-test fixes, update commands/status/docs.
+  Run full Lua/Python/release checks, one whole-branch review/fix pass, integrate/push.
+- [ ] Continue final settlement, continuous supply, scaling/site preparation and all
+  other unfinished fleet requirements without a milestone handoff.

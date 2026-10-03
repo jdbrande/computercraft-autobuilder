@@ -20,7 +20,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Loaded mission compatibility integrated/pushed at `105f2f3`.
 - Managed logistics completed:563 Lua/18 Python tests, native two-courier
   restocking, one final review/fix pass and release checks passed.
-- Next: interrupted movement and heading recovery, followed by every remaining row.
+- Managed logistics integrated/pushed at `d877f95`.
+- Current branch `milestone/0.20.0`: interrupted movement and heading recovery,
+  followed by every remaining row.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
