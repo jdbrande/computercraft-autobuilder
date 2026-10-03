@@ -13,6 +13,7 @@ function M.new(state,config,network,turtle,save)
       fuel=turtle.getFuelLevel(),inventory={used=used,slots=16},
       miningResources=config.mining and config.mining.enabled and U.copy(config.mining.resources or {}) or nil,
       miningArea=config.mining and config.mining.enabled and U.copy(config.mining.bounds) or nil,
+      explorationHome=config.capabilities and config.capabilities.explorationV1 and {depot=U.copy(config.depot),exitRoute=U.copy(config.mining.exitRoute),protectedAreas=U.copy(config.restrictedAreas)} or nil,
       capabilities=U.copy(config.capabilities or {telemetry=true}),task=state.currentTask and tostring(state.currentTask.id)}
   end
   function self:tick(now)

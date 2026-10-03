@@ -77,6 +77,7 @@ test('GPS outage and exceptions return errors without losing local coordinates',
 end)
 
 dofile('tests/exploration_test.lua')
+dofile('tests/exploration_protocol_test.lua')
 dofile('tests/network_test.lua')
 dofile('tests/runtime_test.lua')
 dofile('tests/regression_test.lua')
