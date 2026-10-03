@@ -66,3 +66,14 @@ worker rescue acceptance with finite courier fuel. Keep the loaded test envelope
 explicit until the chunk-loading milestone. A complete rescue returns the courier
 and releases claims; a blocked path remains actionable without excavating protected
 or unknown terrain merely to reach a turtle.
+
+## Native rescue transfer probe
+
+On 2026-10-03, a temporary advanced turtle107 above idle miner101 read the
+adjacent peripheral type `turtle`, called `getID` and obtained101, inspected the
+actual turtle block, then transferred one coal with `dropDown`. Its own inventory
+count changed from1 to0. This establishes that the installed1.120 environment
+supports identity-checked native delivery; no temporary-chest or new upgrade API
+is needed. The probe coal/block were cleaned up. Production rescue still requires
+the frozen-target handshake, capacity and delivery/consumption receipts. Evidence:
+ignored `dist/live-fuel/adjacent-transfer-probe.json`.

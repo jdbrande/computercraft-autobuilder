@@ -31,11 +31,11 @@ function M.new(app,config,e,network,clock)
   end
   local function refuelInPlace(target)
     local item=e.turtle.getItemDetail(15)
-    if item and (item.nbt or not ({['minecraft:coal']=true,['minecraft:charcoal']=true,['minecraft:coal_block']=true})[item.name]) then
+    if item and (item.nbt or not require('autobuilder.resources.fuel').allowed(item.name,config)) then
       return false,'Empty slot 15: it contains a foreign or NBT-tagged item; reserve it for fuel.'
     end
     local selected=e.turtle.getSelectedSlot and e.turtle.getSelectedSlot()
-    local ok,err=require('autobuilder.storage.inventory').new(e.turtle):refuel(target,false)
+    local ok,err=require('autobuilder.storage.inventory').new(e.turtle,config):refuel(target,false)
     if selected then e.turtle.select(selected) end
     return ok,err
   end
@@ -169,7 +169,7 @@ function M.new(app,config,e,network,clock)
         -- detour would abandon the durable adjacent excavation route.
         local target=math.max(config.mining.fuelTarget,#t.sitePlan.points-(t.index or 1)+1+config.minimumFuelReserve)
         local selected=e.turtle.getSelectedSlot and e.turtle.getSelectedSlot()
-        local ok,err=require('autobuilder.storage.inventory').new(e.turtle):refuel(target,false)
+        local ok,err=require('autobuilder.storage.inventory').new(e.turtle,config):refuel(target,false)
         if selected then e.turtle.select(selected) end
         if ok then t.fuelRecovery=nil; resumeTask()
         else t.error='Put coal/charcoal or coal blocks in slot 15; waiting for fuel. '..tostring(err) end
@@ -199,7 +199,7 @@ function M.new(app,config,e,network,clock)
             end
           end
           if not ok then err='Put coal/charcoal or coal blocks in slot 15. '..tostring(err) end
-        else ok,err=require('autobuilder.storage.inventory').new(e.turtle):refuel(target,true) end
+        else ok,err=require('autobuilder.storage.inventory').new(e.turtle,config):refuel(target,true) end
       end
       if ok then t.fuelRecovery=nil; resumeTask(); save()
       elseif err then t.error=err; save() end
@@ -226,7 +226,7 @@ function M.new(app,config,e,network,clock)
     if t.type=='REFUEL' or t.type=='RETURN_HOME' then
       t.homeRoute=t.homeRoute or {}
       local ok,err=require('autobuilder.workers.resupply').travel(t.homeRoute,t,app.navigation,config.depot,save,e.turtle,config)
-      if ok and t.type=='REFUEL' then ok,err=require('autobuilder.storage.inventory').new(e.turtle):refuel(config.mining.fuelTarget,true) end
+      if ok and t.type=='REFUEL' then ok,err=require('autobuilder.storage.inventory').new(e.turtle,config):refuel(config.mining.fuelTarget,true) end
       t.phase=ok and 'completed' or 'blocked'; t.error=err; t.progress=ok and 1 or 0; save(); return true
     end
     local result,err=engine():step()

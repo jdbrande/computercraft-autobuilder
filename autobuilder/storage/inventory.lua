@@ -1,4 +1,5 @@
 local U=require('autobuilder.core.util')
+local Fuel=require('autobuilder.resources.fuel')
 local M={}
 local containers={['minecraft:chest']=true,['minecraft:trapped_chest']=true,['minecraft:barrel']=true}
 function M.new(turtle,config)
@@ -42,6 +43,7 @@ function M.new(turtle,config)
     return moved
   end
   function self:refuel(target,atDepot)
+    assert(U.integer(target) and target>=0 and target<=100000000,'invalid refuel target')
     local fuel=turtle.getFuelLevel()
     if fuel=='unlimited' or fuel>=target then return true end
     if turtle.getFuelLimit and target>turtle.getFuelLimit() then return false,'requested fuel exceeds turtle capacity' end
@@ -53,14 +55,22 @@ function M.new(turtle,config)
         if found and containers[b.name] then turtle.select(slot); turtle.suckUp(64) end
       end
       local item=turtle.getItemDetail(slot)
-      if not item or not (config.fuelItems or {['minecraft:coal']=true,['minecraft:charcoal']=true,['minecraft:coal_block']=true})[item.name] then
-        return false,'fuel supply missing in reserved slot or chest above depot'
+      if item and Fuel.returned(item.name,config) then
+        if not atDepot or item.nbt then return false,'returned fuel container must be unloaded at the depot' end
+        local found,block=turtle.inspectDown()
+        if not found or not containers[block.name] then return false,'depot return container missing; refusing world drop' end
+        local before=turtle.getItemCount(slot); turtle.select(slot); turtle.dropDown(before)
+        if turtle.getItemCount(slot)>=before then return false,'depot return container is full' end
+      else
+        if not item or item.nbt or not Fuel.allowed(item.name,config) then
+          return false,'fuel supply missing in reserved slot or chest above depot'
+        end
+        turtle.select(slot)
+        local before=turtle.getFuelLevel()
+        local ok,err=turtle.refuel(1)
+        if not ok then return false,err or 'refuel failed' end
+        if turtle.getFuelLevel()<=before then return false,'refuel made no progress' end
       end
-      turtle.select(slot)
-      local before=turtle.getFuelLevel()
-      local ok,err=turtle.refuel(1)
-      if not ok then return false,err or 'refuel failed' end
-      if turtle.getFuelLevel()<=before then return false,'refuel made no progress' end
     end
     return false,'refuel operation limit reached'
   end

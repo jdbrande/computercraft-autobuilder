@@ -199,7 +199,7 @@ function M.new(app,config,e,network,clock)
   else
     s.completedMining=s.completedMining or {}
     if config.mining.enabled or s.currentTask and s.currentTask.exploration then
-      self.inventory=require('autobuilder.storage.inventory').new(e.turtle,{reservedSlots={15,16},fuelSlot=15})
+      self.inventory=require('autobuilder.storage.inventory').new(e.turtle,{reservedSlots={15,16},fuelSlot=15,fuel=config.fuel})
       self.scanner=require('autobuilder.resources.scanner').new(e,config.scanner,clock)
       local ok,err=self.scanner:recover(); assert(ok,err)
     end

@@ -9,7 +9,7 @@ M.defaults={
   minimumFuelReserve=100, movementRetries=2, maxTravelDistance=1024,
   restrictedAreas={}, locations={}, capabilities={telemetry=true},
   maxWorkers=128, dedupLimit=512, dedupTTL=120,
-  storageInventories={}, providerPreferences={},
+  storageInventories={}, providerPreferences={}, fuel=require('autobuilder.resources.fuel').defaults,
   furnaces={}, smeltingFuelItem='minecraft:coal', smeltingWaitSteps=600, turtleFuelReserveItems={['minecraft:coal']=64},
   craftingStation={input='',output='',inputSide='up',outputSide='down'},
   automation={enabled=true,building=false,crafting=false,courier=false,logging=false,farming=false},
@@ -34,7 +34,7 @@ local function merge(dst,src)
     assert(dst[k]~=nil or k=='controllerId' or k=='initialPosition' or k=='depot' or k=='label' or k=='entry' or k=='bounds' or k=='x' or k=='y' or k=='z' or k=='min' or k=='max', 'Unknown config key: '..tostring(k))
     if type(v)=='table' and type(dst[k])=='table' then
       -- These maps/lists are user-defined rather than schema objects.
-      if k=='providerPreferences' or k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
+      if k=='values' or k=='returns' or k=='stations' or k=='providerPreferences' or k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
         or k=='furnaces' or k=='turtleFuelReserveItems' or k=='treeFarms' or k=='farms' or k=='depotExpansion' then dst[k]=U.copy(v)
       else merge(dst[k],v) end
     else dst[k]=U.copy(v) end
@@ -43,6 +43,7 @@ end
 function M.load(overrides)
   local c=U.copy(M.defaults); merge(c,overrides or {})
   assert(require('autobuilder.resources.providers').validatePreferences(c.providerPreferences))
+  assert(require('autobuilder.resources.fuel').validate(c.fuel,c))
   assert(c.role=='controller' or c.role=='worker','role must be controller or worker')
   if c.role=='worker' then assert(U.integer(c.controllerId) and c.controllerId>=0,'worker requires controllerId') end
   assert(type(c.protocol)=='string' and #c.protocol>0 and #c.protocol<=64,'invalid protocol')

@@ -147,3 +147,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Installed CC1.120 lacks the newer1.121 turtle_storage upgrade, so it is not a
   dependency. Native receiver identification will be verified before rescue code
   selects direct transfer versus temporary-station fallback.
+
+- Task15: configured fuel policy/budget/native refueling tests and the full Lua
+  suite passed435/435. Lava containers are retained until a verified depot return
+  is possible. Automatic station dispatch remains Task16.
+- Native rescue feasibility: turtle107 verified adjacent miner101 through
+  peripheral.getID and physically delivered one coal with dropDown; probe cleanup
+  submitted. This is hardware feasibility, not completed rescue automation.

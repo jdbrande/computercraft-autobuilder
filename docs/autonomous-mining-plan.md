@@ -500,11 +500,11 @@ before new fuel consumers. Native execution remains authorized.
 **Files:** create `autobuilder/resources/fuel.lua`, `tests/fuel_test.lua`;
 modify config, storage inventory, mining service, worker executor and suite list.
 
-- [ ] Add failing validation/budget cases for known/custom fuels, malformed maps,
+- [x] Add failing validation/budget cases for known/custom fuels, malformed maps,
   thresholds, station identity/geometry, unlimited fuel and insufficient missions.
   Add hardware cases for configured fuel restrictions and lava bucket retention/
   safe depot return; preserve slots 15/16 and existing refuel tests.
-- [ ] Implement validated fuel policy, estimates and measured native refueling;
+- [x] Implement validated fuel policy, estimates and measured native refueling;
   pass config into existing inventory users. No automatic dispatch in this step.
   Run focused/full suites and commit.
 
