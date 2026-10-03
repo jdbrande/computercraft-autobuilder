@@ -12,7 +12,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   tests and native acceptance including final review regressions.
 - Capacity and parallel factory completed:492 Lua/16 Python tests, native
   two-Crafty acceptance and regression-backed final review fixes.
-- Next task: native binary schematic import, then chunk-loading integration.
+- Capacity/parallel factory integrated and pushed at `345b833`.
+- Current branch: `milestone/0.17.0`. Task23: bounded native gzip decoder, followed
+  by typed Sponge import and native construction acceptance; chunk loading next.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.

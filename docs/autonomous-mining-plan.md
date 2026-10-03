@@ -633,3 +633,52 @@ full runtime fixture with two independent Crafty turtles.
   Run native two-Crafty acceptance with finite batches and restart. Correct defects
   with failing regressions. Run all Lua/Python/release checks, one whole-branch
   review and required fix pass, integrate/push, then continue remaining requirements.
+
+## Milestone0.17: native schematic entry
+
+Spec: [native schematic design](native-schematic-design.md). Native execution
+continues under standing authorization. Interfaces: bounded gzip bytes feed typed
+NBT conversion, which feeds the existing validated schema1 project pipeline.
+Review focus: decompression bombs/truncation, incorrect NBT tag types, source
+mutation during import, repeated shorthand after restart, unsupported metadata.
+
+### Task 23: Bounded native gzip decoding
+
+**Files:** `autobuilder/blueprint/gzip.lua`, `autobuilder/vendor/libdeflate.lua`,
+`autobuilder/vendor/README.md`, `tests/native_gzip_test.lua`, suite list/fixtures.
+**Interface:** `gzip.decode(bytes,maxBytes)` returns decompressed bytes or throws
+before any physical effect; raw NBT detection belongs to Task24.
+
+- [ ] Write/run failing stored/fixed/dynamic gzip, optional-header, CRC/ISIZE,
+  trailing/truncated stream and bounded-expansion tests. Expected: missing module.
+- [ ] Vendor pinned LibDeflate with license and a marked bounded/progress hook;
+  implement strict gzip wrapper and cooperative loops. Run focused/full Lua tests;
+  expected all pass. Commit independently usable bounded decoder.
+
+### Task 24: Typed NBT and native Sponge conversion
+
+**Files:** `autobuilder/blueprint/nbt.lua`, `autobuilder/blueprint/sponge.lua`,
+`tests/native_schematic_test.lua`, Python fixture generator/comparison tests.
+**Interfaces:** `nbt.decode(bytes)` returns typed root compound;
+`sponge.decode(bytes)` returns validated schema1, using Task23 for gzip detection.
+
+- [ ] Write/run failing raw/gzip versions2/3, offset/palette/state/required-air,
+  paired/slab quantities, entities/biomes and malformed tag/length/depth/node/
+  dimension/varint cases. Expected: missing modules, no partial blueprint.
+- [ ] Implement bounded typed parsing and schema1 conversion; reuse quantity and
+  schema validation. Run native Lua and Python differential tests; expected equal
+  blueprint values and precise refusal. Run full suite and commit.
+
+### Task 25: Native import commands, live acceptance and integration
+
+**Files:** schematic loader, projects/command help, import/runtime regressions,
+operator documentation, `docs/validation-0.17.0.md`, progress ledger, release.
+
+- [ ] Add failing binary import/shorthand/duplicate/reboot/source-change tests,
+  ensuring invalid files or unsupported analysis cannot start physical work.
+- [ ] Implement binary read/immutable JSON normalization and `.schem` shorthand;
+  retain existing JSON behavior. Run focused/full Lua and Python tests.
+- [ ] Run native gzip-schematic construction/verification and independent world
+  inspection. Fix discovered bugs with regressions. Document exact evidence and
+  limits, generate/check release, conduct one final whole-branch review/fix pass,
+  integrate/push and continue chunk loading and every remaining requirement.
