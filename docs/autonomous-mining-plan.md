@@ -1039,3 +1039,55 @@ must not look infinitely productive; a yielding reservation must not admit stale
 capacity; the same turtle must not count as idle in two roles; scaling must not
 bypass existing storage/factory exclusion or starve mandatory recovery. Tasks46–48
 include direct regression cases for each condition.
+
+## Milestone0.25: persistent mining intelligence
+
+Spec: [mining intelligence design](mining-intelligence-design.md). Native inline
+execution continues under the user's standing authorization. This isolated branch
+starts from0.24 while its native/final gates run; merge its accepted final tree before
+integration. Keep the source-of-truth requirement10 scope and existing physical journals.
+
+### Task50: Bounded physical evidence and durable sector history
+
+**Files:** resources/exploration.lua, resources/miner.lua, core/mining_messages.lua,
+core/jobs.lua; exploration/miner/mining-runtime tests.
+**Interfaces:** optional `exploration.evidence` list in existing progress, at most64
+entries `{x,y,z,kind,name?,reason?}`; existing `E.report`, `E.cleanReport`, `E.record`
+validate, clean and merge evidence within the immutable trip geometry.
+
+- [ ] Add failing protocol cases for legacy reports, each supported kind, sparse or
+  oversized lists, names/reasons, and out-of-contract coordinates. Implement cleaning.
+- [ ] Add failing actual-miner cases for inspection/scanner sightings, liquid and
+  waterlogged obstacles, protected/failed paths and reconciled clear travel. Record
+  evidence through existing checkpoints without repeating ambiguous physical actions.
+- [ ] Add failing duplicate/restart/save-failure tests for per-sector actual yield,
+  successful/empty/inaccessible outcomes, searched coverage and bounded evidence.
+  Implement atomic terminal accounting and preserve older checkpoints. Commit.
+
+### Task51: Evidence-informed dispatch and diagnostics
+
+**Files:** resources/exploration.lua, core/jobs.lua, core/mining_service.lua,
+existing exploration commands/UI and tests.
+**Interfaces:** `E.candidates` retains deterministic bounds and adds observed density,
+prior delivery and hazard costs; `E.plan` consumes bounded known route obstacles.
+
+- [ ] Add failing choice/route tests for useful dense sectors, empty and inaccessible
+  sectors, stale clear paths, liquid avoidance and current protected/owned boundaries.
+  Preserve finite planning budgets and existing fuel/coverage admission.
+- [ ] Add sector status and unowned-sector retry using existing commands. Reproduce
+  rejection of active/offline-owned sector resets and persistence failure rollback.
+- [ ] Run inspection/scanner full-chain runtime scenarios across restart and compare
+  physical receipts with retained learning. Document commands/limits and commit.
+
+### Task52: Native intelligent exploration acceptance and integration
+
+- [ ] Run staged loaded hazard/alternative-resource native acquisition with finite fuel;
+  verify automatic useful selection, observed diagnostics and actual deposited stock.
+- [ ] Add regressions for discovered bugs, preserve cleanup/restart evidence and update
+  permanent acceptance/progress documentation. Run one final review/fix pass and the
+  complete Lua/Python/release/diff checks, integrate/push and continue all remaining work.
+
+Review focus: historical sightings must never become excavation authority; a negative
+route report must belong to its trip; blocked turtle traffic is not a terrain hazard;
+terminal duplicates and failed checkpoints must conserve counters; retries must never
+release another owner's sector or route. Each is covered in Tasks50–51.

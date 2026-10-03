@@ -1051,3 +1051,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   regression and36 runtime/coordination/logistics checks pass; the large run is
   restarting. Preliminary full-suite runs were terminated after this new finding
   and cannot serve as final acceptance. No extra review pass was requested.
+
+- Prepared the next dependency-following milestone for requirement10, persistent mining
+  intelligence, in isolated `.worktrees/mining-intelligence` (`milestone/0.25.0`).
+  The design reuses bounded exploration records and physical journals for inspection
+  evidence, hazards, route history, density/yield ranking and explicit safe sector
+  retries. Tasks50–52 record implementation and native acceptance. No0.25 implementation
+  or acceptance is claimed yet;0.24 scaling native/final validation remains active.
