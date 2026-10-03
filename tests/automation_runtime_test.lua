@@ -126,6 +126,21 @@ test('real production runtime makes requested stone bricks through furnace and n
   for _,j in pairs(f.c.state.automation.jobs) do eq(j.status,'completed') end
 end)
 
+test('blocked crafting resumes after reconnect and reboot without hardware work in the control handler',function()
+  local f=fixture(); f.h.offline='input'; f:request()
+  for _=1,100 do
+    f:step()
+    if f.w.state.currentTask and f.w.state.currentTask.phase=='blocked' then break end
+  end
+  local task=assert(f.w.state.currentTask); eq(task.phase,'blocked')
+  assert(task.error:find('inventory detached')); eq(f.h.crafts,0)
+  f.h.offline=nil; f.w=Runtime.new(f.wc,f.we)
+  local transfers=f.h.transfers
+  assert(f.c:command('resume '..task.id)); f:pump(f.ce,f.w)
+  eq(f.h.transfers,transfers)
+  f:finish(); eq(f.h.crafts,2); eq(f.h:count(mc('stone_bricks')),8)
+end)
+
 test('production runtime reboots after furnace and craft physical effects without duplicate output',function()
   local f=fixture(); f:request(); local controllerCrash,workerCrash=false,false
   f.h.afterTransfer=function(_,target)

@@ -226,7 +226,7 @@ test('runtime network rejects supply controls without their required batch ident
     assert(not ok,'missing supplyId accepted for '..kind)
   end
 end)
-test('runtime never restages a released batch when its following progress packet is delayed',function()
+test('runtime never restages or manufactures a released batch when its following progress packet is delayed',function()
   local f=fixture(); f:startBuild()
   for _=1,400 do f:step(); if f.stats.pulled==1 then break end end
   eq(f.stats.pulled,1); assert(next(f.worker.state.pendingSupplyAcks))
@@ -237,8 +237,10 @@ test('runtime never restages a released batch when its following progress packet
   f.ce.now=f.ce.now+5; f.we.now=f.ce.now
   f.worker:tick(); f:pump(f.we,f.controller); assert(delayed)
   -- Controller's timer may run after the receipt but before updated task telemetry.
+  local requests=f.controller.state.automation.requestSequence
   f.controller:tick(); f:pump(f.ce,f.worker)
   eq(f.stats.staged,1)
+  eq(f.controller.state.automation.requestSequence,requests)
   f.filter=nil; f.controller:receive(delayed.m.sender,delayed.m,delayed.protocol)
   local ok,err=f:complete(); assert(ok,err); eq(f.stats.staged,2); eq(f.stats.pulled,2)
 end)

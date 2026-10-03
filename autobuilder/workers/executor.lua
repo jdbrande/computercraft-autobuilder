@@ -50,7 +50,7 @@ function M.new(app,config,e,network,clock)
   end
   local function resumeTask()
     local t=s.currentTask
-    if t.type=='REFUEL' or t.type=='RETURN_HOME' then t.phase='work'; t.error=nil; t.blockedCategory=nil; return true end
+    if t.type=='REFUEL' or t.type=='RETURN_HOME' or t.type=='CRAFT' then t.phase='work'; t.error=nil; t.blockedCategory=nil; return true end
     return engine():resume()
   end
   local function recoverSupplyReceipt()

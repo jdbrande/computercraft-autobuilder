@@ -92,7 +92,8 @@ function M.new(app,config,e,network,clock)
       if j.workerId and j.status~='completed' then
         if j.paused then send(j.workerId,'task_pause',{jobId=j.id})
         elseif j.status=='paused' or j.resumeRequested then send(j.workerId,'task_resume',{jobId=j.id}) end
-        if j.missingItem and j.supplyId and not j.paused and config.supply.inventory~='' and j.type~='CRAFT' then
+        if j.missingItem and j.supplyId and not j.paused and config.supply.inventory~='' and j.type~='CRAFT'
+          and not (queue.state.completedSupplyBatches or {})[j.supplyId] then
           self.supply=self.supply or require('autobuilder.storage.supply').new(queue.state,config,e,function() return app:save() end)
           local n,err
           local staged=queue.state.supply
