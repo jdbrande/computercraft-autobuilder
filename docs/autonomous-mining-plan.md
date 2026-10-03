@@ -896,3 +896,43 @@ config capability negotiation and actual runtime tests.
   inspection. Record setup, counts, fuel, claims, cleanup and limits.
 - [x] Run full Lua/Python/release gates, one final whole-branch review/fix pass, update
   running progress and docs, integrate/push and continue all fleet requirements.
+
+## Milestone0.23: general automatic site preparation
+
+Spec: [site preparation design](site-preparation-design.md). Native inline execution
+continues under standing authorization. Keep the legacy pilot plan immutable; extend
+the general project pipeline. Full requirement45 and dependent scaling44 remain core
+requirements until all acceptance below passes.
+
+### Task42: Immutable footprint and foundation geometry
+
+- [ ] Add failing transformed footprint/workspace, explicit air, stepped foundation,
+  invalid metadata, world bounds and bounded region/cell iteration tests.
+- [ ] Implement compact immutable geometry with deterministic support elevations,
+  lazy bounded task batches and canonical source/version identity. Preserve explicit
+  schematic cells and derive protection/loaded envelopes from the same geometry.
+
+### Task43: Survey, protection and preparation ownership
+
+- [ ] Add native inspection survey reports and validated bounded contracts; distinguish
+  observed terrain from hidden/blocked cells. Persist progress and retry safely.
+- [ ] Share infrastructure/worker/route protection before every mutation and admission;
+  reserve independent preparation regions and access envelopes durably. Test paused,
+  offline, conflicting workers, changed plans and failed saves.
+
+### Task44: Excavation, foundation fill and debris/supply
+
+- [ ] Implement top-down conflict excavation preserving matching blocks, required-air
+  clearance, suitable fill selection and automatic production/acquisition shortages.
+- [ ] Reuse/extend physical journals for drops, no-drop vegetation, falling blocks and
+  fluids. Drain finite debris batches through home collection without losing region
+  progress. Test hills, holes/caves, water/lava, occupied volumes and interruptions.
+
+### Task45: Verified regions, normal pipeline and native acceptance
+
+- [ ] Require verified foundations/clearance before dependent builders, allow unaffected
+  regions to continue and recheck after changing terrain. Retain correct partial builds.
+- [ ] Run actual multiworker runtime and native uneven-terrain survey→level→fill→clear→
+  verify→build acceptance. Record counts, retained infrastructure, restarts and limits.
+- [ ] Complete Lua/Python/release gates and one final whole-branch review/fix pass;
+  document/integrate/push, then continue dynamic role scaling and all remaining scope.

@@ -26,8 +26,10 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   at `c895b77`.
 - Capacity-aware crafting integrated/pushed at `7029c12`:599 Lua/18 Python tests,
   two native pane trials and final review fixes.
-- Current branch `milestone/0.22.0`: safe worker home/unloading and project settlement,
-  prerequisites for full site preparation and safe scale-down.
+- Worker home/unloading and project settlement integrated/pushed at `bb9c41e`:
+  623 Lua/18 Python, two native trials, final review fixes and release checks.
+- Current branch `milestone/0.23.0`: general automatic site preparation, starting
+  with immutable footprint/foundation geometry and bounded survey contracts.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -470,3 +472,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   unrelated cargo. Both reproduced RED→GREEN and fixed; stale evidence now requests
   a new return, and durable fresh evidence survives subsequent offline telemetry.
   Final gates:623 Lua/18 Python passed, release/check and whitespace clean; no second review.
+
+- 0.23 design/Tasks42–45 now cover the complete required preparation pipeline.
+  Starting transformed footprint/foundation planning; dynamic scaling44 remains the
+  next dependent requirement, followed by all remaining source-of-truth scope.
