@@ -1175,3 +1175,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   initial and prospective budgets include it while active trips retain remaining
   work budgets. Arithmetic, telemetry and prospective-demand regressions pass.
   The superseded0.26 full run was stopped before restarting on this final source.
+
+- Native0.26 clean retest passed across controller restart: proactive refuel before
+  the174-fuel mission, one correct verified stone, automatic station-side home
+  return, empty cargo and114 finite fuel. Independent reads reconcile8 initial
+  coal as6 stored plus2 consumed. Final mining-target source rebooted idle.
+  Permanent evidence: validation-0.26.0.md; complete Lua gate remains running.

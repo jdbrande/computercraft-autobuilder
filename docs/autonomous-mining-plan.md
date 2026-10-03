@@ -1135,7 +1135,7 @@ its concrete task budget; station target uses the same requirement.
 
 ### Task55: Runtime/native fuel forecast acceptance and integration
 
-- [ ] Exercise an above-low worker whose queued mission requires additional fuel;
+- [x] Exercise an above-low worker whose queued mission requires additional fuel;
   verify automatic stock acquisition/refill, refuel-before-dispatch and completed
   physical work across restart in runtime tests and a native fixture.
 - [ ] Run one final review and consolidated regression-backed fix pass. Complete
