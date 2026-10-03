@@ -1331,7 +1331,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 24094,
+      "bytes": 24168,
       "path": "autobuilder/workers/executor.lua",
       "roles": [
         "controller",
@@ -1341,7 +1341,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "c45f787f787f53570eea12925f573c112319fc8a2f17cf84cd3e9387fd44e9f2",
+      "sha256": "81ceb08b4443650aff88f7c26146e47fe48e4b393d492aae5eab376baf6bec8d",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/workers/executor.lua",
       "version": "0.24.0"
     },

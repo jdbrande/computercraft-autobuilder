@@ -203,3 +203,24 @@ test('an idle construction worker vacates a verifier destination through a manag
   local returns=0;for _,r in pairs(f.apps[7].state.automation.returns) do returns=returns+1;eq(r.owner,13) end
   eq(returns,1);eq(f.blocks['4,0,0'].name,'minecraft:stone')
 end)
+
+
+test('construction travel detours another active preparation region without entering or changing it',function()
+  local f=fixture({width=1,scaling=true});local q=f.apps[7].automation.queue
+  f.blocks['4,0,0']={name='minecraft:stone',state={}}
+  q.state.jobs.other={id='other',type='SURVEY_SITE',siteSurvey={columns={}},status='running',workerId=99,
+    bounds={min={x=2,y=1,z=-4},max={x=2,y=2,z=-4}},clearanceY=3}
+  local j=q:submit('VERIFY',{preferredWorker=12,clearanceY=2,
+    blocks={{x=4,y=0,z=0,name='minecraft:stone',state={}}}},{})
+  local denied=false
+  for _=1,400 do
+    f:cycle()
+    local r=f.apps[12].state.motionReservation
+    if r and r.reason and r.reason:find('active preparation region owned by ',1,true)==1 then denied=true end
+    assert(not require('autobuilder.core.pathfinding').inside(f.worlds[12].pose,q.state.jobs.other.bounds))
+    if j.status=='completed' then break end
+  end
+  assert(denied,'fixture did not encounter the protected region');eq(j.status,'completed')
+  eq(j.report.counts.correct,1);eq(q.state.jobs.other.workerId,99);eq(q.state.jobs.other.status,'running')
+  eq(f.blocks['4,0,0'].name,'minecraft:stone')
+end)

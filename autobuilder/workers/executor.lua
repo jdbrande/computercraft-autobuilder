@@ -120,7 +120,8 @@ function M.new(app,config,e,network,clock)
   app.navigation.trafficObstacle=function()
     local r=s.motionReservation
     if r and not r.work and not r.granted and s.currentTask and r.jobId==s.currentTask.id and r.reason
-      and (r.reason=='worker occupies destination' or r.reason:find('position reserved by worker ',1,true)==1) then return U.copy(r.target) end
+      and (r.reason=='worker occupies destination' or r.reason:find('position reserved by worker ',1,true)==1
+        or r.reason:find('active preparation region owned by ',1,true)==1) then return U.copy(r.target) end
   end
   app.navigation.workGuard=function(target) return reserve(app.navigation.pose,target,true) end
   app.navigation.workDone=function()

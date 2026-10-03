@@ -1051,3 +1051,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   regression and36 runtime/coordination/logistics checks pass; the large run is
   restarting. Preliminary full-suite runs were terminated after this new finding
   and cannot serve as final acceptance. No extra review pass was requested.
+
+- The larger scaling rerun exposed a separate movement stall: a traffic detour could
+  enter another worker's reserved preparation volume, but that denial did not resume
+  route planning. The worker now recognizes active preparation ownership as a traffic
+  obstacle. A focused actual-runtime regression fails before the fix and passes after,
+  verifying the protected volume remains unentered and its owner unchanged. Runtime,
+  navigation and coordination checks pass. The48-block rerun continues; the same fix
+  is installed on native workers213–216 with checkpointed tasks retained.
