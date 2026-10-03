@@ -1,8 +1,9 @@
 local U=require('autobuilder.core.util')
 local Materials=require('autobuilder.resources.materials')
 local Coordination=require('autobuilder.core.workflows')
+local E=require('autobuilder.resources.exploration')
 local M={}
-function M.new(state,save,clock,controllerId)
+function M.new(state,save,clock,controllerId,config)
   state.jobs=state.jobs or {}; state.jobSequence=state.jobSequence or 0
   local self={state=state}
   local function persist() local ok,err=save(); assert(ok,err) end
@@ -35,6 +36,69 @@ function M.new(state,save,clock,controllerId)
     if not U.integer(stock) or stock<0 then return nil,'live storage count required' end
     for _,j in pairs(state.jobs) do if j.item==item and j.status~='completed' then return nil,'an unfinished job already requests '..item end end
     local j=create(item,quantity,stock); persist(); return j
+  end
+  state.exploration=state.exploration or {schema=1,sectors={},groups={},sequence=0}
+  local exploration=state.exploration
+  function self:requestAcquisition(item,target,stock,key)
+    if not Materials.get(item) or not U.integer(target) or target<1 or target>1000000 or not U.integer(stock) or stock<0 then return nil,'invalid acquisition demand' end
+    for _,g in pairs(exploration.groups) do
+      if g.key==key and g.status~='completed' then return g end
+    end
+    exploration.sequence=(exploration.sequence or 0)+1
+    local id='acquire:'..controllerId..':'..exploration.sequence
+    local g={id=id,key=key,provider='exploration',item=item,target=target,tripIds={},status=stock>=target and 'completed' or 'running'}
+    exploration.groups[id]=g
+    local ok,err=save(); if not ok then exploration.groups[id]=nil; error(err) end
+    return g
+  end
+  function self:setAcquisitionPaused(id,paused)
+    local g=exploration.groups[id]; if not g then return false,'unknown acquisition' end
+    g.paused=paused; persist(); return true
+  end
+  function self:refreshAcquisition(id,stock)
+    local g=assert(exploration.groups[id]); local active=false
+    for _,jid in ipairs(g.tripIds) do local j=state.jobs[jid]; if j and not j.physicalComplete then active=true end end
+    if stock>=g.target and not active then g.status='completed'; g.error=nil end
+    return g
+  end
+  local function assignExploration(workers,counts)
+    if not config or not config.exploration.enabled or exploration.paused or Coordination.factoryPending(state) or not counts then return end
+    local groups={}; for _,g in pairs(exploration.groups) do if not g.paused and g.status~='completed' then groups[#groups+1]=g end end
+    table.sort(groups,function(a,b) return a.id<b.id end)
+    local ids={}; for _,w in pairs(workers) do ids[#ids+1]=w.id end; table.sort(ids)
+    for _,g in ipairs(groups) do
+      self:refreshAcquisition(g.id,counts[g.item] or 0)
+      local outstanding=0
+      for _,id in ipairs(g.tripIds) do local j=state.jobs[id]; if j and not j.physicalComplete then outstanding=outstanding+math.max(0,j.quantity-j.progress.delivered) end end
+      local remaining=g.target-(counts[g.item] or 0)-outstanding
+      if remaining>0 then
+        local reason='No online exploration-capable worker'; local waiting=false
+        for _,wid in ipairs(ids) do
+          local w=workers[tostring(wid)]; local t=w.telemetry; local home=t and t.explorationHome
+          if w.online and t and t.capabilities and t.capabilities.explorationV1 and E.home(home) and Materials.accepts(t.miningResources,g.item) then
+            if t.status=='idle' and not t.task and not Coordination.workerBusy(state,wid) then
+              local choices=E.candidates(exploration.sectors,config.exploration,g.item,home.exitRoute[#home.exitRoute] or home.depot)
+              reason='Search envelope exhausted for '..g.item
+              for _,sector in ipairs(choices) do
+                local areas=E.protectedAreas(state,config)
+                for _,b in ipairs(home.protectedAreas) do areas[#areas+1]=b end
+                local geometry,why=E.plan(sector,{config=config,depot=home.depot,exitRoute=home.exitRoute,protectedAreas=areas,activeJobs=state.jobs,availableFuel=t.fuel})
+                if geometry then
+                  local j=create(g.item,math.min(64,remaining),0); geometry.groupId=g.id
+                  j.exploration=geometry; j.workerId=wid; j.miningArea=U.copy(geometry.bounds); j.miningResources=U.copy(t.miningResources or {}); j.status='assigned'
+                  g.tripIds[#g.tripIds+1]=j.id; g.status='running'; g.error=nil
+                  local ok,err=save()
+                  if not ok then state.jobs[j.id]=nil; table.remove(g.tripIds); error(err) end
+                  return j
+                end
+                reason=why; if why and why:find('owned') then waiting=true end
+              end
+            else waiting=true end
+          end
+        end
+        g.status=waiting and 'running' or 'blocked'; g.error=reason
+      end
+    end
   end
   local resendCursor=0
   local function physical(job)
@@ -71,6 +135,7 @@ function M.new(state,save,clock,controllerId)
     return a.id<b.id
   end
   function self:assign(workers,counts)
+    local trip=assignExploration(workers,counts); if trip then return trip end
     local candidates={}
     for _,w in pairs(workers) do
       local t=w.telemetry
@@ -91,7 +156,7 @@ function M.new(state,save,clock,controllerId)
       local owner,area,resources
       for _,w in ipairs(candidates) do
         local bounds=miningArea(w.telemetry)
-        if Materials.accepts(w.telemetry.miningResources,job.item) and not conflict(w.id,bounds) then
+        if not w.telemetry.capabilities.explorationV1 and Materials.accepts(w.telemetry.miningResources,job.item) and not conflict(w.id,bounds) then
           owner=w.id; area=bounds; resources=w.telemetry.miningResources; break
         end
       end
@@ -122,7 +187,7 @@ function M.new(state,save,clock,controllerId)
   end
   function self:recoverOwner(workerId,p,workers)
     local j=state.jobs[p.jobId]; local w=workers[tostring(workerId)]; local t=w and w.telemetry
-    if not j or j.status~='queued' or j.workerId or not w or not w.online or not t
+    if not j or j.exploration or j.status~='queued' or j.workerId or not w or not w.online or not t
       or t.task~=j.id or not t.capabilities or not t.capabilities.mining then return false,'ownership recovery lacks a matching registered task' end
     if not U.integer(p.assignedQuantity) or p.assignedQuantity<1 or p.assignedQuantity>j.target then return false,'ownership recovery requires original assigned quantity' end
     if not Materials.accepts(t.miningResources,j.item) then return false,'ownership recovery has incompatible mining resources' end
@@ -136,6 +201,16 @@ function M.new(state,save,clock,controllerId)
     if not j or j.workerId~=workerId then return false,'job owner mismatch' end
     if j.status=='completed' or j.physicalComplete then return true end
     if p.delivered<j.progress.delivered then return false,'stale progress' end
+    if j.exploration then
+      if not E.report(p.exploration) or p.exploration.cursor>193 or p.delivered<0 then return false,'invalid exploration result' end
+      if p.phase=='completed' and (not p.exploration.result or p.held~=0 or stock==nil) then return false,'exploration completion needs unloaded inventory and live stock' end
+      if p.phase=='completed' then
+        assert(E.record(exploration.sectors,j,p.exploration)); j.physicalComplete=true; j.status='completed'; j.error=nil
+      elseif p.phase=='blocked' then j.status='blocked'; j.error=p.error
+      else j.status='running' end
+      j.progress={delivered=p.delivered,held=p.held,phase=p.phase,exploration=E.cleanReport(p.exploration)}
+      self:refreshAcquisition(j.exploration.groupId,stock or 0); persist(); return true
+    end
     j.progress={delivered=p.delivered,held=p.held,phase=p.phase}
     if p.phase=='completed' then
       if p.delivered<j.quantity then return false,'worker completed without its assigned quantity' end

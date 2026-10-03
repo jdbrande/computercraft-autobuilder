@@ -158,4 +158,24 @@ function M.cleanReport(r)
   for _,p in ipairs(r.observations) do local v=point(p); v.name=p.name; out.observations[#out.observations+1]=v end
   return out
 end
+function M.record(records,trip,report)
+  if not M.report(report) then return nil,'invalid exploration progress' end
+  local g=trip.exploration; local r=records[g.sectorId] or {surveys={},observations={}}; records[g.sectorId]=r
+  r.surveys=r.surveys or {}; r.observations=r.observations or {}
+  r.surveys[trip.item]={cursor=report.cursor,exhausted=report.result=='survey_exhausted' or report.result=='route_blocked',bounds=U.copy(g.bounds)}
+  local positions={}; for _,p in ipairs(r.observations) do positions[P.key(p)]=p end
+  for _,p in ipairs(report.observations) do if P.inside(p,g.bounds) then positions[P.key(p)]={x=p.x,y=p.y,z=p.z,name=p.name} end end
+  local keys={}; for k in pairs(positions) do keys[#keys+1]=k end; table.sort(keys)
+  r.observations={}; for i=math.max(1,#keys-63),#keys do r.observations[#r.observations+1]=positions[keys[i]] end
+  return true
+end
+function M.protectedAreas(state,config)
+  local boxes=U.copy(config.restrictedAreas or {})
+  if M.box(config.exploration.baseProtection) then boxes[#boxes+1]=U.copy(config.exploration.baseProtection) end
+  for _,w in pairs(state.workers or {}) do
+    local h=w.telemetry and w.telemetry.explorationHome
+    if h then for _,b in ipairs(h.protectedAreas) do boxes[#boxes+1]=U.copy(b) end end
+  end
+  return boxes
+end
 return M

@@ -1,0 +1,36 @@
+local U=require('autobuilder.core.util')
+local C=require('autobuilder.config')
+local function fixture(save)
+  local config=C.load({exploration={enabled=true,base={x=0,y=0,z=0},bounds={min={x=0,y=0,z=0},max={x=31,y=2,z=7}},baseProtection={min={x=-1,y=0,z=0},max={x=-1,y=0,z=7}}},minimumFuelReserve=0})
+  local state={}; local jobs=require('autobuilder.core.jobs').new(state,save or function() return true end,function() return 1 end,1,config)
+  local workers={}
+  for id=1,2 do workers[tostring(id)]={id=id,online=true,telemetry={status='idle',fuel=1000,capabilities={mining=true,explorationV1=true},
+    explorationHome={depot={x=(id-1)*16-1,y=0,z=(id-1)*7},exitRoute={{x=(id-1)*16,y=0,z=(id-1)*7}},protectedAreas={}},miningResources={}}} end
+  return jobs,state,workers
+end
+test('exploration splits same material without spending outstanding quotas twice',function()
+  local j,s,w=fixture(); assert(j.requestAcquisition,'missing acquisition interface')
+  local g=assert(j:requestAcquisition('minecraft:cobblestone',128,0,'project:a'))
+  local a=assert(j:assign(w,{['minecraft:cobblestone']=0})); eq(a.quantity,64)
+  local b=assert(j:assign(w,{['minecraft:cobblestone']=0})); eq(b.quantity,64); assert(a.workerId~=b.workerId)
+  assert(a.exploration.sectorId~=b.exploration.sectorId)
+  a.status='running'; b.status='running'; eq(j:assign(w,{['minecraft:cobblestone']=64}),nil)
+  w[tostring(a.workerId)].online=false; eq(j:assign(w,{['minecraft:cobblestone']=64}),nil)
+  local p={jobId=a.id,phase='completed',delivered=10,held=0,exploration={result='survey_exhausted',cursor=193,observations={},clearedRouteCount=0}}
+  assert(j:progress(a.workerId,p,10)); eq(a.status,'completed'); eq(j:refreshAcquisition(g.id,10).status,'running')
+  assert(j:progress(a.workerId,p,10)); eq(a.progress.delivered,10)
+  p={jobId=b.id,phase='completed',delivered=64,held=0,exploration={result='quota',cursor=2,observations={},clearedRouteCount=0}}
+  assert(j:progress(b.workerId,p,128)); eq(j:refreshAcquisition(g.id,128).status,'completed')
+end)
+test('exploration failed ownership save cannot leave a dispatchable trip',function()
+  local fail=false; local j,s,w=fixture(function() return not fail,'disk full' end)
+  local g=assert(j:requestAcquisition('minecraft:coal',64,0,'coal')); fail=true
+  assert(not pcall(j.assign,j,w,{['minecraft:coal']=0})); eq(next(s.jobs),nil); eq(#g.tripIds,0)
+end)
+test('exploration pauses new trips and retains uncertain owners',function()
+  local j,s,w=fixture(); local g=assert(j:requestAcquisition('minecraft:coal',128,0,'coal'))
+  local a=assert(j:assign(w,{['minecraft:coal']=0})); a.status='running'
+  assert(j:setAcquisitionPaused(g.id,true)); eq(j:assign(w,{['minecraft:coal']=0}),nil); assert(s.jobs[a.id].workerId)
+  assert(not j:progress(a.workerId,{jobId=a.id,phase='completed',delivered=0,held=0},0))
+  eq(a.status,'running')
+end)
