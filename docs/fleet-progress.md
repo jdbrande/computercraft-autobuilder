@@ -476,3 +476,15 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - 0.23 design/Tasks42–45 now cover the complete required preparation pipeline.
   Starting transformed footprint/foundation planning; dynamic scaling44 remains the
   next dependent requirement, followed by all remaining source-of-truth scope.
+
+- Task42 geometry: four RED→GREEN cases cover all16 rotation/mirror combinations,
+  exact air/state lookup, stepped foundation validation, immutable source copies,
+  bounds and lazy clipped regions for262144 cells. Survey/ownership integration is
+  next; no physical site-preparation completion is claimed.
+
+- Task43 survey foundation: bounded SURVEY_SITE contracts and immutable cumulative
+  observations now run through real controller/worker modules; both reboots and lost
+  completion acknowledgement pass with finite fuel and zero dig/place actions.
+  Tests reject invalid/changed observations, preserve progress on failed saves and
+  cover pause, surface/empty columns and exact transformed geometry. Regional project
+  scheduling, adaptive access, protection and physical preparation remain in progress.

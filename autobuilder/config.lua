@@ -104,6 +104,7 @@ function M.load(overrides)
   for _,k in ipairs({'building','crafting','courier','logging','farming'}) do c.capabilities[k]=c.automation.enabled and c.automation[k] or nil end
   c.capabilities.logisticsV1=c.capabilities.courier and true or nil
   c.capabilities.sitePreparation=c.capabilities.building and true or nil
+  c.capabilities.siteSurveyV1=c.capabilities.building and true or nil
   require('autobuilder.factory.stations').validate(c)
   require('autobuilder.storage.nodes').validate(c)
   c.capabilities.isolatedCraftingV1=c.capabilities.crafting and c.craftingStation.buffer~='' and true or nil

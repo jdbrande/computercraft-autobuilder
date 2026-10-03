@@ -161,3 +161,22 @@ test('project completion waits for native worker home return cargo collection an
   eq(f.worlds[12].pose.x,2);eq(f.worlds[12].pose.z,0);eq(f.worlds[12].items[1],nil)
   eq(F.count(f.inventories.base,'minecraft:stone'),26);eq(next(f.inventories.a),nil);eq(p.report.counts.correct,2)
 end)
+
+test('site survey real runtimes retain observed columns through both reboots and lost acknowledgement',function()
+  local f=fixture();local C=require('tests.loaded_config')
+  f.configs[12].automation.building=true;f.configs[12]=C.load(f.configs[12]);f:reboot(12)
+  local w=f.worlds[12];w.blocks['8,0,4']={name='minecraft:dirt',state={}}
+  local job=f.apps[7].automation.queue:submit('SURVEY_SITE',{clearanceY=4,bounds={min={x=8,y=0,z=4},max={x=9,y=4,z=4}},
+    siteSurvey={identity=string.rep('a',64),region=1,columns={{x=8,z=4,minY=0,clearanceY=4,foundationY=0},{x=9,z=4,minY=0,clearanceY=4,foundationY=0}}}}, {})
+  local id=job.id;local rebooted=false;f.loseAck=true
+  for _=1,400 do
+    f:cycle();local t=f.apps[12].state.currentTask
+    if not rebooted and t and t.progress==1 then f:reboot(7);f:reboot(12);rebooted=true end
+    job=f.apps[7].state.automation.jobs[id]
+    if job.status=='completed' and not f.apps[12].state.currentTask then break end
+  end
+  assert(rebooted);eq(job.status,'completed');eq(job.progress,2)
+  eq(job.siteReport.observations[1].name,'minecraft:dirt');eq(job.siteReport.observations[2].status,'empty')
+  eq(w.digs,0);eq(w.places,0);assert(w.fuel<2000 and w.fuel>0)
+  eq(#f.apps[12].state.completedTasks[id].siteReport.observations,2)
+end)

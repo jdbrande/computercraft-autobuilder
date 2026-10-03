@@ -906,9 +906,9 @@ requirements until all acceptance below passes.
 
 ### Task42: Immutable footprint and foundation geometry
 
-- [ ] Add failing transformed footprint/workspace, explicit air, stepped foundation,
+- [x] Add failing transformed footprint/workspace, explicit air, stepped foundation,
   invalid metadata, world bounds and bounded region/cell iteration tests.
-- [ ] Implement compact immutable geometry with deterministic support elevations,
+- [x] Implement compact immutable geometry with deterministic support elevations,
   lazy bounded task batches and canonical source/version identity. Preserve explicit
   schematic cells and derive protection/loaded envelopes from the same geometry.
 

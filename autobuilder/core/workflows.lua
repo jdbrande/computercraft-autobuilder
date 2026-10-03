@@ -1,7 +1,7 @@
 local U=require('autobuilder.core.util')
 local Types=require('autobuilder.core.task_messages').types
 local M={}
-local caps={RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
+local caps={RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
 local function key(p) return p.x..','..p.y..','..p.z end
 local function intersects(a,b)
   if not a or not b then return false end
@@ -175,6 +175,14 @@ function M.new(state,save,clock,id,chunks,config)
     local j=s.jobs[p.jobId]
     if not j or j.workerId~=owner then return false,'task owner mismatch' end
     if j.status=='completed' or j.workerFinished then return true end
+    if j.type=='SURVEY_SITE' then
+      local r=p.siteReport
+      if not require('autobuilder.build.site_survey').validReport(j,r,p.phase=='completed')
+        or #r.observations~=(p.progress or 0) then return false,'site survey receipt differs from contract' end
+      for i,old in ipairs(j.siteReport and j.siteReport.observations or {}) do
+        if not require('autobuilder.factory.factory').equal(old,r.observations[i]) then return false,'site observation changed or regressed' end
+      end
+    end
     if j.returning then
       local r=p.homeReceipt;local old=j.homeReceipt
       if not require('autobuilder.storage.returns').validReceipt(r) then return false,'home deposit receipt required' end
@@ -205,6 +213,7 @@ function M.new(state,save,clock,id,chunks,config)
     end
     if (p.progress or 0)<j.progress then return false,'stale task progress' end
     if j.type=='RESCUE' and p.fuelDelivered~=nil and (p.fuelDelivered<(j.fuelDelivered or 0) or p.fuelDelivered>j.quantity) then return false,'invalid rescue delivery counter' end
+    if j.type=='SURVEY_SITE' then j.siteReport=U.copy(p.siteReport) end
     if j.returning then j.homeReceipt=U.copy(p.homeReceipt) end
     if j.logistics then j.transportReceipt=U.copy(p.transportReceipt) end
     j.progress=p.progress or 0; j.phase=p.phase; j.error=p.error; j.missingItem=p.missingItem

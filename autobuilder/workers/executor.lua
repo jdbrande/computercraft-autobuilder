@@ -7,8 +7,8 @@ end
 local function homeReceipt(t)
   if t.returning then return {sequence=t.homeCargo and t.homeCargo.sequence or 0,deposited=U.copy(t.homeCargo and t.homeCargo.deposited or {})} end
 end
-local construction={BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true}
-local modules={RETURN_HOME='autobuilder.workers.home',RESCUE='autobuilder.workers.fuel_courier',BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',
+local construction={BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true,SURVEY_SITE=true}
+local modules={RETURN_HOME='autobuilder.workers.home',RESCUE='autobuilder.workers.fuel_courier',BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',SURVEY_SITE='autobuilder.build.site_survey',
   CRAFT='autobuilder.factory.crafting',TRANSPORT='autobuilder.workers.courier',HARVEST='autobuilder.resources.logger',FARM='autobuilder.resources.farmer'}
 function M.new(app,config,e,network,clock)
   local s=app.state; s.completedTasks=s.completedTasks or {}; s.pendingSupplyAcks=s.pendingSupplyAcks or {}; local self={}; local lastSend=-math.huge
@@ -21,16 +21,20 @@ function M.new(app,config,e,network,clock)
     local height=math.max(pose.y,home.y+2,task.clearanceY or -math.huge)
     for _,block in ipairs(task.blocks or {}) do height=math.max(height,block.y+2) end
     local required=0; local limit=config.maxTravelDistance or 1024
-    for index=task.index or 1,#(task.blocks or {}) do
-      local plan=require('autobuilder.build.placement').plan(task.blocks[index])
-      local stand=plan and plan.stand or task.blocks[index]
+    local targets=task.blocks or {}
+    if task.siteSurvey then
+      targets={};for _,c in ipairs(task.siteSurvey.columns) do targets[#targets+1]={x=c.x,y=c.minY+1,z=c.z} end
+    end
+    for index=task.siteSurvey and (task.progress or 0)+1 or task.index or 1,#targets do
+      local plan=not task.siteSurvey and require('autobuilder.build.placement').plan(targets[index])
+      local stand=plan and plan.stand or targets[index]
       local outward=math.abs(pose.x-stand.x)+math.abs(pose.z-stand.z)
       local returning=math.abs(home.x-stand.x)+math.abs(home.z-stand.z)
       local leg=math.max(outward,returning,height-pose.y,height-home.y,height-stand.y)
       if leg>limit then return nil,'Construction route needs '..leg..' blocks; maxTravelDistance is '..limit..'. Increase the configured travel limit.' end
       -- Include both overhead ascents, the work stand and the depot descent.
       -- Eight extra moves cover the builder's bounded side-approach offsets.
-      local fallback=stand.y<task.blocks[index].y and 2*(height-stand.y) or 0
+      local fallback=stand.y<targets[index].y and 2*(height-stand.y) or 0
       required=math.max(required,outward+returning+(height-pose.y)+(height-home.y)+2*(height-stand.y)+fallback+8+config.minimumFuelReserve)
     end
     return required
@@ -132,9 +136,14 @@ function M.new(app,config,e,network,clock)
     end
     if m.type=='task_assign' then
       local j=p.job; local done=s.completedTasks[j.id]
-      if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report,transportReceipt=done.transportReceipt,homeReceipt=done.homeReceipt}) end
+      if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report,transportReceipt=done.transportReceipt,homeReceipt=done.homeReceipt,siteReport=done.siteReport}) end
       if require('autobuilder.core.receipts').archived(s,'completedTasks',j.id) then return false,'Old acknowledged task was archived; restore the matching controller checkpoint' end
       local covered,why=require('autobuilder.core.chunks').workerAccept(config,s,j);if not covered then return false,why end
+      if t and (t.siteSurvey or j.siteSurvey) then
+        for _,field in ipairs({'siteSurvey','bounds','clearanceY'}) do
+          if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed site survey assignment' end
+        end
+      end
       if t and (t.returning or j.returning) then
         for _,field in ipairs({'returning','home','stockInputs','stockOutputs'}) do
           if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed home return assignment' end
@@ -149,14 +158,16 @@ function M.new(app,config,e,network,clock)
       end
       if t then return t.id==j.id,'worker already has a task' end
       if j.logistics and (not config.capabilities.logisticsV1 or not require('autobuilder.storage.nodes').validContract(j)) then return false,'invalid managed transport assignment' end
-      local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
+      local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end
       if j.privateStation and not require('autobuilder.factory.stations').matches(j.privateStation,config,s.id) then return false,'private crafting station does not match worker configuration' end
-      s.currentTask=U.copy(j); s.currentTask.phase='setup'; s.status='setup'; self.engine=nil; save(); return true
+      s.currentTask=U.copy(j); s.currentTask.phase='setup';
+      if j.siteSurvey then s.currentTask.siteReport={identity=j.siteSurvey.identity,region=j.siteSurvey.region,observations={}} end
+      s.status='setup'; self.engine=nil; save(); return true
     end
     if not t or t.id~=p.jobId then return false,'task ID mismatch' end
     if m.type=='task_ack' and t.phase=='completed' then
-      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report),transportReceipt=transportReceipt(t),homeReceipt=homeReceipt(t)})
+      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report),transportReceipt=transportReceipt(t),homeReceipt=homeReceipt(t),siteReport=U.copy(t.siteReport)})
       s.currentTask=nil; self.engine=nil; s.status='idle'; save(); return true
     elseif m.type=='task_pause' then t.paused=true; save(); return true
     elseif m.type=='task_resume' then
@@ -190,7 +201,7 @@ function M.new(app,config,e,network,clock)
     if t.type=='CRAFT' and t.production and t.production.stockSequence then
       stockReceipt={sequence=t.production.stockSequence,withdrawn=U.copy(t.production.withdrawn or {}),delivered={[t.item]=t.production.delivered or 0}}
     end
-    send('task_progress',{homeReceipt=homeReceipt(t),transportReceipt=transportReceipt(t),fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
+    send('task_progress',{siteReport=U.copy(t.siteReport),homeReceipt=homeReceipt(t),transportReceipt=transportReceipt(t),fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
       missingItem=t.supplyRequest and t.supplyRequest.item or t.missingItem,
       missingCount=t.supplyRequest and t.supplyRequest.count or t.missingCount,supplyId=t.supplyRequest and t.supplyRequest.id,report=Reports.compact(t.report)})
     return true
@@ -217,7 +228,7 @@ function M.new(app,config,e,network,clock)
     end
     -- Budget before beginning a route. Reservation yields during its descent
     -- must not charge a second ascent and send an adequately fuelled turtle home.
-    if required and not t.moveRoute and not t.supportCheck and not t.pairCheck and not t.intent
+    if required and not t.surveyRoute and not t.surveyScanning and not t.moveRoute and not t.supportCheck and not t.pairCheck and not t.intent
       and not (t.resupply and t.resupply.intent) and not t.fuelRecovery and not t.supplyRequest then
       local fuel=e.turtle.getFuelLevel()
       if fuel~='unlimited' and fuel<required then
