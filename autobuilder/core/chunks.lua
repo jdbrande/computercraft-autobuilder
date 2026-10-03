@@ -54,9 +54,17 @@ function M.area(job,t)
     else for _,child in pairs(v) do visit(child,depth+1) end end
     seen[v]=nil
   end
-  -- Include all declared coordinates, including route waypoints and farm sites.
-  -- The two-block margin covers the existing bounded builder/supply approaches.
-  visit(job,0);visit(t.position,0);if t.depot then visit(t.depot,0) end
+  -- Only executable geometry: exploration permission/exclusion boxes can cover
+  -- distant unrelated terrain and never describe where this finite trip goes.
+  for _,field in ipairs({'blocks','bounds','source','destination','home','recipient','miningArea'}) do visit(job[field],0) end
+  if job.station then visit(job.station.position,0) end
+  if job.farm then visit(job.farm.sites,0) end
+  if job.sitePlan then for _,field in ipairs({'start','points','bounds'}) do visit(job.sitePlan[field],0) end end
+  if job.exploration then
+    for _,field in ipairs({'depot','bounds','entry','route','exitRoute'}) do visit(job.exploration[field],0) end
+  end
+  -- The two-block margin covers existing bounded builder/supply approaches.
+  visit(t.position,0);if t.depot then visit(t.depot,0) end
   local a={minX=math.floor((loX-2)/16),maxX=math.floor((hiX+2)/16),minZ=math.floor((loZ-2)/16),maxZ=math.floor((hiZ+2)/16)}
   if not M.validArea(a) or (a.maxX-a.minX+1)*(a.maxZ-a.minZ+1)>M.MAX_CHUNKS then return nil,'MISSION_BLOCKED_UNLOADED_AREA: mission chunk limit exceeded' end
   return a
@@ -75,16 +83,47 @@ local function assured(config,area)
   end end
   return true
 end
+local function inside(required,grant)
+  return required and M.validGrant(grant) and required.minX>=grant.minX and required.maxX<=grant.maxX
+    and required.minZ>=grant.minZ and required.maxZ<=grant.maxZ
+end
+local function workerArea(config,state,job)
+  if job.type=='MINE' and not job.exploration and not job.miningArea then
+    job=U.copy(job);job.miningArea=config.mining.bounds
+  end
+  return M.area(job,{position=state.position,depot=config.depot})
+end
+function M.execution(config,state)
+  local job=state.currentTask;local c=config.chunkLoading
+  if not job then return true end
+  if (job.loadedArea or c and c.enabled) and (not state.position or not state.position.known
+    or not U.position(state.position) or state.position.pending or state.position.uncertain) then
+    return false,'MISSION_BLOCKED_UNLOADED_AREA: execution pose unknown or uncertain'
+  end
+  if c and c.anchor then return false,'MISSION_BLOCKED_UNLOADED_AREA: stationary chunk anchor' end
+  if job.loadedArea then
+    -- This immutable assignment was checked before acceptance. Recheck current
+    -- locations without growing the original approach margin after every move.
+    if M.validGrant(job.loadedArea) and M.contains(job.loadedArea,state.position)
+      and (not config.depot or M.contains(job.loadedArea,config.depot)) then return true end
+    return false,'MISSION_BLOCKED_UNLOADED_AREA: saved execution grant omits current pose or depot'
+  end
+  if not c or not c.enabled then return true end
+  local area,why=workerArea(config,state,job)
+  if area and assured(config,area) then return true end
+  return false,why or 'MISSION_BLOCKED_UNLOADED_AREA: legacy task needs complete assured coverage'
+end
 function M.workerAccept(config,state,job)
   local c=config.chunkLoading
   local old=state.currentTask
   if old and not Equal(old.loadedArea,job.loadedArea) then return false,'changed loaded mission grant' end
   if (not c or not c.enabled) and not job.loadedArea then return true end
   if c and c.anchor then return false,'MISSION_BLOCKED_UNLOADED_AREA: stationary chunk anchor' end
-  if old then return old.id==job.id,'worker already has a task' end
-  local geometry=job
-  if job.type=='MINE' and not job.exploration and not job.miningArea then geometry=U.copy(job);geometry.miningArea=config.mining.bounds end
-  local a,why=M.area(geometry,{position=state.position,depot=config.depot});if not a then return false,why end
+  if old then
+    if old.id~=job.id then return false,'worker already has a task' end
+    return M.execution(config,state)
+  end
+  local a,why=workerArea(config,state,job);if not a then return false,why end
   -- Legacy saved assignments can continue only with explicit local assurances.
   if not job.loadedArea and assured(config,a) then return true end
   if not M.validGrant(job.loadedArea) then return false,'MISSION_BLOCKED_UNLOADED_AREA: assignment needs loaded envelope' end
@@ -132,7 +171,7 @@ function M.new(state,config,save)
     local old=s.leases[job.id];local t=worker.telemetry
     if old then
       assert(old.workerId==worker.id and Equal(job.loadedArea,old.area),'changed loaded mission grant')
-      assert(Equal(M.area(job,old.origin),old.area),'changed loaded mission geometry')
+      assert(inside(M.area(job,old.origin),old.area),'changed loaded mission geometry')
       if old.status~='held' then return nil,'loaded mission claim already released' end
       return U.copy(old)
     end

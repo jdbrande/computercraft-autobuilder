@@ -15,8 +15,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Capacity/parallel factory integrated and pushed at `345b833`.
 - Native schematic support integrated/pushed at `9a27b1b`:508 Lua/18 Python tests,
   both native construction trials and review correction passed.
-- Current branch: `milestone/0.18.0`. Task28: native chunky-turtle acceptance, operator setup/status, documentation
-  and final review. Task27 passed526 Lua/18 Python tests.
+- Loaded mission compatibility completed:533 Lua/18 Python tests, native chunky
+  cross-chunk acceptance, final review fixes and release checks passed.
+- Next: physical logistics, registered infrastructure and transport reservations.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -54,7 +55,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 24: worker states | Heartbeats, task/fuel/pose/errors | Equipment/software health and full recovery-state presentation |
 | 25: rescue | Native identity-checked fuel delivery, original-task recovery, offline ownership and journal preservation | Reachable inventory recovery and broader blocked-route recovery missions |
 | 26: offline owners | Ownership survives timeout/restart | Extend to new leases and configurable recovery commands |
-| 27: chunk loading | Strict bounded coverage, durable stationary chunky claims, native cross-chunk construction and offline-loader refusal | 0.18 final review/integration; preserve during infrastructure/scaling work |
+| 27: chunk loading | Strict bounded coverage, durable stationary chunky claims, native cross-chunk construction and offline-loader refusal | Accepted0.18; preserve during infrastructure/scaling work |
 | 28–29: protection/traffic | Protected projects/depots/routes, cell reservations | Global station/farm registration, larger fleet deadlock/routing checks |
 | 30–31: priorities/scheduling | Capabilities, dependencies and exclusive jobs | Priority/cost/fuel/chunk scheduling, dynamic roles and simultaneous projects |
 | 32–34: monitor, commands, logs | Terminal screens and role/project commands, rotating logs | Monitor fleet dashboard, consistent fleet/project/resource/recovery commands, structured significant events |
@@ -309,3 +310,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Fixture shut down and physical anchors removed; AP ticket expiry is asynchronous.
 - Task28 pre-review gate:529 Lua/18 Python, release0.18 generation/check and
   whitespace checks passed. Operator chunk status/setup and migration guide added.
+
+- Task28 final gate:533 Lua/18 Python tests passed, release generation/check and
+  whitespace validation passed. Review regressions cover finite exploration
+  geometry, stationary legacy effects and unknown-pose execution. Delayed GPS
+  restores the prior phase before recovery. Independent world checks confirmed
+  both AP tickets expired; observer force loading removed. Integrating0.18 and
+  continuing required logistics without a milestone pause.

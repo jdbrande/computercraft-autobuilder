@@ -82,10 +82,19 @@ function M.new(config,e)
     self.firstBuild=require('autobuilder.core.first_build').new(self,config,e)
     state.view='guide'
   end
+  local function restoreCoverage()
+    local task=state.currentTask
+    if task and task.chunkBlock and require('autobuilder.core.chunks').execution(config,state) then
+      local prior=task.chunkBlock
+      task.phase=prior.phase;task.blockedCategory=prior.category;task.error=prior.error;task.chunkBlock=nil
+      state.status=task.phase or 'task_paused';self:save()
+    end
+  end
   function self:confirmPose(fix,heading)
     if not self.navigation or not U.heading(heading) then return false,'worker and explicit heading required' end
     local ok,err=self.navigation:reconcile(fix,heading); if not ok then return false,err end
     state.position.source='manual'; state.status=state.currentTask and (state.currentTask.phase or 'task_paused') or 'idle'
+    restoreCoverage()
     if self.mining.poseRecovered then self.mining:poseRecovered() end
     self:report('INFO','Operator confirmed position and heading'); return self:save()
   end
@@ -101,6 +110,7 @@ function M.new(config,e)
       if changed then self:report('WARN','GPS corrected local position') end
       local ok,why=self.navigation:reconcile(fix); if not ok then return false,why end
       p.source='gps'; p.lastFix=clock(); state.gpsError=nil
+      restoreCoverage()
       if self.mining.poseRecovered then self.mining:poseRecovered() end
       if state.status=='recovery_required' and U.heading(p.heading) then state.status=state.currentTask and 'task_paused' or 'idle' end
     else
@@ -158,6 +168,19 @@ function M.new(config,e)
   function self:workStep()
     if self.busy or self.gpsRequested or self.quitRequested then return true end
     if not self.agent then return self.automation:step() end
+    local task=state.currentTask
+    if task and task.phase~='completed' then
+      local covered,why=require('autobuilder.core.chunks').execution(config,state)
+      if not covered then
+        if not task.chunkBlock then task.chunkBlock={phase=task.phase,category=task.blockedCategory,error=task.error} end
+        if task.phase~='blocked' or task.error~=why then
+          task.phase='blocked';task.blockedCategory='chunks';task.error=why;state.status='blocked';self:save()
+        end
+        -- Keep prior action journals untouched. With coverage restored, the
+        -- original engine reconciles them before attempting another side effect.
+        return true
+      elseif task.chunkBlock then restoreCoverage() end
+    end
     if self.fuelRecovery and self.fuelRecovery:active() then
       self.busy=true
       local ok,result,err=pcall(self.fuelRecovery.step,self.fuelRecovery)

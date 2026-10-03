@@ -722,11 +722,11 @@ executor/navigation, setup sharing, runtime tests and explicit loaded test fixtu
 
 ### Task 28: Chunk status, setup, native loading acceptance and integration
 
-- [ ] Document operator assurances, anchor setup, migration, radius0 coverage and
+- [x] Document operator assurances, anchor setup, migration, radius0 coverage and
   lost-provider recovery; expose status and share policy without anchor roles.
-- [ ] Bootstrap distant real chunky anchors, remove operator force loading and
+- [x] Bootstrap distant real chunky anchors, remove operator force loading and
   verify retained ticking plus a cross-chunk mission and uncovered-area refusal.
   Correct defects with regressions and record independent world evidence.
-- [ ] Run all tests/release checks, one final whole-branch review and required fix
+- [x] Run all tests/release checks, one final whole-branch review and required fix
   pass. Integrate/push and continue recovery/logistics/scaling/site preparation and
   every other unfinished requirement without a milestone handoff pause.

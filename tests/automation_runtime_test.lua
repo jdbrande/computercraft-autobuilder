@@ -746,3 +746,15 @@ test('private batch checkpoint cannot fall back to duplicate legacy work after a
   f.cc.craftingStations=stations; f.c=Runtime.new(f.cc,f.ce); f:finish()
   eq(f.h:count(mc('stone_bricks')),16); eq(f.h.crafts+f.other.h.crafts,4)
 end)
+
+test('restored legacy Crafty cannot stage or craft until its full stationary coverage is assured',function()
+  local f=fixture();f.h.inventories.store[3]={name=mc('stone'),count=4}
+  f.w.state.currentTask={id='legacy-craft',type='CRAFT',item=mc('stone_bricks'),quantity=4,batches=1,phase='work'}
+  assert(f.w:save());f.wc.chunkLoading.areas={};f.w=Runtime.new(f.wc,f.we)
+  for _=1,12 do f.w:workStep() end
+  eq(f.h.transfers,0);eq(f.h.crafts,0);assert(f.w.state.currentTask.error:find('UNLOADED_AREA'))
+  f.wc.chunkLoading.areas={{minX=0,maxX=0,minZ=0,maxZ=0}};f.w:workStep();eq(f.h.transfers,0)
+  f.wc.chunkLoading.areas={{minX=-1,maxX=0,minZ=-1,maxZ=0}}
+  for _=1,40 do f.w:workStep() end
+  eq(f.w.state.currentTask.phase,'completed');eq(f.h.crafts,1);eq(f.h:count(mc('stone_bricks')),4)
+end)

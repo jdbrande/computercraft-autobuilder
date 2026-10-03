@@ -69,3 +69,17 @@ test('chunk configuration enforces coverage by default and validates explicit as
     assert(not pcall(C.load,{chunkLoading=override}),'invalid chunk policy accepted')
   end
 end)
+
+test('finite exploration coverage excludes global search limits and protected project metadata',function()
+  local C=require('autobuilder.core.chunks');local w=worker(12,8)
+  local bounds={min={x=9,y=64,z=8},max={x=12,y=66,z=10}}
+  local j={id='local-explorer',type='MINE',exploration={depot=pos(8),entry=pos(9),bounds=bounds,route={pos(9)},exitRoute={},
+    envelope={min={x=-64,y=60,z=-64},max={x=64,y=70,z=64}},protectedAreas={}}}
+  local a=assert(C.area(j,w.telemetry));eq(a.minX,0);eq(a.maxX,0);eq(a.minZ,0);eq(a.maxZ,0)
+  j.exploration.envelope.max.x=1024;j.exploration.envelope.max.z=1024
+  j.exploration.protectedAreas={{min={x=10000,y=0,z=10000},max={x=10100,y=300,z=10100}}}
+  local second=assert(C.area(j,w.telemetry));assert(require('autobuilder.factory.factory').equal(a,second))
+  local ledger=C.new({workers={['20']=anchor(20,8)}},config(),function() return true end)
+  assert(ledger:reserve(j,w));j.exploration.protectedAreas[1].max.x=20000
+  assert(ledger:reserve(j,w),'unrelated project invalidated saved local coverage')
+end)

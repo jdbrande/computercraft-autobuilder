@@ -137,3 +137,35 @@ test('chunks status shows exact missing coverage and offline retained providers'
   eq(c.state.view,'chunks');assert(#c.state.chunksLines>0)
   c.config.chunkLoading.enabled=false;assert(select(2,c:command('chunks')):find('DISABLED'))
 end)
+
+test('restored stationary placement needs whole mission coverage and preserves prior physical intents',function()
+  for _,alreadyPlaced in ipairs({false,true}) do
+    local _,e,cfg=builder();local world=require('tests.build_world').new();world.pose=pos(8);e.turtle=world.turtle
+    local w=R.new(cfg,e);local block={x=8,y=63,z=8,name='minecraft:stone_bricks',state={}}
+    w.state.currentTask={id='legacy-build',type='BUILD',blocks={block},phase='work',index=1}
+    if alreadyPlaced then
+      world.blocks['8,63,8']=U.copy(block)
+      w.state.currentTask.intent={kind='place',index=1,slot=1,item=block.name,before=1}
+    else world.items[1]={name=block.name,count=1} end
+    assert(w:save());w=R.new(cfg,e)
+    w:workStep();eq(world.places,0);eq(w.state.currentTask.phase,'blocked');assert(w.state.currentTask.error:find('UNLOADED_AREA'))
+    assert(not assign(w,U.copy(w.state.currentTask)),'duplicate ungranted legacy task accepted without migration coverage')
+    if alreadyPlaced then assert(w.state.currentTask.intent,'unobserved effect journal discarded') end
+    cfg.chunkLoading.areas={{minX=1,maxX=1,minZ=0,maxZ=0}};w:workStep();eq(world.places,0);eq(w.state.currentTask.phase,'blocked')
+    cfg.chunkLoading.areas={{minX=0,maxX=0,minZ=0,maxZ=0}}
+    for _=1,5 do w:workStep() end
+    eq(w.state.currentTask.phase,'completed');eq(world.places,alreadyPlaced and 0 or 1);eq(w.state.currentTask.intent,nil)
+  end
+end)
+
+test('saved execution grants cannot authorize stationary work at an unknown or uncertain pose',function()
+  for _,field in ipairs({'known','uncertain','pending'}) do
+    local w=builder();assert(assign(w,grant()))
+    if field=='known' then w.state.position.known=false
+    elseif field=='pending' then w.state.position.pending={action='forward'}
+    else w.state.position.uncertain=true end
+    local ok,why=require('autobuilder.core.chunks').execution(w.config,w.state)
+    assert(not ok and why:find('UNLOADED_AREA'),'untrusted pose accepted by execution gate')
+    assert(w.state.currentTask.loadedArea,'saved ownership was erased')
+  end
+end)

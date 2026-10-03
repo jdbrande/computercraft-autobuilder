@@ -312,7 +312,7 @@
       "version": "0.18.0"
     },
     {
-      "bytes": 11908,
+      "bytes": 14013,
       "path": "autobuilder/core/chunks.lua",
       "roles": [
         "controller",
@@ -322,7 +322,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "01a59d7ea74c61d2e0ac5c8aae71176e1c605838619e749c13d7589aa3f34222",
+      "sha256": "64913d95753cd63bceec11c4b8b4c1abf9a72894bbfaaaa9d5c6935c86f3562d",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/chunks.lua",
       "version": "0.18.0"
     },
@@ -567,7 +567,7 @@
       "version": "0.18.0"
     },
     {
-      "bytes": 15586,
+      "bytes": 16747,
       "path": "autobuilder/core/runtime.lua",
       "roles": [
         "controller",
@@ -577,7 +577,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "5d38d7df23dbe144b2b551fb613774854bb09a0750a4b165e31977cc3dafddb6",
+      "sha256": "2952304b3dc86df08b2971d7e1d8b4e71619dec366b6f6ee1167ca90a3ef1a49",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/runtime.lua",
       "version": "0.18.0"
     },

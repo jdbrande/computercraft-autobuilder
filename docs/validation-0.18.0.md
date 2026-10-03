@@ -16,6 +16,11 @@ and deployment are not claimed.
 - Three status/setup regressions failed then passed. Pre-review full gate:529 Lua
   tests,18 Python tests, release0.18.0 generation/check and whitespace check passed.
 
+- Final reviewed gate:533 Lua tests and18 Python tests passed; release0.18.0
+  generation/check and whitespace check passed. The final execution-pose guard
+  also covers unknown, pending and uncertain poses. Its delayed-GPS recovery
+  regression passed after restoring the prior phase before the recovery callback.
+
 Existing hardware simulations explicitly declare their in-memory loaded terrain.
 Production defaults enforce coverage and assume no loaded area. Fixed miners need
 known bounds; envelopes use floor division for negative coordinates and a two-block
@@ -69,8 +74,9 @@ final home return remains later fleet work.
 
 All four test computers were shut down. Physical anchors were removed so AP stops
 refreshing their tickets; AP stale-ticket expiry is separate from vanilla force
-loading and is not assumed immediate. The controller/supply rig and four completed
-blocks remain. Ignored evidence under `dist/live-chunks/` includes setup commands,
+loading and is not assumed immediate. After the configured expiry interval, independent `execute unless loaded` checks
+confirmed both former anchor chunks were unloaded. The observer force-load ticket
+was removed again. The controller/supply rig and four completed blocks remain. Ignored evidence under `dist/live-chunks/` includes setup commands,
 peripheral/state snapshots, removed-ticket results, continuous state/reboot history,
 uncovered/offline refusal, final status, inventory/block inspection and cleanup.
 The observer submits normal operator commands; turtles use native APIs.
@@ -88,3 +94,34 @@ The compatibility boundary accepts bounded covered missions and refuses unsuppor
 areas. Automatic loader placement, broader routing/recovery, full logistics,
 dynamic scaling, automatic leveling and large-fleet acceptance remain mandatory
 subsequent work in the fleet requirements.
+
+## Final review corrections
+
+Two Important issues were reproduced and fixed in one regression-backed pass:
+
+- A recursive geometry walk included the global exploration envelope and unrelated
+  protected projects. A single-chunk trip could require100 chunks or exceed the
+  mission limit. Explicit executable geometry now includes only its sector, routes,
+  depot and applicable task targets; distant exclusions and expanded search limits
+  do not enlarge that trip's grant. Historical wider grants remain valid if they
+  contain the finite executable geometry.
+- Restored legacy jobs could place, craft or unload without translation, bypassing
+  movement guards. A runtime execution gate now blocks stationary physical effects
+  without a saved grant or complete local assurances. It preserves prior phases,
+  errors and physical-action journals; restored coverage returns work to its original
+  engine for reconciliation. Tests observed an unauthorized placement and five
+  crafting transfers before the fix, then zero effects while blocked and exact
+  completion after coverage was supplied. Already-placed intent recovery does not
+  place a duplicate block.
+
+Deferred minor: disabling coverage on the controller bypasses its redundant motion
+reservation check even for an existing grant. Updated workers continue enforcing
+that saved grant, so the actual turtle cannot leave it. Track controller consistency
+with later scheduling/recovery work.
+
+Review rulings: loader manufacture/deployment is not needed for this compatibility
+boundary; physical infrastructure mapping and released-lease archival remain
+subsequent fleet requirements. The existing trusted rednet-peer model remains in
+use. Native evidence was independently inspected during acceptance rather than
+repeated by the reviewer. External loader destruction preserves physical ownership
+and can require infrastructure restoration; it never authorizes reassignment.
