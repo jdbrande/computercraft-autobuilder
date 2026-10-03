@@ -48,7 +48,7 @@ cells, unavailable resources and uncertain recovery remain visible blocked work.
 | Multiple resource miners and automatic construction | [Material team](docs/material-team.md) |
 | Miner hardware, bounded excavation and fuel | [Mining setup](docs/milestone-2.md) |
 | Concurrent miners and durable area ownership | [Parallel mining](docs/parallel-mining.md) |
-| Recipe planning, Crafty station and furnace bank | [Production](docs/production.md) |
+| Recipe planning, Crafty station and furnace bank | [Production](docs/production.md), [parallel Crafty stations](docs/parallel-factory.md) |
 | Automatic fuel stations and rescue | [Fuel management](docs/fuel-management.md), [0.15.0 acceptance](docs/validation-0.15.0.md) |
 | Inventory reservations and physical receipts | [Inventory ownership](docs/inventory-ownership.md), [0.14.0 acceptance](docs/validation-0.14.0.md) |
 | Dependency graph and resource providers | [Resource planning](docs/resource-planning.md), [0.13.0 acceptance](docs/validation-0.13.0.md) |

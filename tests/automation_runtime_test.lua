@@ -683,3 +683,13 @@ test('two private batches cannot spend the same short ingredient stock',function
   for _,j in ipairs(jobs) do eq(j.status,'completed') end
   eq(f.h.crafts+f.other.h.crafts,4); eq(f.h:count(mc('stone_bricks')),16)
 end)
+
+test('factory status reports measured collection rates and station ownership without moving items',function()
+  local f=parallelFixture(); f:request(16); f:finish()
+  for _,j in pairs(f.c.state.automation.jobs) do if j.privateStation.id=='west' then j.factoryStartedAt=nil; j.factoryCompletedAt=nil end end
+  local before=f.h.transfers; local ok,text=f.c:command('factory')
+  assert(ok,text); eq(f.c.state.view,'factory')
+  assert(text:find('stations=2',1,true)); assert(text:find('delivered=16',1,true)); assert(text:find('/s',1,true))
+  assert(text:find('west',1,true) and text:find('east',1,true)); eq(f.h.transfers,before)
+  assert(f.c.state.factoryLines[2]:find('collected=8',1,true),'legacy completed jobs disappeared from station totals')
+end)

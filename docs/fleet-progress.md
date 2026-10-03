@@ -236,3 +236,17 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   waiting batches now yield execution so the shared owner can drain. Full suite487
   passed; an additional short-stock/two-batch regression also passes. Native120–122
   acceptance is running with48 requested stone bricks and64 starting stone.
+
+- Task22 native acceptance: controller120 and Crafty121/122 completed48 stone bricks
+  from64 stone in six automatically scheduled batches, with two workers concurrent.
+  Controller/worker reboot during production needed no resume or reassignment. World
+  inspection confirmed48 output,16 remaining stone, empty private chests/turtles,
+  unchanged finite2000 fuel and all count/capacity leases released. Final status
+  retest, full release gate and review are in progress.
+
+- Native follow-up reached64 total bricks from the original64 stone; all eight jobs
+  completed, both workers idle, all count/capacity leases released. `factory` showed
+  32 collected per station, rates0.60/0.55 per second on timed follow-up batches.
+  Computers120–122 are shut down; observer/station force-load tickets removed.
+  Final pre-review gate:489 Lua/16 Python tests, regenerated0.16.0 release/check and
+  whitespace validation. Whole-branch review is next.

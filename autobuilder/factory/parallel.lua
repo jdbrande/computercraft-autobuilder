@@ -6,6 +6,7 @@ function M.new(app,config,e,queue,production)
   local save=function() return app:save() end
   local capacity=require('autobuilder.storage.capacity').new(app.state,save)
   local self={capacity=capacity,cursor=0}
+  local function now() return e.os and e.os.epoch and e.os.epoch('utc')/1000 or 0 end
   local function jobsFor(r)
     local jobs={}
     for _,j in pairs(queue.state.jobs) do
@@ -104,7 +105,7 @@ function M.new(app,config,e,queue,production)
       assert(F.equal(counts(inv),expected),'private crafting output changed before collection')
       if delivered==job.quantity then
         capacity:release(job.id)
-        F.commit(job,save,function() job.status='completed'; job.error=nil end)
+        F.commit(job,save,function() job.status='completed'; job.error=nil; job.factoryCompletedAt=now() end)
         return 'complete'
       end
       local lease=assert(capacity.state.leases[job.id],'missing craft capacity claim')
@@ -145,7 +146,7 @@ function M.new(app,config,e,queue,production)
         error('reserved private input capacity is full',0)
       end
     end
-    F.commit(job,save,function() job.privateReady=true; job.status='queued'; job.error=nil end)
+    F.commit(job,save,function() job.privateReady=true; job.status='queued'; job.error=nil; job.factoryStartedAt=now() end)
     return 'ready'
   end
   function self:step()
@@ -173,6 +174,32 @@ function M.new(app,config,e,queue,production)
     -- A waiting private batch must not starve the existing shared owner whose
     -- completion will make that batch eligible.
     return false
+  end
+  function self:describe()
+    local active,queued,delivered=0,0,0
+    local rows={}
+    for _,j in pairs(queue.state.jobs) do if j.privateStation then
+      local id=j.privateStation.id; local row=rows[id] or {delivered=0,measured=0,seconds=0}; rows[id]=row
+      local n=j.factoryFlow and j.factoryFlow.collect.delivered or 0; delivered=delivered+n
+      row.delivered=row.delivered+n
+      if j.status~='completed' then
+        row.job=j
+        if j.workerId then active=active+1 else queued=queued+1 end
+      elseif j.factoryStartedAt and j.factoryCompletedAt and j.factoryCompletedAt>j.factoryStartedAt then
+        row.measured=row.measured+n; row.seconds=row.seconds+j.factoryCompletedAt-j.factoryStartedAt
+      end
+    end end
+    local lines={'FACTORY stations='..#config.craftingStations..' active='..active..' queued='..queued..' delivered='..delivered}
+    for _,station in ipairs(config.craftingStations) do
+      local row=rows[station.id] or {}; local j=row.job
+      local rate=(row.seconds or 0)>0 and string.format('%.2f/s',row.measured/row.seconds) or 'unmeasured'
+      lines[#lines+1]=station.id..' worker='..station.workerId..' '..(j and j.status or 'idle')..' collected='..(row.delivered or 0)..' rate='..rate
+      if j then
+        local reason=j.error or j.stockError or (not j.privateReady and 'reserving/staging inputs' or j.workerFinished and 'collecting output' or 'crafting private batch')
+        lines[#lines+1]=j.id..' '..j.item..' '..(j.factoryFlow and j.factoryFlow.collect.delivered or 0)..'/'..j.quantity..' '..reason
+      end
+    end
+    app.state.factoryLines=lines; return table.concat(lines,'; ')
   end
   return self
 end
