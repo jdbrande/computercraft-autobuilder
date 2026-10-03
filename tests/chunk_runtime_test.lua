@@ -131,6 +131,7 @@ end)
 
 test('chunks status shows exact missing coverage and offline retained providers',function()
   local c=controller({});local q=c.automation.queue;c.state.workers['20']=worker(20,8,true)
+  c.config.scaling.roles.building.min=2 -- Exercise the second mission's coverage gate beside the retained owner.
   local j=task(q,9);assert(q:assign(c.state.workers));c.state.workers['20'].online=false
   c.state.workers['13']=worker(13,8);local far=task(q,40);q:assign(c.state.workers)
   local ok,text=c:command('chunks');assert(ok,text);assert(text:find('enforced') and text:find('held') and text:find('offline') and text:find(j.id) and text:find('UNLOADED_AREA'),text)

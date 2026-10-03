@@ -260,3 +260,19 @@ test('hauling role limits prevent new stock staging but retain collection for al
   for _,j in ipairs(f:jobs()) do if j.status~='completed' then f:deliver(j) end end
   f:step(20);eq(r.status,'completed');eq(F.count(f.inventories.site,item),16)
 end)
+
+
+test('pause during native capacity observation preserves pause and cannot stage that batch beside ready hauling',function()
+  local f=fixture();f.service:request(item,16,'base','site','pause-observation');f:step()
+  local first=assert(f:jobs()[1]);first.paused=true;f:step();eq(#f:jobs(),2);first.paused=nil
+  local call=f.e.peripheral.call;local paused=false
+  f.e.peripheral.call=function(name,method,...)
+    if method=='getItemLimit' and not paused then paused=true;first.paused=true;assert(f.app:save()) end
+    return call(name,method,...)
+  end
+  f:step();assert(paused);assert(first.paused,'failed draft rollback discarded the newer pause')
+  eq(first.logisticsFlow,nil);eq(f.app.state.capacityLedger.leases[first.id],nil);eq(f.app.state.inventoryLedger.leases[first.id],nil)
+  eq(F.count(f.inventories[first.logistics.pickup.inventory],item),0)
+  f:step(20);local other=f:jobs()[2];assert(other.logisticsReady);f:deliver(other);f:step(20)
+  first.paused=nil;f:step(20);assert(first.logisticsReady,'resumed haul never staged')
+end)

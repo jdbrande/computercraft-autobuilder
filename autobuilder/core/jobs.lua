@@ -97,7 +97,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
         if config.scaling then
           local allocation=require('autobuilder.core.scaling').snapshot(state,config,counts,clock(),workers).mining
           eligible=math.min(eligible,math.max(0,allocation.desired-allocation.active))
-          if eligible==0 then g.error='mining allocation '..allocation.active..'/'..allocation.desired;return end
+          if allocation.active>=allocation.desired then g.error='mining allocation '..allocation.active..'/'..allocation.desired;return end
         end
         local cursor=planning[g.id] or {worker=1,sector=1}
         local reason=cursor.reason or 'No online exploration-capable worker'; local waiting=cursor.waiting or false

@@ -1018,7 +1018,7 @@ operator docs and progress ledger.
 - [ ] Add actual controller/miner/worker runtime scenarios that start with one
   suitable turtle, register more during heavy mixed demand, prove multiple miners,
   clearers and builders contribute, and finish with idle settled workers.
-- [ ] Include slower supply/processing, zero-yield searches, changed limits and
+- [x] Include slower supply/processing, zero-yield searches, changed limits and
   controller/worker restarts. Confirm no duplicated physical work, stock or claims.
 - [ ] Run the focused/runtime checks, document supported tuning and commit.
 

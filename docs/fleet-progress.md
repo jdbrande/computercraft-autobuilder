@@ -1020,3 +1020,23 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   releases capacity and drains allocation to zero. Scaling and factory runtime
   focused checks pass. This extends the same backlog treatment already used for
   bounded construction/preparation queues.
+
+- The single final0.24 review found two reproducible Important issues. An unsupported
+  first acquisition exited the whole exploration pass, starving later compatible
+  demand. It now stops globally only when role capacity is exhausted; unsupported
+  and offline-only material groups no longer block other miners. A pause arriving
+  during native logistics capacity observations also permitted a new claim and
+  transfer. Final eligibility now rejects paused/retired work; rollback snapshots
+  begin after yielding observations so they preserve the newer pause. Regressions
+  failed before fixes and pass afterward, including resumption after other hauling
+  settles. No second review is planned.
+- The initial full suite exposed an older coverage-status fixture that expected a
+  second tiny build to dispatch beside an existing owner. It now explicitly requests
+  minimum two builders so it still exercises missing chunk coverage. Production
+  allocation remains unchanged. That preliminary suite was superseded by the review
+  fixes and fixture correction; it is not final passing evidence.
+- Native0.24 home returns correctly refused missing coverage for chunk64,-1 at the
+  central storage boundary. The operator added two loaded chunks and widened only
+  the controller's explicit assurance rectangle (now20 chunks), then restarted it.
+  All three pending debris returns completed; preparation and building continued
+  concurrently. This was fixture configuration, without extra stock or terrain edits.

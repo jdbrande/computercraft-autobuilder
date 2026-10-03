@@ -492,7 +492,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 19319,
+      "bytes": 19345,
       "path": "autobuilder/core/jobs.lua",
       "roles": [
         "controller",
@@ -502,7 +502,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "ff7a31200b5dcd5aeda0e0a66c798f5670493ed47d3164ecf3f382abe9cb1b61",
+      "sha256": "5bfa477bf722d0316f9955d498da3017870827eefb92ced8b63135c6eeb1029a",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/jobs.lua",
       "version": "0.24.0"
     },
@@ -522,7 +522,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 17641,
+      "bytes": 17785,
       "path": "autobuilder/core/logistics_service.lua",
       "roles": [
         "controller",
@@ -532,7 +532,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "394244b3077cfcb2b956539a88fff396fd344f70681ba4a7f09e60dbaf29d438",
+      "sha256": "6f9487b3493372ea5d06e39aebd50ec277ce3526c37c69c4d1c450a01cf4d498",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/logistics_service.lua",
       "version": "0.24.0"
     },

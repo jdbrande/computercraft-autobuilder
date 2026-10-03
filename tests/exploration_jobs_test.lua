@@ -137,3 +137,17 @@ test('exploration prefers a specialist and leaves a shared worker for ready cons
   jobs:assign(workers,{});eq(#g.tripIds,1)
   eq(q:assign(workers).id,build.id);eq(build.workerId,1)
 end)
+
+
+test('an acquisition without a compatible worker cannot starve later serviceable demand',function()
+  for _,offline in ipairs({false,true}) do
+    local j,s,w=fixture()
+    for _,worker in pairs(w) do worker.telemetry.miningResources={'minecraft:cobblestone'} end
+    if offline then w['3']=require('autobuilder.core.util').copy(w['1']);w['3'].id=3;w['3'].online=false;w['3'].telemetry.miningResources={'minecraft:coal'} end
+    local coal=j:requestAcquisition('minecraft:coal',64,0,'first')
+    local stone=j:requestAcquisition('minecraft:cobblestone',64,0,'second')
+    local trip;for _=1,5 do trip=j:assign(w,{});if trip then break end end
+    assert(trip,'unserviceable first demand starved a compatible idle miner');eq(trip.item,'minecraft:cobblestone')
+    eq(#coal.tripIds,0);eq(#stone.tripIds,1)
+  end
+end)
