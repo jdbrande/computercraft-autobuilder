@@ -203,3 +203,43 @@ test('an idle construction worker vacates a verifier destination through a manag
   local returns=0;for _,r in pairs(f.apps[7].state.automation.returns) do returns=returns+1;eq(r.owner,13) end
   eq(returns,1);eq(f.blocks['4,0,0'].name,'minecraft:stone')
 end)
+
+
+test('construction travel detours another active preparation region without entering or changing it',function()
+  local f=fixture({width=1,scaling=true});local q=f.apps[7].automation.queue
+  f.blocks['4,0,0']={name='minecraft:stone',state={}}
+  q.state.jobs.other={id='other',type='SURVEY_SITE',siteSurvey={columns={}},status='running',workerId=99,
+    bounds={min={x=2,y=1,z=-4},max={x=2,y=2,z=-4}},clearanceY=3}
+  local j=q:submit('VERIFY',{preferredWorker=12,clearanceY=2,
+    blocks={{x=4,y=0,z=0,name='minecraft:stone',state={}}}},{})
+  local denied=false
+  for _=1,400 do
+    f:cycle()
+    local r=f.apps[12].state.motionReservation
+    if r and r.reason and r.reason:find('active preparation region owned by ',1,true)==1 then denied=true end
+    assert(not require('autobuilder.core.pathfinding').inside(f.worlds[12].pose,q.state.jobs.other.bounds))
+    if j.status=='completed' then break end
+  end
+  assert(denied,'fixture did not encounter the protected region');eq(j.status,'completed')
+  eq(j.report.counts.correct,1);eq(q.state.jobs.other.workerId,99);eq(q.state.jobs.other.status,'running')
+  eq(f.blocks['4,0,0'].name,'minecraft:stone')
+end)
+
+
+test('opposing construction workers pass one another without synchronized detour deadlock',function()
+  local f=fixture({width=20,scaling=true});assert(f.apps[7]:command('fleet limit building 2 4'))
+  for id,x in pairs({[12]=10,[13]=11}) do
+    for axis,value in pairs({x=x,y=2,z=0}) do f.worlds[id].pose[axis]=value;f.apps[id].state.position[axis]=value end
+  end
+  for x=0,20 do f.blocks[x..',0,2']={name='minecraft:stone',state={}} end
+  local q=f.apps[7].automation.queue;local jobs={}
+  for id,x in pairs({[12]=20,[13]=0}) do jobs[#jobs+1]=q:submit('VERIFY',{preferredWorker=id,clearanceY=2,
+    blocks={{x=x,y=0,z=2,name='minecraft:stone',state={}}}},{}) end
+  f.heldBuilder=12
+  for _=1,30 do f:cycle();if jobs[1].workerId and jobs[2].workerId then break end end
+  f.heldBuilder=nil
+  for _=1,800 do f:cycle();if jobs[1].status=='completed' and jobs[2].status=='completed' then break end end
+  assert((f.active.VERIFY or 0)>=2,'fixture did not run opposing workers concurrently')
+  for _,j in ipairs(jobs) do eq(j.status,'completed');eq(j.report.counts.correct,1) end
+  for x=0,20 do eq(f.blocks[x..',0,2'].name,'minecraft:stone') end
+end)

@@ -1083,3 +1083,20 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   The separate native219/220 learning fixture is running with2,000 finite fuel, a staged
   protected obstacle, empty first sector and six stone blocks beyond it. Eight chunks
   are explicitly loaded. Native acceptance and final review/gates remain pending.
+- The larger scaling rerun exposed a separate movement stall: a traffic detour could
+  enter another worker's reserved preparation volume, but that denial did not resume
+  route planning. The worker now recognizes active preparation ownership as a traffic
+  obstacle. A focused actual-runtime regression fails before the fix and passes after,
+  verifying the protected volume remains unentered and its owner unchanged. Runtime,
+  navigation and coordination checks pass. The48-block rerun continues; the same fix
+  is installed on native workers213–216 with checkpointed tasks retained.
+
+- The next larger rerun revealed symmetric traffic detours: opposing workers repeatedly
+  chose the same passing lane, accumulated16 blocked cells and eventually hit terrain
+  or stayed at the detour limit. A two-worker actual-runtime regression reproduces
+  inaccessible verification after this synchronized movement. Navigation now tries a
+  right-side step before its bounded onward search, separating approaching workers.
+  Both workers verify successfully with all physical collision assertions enabled.
+  A full obstacle cache is checkpointed away to permit later traffic changes; it no
+  longer creates an absorbing blocked state. Focused navigation/runtime/coordination
+  checks pass. Native workers213–218 received the fix; larger and final suites restart.
