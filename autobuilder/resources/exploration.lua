@@ -19,6 +19,7 @@ function M.sameBox(a,b)
 end
 function M.validate(c)
   if type(c)~='table' or type(c.enabled)~='boolean' then return nil,'invalid exploration mode' end
+  if c.revision~=nil and (not U.integer(c.revision) or c.revision<0) then return nil,'invalid exploration settings revision' end
   if not c.enabled then return true end
   if not U.position(c.base) or not M.box(c.bounds) or not M.box(c.baseProtection) then return nil,'exploration requires base, bounds and base protection' end
   if not U.integer(c.dimensionMinY) or not U.integer(c.dimensionMaxY) or c.dimensionMinY>c.dimensionMaxY
@@ -45,12 +46,30 @@ function M.sectors(c)
   end
   return out
 end
+function M.surveyCell(b,index)
+  local nx=b.max.x-b.min.x+1; local nz=b.max.z-b.min.z+1; local i=index-1
+  if i>=nx*nz*(b.max.y-b.min.y+1) then return nil end
+  local y=math.floor(i/(nx*nz)); local z=math.floor(i/nx)%nz; local x=i%nx
+  if z%2==1 then x=nx-1-x end
+  return {x=b.min.x+x,y=b.min.y+y,z=b.min.z+z}
+end
+local function coverage(survey)
+  local points={}
+  if survey then
+    for _,p in ipairs(survey.surveyed or {}) do points[P.key(p)]=p end
+    for i=1,(survey.cursor or 1)-1 do local p=M.surveyCell(survey.bounds,i); if p then points[P.key(p)]=p end end
+  end
+  return points
+end
 function M.candidates(records,c,item,start)
   local result={}; local material=assert(Materials.get(item))
   for _,sector in ipairs(M.sectors(c)) do
     local r=records[sector.id] or {}; local survey=(r.surveys or {})[item]
     if not survey or not survey.exhausted or not M.sameBox(survey.bounds,sector.bounds) then
       sector.cursor=survey and M.sameBox(survey.bounds,sector.bounds) and survey.cursor or 1
+      sector.surveyed={}
+      local visited=coverage(survey); local keys={}; for k in pairs(visited) do keys[#keys+1]=k end; table.sort(keys)
+      for _,k in ipairs(keys) do if P.inside(visited[k],sector.bounds) then sector.surveyed[#sector.surveyed+1]=U.copy(visited[k]) end end
       sector.known=false
       for _,p in ipairs(r.observations or {}) do if material.blocks[p.name] and P.inside(p,sector.bounds) then sector.known=true; break end end
       sector.distance=U.distance(start,sector.bounds.min)
@@ -72,11 +91,15 @@ function M.protected(p,boxes)
 end
 function M.plan(sector,ctx)
   local c=ctx.config; local envelope=c.exploration.bounds; local claims={}
+  if #(ctx.protectedAreas or {})>128 then return nil,'Too many protection boxes; combine nearby infrastructure in base protection' end
   for _,j in pairs(ctx.activeJobs or {}) do
     if j.workerId and not j.physicalComplete and j.status~='completed' then
       local g=j.exploration
       if not g then return nil,'territory owned by a fixed miner' end
       if M.overlaps(sector.bounds,g.bounds) then return nil,'sector owned' end
+      for _,path in ipairs({g.route,g.exitRoute or {}}) do
+        for _,p in ipairs(path) do if P.inside(p,sector.bounds) then return nil,'sector contains owned route' end end
+      end
       claims[#claims+1]=g
     end
   end
@@ -85,21 +108,55 @@ function M.plan(sector,ctx)
     for _,g in ipairs(claims) do
       if P.inside(p,g.bounds) then return false end
       for _,r in ipairs(g.route) do if P.key(r)==P.key(p) then return false end end
+      for _,r in ipairs(g.exitRoute or {}) do if P.key(r)==P.key(p) then return false end end
     end
     return true
   end
   local start=ctx.depot
-  for _,p in ipairs(ctx.exitRoute or {}) do if U.distance(start,p)~=1 then return nil,'invalid clear exit route' end; start=p end
+  for _,p in ipairs(ctx.exitRoute or {}) do
+    if U.distance(start,p)~=1 then return nil,'invalid clear exit route' end
+    for _,g in ipairs(claims) do
+      if P.inside(p,g.bounds) then return nil,'exit crosses owned sector' end
+      for _,path in ipairs({g.route,g.exitRoute or {}}) do for _,r in ipairs(path) do
+        if P.key(r)==P.key(p) then return nil,'exit crosses owned route' end
+      end end
+    end
+    start=p
+  end
   local entry={}
   for _,a in ipairs({'x','y','z'}) do entry[a]=math.max(sector.bounds.min[a],math.min(start[a],sector.bounds.max[a])) end
-  if not allowed(start) or not allowed(entry) then return nil,'protected or owned entry' end
-  local route,why=P.find(start,entry,allowed,c.mining.pathBudget)
+  if not P.inside(start,envelope) then return nil,'exit outside exploration envelope' end
+  if not allowed(entry) then
+    local nearest,distance
+    for x=sector.bounds.min.x,sector.bounds.max.x do for y=sector.bounds.min.y,sector.bounds.max.y do for z=sector.bounds.min.z,sector.bounds.max.z do
+      local p={x=x,y=y,z=z}; local d=U.distance(start,p)
+      if allowed(p) and (not distance or d<distance) then nearest=p; distance=d end
+    end end end
+    if not nearest then return nil,'protected or owned entry' end
+    entry=nearest
+  end
+  local lower=U.distance(start,entry)+#(ctx.exitRoute or {})
+  local limit=math.min(math.floor(c.maxTravelDistance),1024)
+  if lower>limit then return nil,'route exceeds travel limit' end
+  if ctx.availableFuel~='unlimited' and ctx.availableFuel<lower*2+c.minimumFuelReserve+c.mining.returnMargin+2 then return nil,'insufficient round-trip fuel' end
+  local route={}; local position=U.copy(start)
+  for _,axis in ipairs({'x','y','z'}) do
+    while position[axis]~=entry[axis] do
+      position[axis]=position[axis]+(entry[axis]>position[axis] and 1 or -1)
+      if not allowed(position) then route=nil; break end
+      route[#route+1]=U.copy(position)
+    end
+    if not route then break end
+  end
+  local why
+  -- ponytail: bounded detour search; a failed candidate gives the next sector a turn.
+  if not route then route,why=P.find(start,entry,allowed,math.min(c.mining.pathBudget,256)) end
   if not route then return nil,why end
   local distance=#route+#(ctx.exitRoute or {})
   if distance>math.min(math.floor(c.maxTravelDistance),1024) then return nil,'route exceeds travel limit' end
   if ctx.availableFuel~='unlimited' and ctx.availableFuel<distance*2+c.minimumFuelReserve+c.mining.returnMargin+2 then return nil,'insufficient round-trip fuel' end
   return {version=1,depot=U.copy(ctx.depot),sectorId=sector.id,bounds=U.copy(sector.bounds),entry=entry,route=route,exitRoute=U.copy(ctx.exitRoute or {}),
-    cursor=sector.cursor or 1,envelope=U.copy(envelope),protectedAreas=U.copy(ctx.protectedAreas or {})}
+    cursor=sector.cursor or 1,surveyed=U.copy(sector.surveyed or {}),envelope=U.copy(envelope),protectedAreas=U.copy(ctx.protectedAreas or {})}
 end
 function M.list(t,limit,valid)
   if type(t)~='table' then return false end
@@ -125,6 +182,7 @@ function M.geometry(g)
   if not P.inside(g.bounds.min,g.envelope) or not P.inside(g.bounds.max,g.envelope) or not P.inside(g.entry,g.bounds) then return false end
   for _,a in ipairs({'x','y','z'}) do if g.bounds.max[a]-g.bounds.min[a]> (a=='y' and 2 or 7) then return false end end
   if #g.route+#g.exitRoute>1024 then return false end
+  if g.surveyed~=nil and not M.list(g.surveyed,192,function(p) return U.position(p) and P.inside(p,g.bounds) end) then return false end
   local p=g.exitRoute[#g.exitRoute] or g.depot
   for _,v in ipairs(g.route) do
     if U.distance(p,v)~=1 or not P.inside(v,g.envelope) or M.protected(v,g.protectedAreas) then return false end; p=v
@@ -151,6 +209,7 @@ function M.cleanGeometry(g)
   for _,k in ipairs({'version','groupId','sectorId','cursor'}) do out[k]=g[k] end
   out.bounds=box(g.bounds); out.envelope=box(g.envelope); out.entry=point(g.entry); out.route={}
   for _,p in ipairs(g.route) do out.route[#out.route+1]=point(p) end
+  if g.surveyed then out.surveyed={}; for _,p in ipairs(g.surveyed) do out.surveyed[#out.surveyed+1]=point(p) end end
   return out
 end
 function M.cleanReport(r)
@@ -162,7 +221,11 @@ function M.record(records,trip,report)
   if not M.report(report) then return nil,'invalid exploration progress' end
   local g=trip.exploration; local r=records[g.sectorId] or {surveys={},observations={}}; records[g.sectorId]=r
   r.surveys=r.surveys or {}; r.observations=r.observations or {}
-  r.surveys[trip.item]={cursor=report.cursor,exhausted=report.result=='survey_exhausted' or report.result=='route_blocked',bounds=U.copy(g.bounds)}
+  local visited=coverage(r.surveys[trip.item])
+  for k,p in pairs(coverage({bounds=g.bounds,cursor=report.cursor,surveyed=g.surveyed})) do visited[k]=p end
+  local keys={}; for k in pairs(visited) do keys[#keys+1]=k end; table.sort(keys)
+  local surveyed={}; for i=1,math.min(192,#keys) do surveyed[#surveyed+1]=U.copy(visited[keys[i]]) end
+  r.surveys[trip.item]={cursor=report.cursor,surveyed=surveyed,exhausted=report.result=='survey_exhausted' or report.result=='route_blocked',bounds=U.copy(g.bounds)}
   local positions={}; for _,p in ipairs(r.observations) do positions[P.key(p)]=p end
   for _,p in ipairs(report.observations) do if P.inside(p,g.bounds) then positions[P.key(p)]={x=p.x,y=p.y,z=p.z,name=p.name} end end
   local keys={}; for k in pairs(positions) do keys[#keys+1]=k end; table.sort(keys)
@@ -179,7 +242,23 @@ function M.protectedAreas(state,config)
   if M.box(config.exploration.baseProtection) then boxes[#boxes+1]=U.copy(config.exploration.baseProtection) end
   for _,w in pairs(state.workers or {}) do
     local h=w.telemetry and w.telemetry.explorationHome
-    if h then for _,b in ipairs(h.protectedAreas) do boxes[#boxes+1]=U.copy(b) end end
+    if h then
+      for _,b in ipairs(h.protectedAreas) do boxes[#boxes+1]=U.copy(b) end
+      local d=h.depot
+      boxes[#boxes+1]={min={x=d.x,y=d.y-1,z=d.z},max={x=d.x,y=d.y+2,z=d.z}}
+      -- A cleared exit is traversal-only. Coalesce straight runs to bound messages.
+      local segment,last,axis,direction
+      for _,p in ipairs(h.exitRoute) do
+        local a,sign
+        if last then for _,k in ipairs({'x','y','z'}) do if p[k]~=last[k] then a=k; sign=p[k]-last[k] end end end
+        if segment and a==axis and sign==direction then
+          for _,k in ipairs({'x','y','z'}) do segment.min[k]=math.min(segment.min[k],p[k]); segment.max[k]=math.max(segment.max[k],p[k]) end
+        else
+          segment={min=point(p),max=point(p)}; boxes[#boxes+1]=segment; axis=a; direction=sign
+        end
+        last=p
+      end
+    end
   end
   return boxes
 end

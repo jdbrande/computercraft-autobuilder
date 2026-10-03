@@ -5,11 +5,12 @@ local M={}
 local phases={setup=true,travel=true,work=true,['return']=true,unload=true,blocked=true,completed=true}
 function M.validate(kind,p)
   if not U.shortString(p.jobId,100) then return false,'invalid job ID' end
+  if p.exploration~=nil and kind~='mine_assign' and kind~='mine_progress' then return false,'unexpected exploration fields' end
   if kind=='mine_assign' then
+    if not Materials.get(p.item) or not U.integer(p.quantity) or p.quantity<1 or p.quantity>1000000 then return false,'invalid mining assignment' end
     if p.returnRequested~=nil and (not p.exploration or type(p.returnRequested)~='boolean') then return false,'invalid return request' end
     if p.exploration and (not E.geometry(p.exploration) or p.quantity>64) then return false,'invalid exploration assignment' end
     if not Materials.validResources(p.miningResources) then return false,'invalid assigned mining resources' end
-    if not Materials.get(p.item) or not U.integer(p.quantity) or p.quantity<1 or p.quantity>1000000 then return false,'invalid mining assignment' end
     if p.miningArea then
       if type(p.miningArea)~='table' or not U.position(p.miningArea.min) or not U.position(p.miningArea.max) then return false,'invalid assigned mining area' end
       for _,axis in ipairs({'x','y','z'}) do if p.miningArea.min[axis]>p.miningArea.max[axis] or p.miningArea.max[axis]-p.miningArea.min[axis]>256 then return false,'invalid assigned mining area' end end
@@ -25,7 +26,8 @@ function M.validate(kind,p)
 end
 function M.clean(kind,p)
   local out={jobId=p.jobId}
-  if p.exploration then out.exploration=kind=='mine_assign' and E.cleanGeometry(p.exploration) or E.cleanReport(p.exploration) end
+  if p.exploration and kind=='mine_assign' then out.exploration=E.cleanGeometry(p.exploration)
+  elseif p.exploration and kind=='mine_progress' then out.exploration=E.cleanReport(p.exploration) end
   if kind=='mine_assign' then
     out.returnRequested=p.returnRequested; out.item=p.item; out.quantity=p.quantity; out.miningResources=U.copy(p.miningResources)
     if p.miningArea then out.miningArea={min={x=p.miningArea.min.x,y=p.miningArea.min.y,z=p.miningArea.min.z},max={x=p.miningArea.max.x,y=p.miningArea.max.y,z=p.miningArea.max.z}} end

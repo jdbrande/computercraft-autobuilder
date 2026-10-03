@@ -21,11 +21,17 @@ function M.new(app,config,e,network,clock)
     self.storage=require('autobuilder.storage.storage').new(e.peripheral,config.storageInventories)
     self.jobs=require('autobuilder.core.jobs').new(s,save,clock,s.id,config)
     if (config.exploration or {}).enabled then
-      if s.exploration.gridBase and not same(s.exploration.gridBase,config.exploration.base) then
+      local gridChanged=s.exploration.gridBase and not same(s.exploration.gridBase,config.exploration.base)
+      local settingsChanged=s.exploration.settingsRevision~=nil and s.exploration.settingsRevision~=(config.exploration.revision or 0)
+        or s.exploration.configuredBounds and not same(s.exploration.configuredBounds,config.exploration.bounds) and not same(s.exploration.bounds,config.exploration.bounds)
+      if gridChanged or settingsChanged then
         for _,j in pairs(s.jobs) do assert(j.physicalComplete or j.status=='completed','Finish exploration work before changing its base grid') end
-        s.exploration.sectors={}; s.exploration.bounds=nil
+        if gridChanged then s.exploration.sectors={} end
+        s.exploration.bounds=nil; s.exploration.configuredBounds=nil
       end
       s.exploration.gridBase=U.copy(config.exploration.base)
+      s.exploration.settingsRevision=config.exploration.revision or 0
+      s.exploration.configuredBounds=s.exploration.configuredBounds or U.copy(config.exploration.bounds)
       if s.exploration.bounds then config.exploration.bounds=U.copy(s.exploration.bounds); assert(E.validate(config.exploration)) end
     end
     function self:refresh()

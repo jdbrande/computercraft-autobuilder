@@ -4,7 +4,7 @@ Candidate: 0.12.0, `feature/autonomous-exploration`.
 
 ## Automated evidence
 
-- Lua suite: 394 tests passed (`.venv/bin/python tests/run.py`).
+- Lua suite: 405 tests passed (`.venv/bin/python tests/run.py`).
 - Python suite: 16 tests ran, one skipped because the optional local source
   schematic is absent from the isolated checkout.
 - Release generation and `python3 tools/release.py --check` passed.
@@ -22,6 +22,18 @@ automatic chunk loading or fuel distribution.
 Focused tests cover partial receipts, changed duplicate assignments, paused or
 disabled dispatch, journaled excavation, low fuel, waterlogged blocks, obstructed
 return, failed ownership checkpoints, project protection and bounded expansion.
+
+The final review identified eight issues. Regression-backed fixes cover malformed
+message rejection before deduplication, sectors overlapping another owner's route,
+bounded planning across ticks, new setup superseding saved expansion, safe returns
+around survey obstacles, registered depot/exit protection, retained coverage after
+clipped-sector expansion, and reopening acquisition after live stock disappears.
+An additional case checks that an unfueled explorer cannot delay a ready worker.
+
+Active routes and exits remain exclusive until return. This favors simple durable
+ownership at the cost of concurrency on shared corridors. Detour planning is
+capped at 256 nodes per candidate; intricate routes may be skipped while other
+sectors are considered.
 
 ## Live Minecraft acceptance: pending
 

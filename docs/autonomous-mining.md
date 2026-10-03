@@ -34,6 +34,11 @@ if setup reports this limit.
 6. Use separate parking places and exits. Miners wait for occupied routes and cannot
    own overlapping search sectors. A narrow shared exit can limit concurrency.
 
+Active trip routes, including declared exits, stay exclusive until the owner
+returns. Completed routes can be reused. Route planning tries at most four sectors
+per controller tick and limits detour searches to 256 nodes (or the configured
+smaller budget); a complicated reachable sector may be reported inaccessible.
+
 Miners return to their own deposit chests to unload. They can refuel through the
 existing configured inventory behavior, but fuel delivery to each station is not
 automatic in this milestone. An insufficiently fueled idle turtle will not be

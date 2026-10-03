@@ -18,6 +18,13 @@ Java 1.20.1 target; existing Python/Lupa tests and Python standard-library tooli
 **Spec:** [Milestone 1 design](autonomous-mining-design.md), governed by the user's
 [full fleet requirements](fleet-requirements.md), especially sections 41 and 42.
 
+**Execution:** All eight tasks implemented on `feature/autonomous-exploration`.
+The final independent review produced eight findings, addressed in one regression
+fix pass. Final evidence: 405 Lua tests; 16 Python tests run, one skipped;
+release checks passed. See [validation and live checklist](validation-autonomous-mining.md).
+Live Minecraft acceptance and branch integration remain pending. The operating
+guide records the exclusive-corridor and bounded-detour implementation decisions.
+
 ## Global constraints
 
 - Sectors are 8 by 8 by 3, with at most 4096 sectors in an envelope.

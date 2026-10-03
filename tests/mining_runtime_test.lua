@@ -264,3 +264,12 @@ test('exploration expansion survives restart and refuses shrinking or oversized 
   c=R.new(cc,ce); assert(c.state.exploration.paused); eq(c.state.exploration.bounds.min.x,-16)
   assert(c:command('exploration resume')); assert(not c.state.exploration.paused)
 end)
+test('fresh exploration setup replaces a saved expansion at the same base',function()
+  local U=require('autobuilder.core.util'); local _,ce,_,_,_,cc=fixture()
+  cc.exploration={enabled=true,base={x=0,y=0,z=0},bounds={min={x=-8,y=0,z=-8},max={x=8,y=2,z=8}},baseProtection={min={x=0,y=-1,z=0},max={x=0,y=-1,z=0}},dimensionMinY=-64,dimensionMaxY=319}
+  local original=U.copy(cc); local R=require('autobuilder.core.runtime'); local c=R.new(cc,ce)
+  assert(c:command('exploration expand 16'))
+  c=R.new(U.copy(original),ce); eq(c.config.exploration.bounds.max.x,16)
+  local fresh=U.copy(original); fresh.exploration.bounds.min.y=10; fresh.exploration.bounds.max.y=12
+  c=R.new(fresh,ce); eq(fresh.exploration.bounds.max.x,8); eq(fresh.exploration.bounds.min.y,10)
+end)

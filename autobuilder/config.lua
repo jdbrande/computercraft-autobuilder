@@ -18,7 +18,7 @@ M.defaults={
   supply={inventory='',side='front',batch=64}, treeFarms={}, farms={}, depotExpansion={}, farmRetrySeconds=60,
   autoDepotExpansion={enabled=false,freeSlots=2},
   scanner={side='left',slot=16,radius=8,ttl=15,cooldown=3,maxCost=0,maxWait=30},
-  exploration={enabled=false,base={},bounds={},baseProtection={},dimensionMinY=-64,dimensionMaxY=319},
+  exploration={enabled=false,revision=0,base={},bounds={},baseProtection={},dimensionMinY=-64,dimensionMaxY=319},
   mining={mode='fixed',exitRoute={},enabled=false,resources={},fallback=true,maxSurveySteps=256,pathBudget=4096,returnMargin=8,fuelTarget=1000},
   allowedMiningBlocks={['minecraft:stone']=true,['minecraft:deepslate']=true,
     ['minecraft:cobblestone']=true,['minecraft:cobbled_deepslate']=true,

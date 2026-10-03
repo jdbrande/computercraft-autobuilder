@@ -212,7 +212,7 @@
       "version": "0.12.0"
     },
     {
-      "bytes": 9815,
+      "bytes": 9826,
       "path": "autobuilder/config.lua",
       "roles": [
         "controller",
@@ -222,7 +222,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "bca6a7300352592b4c7cfee8a26f7dbdcc3b1a905c7c1653386b52f60e21fe4a",
+      "sha256": "12dc18d8d438287f121410f3ada1848fbbc5d4c8e9a03962b9ad1cb23941fb77",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/config.lua",
       "version": "0.12.0"
     },
@@ -327,7 +327,7 @@
       "version": "0.12.0"
     },
     {
-      "bytes": 13843,
+      "bytes": 14651,
       "path": "autobuilder/core/jobs.lua",
       "roles": [
         "controller",
@@ -337,7 +337,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "547619ec9961faa273f0707e0c6ed4841c127dc62173faa02880ba780e98c632",
+      "sha256": "72a56e03c86ae5860d3647495c0053b14f2f6291d510b62cfe506c423ae3db7a",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/jobs.lua",
       "version": "0.12.0"
     },
@@ -357,7 +357,7 @@
       "version": "0.12.0"
     },
     {
-      "bytes": 2859,
+      "bytes": 3054,
       "path": "autobuilder/core/mining_messages.lua",
       "roles": [
         "controller",
@@ -367,12 +367,12 @@
         "logger",
         "courier"
       ],
-      "sha256": "fc98c89a012673f54896fea31e8997579025e416b0a93b5eebb3e8da776ac677",
+      "sha256": "c93ed92034c937e8e34f6ca061e8f951c16ae59563d7fe11a7d4983d42b4a32e",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/mining_messages.lua",
       "version": "0.12.0"
     },
     {
-      "bytes": 17332,
+      "bytes": 17938,
       "path": "autobuilder/core/mining_service.lua",
       "roles": [
         "controller",
@@ -382,7 +382,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "37f34db4187fc446e7e8fc2c90fd915d05d7ba27559d2af94bdd9311354830c0",
+      "sha256": "b21ebf0d56f61cfcbf5fbb2b150f4d4b9be588a48c9c7b4fbee95a331bcc9515",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/mining_service.lua",
       "version": "0.12.0"
     },
@@ -731,7 +731,7 @@
       "version": "0.12.0"
     },
     {
-      "bytes": 10855,
+      "bytes": 15260,
       "path": "autobuilder/resources/exploration.lua",
       "roles": [
         "controller",
@@ -741,7 +741,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "74806aa1cc91ad87a000ebb5244139621ad8add74e61ebc780e86d3700e8eba4",
+      "sha256": "97b933ab128a5fb6361b4f5c404e276474b63958df08422908c15e6c553e449d",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/resources/exploration.lua",
       "version": "0.12.0"
     },
@@ -791,7 +791,7 @@
       "version": "0.12.0"
     },
     {
-      "bytes": 18627,
+      "bytes": 18974,
       "path": "autobuilder/resources/miner.lua",
       "roles": [
         "controller",
@@ -801,7 +801,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "73e41b0d3a6e082dcc97509be6eaef5c9fa6d06469e670335003f8e3a779bc09",
+      "sha256": "809979550bc173c55298b60885fef4859aa145e3652bb834ce09721a7108b2d7",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/resources/miner.lua",
       "version": "0.12.0"
     },
@@ -851,7 +851,7 @@
       "version": "0.12.0"
     },
     {
-      "bytes": 28989,
+      "bytes": 29044,
       "path": "autobuilder/setup_wizard.lua",
       "roles": [
         "controller",
@@ -861,7 +861,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "d0047416332fbf67af6f8d729a8c506bb9182bfc66a5b5e15aadcdb7809a57c6",
+      "sha256": "82782c39b42696aaf99f3800359df9ea3dc1334dcc4dd6534e6c16b00a05f190",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/setup_wizard.lua",
       "version": "0.12.0"
     },

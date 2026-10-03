@@ -14,6 +14,20 @@ test('exploration protocol retains owned geometry and refuses malformed routes',
   p=assignment(); p.exploration.route[1]=p.exploration; assert(not MM.validate('mine_assign',p))
   p=assignment(); p.exploration.version=2; assert(not MM.validate('mine_assign',p))
 end)
+test('network rejects malformed exploration fields before copying or deduplication',function()
+  local N=require('autobuilder.core.network').new({}, {protocol='test'},1,1)
+  local p=assignment()
+  local cases={}
+  for _,kind in ipairs({'mine_ack','mine_resume','mine_return'}) do
+    cases[#cases+1]={kind=kind,payload={jobId=p.jobId,exploration={}}}
+  end
+  for _,quantity in ipairs({false,'64',{},0/0}) do local a=assignment(); a.quantity=quantity; cases[#cases+1]={kind='mine_assign',payload=a} end
+  local a=assignment(); a.quantity=nil; cases[#cases+1]={kind='mine_assign',payload=a}
+  for _,c in ipairs(cases) do
+    local ok,result=pcall(N.accept,N,2,{version=1,sender=2,boot=1,sequence=1,id='2:1:1',type=c.kind,payload=c.payload},'test',0)
+    assert(ok,'malformed message threw'); eq(result,nil); eq(N:cacheSize(),0)
+  end
+end)
 test('exploration partial results and return requests use bounded report fields',function()
   local p={jobId='mine:1:1:1',phase='completed',delivered=3,held=0,exploration={result='survey_exhausted',cursor=193,clearedRouteCount=1,observations={}}}
   assert(MM.validate('mine_progress',p)); assert(MM.clean('mine_progress',p).exploration)

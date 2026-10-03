@@ -12,13 +12,14 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
   assert(Materials.get(task.item) and U.integer(task.quantity) and task.quantity>0,'invalid mining task')
   local g=task.exploration
   local c=config.mining; local pose=nav.pose; local t=hw.turtle
-  local routeCells,exitCells,travel={},{},{}
+  local routeCells,exitCells,travel,surveyed={},{},{},{}
   if g then
     assert(E.geometry(g),'invalid saved exploration geometry')
     c=U.copy(config.mining); c.bounds=g.bounds; c.entry=g.entry
     for _,p in ipairs(g.exitRoute) do travel[#travel+1]=p; exitCells[P.key(p)]=true end
     exitCells[P.key(g.depot)]=true
     for _,p in ipairs(g.route) do travel[#travel+1]=p; routeCells[P.key(p)]=true end
+    for _,p in ipairs(g.surveyed or {}) do surveyed[P.key(p)]=true end
     task.explorationProgress=task.explorationProgress or {cursor=g.cursor,observations={},clearedRouteCount=0}
     task.survey=task.explorationProgress.cursor
     nav.clearExit=function(p) return task.phase~='completed' and exitCells[P.key(p)]==true end
@@ -160,11 +161,7 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
   local function surveyTarget()
     local b=c.bounds
     if g then
-      local nx=b.max.x-b.min.x+1; local nz=b.max.z-b.min.z+1; local i=task.survey-1
-      if i>=nx*nz*(b.max.y-b.min.y+1) then return nil end
-      local y=math.floor(i/(nx*nz)); local z=math.floor(i/nx)%nz; local x=i%nx
-      if z%2==1 then x=nx-1-x end
-      return {x=b.min.x+x,y=b.min.y+y,z=b.min.z+z}
+      return E.surveyCell(b,task.survey)
     end
     local row=math.floor((task.survey-1)/2); local edge=(task.survey-1)%2
     local direction=c.entry.z==b.max.z and b.min.z<b.max.z and -1 or 1
@@ -227,7 +224,7 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
       if not task.target then
         if not g and task.surveySteps>=c.maxSurveySteps then return startReturn('survey exhausted') end
         local target=surveyTarget()
-        while target and same(target,pose) do task.survey=task.survey+1; target=surveyTarget() end
+        while target and (same(target,pose) or g and (surveyed[P.key(target)] or restricted(target) or avoided[P.key(target)])) do task.survey=task.survey+1; target=surveyTarget() end
         if not target then return startReturn('survey exhausted') end
         task.target=target; task.surveying=true
       else task.surveying=false end
@@ -237,7 +234,10 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
     if not route or routeTarget~=P.key(task.target) or #route==0 or U.distance(pose,route[1])~=1 then
       local err; route,err=P.find(pose,task.target,passable,c.pathBudget)
       routeTarget=P.key(task.target)
-      if not route or #route==0 then return block(err or 'target unreachable') end
+      if not route or #route==0 then
+        if g then return startReturn('route_blocked') end
+        return block(err or 'target unreachable')
+      end
     end
     local nextPosition=route[1]
     local ok,why=move(nextPosition,'work')
@@ -255,7 +255,15 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
     elseif same(pose,task.target) then task.target=nil end
     return persist()
   end
-  function self:requestReturn() task.returnRequested=true; return persist() end
+  function self:requestReturn()
+    task.returnRequested=true
+    if g and task.phase=='blocked' and (task.resumePhase=='work' or task.resumePhase=='travel')
+      and pose.known and not pose.pending and not pose.uncertain and not task.pendingMove and not task.digIntent and not task.depositIntent
+      and #task.trail>0 and same(pose,task.trail[#task.trail]) then
+      task.error=nil; return startReturn('paused')
+    end
+    return persist()
+  end
   function self:resume()
     if task.phase~='blocked' then return false,'task is not blocked' end
     if scanner.recover then local ok,err=scanner:recover(); if not ok then return false,err end end

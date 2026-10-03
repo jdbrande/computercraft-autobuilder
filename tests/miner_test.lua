@@ -141,6 +141,23 @@ test('explorer digs assigned route and returns a measured partial survey result'
   local m=explorer(w); assert(run(m,w,2000)); eq(m.task.delivered,1); eq(w.pose.x,0)
   eq(m.task.explorationProgress.result,'survey_exhausted'); eq(w.stock['minecraft:raw_iron'],1)
 end)
+test('explorer skips forbidden survey cells and can return from a reconciled outward block',function()
+  local w=W.new(); w.blocks['3,0,0']='minecraft:bedrock'; local m=explorer(w)
+  assert(run(m,w,2000)); eq(w.pose.x,0); eq(w.blocks['3,0,0'],'minecraft:bedrock')
+  w=W.new(); m=explorer(w); for _=1,5 do assert(m:step()) end
+  m.task.resumePhase='work'; m.task.phase='blocked'; m.task.error='no safe path'
+  assert(m:requestReturn()); assert(run(m,w)); eq(w.pose.x,0)
+  w=W.new(); m=explorer(w); m.task.phase='blocked'; m.task.resumePhase='return'; m.task.error='obstructed return'
+  assert(m:requestReturn()); assert(not m:step()); eq(m.task.phase,'blocked')
+end)
+test('explorer does not revisit covered survey cells after clipped expansion',function()
+  local w=W.new(); local m=explorer(w); local task=U.copy(m.task)
+  task.exploration.surveyed={{x=3,y=0,z=0}}; w.peripheral.getType=function() return nil end
+  m=explorer(w,task)
+  for _=1,10 do assert(m:step()); if task.phase=='work' then break end end
+  assert(m:step()); assert(task.survey>=3,'survey selected already covered cell')
+  assert(run(m,w,2000))
+end)
 test('explorer inspection fallback surveys all layers and respects safe return request',function()
   local w=W.new(); w.peripheral.getType=function() return nil end; w.blocks['3,1,1']='minecraft:iron_ore'
   local m=explorer(w); assert(run(m,w,2000)); eq(m.task.delivered,1)

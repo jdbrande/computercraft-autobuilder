@@ -258,6 +258,7 @@ local function explorationController(e,overrides,config)
   e.print('Protected base: '..describe(low)..' through '..describe(high))
   e.print('Software does not load chunks. Keep every search cell and depot loaded and within modem coverage.')
   if not yes(e,'Is this operating boundary loaded, reachable and protected as shown? yes/no') then return false end
+  chosen.revision=(config.exploration.revision or 0)+1
   overrides.exploration=chosen; return true
 end
 local function miner(e,overrides,config,resource)

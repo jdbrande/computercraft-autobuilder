@@ -120,9 +120,10 @@ but may never excavate protected cells. This removes the current requirement for
 a player-cleared route to each individual mine.
 
 Save the sector and access-route excavation claims before dispatch. Never overlap
-another miner's owned search sector or uncompleted excavation route. Previously
-confirmed clear passages can be shared using existing cell movement reservations;
-an occupied passage waits without digging the occupying turtle. Route length must
+another miner's owned search sector or uncompleted excavation route. This candidate
+keeps active routes and declared exits exclusive until return; completed passages
+can be reused. Sharing active cleared corridors remains a throughput improvement.
+An occupied passage waits without digging the occupying turtle. Route length must
 fit the available round-trip fuel budget, including the existing reserve, and
 cannot exceed `maxTravelDistance`. Route messages are bounded by that same limit.
 

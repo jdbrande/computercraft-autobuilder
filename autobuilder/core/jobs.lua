@@ -58,11 +58,14 @@ function M.new(state,save,clock,controllerId,config)
   function self:refreshAcquisition(id,stock)
     local g=assert(exploration.groups[id]); local active=false
     for _,jid in ipairs(g.tripIds) do local j=state.jobs[jid]; if j and not j.physicalComplete then active=true end end
-    if stock>=g.target and not active then g.status='completed'; g.error=nil end
+    if stock>=g.target and not active then g.status='completed'; g.error=nil
+    elseif g.status=='completed' then g.status='running'; g.error=nil end
     return g
   end
+  local planning={}
   local function assignExploration(workers,counts)
     if not config or not (config.exploration or {}).enabled or exploration.paused or Coordination.factoryPending(state) or not counts then return end
+    local attempts=0
     local groups={}; for _,g in pairs(exploration.groups) do if not g.paused and g.status~='completed' then groups[#groups+1]=g end end
     table.sort(groups,function(a,b) return a.id<b.id end)
     local ids={}; for _,w in pairs(workers) do ids[#ids+1]=w.id end; table.sort(ids)
@@ -77,18 +80,28 @@ function M.new(state,save,clock,controllerId,config)
           if w.online and t and t.capabilities and t.capabilities.explorationV1 and E.home(t.explorationHome)
             and Materials.accepts(t.miningResources,g.item) and t.status=='idle' and not t.task and not Coordination.workerBusy(state,w.id) then eligible=eligible+1 end
         end
-        local reason='No online exploration-capable worker'; local waiting=false
-        for _,wid in ipairs(ids) do
+        local cursor=planning[g.id] or {worker=1,sector=1}
+        local reason=cursor.reason or 'No online exploration-capable worker'; local waiting=cursor.waiting or false
+        for wi=cursor.worker,#ids do
+          local wid=ids[wi]
           local w=workers[tostring(wid)]; local t=w.telemetry; local home=t and t.explorationHome
           if w.online and t and t.capabilities and t.capabilities.explorationV1 and E.home(home) and Materials.accepts(t.miningResources,g.item) then
-            if t.status=='idle' and not t.task and not Coordination.workerBusy(state,wid) then
+            if t.fuel~='unlimited' and t.fuel<2*#home.exitRoute+config.minimumFuelReserve+config.mining.returnMargin+2 then
+              reason='insufficient round-trip fuel for worker '..wid
+            elseif t.status=='idle' and not t.task and not Coordination.workerBusy(state,wid) then
               local choices=E.candidates(exploration.sectors,config.exploration,g.item,home.exitRoute[#home.exitRoute] or home.depot)
               reason='Search envelope exhausted for '..g.item
-              for _,sector in ipairs(choices) do
-                local areas=E.protectedAreas(state,config)
-                for _,b in ipairs(home.protectedAreas) do areas[#areas+1]=b end
+              local areas=E.protectedAreas(state,config)
+              for _,b in ipairs(home.protectedAreas) do areas[#areas+1]=b end
+              for ci=cursor.sector,#choices do
+                if attempts>=4 then
+                  planning[g.id]={worker=wi,sector=ci,reason=reason,waiting=waiting}
+                  g.status='running'; g.error='Planning reachable search sectors'; return
+                end
+                attempts=attempts+1; local sector=choices[ci]
                 local geometry,why=E.plan(sector,{config=config,depot=home.depot,exitRoute=home.exitRoute,protectedAreas=areas,activeJobs=state.jobs,availableFuel=t.fuel})
                 if geometry then
+                  planning[g.id]=nil
                   local j=create(g.item,math.min(64,math.ceil(remaining/math.max(1,eligible))),0); geometry.groupId=g.id
                   j.exploration=geometry; j.workerId=wid; j.miningArea=U.copy(geometry.bounds); j.miningResources=U.copy(t.miningResources or {}); j.status='assigned'
                   g.tripIds[#g.tripIds+1]=j.id; g.status='running'; g.error=nil
@@ -100,7 +113,9 @@ function M.new(state,save,clock,controllerId,config)
               end
             else waiting=true end
           end
+          cursor.sector=1
         end
+        planning[g.id]=nil
         g.status=waiting and 'running' or 'blocked'; g.error=reason
       end
     end
