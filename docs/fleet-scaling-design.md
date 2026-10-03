@@ -93,3 +93,7 @@ the role limit. Hauling bootstrap estimates include the round trip between priva
 endpoints. Stationary crafting does not require movement fuel. Final grants recheck
 idle state, capabilities and role capacity after yielding observations. Stock staging
 uses the same limits, and existing staged batches retain their owners through drain.
+
+Region lookahead exposes two candidates per eligible worker, with a four-region
+floor and64-region ceiling, so the one-cell separation rule can admit alternating
+regions without leaving useful workers idle behind neighboring queued regions.

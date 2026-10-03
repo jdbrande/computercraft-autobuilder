@@ -184,7 +184,9 @@ end
 function M.window(state,c,role)
   local n=0
   for _,w in pairs(state.workers or {}) do if w.online and capable(w,role) then n=n+1 end end
-  return math.max(4,math.min(64,M.limits(state,c,role).max,n))
+  -- Neighboring regions retain a one-cell safety gap. Expose alternate regions
+  -- so a queue sized to the fleet does not halve useful physical concurrency.
+  return math.max(4,math.min(64,2*math.min(M.limits(state,c,role).max,n)))
 end
 function M.update(state,c,counts,now,save)
   local view=M.snapshot(state,c,counts,now);local fleet=U.copy(state.fleet or {metrics={}})

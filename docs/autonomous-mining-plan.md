@@ -992,7 +992,7 @@ admission and a concrete reason. It never changes ownership.
 
 **Interfaces:** Task46 admission is called before planning and again immediately
 before durable ownership, including after yielding loaded-area observations.
-`Scaling.window(state,config,role)` returns a bounded producer window (1..64).
+`Scaling.window(state,config,role)` returns a bounded producer window (4..64), with two region candidates per worker.
 
 - [x] Add failing queue/runtime tests: configured role caps across both ownership
   queues, shared-material exploration quota splitting, specialized-worker preference,

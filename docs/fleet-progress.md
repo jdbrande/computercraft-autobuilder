@@ -997,3 +997,18 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   reservation checks after traffic clears. Another regression corrected private
   crafting rates to use collected output and factory start/completion timestamps.
   Both focused regressions pass; the larger construction rerun is still pending.
+
+- Native0.24 fixture212–218 is running a48-block mixed cobblestone/glass project on
+  uneven terrain. Only builder213 and miner217 began powered on; after each owned
+  automatic work, builders214–216 and miner218 joined through ordinary registration.
+  Two miners and multiple surveyors became active without assignment commands.
+  Initial stock contains16 glass, no cobblestone; placed stone deposits supply the
+  missing structure/foundation material. Six workers each started with20,000 finite
+  fuel. The operator explicitly loaded18 chunks and supplied separate private endpoints.
+- Native survey observations exposed underutilization from one queued neighboring
+  region per worker. A regression admitted only two of four useful builders; exposing
+  two candidates per worker (still bounded4..64) admits four separated regions while
+  retaining every existing conflict check. Scaling/site/coordination tests pass.
+  The long construction rerun was superseded by this producer-window change and is
+  now running with periodic diagnostic snapshots; its earlier interrupted run is
+  not passing evidence. Initial Python gate passed all18 tests.

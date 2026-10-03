@@ -702,7 +702,7 @@
       "version": "0.24.0"
     },
     {
-      "bytes": 14425,
+      "bytes": 14596,
       "path": "autobuilder/core/scaling.lua",
       "roles": [
         "controller",
@@ -712,7 +712,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "19fc7785b6c5b378931a799f2eff6e4eb442bb5290ca81016263491ae7b58839",
+      "sha256": "f1b0c647c391c5b9d40886ffc7acbd87b85b3ae36bd0febb41de740d3fca57bf",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/scaling.lua",
       "version": "0.24.0"
     },

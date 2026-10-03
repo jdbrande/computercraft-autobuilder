@@ -150,7 +150,7 @@ test('stationary crafting remains useful without movement fuel and larger fleets
   for _,w in pairs(s.workers) do w.telemetry.fuel=0 end
   job(s,'craft','CRAFT',100);eq(S.snapshot(s,c,{},100).crafting.idle,12)
   eq(S.snapshot(s,c,{},100).building.idle,0)
-  eq(S.window(s,c,'clearing'),12);c.scaling.roles.clearing.max=6;eq(S.window(s,c,'clearing'),6)
+  eq(S.window(s,c,'clearing'),24);c.scaling.roles.clearing.max=6;eq(S.window(s,c,'clearing'),12)
 end)
 
 test('delivery rates include collection after worker completion and exclude unfinished private stock',function()
@@ -218,4 +218,18 @@ test('private crafting rates use centrally collected output and the durable fact
   j.factoryStartedAt=10;j.assignedAt=15;j.completedAt=20;j.factoryCompletedAt=30
   j.factoryFlow={collect={delivered=8}}
   assert(S.record(s,j,function() return true end,100));eq(s.fleet.metrics.crafting.units,8);eq(s.fleet.metrics.crafting.seconds,20)
+end)
+
+
+test('region lookahead exposes enough separated work for every useful builder',function()
+  local s,c=fixture(4);local S=require('autobuilder.core.scaling')
+  s.automation.projects.large={phase='building',total=1000,completed=0}
+  for i=1,S.window(s,c,'building') do
+    local j=job(s,'region'..i,'BUILD',4);j.project='large';j.created=i;j.requiredCapability='building'
+    j.bounds={min={x=4*i,y=1,z=0},max={x=4*i+3,y=3,z=0}}
+  end
+  local q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+  for _=1,4 do q:assign(s.workers) end
+  local n=0;for _,j in pairs(s.automation.jobs) do if j.workerId then n=n+1 end end
+  eq(n,4)
 end)

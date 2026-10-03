@@ -51,3 +51,7 @@ share a checkpoint, preventing duplicate samples after restart. Old jobs without
 durable work-start timestamp do not contribute fabricated durations.
 
 Implementation and acceptance progress is recorded in [fleet progress](fleet-progress.md).
+
+Region lookahead exposes two candidates per eligible worker, with a four-region
+floor and64-region ceiling, so the one-cell separation rule can admit alternating
+regions without leaving useful workers idle behind neighboring queued regions.
