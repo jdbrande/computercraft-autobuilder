@@ -874,9 +874,9 @@ network/task messages, `tests/home_return_test.lua`, suite registration.
 **Files:** `core/return_service.lua`, production/automation/workflows, nodes/chunks,
 config capability negotiation and actual runtime tests.
 
-- [ ] Add failing explicit return scheduling, native capacity, atomic failure,
+- [x] Add failing explicit return scheduling, native capacity, atomic failure,
   unavailable worker, endpoint change and exact central-receipt tests.
-- [ ] Implement durable return requests, exclusive buffer/output capacity and count
+- [x] Implement durable return requests, exclusive buffer/output capacity and count
   claims, monotone deposit receipts and controller collection before final task ack.
   Run actual runtime restarts/lost messages and ownership contention regressions.
 

@@ -9,6 +9,7 @@ function M.new(app,config,e,queue)
   self.ledger=require('autobuilder.storage.ledger').new(app.state,save)
   self.parallel=require('autobuilder.factory.parallel').new(app,config,e,queue,self)
   self.logistics=require('autobuilder.core.logistics_service').new(app,config,e,queue,self)
+  self.returns=require('autobuilder.core.return_service').new(app,config,e,queue,self)
   function self:request(requirements,key,options)
     options=options or {}
     assert(type(requirements)=='table' and next(requirements),'resource request needs item quantities')
@@ -42,12 +43,18 @@ function M.new(app,config,e,queue)
     return ok,why
   end
   function self:acceptReceipt(job,receipt)
-    if job.privateStation or job.logistics then return true end -- worker receipts describe private stock, not central delivery
+    if job.privateStation or job.logistics or job.returning then return true end -- worker receipts describe private stock, not central delivery
     if not job.stockInputs then return true end -- exclusive legacy job
     local ok,err=pcall(self.ledger.receipt,self.ledger,job.id,receipt.withdrawn,receipt.delivered,receipt.transit or {},receipt.sequence)
     return ok,not ok and tostring(err) or nil
   end
   local function localReceipt(job)
+    if job.returning then
+      local delivered,sequence={},0
+      for item,flow in pairs(job.returnFlow.collect) do delivered[item]=flow.delivered or 0;sequence=sequence+(flow.stockSequence or 0) end
+      if sequence>0 then return {withdrawn={},delivered=delivered,sequence=sequence} end
+      return
+    end
     if job.logistics then
       local f=job.logisticsFlow;if not f then return end
       local sequence=(f.stage.stockSequence or 0)+(f.collect.stockSequence or 0)
@@ -86,7 +93,7 @@ function M.new(app,config,e,queue)
           -- Older Crafty workers can acknowledge completion without counters.
           -- Their exclusive job completion already guarantees exact output.
           if not require('autobuilder.factory.factory').equal(lease.delivered,j.stockOutputs) then
-            assert(not j.privateStation and not j.logistics,'private output has not reached shared storage')
+            assert(not j.privateStation and not j.logistics and not j.returning,'private output has not reached shared storage')
             local withdrawn=j.type=='CRAFT' and j.stockInputs or lease.withdrawn
             self.ledger:receipt(j.id,withdrawn,j.stockOutputs,{},lease.sequence+1)
           end
@@ -95,7 +102,7 @@ function M.new(app,config,e,queue)
       end
     end
     if allowGrant==false then return end
-    for _,j in ipairs(jobs) do if j.status~='completed' and not j.logistics and not j.privateStation and not self.ledger.state.leases[j.id] then
+    for _,j in ipairs(jobs) do if j.status~='completed' and not j.logistics and not j.privateStation and not j.returnManaged and not self.ledger.state.leases[j.id] then
       local lease,why=self.ledger:reserve(j.id,j.stockInputs,j.stockOutputs,
         app.mining.storage.valid and app.mining.storage.counts or nil,{protected=j.type=='FUEL_STATION' and {} or config.turtleFuelReserveItems})
       if j.stockError~=why then j.stockError=why; save() end
@@ -398,6 +405,7 @@ function M.new(app,config,e,queue)
   local function step()
     for id in pairs(self.machines) do if not s.jobs[id] then self.machines[id]=nil end end
     if app.state.assignmentRecovery then return true end
+    if self.returns:step() then return true end
     if self.logistics:step() then return true end
     if self.parallel:step() then return true end
     local all={}

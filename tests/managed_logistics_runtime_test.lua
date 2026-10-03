@@ -98,3 +98,38 @@ test('operator haul and logistics commands expose managed node progress',functio
   eq(app.state.automation.hauls['haul:1'].quantity,8)
   assert(app:command('logistics'));eq(app.state.view,'logistics');assert(app.state.logisticsLines[1]:find('nodes=2',1,true))
 end)
+
+test('native runtime home return settles mixed cargo after drop and collection reboots before acknowledgement',function()
+  local f=fixture();local w=f.worlds[12];local t=w.turtle
+  w.items={[1]={name='minecraft:stone',count=5},[2]={name='minecraft:dirt',count=3},[15]={name='minecraft:coal',count=2}}
+  f.configs[12].depot={x=2,y=1,z=0};f:reboot(12)
+  local cutDrop=true;local dropped=0
+  t.dropDown=function(n)
+    assert(w.pose.x==2 and w.pose.y==1 and w.pose.z==0,'return dropped outside depot')
+    local v=w.items[w.selected];local inv=f.inventories.a;local slot
+    for i=1,3 do if not inv[i] or inv[i].name==v.name and inv[i].count<64 then slot=i;break end end
+    if not slot then return false end
+    local moved=math.min(n,v.count,64-(inv[slot] and inv[slot].count or 0));local name=v.name
+    inv[slot]=inv[slot] or {name=name,count=0};inv[slot].count=inv[slot].count+moved;v.count=v.count-moved
+    if v.count==0 then w.items[w.selected]=nil end;dropped=dropped+moved
+    if cutDrop then cutDrop=false;error('power loss after home drop') end;return true
+  end
+  f:cycle();local ok,id=f.apps[7]:command('worker return 12');assert(ok,id)
+  local rebooted,collection=false,false;f.loseAck=true;f.partial=2
+  for _=1,600 do
+    f:cycle();local task=f.apps[12].state.currentTask
+    if not rebooted and task and task.homeCargo and task.homeCargo.intent then
+      f:reboot(12);f:reboot(7);rebooted=true;f.crashTransfer=true
+    end
+    if f.crashed and not collection then f:reboot(7);collection=true end
+    local r=f.apps[7].state.automation.returns[id]
+    if r.status=='completed' and not f.apps[12].state.currentTask then break end
+  end
+  local r=f.apps[7].state.automation.returns[id];eq(r.status,'completed');assert(rebooted and collection)
+  eq(dropped,8);eq(F.count(f.inventories.base,'minecraft:stone'),29);eq(F.count(f.inventories.base,'minecraft:dirt'),10)
+  eq(next(f.inventories.a),nil);eq(w.items[1],nil);eq(w.items[2],nil);eq(w.items[15].count,2)
+  eq(w.pose.x,2);eq(w.pose.y,1);eq(w.pose.z,0);assert(w.fuel<2000 and w.fuel>0)
+  local j=f.apps[7].state.automation.jobs[r.jobId];eq(j.status,'completed')
+  eq(f.apps[7].state.capacityLedger.leases[j.id].status,'released');eq(f.apps[7].state.inventoryLedger.leases[j.id].status,'released')
+  local receipt=f.apps[12].state.completedTasks[j.id];eq(receipt.homeReceipt.deposited['minecraft:stone'],5)
+end)

@@ -28,6 +28,9 @@ function M.new(app,config,e,network,clock)
   function self:command(line)
     local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
     if args[1]=='fuel' then app.state.view='fuel'; return true,fuel:describe()
+    elseif args[1]=='worker' and args[2]=='return' then
+      assert(#args==3,'Usage: worker return <id>');return true,production.returns:request(tonumber(args[3])).id
+    elseif args[1]=='returns' then return true,production.returns:describe()
     elseif args[1]=='logistics' then app.state.view='logistics';return true,production.logistics:describe()
     elseif args[1]=='haul' then
       assert(#args==5,'Usage: haul <item> <count> <source-node> <destination-node>')
@@ -77,6 +80,7 @@ function M.new(app,config,e,network,clock)
       if p.stockReceipt then local ok,err=production:acceptReceipt(j,p.stockReceipt); if not ok then return false,err end end
       local ok,err=queue:progress(sender,p); if not ok then return false,err end
       if p.phase~='paused' and p.phase~='blocked' then j.resumeRequested=nil end
+      if j.returning and j.workerFinished and j.status~='completed' then return true end
       if j.status=='completed' or j.workerFinished then
         j.completedAt=j.completedAt or clock()
         j.blocks=nil; app:save(); return send(sender,'task_ack',{jobId=j.id})

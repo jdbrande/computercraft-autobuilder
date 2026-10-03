@@ -63,6 +63,9 @@ end
 local function owned(state,visit)
   for _,job in pairs((state.automation or {}).jobs or {}) do
     local lease=(state.capacityLedger or {}).leases and state.capacityLedger.leases[job.id]
+    if job.returning and (job.status~='completed' or lease and lease.status=='held') then
+      local c=job.returning;visit({source=c.node,destination=c.node,pickup=c.buffer,drop=c.buffer})
+    end
     if job.logistics and (job.status~='completed' or lease and lease.status=='held') then visit(job.logistics) end
   end
 end
@@ -83,7 +86,7 @@ function M.validateSaved(config,state)
       local job=(state.automation or {}).jobs and state.automation.jobs[id]
       for name,node in pairs(lease.nodes) do
         if node.exclusive and reserved[name] then
-          assert(job and job.logistics and (job.logistics.pickup.inventory==name or job.logistics.drop.inventory==name),
+          assert(job and (job.logistics and (job.logistics.pickup.inventory==name or job.logistics.drop.inventory==name) or job.returning and job.returning.buffer.inventory==name),
             'owned private inventory cannot become logistics buffer: '..name)
         end
       end

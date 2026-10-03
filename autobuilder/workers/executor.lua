@@ -4,6 +4,9 @@ local M={}
 local function transportReceipt(t)
   if t.logistics then return {sequence=t.transportSequence or 0,pickedUp=t.pickedUp or 0,delivered=t.delivered or 0} end
 end
+local function homeReceipt(t)
+  if t.returning then return {sequence=t.homeCargo and t.homeCargo.sequence or 0,deposited=U.copy(t.homeCargo and t.homeCargo.deposited or {})} end
+end
 local construction={BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true}
 local modules={RETURN_HOME='autobuilder.workers.home',RESCUE='autobuilder.workers.fuel_courier',BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',
   CRAFT='autobuilder.factory.crafting',TRANSPORT='autobuilder.workers.courier',HARVEST='autobuilder.resources.logger',FARM='autobuilder.resources.farmer'}
@@ -129,9 +132,16 @@ function M.new(app,config,e,network,clock)
     end
     if m.type=='task_assign' then
       local j=p.job; local done=s.completedTasks[j.id]
-      if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report,transportReceipt=done.transportReceipt}) end
+      if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report,transportReceipt=done.transportReceipt,homeReceipt=done.homeReceipt}) end
       if require('autobuilder.core.receipts').archived(s,'completedTasks',j.id) then return false,'Old acknowledged task was archived; restore the matching controller checkpoint' end
       local covered,why=require('autobuilder.core.chunks').workerAccept(config,s,j);if not covered then return false,why end
+      if t and (t.returning or j.returning) then
+        for _,field in ipairs({'returning','home','stockInputs','stockOutputs'}) do
+          if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed home return assignment' end
+        end
+      end
+      if j.returnManaged and (j.workerId~=s.id or j.preferredWorker~=s.id or not U.position(j.home)
+        or not U.position(config.depot) or U.distance(j.home,config.depot)~=0) then return false,'home assignment differs from worker depot or identity' end
       if t and (t.logistics or j.logistics) then
         for _,field in ipairs({'logistics','source','destination','item','quantity','stockInputs','stockOutputs'}) do
           if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed managed transport assignment' end
@@ -146,7 +156,7 @@ function M.new(app,config,e,network,clock)
     end
     if not t or t.id~=p.jobId then return false,'task ID mismatch' end
     if m.type=='task_ack' and t.phase=='completed' then
-      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report),transportReceipt=transportReceipt(t)})
+      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report),transportReceipt=transportReceipt(t),homeReceipt=homeReceipt(t)})
       s.currentTask=nil; self.engine=nil; s.status='idle'; save(); return true
     elseif m.type=='task_pause' then t.paused=true; save(); return true
     elseif m.type=='task_resume' then
@@ -180,8 +190,7 @@ function M.new(app,config,e,network,clock)
     if t.type=='CRAFT' and t.production and t.production.stockSequence then
       stockReceipt={sequence=t.production.stockSequence,withdrawn=U.copy(t.production.withdrawn or {}),delivered={[t.item]=t.production.delivered or 0}}
     end
-    local homeReceipt=t.returning and {sequence=t.homeCargo and t.homeCargo.sequence or 0,deposited=U.copy(t.homeCargo and t.homeCargo.deposited or {})} or nil
-    send('task_progress',{homeReceipt=homeReceipt,transportReceipt=transportReceipt(t),fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
+    send('task_progress',{homeReceipt=homeReceipt(t),transportReceipt=transportReceipt(t),fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
       missingItem=t.supplyRequest and t.supplyRequest.item or t.missingItem,
       missingCount=t.supplyRequest and t.supplyRequest.count or t.missingCount,supplyId=t.supplyRequest and t.supplyRequest.id,report=Reports.compact(t.report)})
     return true

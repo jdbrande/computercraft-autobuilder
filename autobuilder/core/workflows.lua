@@ -20,7 +20,7 @@ function M.workerBusy(state,owner,exceptId)
   for _,job in pairs((state.automation or {}).jobs or {}) do
     if job.id~=exceptId and job.type=='RESCUE' and not job.rescueSettled
       and (job.preferredWorker==owner and job.status~='completed' or job.targetWorker==owner) then return true end
-    if job.id~=exceptId and (job.workerId==owner or (job.managedFuel or job.privateStation and job.factoryFlow or job.logistics and job.logisticsFlow) and job.preferredWorker==owner) and job.status~='completed' then return true end
+    if job.id~=exceptId and (job.workerId==owner or (job.managedFuel or job.returnManaged and job.returnReady or job.privateStation and job.factoryFlow or job.logistics and job.logisticsFlow) and job.preferredWorker==owner) and job.status~='completed' then return true end
   end
   return false
 end
@@ -30,8 +30,14 @@ function M.logisticsActive(state)
   end
   return false
 end
+function M.returnActive(state)
+  for _,job in pairs((state.automation or {}).jobs or {}) do
+    if job.returning and job.returnReady and job.status~='completed' then return true end
+  end
+  return false
+end
 function M.factoryPending(state)
-  if M.logisticsActive(state) then return true end
+  if M.logisticsActive(state) or M.returnActive(state) then return true end
   for _,job in pairs((state.automation or {}).jobs or {}) do
     if factory(job) and (job.status~='completed' or job.production and job.production.intent) then return true end
   end
@@ -51,7 +57,8 @@ function M.canOfferSupply(state,job)
   -- queued. The factory cannot take physical ownership until this actor finishes.
   return storageWorkers[job.type] and job.workerId~=nil and job.status~='completed' and not M.factoryActive(state)
 end
-function M.storageBusy(state)
+function M.storageBusy(state,ignoreReturns)
+  if not ignoreReturns and M.returnActive(state) then return true,'waiting for home cargo collection' end
   for _,job in pairs(state.jobs or {}) do
     if job.workerId and job.status~='completed' and not job.physicalComplete then return true,'waiting for active mining job '..job.id end
   end
@@ -118,6 +125,7 @@ function M.new(state,save,clock,id,chunks,config)
     local factoryPending=M.factoryPending(state)
     for _,j in ipairs(ordered) do
       local allowed=not (storageWorkers[j.type] and factoryPending)
+      if j.returnManaged then allowed=j.returnReady==true end
       if j.type=='RESCUE' then allowed=j.rescueReady==true and not M.factoryActive(state) end
       if j.logistics then allowed=j.logisticsReady==true and not M.factoryActive(state) end
       if j.managedFuel then allowed=j.fuelReady==true and not M.factoryActive(state) end
@@ -132,6 +140,7 @@ function M.new(state,save,clock,id,chunks,config)
             if w.online and t and t.status=='idle' and not t.task and t.capabilities and t.capabilities[j.requiredCapability]
               and (not j.privateStation or t.capabilities.isolatedCraftingV1)
               and (not j.logistics or t.capabilities.logisticsV1)
+              and (not j.returnManaged or t.capabilities.returnCargoV1)
               and (not j.preferredWorker or j.preferredWorker==w.id)
               and not M.workerBusy(state,w.id,j.id) then ids[#ids+1]=tonumber(wid) end
           end
@@ -166,6 +175,21 @@ function M.new(state,save,clock,id,chunks,config)
     local j=s.jobs[p.jobId]
     if not j or j.workerId~=owner then return false,'task owner mismatch' end
     if j.status=='completed' or j.workerFinished then return true end
+    if j.returning then
+      local r=p.homeReceipt;local old=j.homeReceipt
+      if not require('autobuilder.storage.returns').validReceipt(r) then return false,'home deposit receipt required' end
+      local total=0
+      for item,n in pairs(r.deposited) do
+        if n>(j.returning.items[item] or 0) then return false,'home deposit exceeds cargo contract' end;total=total+n
+      end
+      if total~=(p.progress or 0) then return false,'home progress differs from deposited cargo' end
+      if p.phase=='completed' and not require('autobuilder.factory.factory').equal(r.deposited,j.returning.items) then return false,'home completion lacks exact cargo receipt' end
+      if old then
+        if r.sequence<old.sequence then return false,'stale home deposit receipt' end
+        if r.sequence==old.sequence and not require('autobuilder.factory.factory').equal(r,old) then return false,'changed duplicate home deposit receipt' end
+        for item,n in pairs(old.deposited) do if (r.deposited[item] or 0)<n then return false,'home deposit regressed' end end
+      end
+    end
     if j.logistics then
       local r=p.transportReceipt;local old=j.transportReceipt
       if type(r)~='table' or not U.integer(r.sequence) or r.sequence<0
@@ -181,12 +205,13 @@ function M.new(state,save,clock,id,chunks,config)
     end
     if (p.progress or 0)<j.progress then return false,'stale task progress' end
     if j.type=='RESCUE' and p.fuelDelivered~=nil and (p.fuelDelivered<(j.fuelDelivered or 0) or p.fuelDelivered>j.quantity) then return false,'invalid rescue delivery counter' end
+    if j.returning then j.homeReceipt=U.copy(p.homeReceipt) end
     if j.logistics then j.transportReceipt=U.copy(p.transportReceipt) end
     j.progress=p.progress or 0; j.phase=p.phase; j.error=p.error; j.missingItem=p.missingItem
     if j.type=='RESCUE' and p.fuelDelivered~=nil then j.fuelDelivered=p.fuelDelivered end
     j.missingCount=p.missingCount; j.supplyId=p.supplyId; j.report=U.copy(p.report)
     j.status=p.phase=='completed' and 'completed' or p.phase=='blocked' and 'blocked' or p.phase=='paused' and 'paused' or 'running'
-    if (j.privateStation or j.logistics) and p.phase=='completed' then j.workerFinished=true; j.status='collecting' end
+    if (j.privateStation or j.logistics or j.returning) and p.phase=='completed' then j.workerFinished=true; j.status='collecting' end
     persist(); return true
   end
   function self:reserve(owner,jobId,from,target,workers)

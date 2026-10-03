@@ -437,3 +437,13 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   post-effect restart, ambiguous reserved-slot mutation and failed receipt saves.
   Existing runtime/logistics focused suites pass. Controller return collection and
   project completion gate are in progress; no native acceptance claimed yet.
+
+-0.22 Task39: controller returns reserve private/central capacity and output-only
+  counts atomically, retain the worker through exact collection, and acknowledge
+  only afterward. Runtime mixed-cargo test passes both post-drop and post-collection
+  restarts, lost acknowledgement, partial transfers and protected fuel slots.
+- Initial Task39 full gate615 Lua/18 Python passed. Additional RED→GREEN regression
+  prevents shared factory/supply observers from starting while return cargo is owned;
+  existing private return collection and its runtime regression pass afterward.
+  Grant rollback, yielding-worker/cargo changes, node rebinding, loaded central
+  geometry and exact acknowledged receipt tests pass. Project barrier follows.
