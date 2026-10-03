@@ -122,3 +122,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   immutable identities, ordered partial receipts, restart and save rollback pass.
   Runtime factory gates and receipts remain Task13; ledger alone does not yet
   coordinate physical consumers.
+
+- Task13: factory contracts/gates and cumulative withdrawal/output receipts
+  implemented. Four new regressions failed before changes; production/runtime/
+  logistics focused suites and full 429-test Lua suite passed. Legacy checkpoint
+  fixtures now omit modern ledger grants as well as modern jobs. Live furnace
+  acceptance is running and has reported actual partial delivery under its claim.

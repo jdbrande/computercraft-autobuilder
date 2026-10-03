@@ -121,7 +121,11 @@ function M.new(app,config,e,network,clock)
     lastSend=clock(); local t=s.currentTask; local phase=t.paused and 'paused' or t.phase
     if not ({setup=true,work=true,waiting=true,blocked=true,completed=true,paused=true,supply=true})[phase] then phase='running' end
     local err=t.error and tostring(t.error):gsub('[%c]',' '):sub(1,512)
-    send('task_progress',{jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
+    local stockReceipt
+    if t.type=='CRAFT' and t.production and t.production.stockSequence then
+      stockReceipt={sequence=t.production.stockSequence,withdrawn=U.copy(t.production.withdrawn or {}),delivered={[t.item]=t.production.delivered or 0}}
+    end
+    send('task_progress',{stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
       missingItem=t.supplyRequest and t.supplyRequest.item or t.missingItem,
       missingCount=t.supplyRequest and t.supplyRequest.count or t.missingCount,supplyId=t.supplyRequest and t.supplyRequest.id,report=Reports.compact(t.report)})
     return true

@@ -439,3 +439,30 @@ test('provider switching rolls back if its retirement checkpoint fails',function
   assert(not pcall(p.tick,p)); eq(r.mines[item],old); eq(app.state.jobs[old].status,'queued')
   eq(next(q.state.jobs),nil)
 end)
+
+test('factory jobs require durable ingredient grants and competing claims recover after stock arrives',function()
+  local app,p,q,config,h=productionFixture({[1]={name=mc('stone'),count=4}})
+  app.state.workers['9']={id=9,online=true,telemetry={status='idle',capabilities={crafting=true}}}
+  local r=p:request({[mc('stone_bricks')]=4}); p:tick()
+  local first=q.state.jobs[r.jobId]; eq(assert(first.stockInputs,'factory input contract missing')[mc('stone')],4)
+  local second=q:submit('CRAFT',{item=mc('stone_bricks'),quantity=4,batches=1,
+    stockInputs={[mc('stone')]=4},stockOutputs={[mc('stone_bricks')]=4}},{})
+  eq(q:assign(app.state.workers),nil) -- no grant until reconciliation
+  p:tick(); assert(app.state.inventoryLedger.leases[first.id]); eq(app.state.inventoryLedger.leases[second.id],nil)
+  eq(q:assign(app.state.workers).id,first.id)
+  h.inventories.store={[1]={name=mc('stone_bricks'),count=4}}; first.status='completed'; p:tick()
+  eq(app.state.inventoryLedger.leases[first.id].status,'released'); eq(q:assign(app.state.workers),nil)
+  h.inventories.store[2]={name=mc('stone'),count=4}; p:tick()
+  eq(q:assign(app.state.workers).id,second.id)
+end)
+
+test('ungranted furnace task makes no physical transfer and recovers from unavailable stock',function()
+  local app,p,q,config,h=productionFixture()
+  local job=q:submit('SMELT',{item=mc('stone'),quantity=1,batches=1,furnaceLane='furnace',
+    stockInputs={[mc('cobblestone')]=1,[mc('coal')]=1},stockOutputs={[mc('stone')]=1}},{})
+  p:step(); eq(next(h.inventories.furnace),nil); eq(job.production,nil)
+  p:tick(); eq(app.state.inventoryLedger.leases[job.id],nil)
+  h.inventories.store={[1]={name=mc('cobblestone'),count=1},[2]={name=mc('coal'),count=1}}
+  p:tick(); p:step(); assert(job.production); eq(job.production.loaded,1)
+  local lease=app.state.inventoryLedger.leases[job.id]; eq(lease.withdrawn[mc('cobblestone')],1)
+end)

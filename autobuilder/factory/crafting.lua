@@ -99,7 +99,7 @@ function M.new(task,e,config,save)
         local reserve=(config.turtleFuelReserveItems or {})[item] or 0
         assert(total>reserve,'crafting input shortage: '..item)
         local source=sources[1]; assert(source,'craft ingredient unavailable')
-        return F.transfer(s,e,save,source.name,source.slot,station.input,1,item,1,station.input,1,nil,{stagedSlot=slot})
+        return F.transfer(s,e,save,source.name,source.slot,station.input,1,item,1,station.input,1,nil,{stagedSlot=slot},true)
       end
     end
     local after={[13]={name=task.item,count=recipe.yield}}

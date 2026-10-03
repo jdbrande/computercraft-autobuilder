@@ -6,6 +6,7 @@ local M={}
 function M.new(app,config,e,queue)
   local s=queue.state; s.requestSequence=s.requestSequence or 0
   local self={machines={},laneCursor=0}; local save=function() return app:save() end
+  self.ledger=require('autobuilder.storage.ledger').new(app.state,save)
   function self:request(requirements,key,options)
     options=options or {}
     assert(type(requirements)=='table' and next(requirements),'resource request needs item quantities')
@@ -32,6 +33,50 @@ function M.new(app,config,e,queue)
   end
   function self:refresh()
     return app.mining:refresh()
+  end
+  function self:acceptReceipt(job,receipt)
+    if not job.stockInputs then return true end -- exclusive legacy job
+    local ok,err=pcall(self.ledger.receipt,self.ledger,job.id,receipt.withdrawn,receipt.delivered,{},receipt.sequence)
+    return ok,not ok and tostring(err) or nil
+  end
+  local function localReceipt(job)
+    local p=job.production
+    if not p or not p.stockSequence then return end
+    local withdrawn=U.copy(p.withdrawn or {})
+    if job.type=='SMELT' then
+      local recipe=require('autobuilder.factory.recipes').get(job.item)
+      withdrawn[next(recipe.ingredients)]=p.loaded or 0
+      local fuel=config.smeltingFuelItem or 'minecraft:coal'
+      withdrawn[fuel]=(withdrawn[fuel] or 0)+(p.fuelLoaded or 0)
+    end
+    return {withdrawn=withdrawn,delivered={[job.item]=p.delivered or 0},sequence=p.stockSequence}
+  end
+  function self:syncClaims(allowGrant)
+    local jobs={}; for _,j in pairs(s.jobs) do if j.stockInputs then jobs[#jobs+1]=j end end
+    table.sort(jobs,function(a,b) return a.id<b.id end)
+    for _,j in ipairs(jobs) do
+      local lease=self.ledger.state.leases[j.id]
+      if lease and lease.status=='held' then
+        local receipt=localReceipt(j)
+        if receipt then assert(self:acceptReceipt(j,receipt)) end
+        lease=self.ledger.state.leases[j.id]
+        if j.status=='completed' then
+          -- Older Crafty workers can acknowledge completion without counters.
+          -- Their exclusive job completion already guarantees exact output.
+          if not require('autobuilder.factory.factory').equal(lease.delivered,j.stockOutputs) then
+            local withdrawn=j.type=='CRAFT' and j.stockInputs or lease.withdrawn
+            self.ledger:receipt(j.id,withdrawn,j.stockOutputs,{},lease.sequence+1)
+          end
+          self.ledger:release(j.id)
+        end
+      end
+    end
+    if allowGrant==false then return end
+    for _,j in ipairs(jobs) do if j.status~='completed' and not self.ledger.state.leases[j.id] then
+      local lease,why=self.ledger:reserve(j.id,j.stockInputs,j.stockOutputs,
+        app.mining.storage.valid and app.mining.storage.counts or nil,{protected=config.turtleFuelReserveItems})
+      if j.stockError~=why then j.stockError=why; save() end
+    end end
   end
   local function hasWorker(capability,item)
     -- Small integrations predating the registry can still drive production.
@@ -155,9 +200,10 @@ function M.new(app,config,e,queue)
       local list={}; for _,r in pairs(s.requests) do if r.status=='queued' then list[#list+1]=r end end
       table.sort(list,function(a,b) return tonumber(a.id:match('%d+'))<tonumber(b.id:match('%d+')) end); active=list[1]
     end
-    if not active or active.paused then return end
+    if not active or active.paused then self:refresh(); self:syncClaims(); return end
     local r=active; local ok,err=self:refresh()
     if not ok then r.status='blocked'; r.error=err; return end
+    self:syncClaims()
     if r.stockOnly then
       -- The beginner test is supplied by the user. It must not queue mining,
       -- crafting, or a global fuel-stock replenishment as a side effect.
@@ -226,7 +272,12 @@ function M.new(app,config,e,queue)
         if not r.jobId then
           for index,lane in ipairs(lanes) do
             if not r.jobIds[index] then
+              local inputs={}
+              for item,n in pairs(op.inputs) do inputs[item]=n/op.batches*lane.batches end
+              local fuel=config.smeltingFuelItem or 'minecraft:coal'
+              inputs[fuel]=(inputs[fuel] or 0)+math.ceil(lane.batches/require('autobuilder.factory.fuel').capacity(fuel))
               local job=queue:submit('SMELT',{item=op.item,quantity=lane.batches,batches=lane.batches,
+                stockInputs=inputs,stockOutputs={[op.item]=lane.batches},
                 furnaceLane=lane.furnaceLane,productionRequest=r.id,productionOperation=r.operation},{},r.id..':op:'..r.operation..':lane:'..index..(r.replans and ':replan:'..r.replans or ''))
               r.jobIds[index]=job.id; save()
             end
@@ -236,7 +287,8 @@ function M.new(app,config,e,queue)
         for _,id in ipairs(r.jobIds) do
           local job=assert(s.jobs[id],'production furnace lane job is missing')
           if job.status~='completed' then complete=false end
-          if job.status=='blocked' then blocked=job.error or 'furnace lane blocked' end
+          if job.stockError then blocked=job.stockError
+          elseif job.status=='blocked' then blocked=job.error or 'furnace lane blocked' end
         end
         if complete then r.operation=r.operation+1; r.jobId=nil; r.jobIds=nil; r.status='running'; r.error=nil; save()
         elseif blocked then r.status='blocked'; r.error=blocked; save() end
@@ -247,10 +299,11 @@ function M.new(app,config,e,queue)
         end
         r.status='running'; r.error=nil
         if not job then
-          job=queue:submit(op.type,{item=op.item,quantity=op.quantity,batches=op.batches},{},r.id..':op:'..r.operation..(r.replans and ':replan:'..r.replans or ''))
+          job=queue:submit(op.type,{item=op.item,quantity=op.quantity,batches=op.batches,
+            stockInputs=U.copy(op.inputs),stockOutputs={[op.item]=op.quantity}},{},r.id..':op:'..r.operation..(r.replans and ':replan:'..r.replans or ''))
           r.jobId=job.id; save()
         elseif job.status=='completed' then r.operation=r.operation+1; r.jobId=nil; r.error=nil; save()
-        elseif job.status=='blocked' then r.status='blocked'; r.error=job.error; save() end
+        elseif job.stockError or job.status=='blocked' then r.status='blocked'; r.error=job.stockError or job.error; save() end
       end
     else
       for item,n in pairs(r.plan.requirements or r.requirements) do
@@ -295,7 +348,7 @@ function M.new(app,config,e,queue)
     end
     local status,err=machine:step()
     job.status=status=='complete' and 'completed' or status=='blocked' and 'blocked' or 'running'
-    job.error=err; save(); return true
+    job.error=err; save(); self:syncClaims(false); return true
   end
   function self:step()
     for id in pairs(self.machines) do if not s.jobs[id] then self.machines[id]=nil end end

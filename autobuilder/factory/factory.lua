@@ -67,17 +67,21 @@ function M.reconcileTransfer(state,e,save)
   M.commit(state,save,function()
     if moved>0 then state.waits=0 end
     if i.counter then state[i.counter]=(state[i.counter] or 0)+moved end
+    if i.withdrawal then
+      state.withdrawn=state.withdrawn or {}; state.withdrawn[i.item]=(state.withdrawn[i.item] or 0)+moved
+    end
+    if i.counter or i.withdrawal then state.stockSequence=(state.stockSequence or 0)+1 end
     if i.patch and moved==i.limit then for k,v in pairs(i.patch) do state[k]=v end end
     state.intent=nil
   end)
   if moved==0 then return 'blocked','inventory transfer made no progress; check capacity and supply' end
   return 'running'
 end
-function M.transfer(state,e,save,from,slot,to,target,item,limit,observe,sign,counter,patch)
+function M.transfer(state,e,save,from,slot,to,target,item,limit,observe,sign,counter,patch,withdrawal)
   assert(from~=to,'source and destination inventory must differ')
   local before=M.list(e,observe)
   M.commit(state,save,function() state.intent={action='transfer',from=from,slot=slot,to=to,target=target,item=item,
-    limit=limit,observe=observe,sign=sign,before=before,beforeCount=M.count(before,item),counter=counter,patch=patch} end)
+    limit=limit,observe=observe,sign=sign,before=before,beforeCount=M.count(before,item),counter=counter,patch=patch,withdrawal=withdrawal} end)
   local moved=e.peripheral.call(from,'pushItems',to,slot,limit,target)
   assert(U.integer(moved) and moved>=0 and moved<=limit,'invalid transfer result; reconcile journal')
   return M.reconcileTransfer(state,e,save)

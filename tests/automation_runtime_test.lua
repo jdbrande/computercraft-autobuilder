@@ -248,6 +248,7 @@ test('furnace bank adopts a legacy unsplit active job without producing duplicat
   local f=fixture(2); f:request(); f.c:tick()
   local request=f.c.state.automation.requests[f.id]; local plan=request.plan
   for id in pairs(f.c.state.automation.jobs) do f.c.state.automation.jobs[id]=nil end
+  f.c.state.inventoryLedger=nil -- historical checkpoints predate reservation grants
   local old=f.c.automation.queue:submit('SMELT',{item=mc('stone'),batches=8,quantity=8},{},request.id..':op:1')
   request.jobId=old.id; request.jobIds=nil; plan.operations[1].lanes=nil
   f.c:save(); f.c=Runtime.new(f.cc,f.ce); f.ce.packets={}
@@ -260,6 +261,7 @@ test('legacy planned fuel budget is not enlarged when restoring without lane met
   local f=fixture(2); f:request(); f.c:tick()
   local request=f.c.state.automation.requests[f.id]
   for id in pairs(f.c.state.automation.jobs) do f.c.state.automation.jobs[id]=nil end
+  f.c.state.inventoryLedger=nil -- historical checkpoints predate reservation grants
   request.jobId=nil; request.jobIds=nil; request.plan.operations[1].lanes=nil
   request.plan.fuel.items=1; f.h.inventories.store[2].count=3
   f.c:save(); f.c=Runtime.new(f.cc,f.ce); f.ce.packets={}
@@ -273,4 +275,35 @@ test('resource command exposes request dependency graph without issuing physical
   assert(ok,'resource command missing'); assert(summary:find('required=8',1,true),summary)
   assert(summary:find('planned=8',1,true),summary); eq(f.h.transfers,transfers)
   assert(not pcall(f.c.automation.command,f.c.automation,'resource'))
+end)
+
+test('factory inventory receipts survive reboot and release only measured output',function()
+  local f=fixture(); f:request(); local partial=false
+  for _=1,150 do
+    f:step()
+    local ledger=assert(f.c.state.inventoryLedger,'controller inventory ledger missing')
+    for id,l in pairs(ledger.leases) do
+      if (l.withdrawn[mc('stone')] or 0)>0 and (l.delivered[mc('stone_bricks')] or 0)<8 then
+        eq(l.status,'held'); partial=true
+        f.c=Runtime.new(f.cc,f.ce); f.w=Runtime.new(f.wc,f.we)
+        eq(f.c.state.inventoryLedger.leases[id].withdrawn[mc('stone')],l.withdrawn[mc('stone')])
+        break
+      end
+    end
+    if partial then break end
+  end
+  assert(partial,'no partial physical ingredient receipt reached controller')
+  f:finish(); local seen=0
+  for _,l in pairs(f.c.state.inventoryLedger.leases) do eq(l.status,'released'); seen=seen+1 end
+  eq(seen,2); eq(f.h:count(mc('stone_bricks')),8); eq(f.h.crafts,2)
+end)
+
+test('stock receipt protocol rejects malformed counters before accepting progress',function()
+  local P=require('autobuilder.core.task_messages')
+  for _,receipt in ipairs({{sequence=0,withdrawn={},delivered={}},
+    {sequence=1,withdrawn={[mc('stone')]=-1},delivered={}},
+    {sequence=1,withdrawn='bad',delivered={}},
+    {sequence=1,withdrawn={},delivered={[mc('stone')]=math.huge}}}) do
+    assert(not P.validate('task_progress',{jobId='task:7:1',phase='work',stockReceipt=receipt}))
+  end
 end)

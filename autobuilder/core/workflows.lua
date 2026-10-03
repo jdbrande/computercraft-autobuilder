@@ -53,6 +53,10 @@ function M.storageBusy(state)
   return false
 end
 function M.factoryCanRun(state,job)
+  if job.stockInputs then
+    local lease=state.inventoryLedger and state.inventoryLedger.leases[job.id]
+    if not lease or lease.status~='held' then return false,job.stockError or 'waiting for durable ingredient reservation' end
+  end
   local busy,why=M.storageBusy(state); if busy then return false,why end
   for _,other in pairs((state.automation or {}).jobs or {}) do
     if other.id~=job.id and factory(other) and other.status~='completed' then

@@ -51,6 +51,7 @@ function M.new(app,config,e,network,clock)
     if j and not j.workerId and m.type=='task_progress' then queue:recoverOwner(sender,p,app.state.workers) end
     if not j or j.workerId~=sender then return false,'unknown task or owner' end
     if m.type=='task_progress' then
+      if p.stockReceipt then local ok,err=production:acceptReceipt(j,p.stockReceipt); if not ok then return false,err end end
       local ok,err=queue:progress(sender,p); if not ok then return false,err end
       if p.phase~='paused' and p.phase~='blocked' then j.resumeRequested=nil end
       if j.status=='completed' then
@@ -89,6 +90,7 @@ function M.new(app,config,e,network,clock)
       app.state.assignmentRecovery=nil; app:save()
     end
     production:tick(); projects:tick(); infrastructure:tick(); cathedral:tick()
+    production:syncClaims()
     if clock()-last<config.heartbeatInterval then return true end
     last=clock()
     for _,j in pairs(queue.state.jobs) do

@@ -470,10 +470,10 @@ reserved, transit, expected, demand; protected reserve passed during grants.
 `autobuilder/workers/executor.lua`, `autobuilder/core/task_messages.lua`;
 add regressions to production/runtime/logistics tests.
 
-- [ ] Add failing runtime cases for competing queued claims, no assignment/action
+- [x] Add failing runtime cases for competing queued claims, no assignment/action
   before grant, partial withdrawal/output reports, delayed duplicates, reboot and
   stock shortfall recovery. Preserve exclusive legacy saved jobs.
-- [ ] Declare exact inputs/outputs for new factory tasks; grant before dispatch or
+- [x] Declare exact inputs/outputs for new factory tasks; grant before dispatch or
   furnace action. Journal crafting withdrawals and send bounded cumulative counts;
   reconcile furnace counters and release only after physical completion. Keep the
   existing factory barrier. Run focused/full suites and commit.

@@ -14,6 +14,15 @@ local function bounded(value,depth,seen,budget)
   end
   seen[value]=nil; return true
 end
+local function quantities(map)
+  if type(map)~='table' then return false end
+  local size=0
+  for item,n in pairs(map) do
+    size=size+1
+    if size>64 or not U.shortString(item,128) or not U.integer(n) or n<0 or n>100000000 then return false end
+  end
+  return true
+end
 function M.validate(kind,p)
   if type(p)~='table' or not bounded(p,0,{}, {n=0,bytes=0}) then return false,'oversized or malformed task payload' end
   if kind=='task_assign' then
@@ -32,6 +41,7 @@ function M.validate(kind,p)
         for k,v in pairs(b.state) do if type(k)~='string' or type(v)~='string' then return false,'invalid block state' end end
       end
     end
+    if (j.stockInputs or j.stockOutputs) and (not quantities(j.stockInputs) or not quantities(j.stockOutputs)) then return false,'invalid stock contract' end
     if j.item and not U.shortString(j.item,128) then return false,'invalid task item' end
     if j.quantity and (not U.integer(j.quantity) or j.quantity<1 or j.quantity>1000000) then return false,'invalid task quantity' end
     if j.batches and (not U.integer(j.batches) or j.batches<1 or j.batches>1000000) then return false,'invalid task batches' end
@@ -42,6 +52,9 @@ function M.validate(kind,p)
       if not U.shortString(p.supplyId,160) or p.supplyId:sub(1,#p.jobId+8)~=p.jobId..':supply:' or not p.supplyId:sub(#p.jobId+9):match('^%d+$') then return false,'supply batch identity required' end
     end
     if kind=='task_progress' then
+      local r=p.stockReceipt
+      if r and (type(r)~='table' or not U.integer(r.sequence) or r.sequence<1 or r.sequence>9007199254740991
+        or not quantities(r.withdrawn) or not quantities(r.delivered)) then return false,'invalid stock receipt' end
       if not phases[p.phase] or not U.integer(p.progress or 0) or (p.progress or 0)<0 then return false,'invalid task progress' end
       if p.error and not U.shortString(p.error,512) then return false,'invalid task error' end
       if p.missingItem and not U.shortString(p.missingItem,128) then return false,'invalid missing item' end
