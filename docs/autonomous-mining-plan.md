@@ -1168,10 +1168,11 @@ ordered integration of accepted0.24–0.26. Reuse production and inventory journ
 
 - [ ] Add failing worker cases for positive-but-low cargo, next region material,
   reserved/NBT slots, existing supplies, paused/finished work and preparation fill.
-  Publish validated optional upcoming material demand without changing physical work.
+  Calculate bounded upcoming demand at safe boundaries and enter the existing
+  supply journal before zero; no new wire message or staging owner is needed.
 - [ ] Add shared-demand/controller restart/duplicate/offline/completed request tests.
-  Aggregate eligible needs and create finite existing production requests before
-  zero inventory, preserving factory exclusion and measured station journals.
+  Use existing finite supply-production requests before zero inventory, preserving
+  factory exclusion, duplicate protection and measured station journals.
 - [ ] Run focused and actual-runtime replenishment tests with controller/worker
   restart; document surplus and initial-preparation limits, commit.
 

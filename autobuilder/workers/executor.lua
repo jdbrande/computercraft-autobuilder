@@ -173,7 +173,7 @@ function M.new(app,config,e,network,clock)
     end
     if not t or t.id~=p.jobId then return false,'task ID mismatch' end
     if m.type=='task_ack' and t.phase=='completed' then
-      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report),transportReceipt=transportReceipt(t),homeReceipt=homeReceipt(t),siteReport=U.copy(t.siteReport)})
+      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report,t.type),transportReceipt=transportReceipt(t),homeReceipt=homeReceipt(t),siteReport=U.copy(t.siteReport)})
       s.currentTask=nil; self.engine=nil; s.status='idle'; save(); return true
     elseif m.type=='task_pause' then t.paused=true; save(); return true
     elseif m.type=='task_resume' then
@@ -212,7 +212,7 @@ function M.new(app,config,e,network,clock)
     end
     send('task_progress',{siteReport=U.copy(t.siteReport),homeReceipt=homeReceipt(t),transportReceipt=transportReceipt(t),fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
       missingItem=t.supplyRequest and t.supplyRequest.item or t.missingItem,
-      missingCount=t.supplyRequest and t.supplyRequest.count or t.missingCount,supplyId=t.supplyRequest and t.supplyRequest.id,report=Reports.compact(t.report)})
+      missingCount=t.supplyRequest and t.supplyRequest.count or t.missingCount,supplyId=t.supplyRequest and t.supplyRequest.id,report=Reports.compact(t.report,t.type)})
     return true
   end
   function self:step()
@@ -321,6 +321,14 @@ function M.new(app,config,e,network,clock)
         end
         t.supplyRequest={id=t.id..':supply:'..t.supplySequence,item=t.missingItem,count=math.min(config.supply.batch,needed),granted=false}; t.lastSupply=nil; save(); return true
       else return true end
+    end
+    if not atMutation then
+      local upcoming=require('autobuilder.resources.material_forecast').upcoming(t,e.turtle,config)
+      if upcoming then
+        t.supplySequence=(t.supplySequence or 0)+1
+        t.supplyRequest={id=t.id..':supply:'..t.supplySequence,item=upcoming.item,count=upcoming.count,granted=false}
+        t.lastSupply=nil;save();return true
+      end
     end
     if t.type=='REFUEL' or t.type=='RETURN_HOME' and not t.returning then
       if t.managedFuel then

@@ -133,6 +133,20 @@ function M.new(app,config,e,queue,production)
     end
     return work,requests
   end
+  function self:forecast(name)
+    local p=s.projects[name or s.currentProject]
+    if not p then app.state.forecastLines={'No selected project; use build forecast <name>.'};return nil end
+    if not p.requirements then p.requirements=U.copy(analysis(p,true).requirements) end
+    local ok,why=production:refresh();local scopes={}
+    for _,candidate in pairs(s.projects) do if candidate.requirements then
+      scopes[#scopes+1]={project=candidate,work=linked(candidate)}
+    end end
+    local F=require('autobuilder.resources.material_forecast')
+    local f=F.build(app.state,ok and app.mining.storage.counts or nil,scopes)[p.name]
+    app.state.forecastLines=F.describe(f)
+    if not ok then app.state.forecastLines[#app.state.forecastLines+1]='Inventory unavailable: '..tostring(why) end
+    return f
+  end
   local function actors(p,work)
     p.actors=p.actors or {};local changed=false
     for _,j in pairs(work) do if j.workerId then
@@ -272,6 +286,9 @@ function M.new(app,config,e,queue,production)
       s.projects[title]=p; s.currentProject=title; save(); return true,'Imported '..title
     end
     local p=project(name); s.currentProject=p.name
+    if action=='forecast' then
+      self:forecast(p.name);app.state.view='forecast';save();return true,table.concat(app.state.forecastLines,'; ')
+    end
     if action=='status' then return true,p.name..': '..p.phase..' '..(p.completed or 0)..'/'..(p.total or 0)..' positions'..(p.error and '; '..p.error or '') end
     if action=='pause' then
       p.paused=true
@@ -345,7 +362,7 @@ function M.new(app,config,e,queue,production)
       p.autoStart=nil
       save(); return true,p.phase..' '..p.name
     end
-    return false,'build import|analyze|materials|survey|level|auto|prepare|start|status|pause|resume|verify|repair|clear [name]'
+    return false,'build import|analyze|materials|forecast|survey|level|auto|prepare|start|status|pause|resume|verify|repair|clear [name]'
   end
   function self:tick()
     if s.retiredBlueprints and #s.retiredBlueprints>0 then
@@ -379,6 +396,10 @@ function M.new(app,config,e,queue,production)
           if j.status~='completed' then active=active+1 end
           done=done+(j.progress or 0)
           if j.status=='completed' and j.report and not j.reportCollected then
+            p.report.materials=p.report.materials or {}
+            if j.report.materials then
+              for item,n in pairs(j.report.materials) do p.report.materials[item]=(p.report.materials[item] or 0)+n end
+            else p.report.materialUnknown=true end
             for k,n in pairs(j.report.counts or {}) do p.report.counts[k]=(p.report.counts[k] or 0)+n end
             p.report.omittedEntries=(p.report.omittedEntries or 0)+(j.report.omittedEntries or 0)
             for _,entry in ipairs(j.report.entries or {}) do

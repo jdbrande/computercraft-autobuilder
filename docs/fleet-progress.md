@@ -1188,3 +1188,32 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   preparation into overlapping production/construction; reusing current finite
   requests preserves ownership. Cost: the full continuous pipeline remains open.
   No0.27 implementation or acceptance is claimed yet.
+
+- Task56 implementation now retains bounded correct-material totals through report
+  compaction and retired task payloads, validates quantities against owned blocks,
+  and exposes `build forecast`. Read-only forecasts allocate shared available stock
+  once and distinguish provider estimates, reservations, transit and worker cargo.
+  Red/green regressions cover mixed blocks, air/door halves, malformed/regressing
+  totals, duplicate project demand, offline evidence and side-effect-free commands.
+  The broader project runtime regression is still running; Task56 is not complete.
+
+- Task57's early top-up now passes an actual-runtime red/green regression: a
+  builder with one held stone requests its next item before placing the last,
+  restarts both runtimes, places exactly two and reconciles one supplied item.
+  Ruling: reuse the existing supply journal immediately at a safe action boundary;
+  a second staging request would conflict with factory exclusion. Cost: the worker
+  waits during replenishment. No new protocol or independent ownership was added.
+
+- The full early-replenishment chain exposed stock consumption before its own
+  acquisition group settled: one missing cobblestone caused two deliveries.
+  Regression failed with two deposited/one pulled. A supply batch now waits for
+  its linked finite production request to complete before first staging, while
+  already-offered batches still drain. The actual controller/explorer/builder
+  regression passes across both runtime restarts with exactly one mined, one
+  supplied and two placed (including one initial held item).
+- The prior supply-receipt timing test now expects the next batch before placement,
+  retaining its assertion that an older receipt survives until acknowledgement.
+  Full logistics runtime checks pass before the acquisition-settlement correction;
+  final focused/regression checks and the complete release suite will include it.
+- Forecast view retirement also has a red/green regression: deleting the selected
+  project displays an empty selection instead of throwing from the next tick.

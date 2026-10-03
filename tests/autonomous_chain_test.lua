@@ -273,3 +273,36 @@ test('late registered miner joins costly shared demand automatically and the fle
   eq(view.mining.active,0);eq(view.mining.desired,0)
   assert(c.state.fleet.metrics.mining.count>1);assert(#c.state.fleet.decisions>0)
 end)
+
+test('early builder top-up launches real exploration while its last held block remains across restarts',function()
+  local f=fixture({exploration=true,scanner=false,finiteFuel=true})
+  f.builder.world.items[1]={name=mc('cobblestone'),count=1}
+  local q=f.controller.runtime.automation.queue
+  local job=q:submit('BUILD',{clearanceY=2,blocks={{x=2,y=0,z=0,name=mc('cobblestone'),state={}}, {x=3,y=0,z=0,name=mc('cobblestone'),state={}}}},{})
+  local early,restarted=false,false
+  for _=1,5000 do
+    f:step()
+    local active=false
+    for _,a in ipairs(f.miners) do
+      local task=a.runtime.state.currentTask
+      if task and task.phase=='work' then active=true end
+    end
+    if active and not early then
+      eq(f.builder.world.places,0);eq(f.builder.world.turtle.getItemCount(1),1);early=true
+      f:reboot(f.controller);f:reboot(f.builder);restarted=true
+    end
+    local complete=f.controller.runtime.state.automation.jobs[job.id].status=='completed'
+    local busy=false;for _,a in ipairs(f.miners) do busy=busy or a.runtime.state.currentTask~=nil end
+    local settled=true;for _,r in pairs(f.controller.runtime.state.automation.requests) do if r.status~='completed' then settled=false end end
+    if complete and settled and not busy and not f.builder.runtime.state.currentTask then break end
+  end
+  assert(early and restarted,'exploration did not begin before the last held block was spent')
+  local c=f.controller.runtime;eq(c.state.automation.jobs[job.id].status,'completed')
+  eq(f.builder.world.places,2)
+  assert(f.stats.deposited[mc('cobblestone')]==1, f.controller.e.textutils.serialize({deposited=f.stats.deposited,pulled=f.stats.pulled,requests=c.state.automation.requests,groups=c.state.exploration.groups,jobs=c.state.jobs}))
+  eq(f.stats.pulled[mc('cobblestone')],1)
+  eq(f:count('cobblestone'),0);eq(next(f.inventories.stage),nil);eq(next(f.builder.world.items),nil)
+  eq(f.builder.world.blocks['2,0,0'].name,mc('cobblestone'));eq(f.builder.world.blocks['3,0,0'].name,mc('cobblestone'))
+  for _,r in pairs(c.state.automation.requests) do eq(r.status,'completed') end
+  for _,a in ipairs(f.miners) do eq(a.runtime.state.currentTask,nil);eq(a.world.pose.x,a.source.x);assert(a.world.fuel>0) end
+end)

@@ -38,3 +38,41 @@ test('maximum region verification report transmits exact counts and bounded issu
   eq(compact.counts.correct,384); eq(compact.counts.wrong,128); eq(#compact.entries,16); eq(compact.omittedEntries,112)
   assert(require('autobuilder.core.task_messages').validate('task_progress',{jobId='task:7:1',phase='completed',progress=384,report=compact}))
 end)
+
+test('compact reports retain correct material quantities without counting air or upper door halves',function()
+  local R=require('autobuilder.core.reports')
+  local report={counts={correct=5,wrong=1},entries={
+    {status='correct',expected={name='minecraft:stone',state={}}},
+    {status='correct',expected={name='minecraft:wall_torch',state={}}},
+    {status='correct',expected={name='minecraft:oak_door',state={half='lower'}}},
+    {status='correct',expected={name='minecraft:oak_door',state={half='upper'}}},
+    {status='correct',expected={name='minecraft:air',state={}}},
+    {status='wrong',expected={name='minecraft:glass',state={}}}}}
+  local compact=R.compact(report);assert(compact.materials,'correct material totals lost in compaction')
+  eq(compact.materials['minecraft:stone'],1);eq(compact.materials['minecraft:torch'],1)
+  eq(compact.materials['minecraft:oak_door'],1);eq(compact.materials['minecraft:air'],nil);eq(compact.materials['minecraft:glass'],nil)
+  eq(R.compact(compact).materials['minecraft:stone'],1)
+  eq(R.compact(report,'PREPARE_REGION').materials,nil)
+  eq(R.compact({counts={correct=1},entries={}}).materials,nil)
+end)
+
+test('task messages reject malformed material totals but retain legacy reports',function()
+  local M=require('autobuilder.core.task_messages');local p={jobId='task:7:1',phase='work',progress=1,report={counts={correct=1},materials={['minecraft:stone']=1}}}
+  assert(M.validate('task_progress',p))
+  for _,bad in ipairs({false,1,{['minecraft:stone']=-1},{['minecraft:stone']=1.5},{['minecraft:stone']=513}}) do
+    p.report.materials=bad;assert(not M.validate('task_progress',p),'malformed material counts accepted')
+  end
+  p.report.materials=nil;assert(M.validate('task_progress',p))
+end)
+
+test('owned material progress is bounded by its blocks and survives reconstruction',function()
+  local Q=require('autobuilder.core.workflows');local state={};local q=Q.new(state,function() return true end,function() return 1 end,7)
+  local j=q:submit('BUILD',{blocks={{x=0,y=0,z=0,name='minecraft:stone',state={}}, {x=1,y=0,z=0,name='minecraft:glass',state={}}}},{});j.workerId=12;j.status='running'
+  local p={jobId=j.id,phase='work',progress=1,report={counts={correct=1},materials={['minecraft:stone']=2}}}
+  assert(not q:progress(12,p),'overclaimed material accepted');eq(j.progress,0)
+  p.report.materials={['minecraft:stone']=1};assert(q:progress(12,p));eq(j.materials['minecraft:stone'],1)
+  q=Q.new(state,function() return true end,function() return 2 end,7)
+  p.report.materials={['minecraft:glass']=1};assert(not q:progress(12,p),'changed cumulative material accepted')
+  p.phase='completed';p.progress=2;p.report.counts.correct=2;p.report.materials={['minecraft:stone']=1,['minecraft:glass']=1}
+  assert(q:progress(12,p));j.blocks=nil;j.report=nil;eq(j.materials['minecraft:stone'],1);eq(j.materials['minecraft:glass'],1)
+end)

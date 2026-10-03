@@ -92,6 +92,8 @@ function M.validate(kind,p)
     elseif kind=='task_fuel_release' then
       -- Identity-only release; the worker verifies its durable consumed receipt.
     elseif kind=='task_progress' then
+      if p.report~=nil and type(p.report)~='table' then return false,'invalid task report' end
+      if p.report and p.report.materials~=nil and not require('autobuilder.core.reports').validMaterials(p.report.materials) then return false,'invalid material report' end
       if p.siteReport~=nil and not require('autobuilder.build.site_survey').validSummary(p.siteReport) then return false,'invalid site survey report' end
       if p.homeReceipt~=nil and not require('autobuilder.storage.returns').validReceipt(p.homeReceipt) then return false,'invalid home deposit receipt' end
       local tr=p.transportReceipt

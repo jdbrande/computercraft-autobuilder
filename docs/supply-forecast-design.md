@@ -23,15 +23,18 @@ not promised independently to every project. Reserved/transit/expected categorie
 are disjoint in deficit arithmetic; production expectations are never stock.
 Paused/offline owners retain their claims and cannot authorize new work.
 
-Workers publish a bounded upcoming material need from their current immutable
-BUILD/REPAIR region, remaining cursor and unreserved inventory. This forecast does
-not claim a supply chest, interrupt placement, or transfer items. The controller
-aggregates eligible needs and requests finite replacement stock through existing
-production before the workers reach zero. Requests are idempotent while active;
-completed-batch tombstones and ordinary actual supply receipts remain authoritative.
-Existing station leases, factory exclusion and measured resupply stay unchanged.
-Preparation fill remains inspection-driven because existing suitable ground can
-eliminate its apparent demand. VERIFY/CLEAR and paused work cannot create demand.
+Workers calculate a bounded upcoming material need from their current immutable
+BUILD/REPAIR region, remaining cursor and unreserved inventory. At a safe action
+boundary, positive cargo at or below one quarter of the configured batch triggers
+the existing resupply journal for the remaining shortage. The worker retains its
+last items while normal supply handling obtains replacements. Zero cargo still
+uses inspection-driven missing-material handling. No separate forecast reservation
+or transfer protocol is added. Existing batches, factory exclusion, production
+requests, tombstones and measured receipts remain authoritative.
+Preparation fill stays inspection-driven because suitable ground can eliminate
+its apparent demand. VERIFY/CLEAR, paused work and in-flight placement/navigation
+cannot trigger early resupply. Finite concurrent requests retain the existing
+shared-stock acquisition behavior and duplicate/restart guarantees.
 
 Alternatives rejected: a second inventory ledger would duplicate ownership; a
 whole-project reserved stock promise would require changing all current consumers;
@@ -52,3 +55,20 @@ consolidated regression pass precede complete tests and integration.
 Forecasts are bounded estimates. Existing correctly built regions can reduce actual
 consumption; finite in-flight production may finish with surplus, which remains
 physical stock. No forecast licenses excavation or changes durable ownership.
+
+Implementation detail: the view allocates unreserved shared stock once in stable
+project-name order. This is a read-only estimate, not a ledger reservation or
+scheduler priority. Per-item correct totals describe the current construction or
+verification generation. During a new verification pass the confirmed count grows
+again as cells are revisited. Offered supply staging remains explicitly uncertain
+until its actual transfer is reflected in cargo/receipts; its original grant amount
+is never added again to fresh worker cargo. Legacy and offline evidence is marked
+unknown. These conservative gaps do not create production requests from the view.
+
+Ruling after tracing supply/factory exclusion: a separate prefetch request that
+holds staging while placement continues can block the factory operation needed to
+fill it. Early top-up therefore enters the existing resupply flow immediately at
+a safe boundary. This starts acquisition before zero with one durable owner and
+requires no new network message. Cost: that worker waits during replenishment;
+overlapping initial production and sustained placement remains the next pipeline
+change rather than an unsupported claim in this milestone.
