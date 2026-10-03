@@ -102,3 +102,26 @@ test('network validates cargo manifests and strips unknown cyclic cargo fields',
   m=packet('heartbeat',2);m.payload.cargo={items={['minecraft:stone']=-1},limits={['minecraft:stone']=64}}
   assert(not n:accept(12,m,'test',2))
 end)
+
+test('mission fuel telemetry validates arithmetic identity and current fuel and strips unknown fields',function()
+  local U=require('autobuilder.core.util');local N=require('autobuilder.core.network')
+  local m=packet('heartbeat',1);m.payload.task='task:1';m.payload.fuel=100
+  local b={taskId='task:1',scope='excursion',current=100,outward=20,work=10,returning=20,reserve=100,required=150,shortfall=50,allowed=false}
+  m.payload.fuelBudget=U.copy(b);m.payload.fuelBudget.extra=m.payload.fuelBudget
+  local got=assert(net(7,1):accept(12,m,'test',1));assert(got.payload.fuelBudget,'mission budget missing');eq(got.payload.fuelBudget.required,150);eq(got.payload.fuelBudget.extra,nil)
+  for _,change in ipairs({{work=-1},{work=1.5},{required=149},{shortfall=0},{allowed=true},{taskId='other'},{current=99},{scope='guaranteed'},{reserve=math.huge}}) do
+    m.payload.fuelBudget=U.copy(b);for k,v in pairs(change) do m.payload.fuelBudget[k]=v end
+    assert(not N.validate(12,m),'malformed budget accepted')
+  end
+  m.payload.fuelBudget=nil;assert(N.validate(12,m),'legacy telemetry rejected')
+end)
+
+test('worker publishes current mission fuel and explicit unavailable geometry without losing telemetry',function()
+  local c=require('tests.loaded_config').load({role='worker',controllerId=7,depot={x=0,y=0,z=0},minimumFuelReserve=20})
+  local t=S.turtle();t.fuel=100
+  local state={id=12,position={known=true,x=0,y=0,z=0,heading='north'},currentTask={id='build',type='BUILD',blocks={{x=10,y=0,z=0,name='minecraft:stone'}}}}
+  local a=require('autobuilder.workers.agent').new(state,c,net(12,1),t,function() return true end)
+  local p=a:telemetry();assert(p.fuelBudget,'missing worker budget');eq(p.fuelBudget.required,54);eq(p.fuelBudget.current,p.fuel);eq(p.fuelBudget.taskId,p.task)
+  state.position.known=false;p=a:telemetry();eq(p.fuelBudget,nil);assert(p.fuelBudgetError:find('position'))
+  state.currentTask=nil;p=a:telemetry();eq(p.fuelBudget,nil);eq(p.fuelBudgetError,nil)
+end)

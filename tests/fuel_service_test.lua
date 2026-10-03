@@ -132,3 +132,34 @@ test('fuel status reports physical station stock owners and actionable shortages
   assert(description:find('home',1,true)); assert(description:find('stock=0',1,true)); assert(description:find('fill=task:',1,true))
   eq(f.h.transfers,before)
 end)
+
+test('a worker above low fuel refuels proactively for its next mission before assignment',function()
+  local f=fixture();local w={id=2,online=true,telemetry={fuel=100,fuelLimit=20000,status='idle',position={known=true,x=0,y=0,z=0},depot={x=0,y=0,z=0},capabilities={telemetry=true,building=true,fuelV1=true}}}
+  f.app.state.workers['2']=w
+  local build=f.q:submit('BUILD',{blocks={{x=50,y=0,z=0,name=mc('stone')}}})
+  f:tick();local refuel=f.q.state.jobs[f.app.state.fuel.stations.home.refuel or '']
+  assert(refuel,'above-low worker was not refueled for queued work');eq(refuel.fuelTarget,214);eq(build.workerId,nil)
+  eq(f.app.state.fuel.stations.home.goal,214)
+  for _=1,5 do f.fuel:step();f:tick() end
+  local nextJob=assert(f.q:assign(f.app.state.workers));eq(nextJob.type,'REFUEL')
+  refuel.status='completed';w.telemetry.fuel=260;f:tick()
+  eq(f.app.state.fuel.stations.home.goal,nil)
+  assert(f.fuel:describe():find('outward=',1,true),'component budget missing from operator status')
+end)
+
+test('fuel forecast refuses endless top ups when a mission exceeds the native tank',function()
+  local f=fixture();f.app.state.workers['2']={id=2,online=true,telemetry={fuel=100,fuelLimit=160,status='idle',position={known=true,x=0,y=0,z=0},depot={x=0,y=0,z=0},capabilities={telemetry=true,building=true,fuelV1=true}}}
+  f.q:submit('BUILD',{blocks={{x=50,y=0,z=0,name=mc('stone')}}})
+  f:tick();local row=f.app.state.fuel.stations.home
+  assert(row.error and row.error:find('fuel limit',1,true),'native limit was not explained')
+  for _,j in pairs(f.q.state.jobs) do assert(j.type~='REFUEL','impossible refuel loop created') end
+end)
+
+test('a full native tank below configured low never creates repeated refuel jobs',function()
+  local f=fixture();f.config.fuel.low=200;f.config.fuel.target=1000
+  f.app.state.workers['2']={id=2,online=true,telemetry={fuel=160,fuelLimit=160,status='idle',position={known=true,x=0,y=0,z=0},depot={x=0,y=0,z=0},capabilities={telemetry=true,fuelV1=true}}}
+  f.app.state.fuel.stations.home={goal=1000}
+  for _=1,3 do f:tick() end
+  for _,j in pairs(f.q.state.jobs) do assert(j.type~='REFUEL','full native tank was queued for refuel') end
+  eq(f.app.state.fuel.stations.home.goal,nil)
+end)

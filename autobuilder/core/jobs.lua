@@ -68,6 +68,8 @@ function M.new(state,save,clock,controllerId,config,chunks)
     if not w.online or not t or not (t.capabilities or {}).mining or job.item and not Materials.accepts(t.miningResources,job.item) then
       return false,'mining worker capability or resources changed'
     end
+    local fueled,why=require('autobuilder.resources.fuel_budget').admit(config,job,w)
+    if not fueled then return false,why end
     if config and config.scaling then return require('autobuilder.core.scaling').canAssign(state,config,job,w,counts,clock(),workers) end
     return not Coordination.workerBusy(state,w.id,job.id),'worker already owns work'
   end

@@ -90,3 +90,30 @@ shaft. Larger traffic planning, automatic inventory recovery and workload scalin
 remain tracked in [fleet progress](fleet-progress.md). See the
 [implementation contract](fuel-management-design.md) and
 [0.15.0 acceptance](validation-0.15.0.md) for evidence and limits.
+
+
+## Mission budgets and proactive refueling
+
+`fuel` now shows a scoped budget for each owned or next compatible queued mission:
+current fuel, outward travel, work, return and reserve. The summary is for the next
+bounded excursions, not a promise of whole-project fuel cost. One prospective job
+is counted once; suitable already-fueled workers are preferred. Offline ownership
+is retained but its stale fuel is reported as unknown. Missing position or route
+geometry is explicit, never a zero-cost movement estimate.
+
+With automatic fuel enabled, ordinary new assignments must have enough fuel for
+that budget. The check repeats after yielding coverage observations. An idle worker
+above `fuel.low` still receives a managed refuel task when its next ready mission
+needs more. Its target rises to the mission requirement if necessary. Station
+batches, inventory claims and measured refueling remain unchanged. Native tank
+limits cap configurable targets; a mission beyond that capacity shows its required
+fuel and the limit instead of repeatedly topping up a full tank.
+
+Construction budgets retain the existing largest-next-target excursion, including
+clearance, approach, temporary access, depot return and reserve. They allow normal
+refueling between targets. Mining and harvesting likewise forecast bounded work
+before safe return; hauling covers one cargo trip. Rescue and home/station travel
+retain their existing recovery rules. Dynamic obstructions can increase actual
+travel and still invoke the navigation reserve stop. Forecast fuel-item quantities
+are estimates; only observed station stock and transfer receipts are physical fuel.
+Optional task-bound budget telemetry remains compatible with older worker reports.

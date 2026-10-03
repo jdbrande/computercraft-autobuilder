@@ -11,6 +11,8 @@ local function telemetry(p)
   for _,field in ipairs({'fuelRequired','fuelLimit'}) do
     if p[field]~=nil and (not U.integer(p[field]) or p[field]<1 or p[field]>100000000) then return false end
   end
+  if p.fuelBudget~=nil and not require('autobuilder.resources.fuel_budget').valid(p.fuelBudget,p.task,p.fuel) then return false end
+  if p.fuelBudgetError~=nil and (not short(p.fuelBudgetError,512) or not short(p.task,128) or p.fuelBudget~=nil) then return false end
   if p.chunkAnchor~=nil and not Chunks.validAnchor(p.chunkAnchor) then return false end
   if p.poseRecovery~=nil and (not TaskMessages.validPoseReport(p.poseRecovery)
     or p.poseRecovery.stage~='settled' and p.poseRecovery.jobId~=p.task) then return false end
@@ -95,6 +97,7 @@ function M.new(hw,config,id,boot)
     local p=message.payload; local clean={}
     if message.type=='register' or message.type=='heartbeat' then
       clean={controllerBoot=p.controllerBoot,label=p.label,status=p.status,fuel=p.fuel,task=p.task,fuelRequired=p.fuelRequired,fuelLimit=p.fuelLimit,
+        fuelBudget=require('autobuilder.resources.fuel_budget').clean(p.fuelBudget),fuelBudgetError=p.fuelBudgetError,
         inventory={used=p.inventory.used,slots=16},capabilities=U.copy(p.capabilities),
         position={known=p.position.known,heading=p.position.heading,source=p.position.source}}
       if p.position.known then clean.position.x,clean.position.y,clean.position.z=p.position.x,p.position.y,p.position.z end

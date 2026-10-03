@@ -1108,12 +1108,12 @@ or `nil,reason`; `Budget.construction(config,task,pose,current)` preserves the
 existing worker gate and route-distance errors; `Budget.valid/clean` validate and
 copy optional task-bound telemetry.
 
-- [ ] Add failing finite/unlimited cases for construction, survey/preparation, mining,
+- [x] Add failing finite/unlimited cases for construction, survey/preparation, mining,
   renewables, transport, rescue, home, refuel and stationary craft. Include missing
   pose, progressed work, access geometry and maximum travel distance.
-- [ ] Extract construction calculation without weakening its existing checks;
+- [x] Extract construction calculation without weakening its existing checks;
   implement remaining role estimates using current route rules. Run focused tests.
-- [ ] Add malformed/inconsistent/task-mismatch/legacy telemetry tests; publish and
+- [x] Add malformed/inconsistent/task-mismatch/legacy telemetry tests; publish and
   validate the optional budget. Run worker/network regressions and commit.
 
 ### Task54: Forecast-driven admission and station targets
@@ -1124,13 +1124,13 @@ core/jobs.lua where needed; fuel-service/queue/loaded-coverage tests.
 one distinct next compatible ready task and budget. Shared ordinary admission uses
 its concrete task budget; station target uses the same requirement.
 
-- [ ] Add failing tests for above-low under-budget workers, alternate ready workers,
+- [x] Add failing tests for above-low under-budget workers, alternate ready workers,
   deterministic unique forecast matching, a changed budget across yielding coverage,
   retained active/offline ownership and recovery-task eligibility.
-- [ ] Enforce final admission when automatic fuel is enabled. Raise station refuel
+- [x] Enforce final admission when automatic fuel is enabled. Raise station refuel
   targets to ready mission needs; surface native-limit/unknown-geometry errors.
   Preserve finite batches and journal recovery. Verify repeated fills/restarts.
-- [ ] Expose component budgets and scoped aggregate demand/shortfall in `fuel`;
+- [x] Expose component budgets and scoped aggregate demand/shortfall in `fuel`;
   distinguish estimates from stock. Run focused checks, document and commit.
 
 ### Task55: Runtime/native fuel forecast acceptance and integration

@@ -21,30 +21,9 @@ function M.new(app,config,e,network,clock)
     return t and (not t.type or t.type=='MINE') and (config.mining.enabled or t.exploration)
   end
   local function constructionFuel(task,origin)
-    local home=config.depot; local pose=origin or app.navigation.pose
-    if not construction[task.type] or not U.position(home) or not U.position(pose) then return nil end
-    local height=math.max(pose.y,home.y+2,task.clearanceY or -math.huge)
-    for _,block in ipairs(task.blocks or {}) do height=math.max(height,block.y+2) end
-    local required=0; local limit=config.maxTravelDistance or 1024
-    local targets=task.blocks or {}
-    if task.siteSurvey then
-      targets={};for _,c in ipairs(task.siteSurvey.columns) do targets[#targets+1]={x=c.x,y=c.minY+1,z=c.z} end
-    end
-    for index=task.siteSurvey and (task.progress or 0)+1 or task.index or 1,#targets do
-      local plan=not task.siteSurvey and require('autobuilder.build.placement').plan(targets[index])
-      if plan and task.siteAccess then plan=require('autobuilder.build.site_work').approach(task.siteAccess,targets[index],plan) end
-      local stand=plan and plan.stand or targets[index]
-      local outward=math.abs(pose.x-stand.x)+math.abs(pose.z-stand.z)
-      local returning=math.abs(home.x-stand.x)+math.abs(home.z-stand.z)
-      local leg=math.max(outward,returning,height-pose.y,height-home.y,height-stand.y)
-      if leg>limit then return nil,'Construction route needs '..leg..' blocks; maxTravelDistance is '..limit..'. Increase the configured travel limit.' end
-      -- Include both overhead ascents, the work stand and the depot descent.
-      -- Eight extra moves cover the builder's bounded side-approach offsets.
-      local fallback=stand.y<targets[index].y and 2*(height-stand.y) or 0
-      local access=task.siteAccess and 4*#task.siteAccess.cells or 0 -- exit/reentry and the return through the owned shaft
-      required=math.max(required,outward+returning+(height-pose.y)+(height-home.y)+2*(height-stand.y)+fallback+access+8+config.minimumFuelReserve)
-    end
-    return required
+    if not construction[task.type] then return nil end
+    local b,why=require('autobuilder.resources.fuel_budget').construction(config,task,origin or app.navigation.pose,e.turtle.getFuelLevel())
+    return b and b.required,why
   end
   local function refuelInPlace(target)
     local item=e.turtle.getItemDetail(15)

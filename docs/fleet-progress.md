@@ -1136,3 +1136,19 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   and Tasks53–55 extend shared bounded-excursion budgets, validated telemetry,
   proactive station targets and final dispatch admission. No0.26 implementation
   is claimed yet.0.24 native and0.24/0.25 complete Lua gates continue independently.
+
+- Task53 shared role budgets and optional task-bound telemetry are implemented.
+  Construction retains its original maximum excursion arithmetic; transport, rescue,
+  home/station, farms, access work and bounded mining expose separate outward/work/
+  return/reserve components. Unknown geometry remains explicit. Focused arithmetic,
+  network, construction, fuel-service and automation runtime checks pass. The focused
+  construction supply/fuel runtime regression is running before the task commit.
+
+- Task54 now matches distinct queued missions to compatible idle workers, rechecks
+  concrete fuel budgets at final admission and raises managed station targets before
+  assignment. Red/green tests cover above-low shortage, native-limit refusal and a
+  full-tank repeated-refuel bug; queue tests cover a fuel change during coverage
+  observation and selecting a different ready worker. Role/network/coordination/
+  coverage checks pass. An actual-runtime distant verification refueled first,
+  survived controller reboot, completed correctly and conserved all four initial
+  coal items with one consumed. Broader fuel runtime checks are running.
