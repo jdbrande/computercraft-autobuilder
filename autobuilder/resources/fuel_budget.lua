@@ -57,7 +57,12 @@ function M.mission(config,task,telemetry)
     elseif g then outward=math.max(0,outward-math.max(0,trail-1))
     else outward=task.outbound and math.max(0,#task.outbound-math.max(1,trail)) or U.distance(pose,entry) end
     returning=returning+outward
-    return result(task,current,outward,back and 0 or 2,returning,reserve+((config.mining or {}).returnMargin or 8))
+    reserve=reserve+((config.mining or {}).returnMargin or 8)
+    if not back and phase~='work' and phase~='survey' and phase~='travel' then
+      local target=telemetry.miningRoute and telemetry.miningRoute.fuelTarget or 0
+      reserve=math.max(reserve,target-outward-returning-2)
+    end
+    return result(task,current,outward,back and 0 or 2,returning,reserve)
   elseif task.type=='TRANSPORT' or task.type=='RESCUE' then
     if not U.position(task.source) or not U.position(task.destination) then return nil,'Pickup and delivery geometry unavailable' end
     home=task.home or home
@@ -189,7 +194,8 @@ function M.forecast(state,config)
         and require('autobuilder.resources.materials').accepts(t.miningResources,g.item)
         and require('autobuilder.factory.factory').equal(need.home,t.explorationHome)
         and require('autobuilder.factory.factory').equal(need.bounds,config.exploration.bounds) then
-        local b=Fuel.budget(t.fuel,need.outward,2,need.outward,need.reserve)
+        local reserve=math.max(need.reserve,((t.miningRoute or {}).fuelTarget or 0)-2*need.outward-2)
+        local b=Fuel.budget(t.fuel,need.outward,2,need.outward,reserve)
         b.taskId=g.id..':fuel';b.scope='excursion'
         if not chosen or (not t.fuelLimit or b.required<=t.fuelLimit) and (state.workers[chosen].telemetry.fuelLimit and best.required>state.workers[chosen].telemetry.fuelLimit or b.required<best.required) then chosen,best=id,b end
       end

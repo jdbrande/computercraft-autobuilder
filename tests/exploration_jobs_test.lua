@@ -226,6 +226,9 @@ test('unmaterialized exploration fuel demand triggers a forecast without inventi
   eq(jobs:assign(workers,{}),nil);eq(next(state.jobs),nil)
   local f=require('autobuilder.resources.fuel_budget').forecast(state,config)
   assert(f.required>=150,'live acquisition shortage vanished before concrete trip creation');assert(f.shortfall>=50);eq(#group.tripIds,0)
+  t.miningRoute={entry={x=0,y=0,z=0},fuelTarget=1000}
+  f=require('autobuilder.resources.fuel_budget').forecast(state,config);eq(f.required,1000);eq(f.shortfall,900)
+  t.miningRoute=nil
   jobs:setAcquisitionPaused(group.id,true);eq(require('autobuilder.resources.fuel_budget').forecast(state,config).required,0)
   jobs:setAcquisitionPaused(group.id,false);t.fuel=200
   local trip=assert(jobs:assign(workers,{}),'refueled explorer did not resume');eq(trip.workerId,1);eq(#group.tripIds,1)

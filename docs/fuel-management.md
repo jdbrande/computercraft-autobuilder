@@ -119,8 +119,10 @@ are estimates; only observed station stock and transfer receipts are physical fu
 Optional task-bound budget telemetry remains compatible with older worker reports.
 
 
-Fixed miners advertise their configured entry in optional validated telemetry;
+Miners advertise their departure fuel target and entry in optional validated telemetry;
 update workers with the controller to obtain those per-worker route forecasts.
+Initial assignments and prospective exploration include that departure target;
+ongoing trips budget their remaining work rather than another fresh departure.
 Exploration's bounded planner exposes prospective fuel needs even before a trip
 can be created. The initial exit/route lower bound may rise when a detour is found;
 no additional route search or speculative ownership is created by the fuel view.

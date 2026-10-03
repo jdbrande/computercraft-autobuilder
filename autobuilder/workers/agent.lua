@@ -21,7 +21,12 @@ function M.new(state,config,network,turtle,save,chunkProbe)
     local limit=turtle.getFuelLimit and turtle.getFuelLimit() or nil
     if limit=='unlimited' then limit=nil end
     local current=turtle.getFuelLevel();local budget,budgetError
-    local miningRoute=config.mining and config.mining.enabled and U.position(config.mining.entry) and {entry=U.copy(config.mining.entry)} or nil
+    local mining=config.mining;local miningRoute
+    if mining and mining.enabled then
+      local entry=mining.entry or (task and task.exploration and task.exploration.entry)
+      if not entry and capabilities.explorationV1 then entry=(mining.exitRoute or {})[#(mining.exitRoute or {})] or config.depot end
+      if U.position(entry) then miningRoute={entry=U.copy(entry),fuelTarget=mining.fuelTarget} end
+    end
     if task then budget,budgetError=require('autobuilder.resources.fuel_budget').mission(config,task,{fuel=current,position=p,depot=config.depot,miningRoute=miningRoute}) end
     return {cargo=cargo,controllerBoot=state.controllerBoot,poseRecovery=require('autobuilder.core.task_messages').poseReport(state.poseRecovery or state.poseReceipt),
       fuelBudget=budget,fuelBudgetError=budgetError,

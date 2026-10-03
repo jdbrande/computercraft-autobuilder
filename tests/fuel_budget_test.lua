@@ -130,3 +130,12 @@ test('fixed miner budget uses its advertised entry rather than controller mining
   local t=telemetry(1000);t.miningRoute={entry={x=20,y=0,z=0}}
   local b=assert(B.mission(config,{id='fixed',item='minecraft:coal',quantity=4},t));eq(b.outward,20);eq(b.returning,20);eq(b.required,70)
 end)
+
+test('initial mining fuel budgets include the workers configured departure target',function()
+  local B=require('autobuilder.resources.fuel_budget');local t=telemetry(200)
+  t.miningRoute={entry={x=3,y=0,z=0},fuelTarget=1000}
+  local task={id='fixed',item='minecraft:coal',quantity=1}
+  local b=assert(B.mission(c,task,t));eq(b.required,1000);eq(b.shortfall,800)
+  task.phase='work';task.trail={{x=0,y=0,z=0},{x=1,y=0,z=0}};t.position={known=true,x=1,y=0,z=0}
+  b=assert(B.mission(c,task,t));assert(b.required<1000,'active mining charged a fresh departure target')
+end)

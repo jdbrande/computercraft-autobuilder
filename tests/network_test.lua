@@ -128,8 +128,19 @@ end)
 
 test('fixed mining route telemetry copies validated worker entry and accepts legacy omission',function()
   local N=require('autobuilder.core.network');local m=packet('heartbeat',1)
-  m.payload.miningRoute={entry={x=40,y=-20,z=7}};m.payload.miningRoute.extra=m.payload.miningRoute
-  local got=assert(net(7,1):accept(12,m,'test',1));eq(got.payload.miningRoute.entry.x,40);eq(got.payload.miningRoute.extra,nil)
+  m.payload.miningRoute={entry={x=40,y=-20,z=7},fuelTarget=1000};m.payload.miningRoute.extra=m.payload.miningRoute
+  local got=assert(net(7,1):accept(12,m,'test',1));eq(got.payload.miningRoute.entry.x,40);eq(got.payload.miningRoute.extra,nil);eq(got.payload.miningRoute.fuelTarget,1000)
   for _,bad in ipairs({false,{}, {entry={x=0/0,y=1,z=2}},{entry={x=1,y=1.5,z=2}}}) do m.payload.miningRoute=bad;assert(not N.validate(12,m)) end
+  for _,bad in ipairs({0,-1,1.5,'1000',math.huge}) do m.payload.miningRoute={entry={x=0,y=0,z=0},fuelTarget=bad};assert(not N.validate(12,m)) end
+  m.payload.miningRoute={entry={x=0,y=0,z=0}};assert(N.validate(12,m))
   m.payload.miningRoute=nil;assert(N.validate(12,m))
+end)
+
+
+test('idle explorer advertises its departure fuel target before a trip exists',function()
+  local c={mining={enabled=true,fuelTarget=1000,exitRoute={{x=1,y=0,z=0}}},capabilities={explorationV1=true},depot={x=0,y=0,z=0}}
+  local state={id=12,position={known=true,x=0,y=0,z=0,heading='east'}}
+  local a=require('autobuilder.workers.agent').new(state,c,net(12,1),S.turtle(),function() return true end)
+  local p=a:telemetry();eq(p.miningRoute.fuelTarget,1000);eq(p.miningRoute.entry.x,1);eq(p.task,nil)
+  c.mining.exitRoute[1].x=2;eq(p.miningRoute.entry.x,1)
 end)

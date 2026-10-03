@@ -36,7 +36,8 @@ local function telemetry(p)
     if type(p.miningArea)~='table' or not U.position(p.miningArea.min) or not U.position(p.miningArea.max) then return false end
     for _,axis in ipairs({'x','y','z'}) do if p.miningArea.max[axis]<p.miningArea.min[axis] or p.miningArea.max[axis]-p.miningArea.min[axis]>256 then return false end end
   end
-  if p.miningRoute~=nil and (type(p.miningRoute)~='table' or not U.position(p.miningRoute.entry)) then return false end
+  if p.miningRoute~=nil and (type(p.miningRoute)~='table' or not U.position(p.miningRoute.entry)
+    or p.miningRoute.fuelTarget~=nil and (not U.integer(p.miningRoute.fuelTarget) or p.miningRoute.fuelTarget<1 or p.miningRoute.fuelTarget>100000000)) then return false end
   return true
 end
 function M.validate(sender,m)
@@ -107,7 +108,7 @@ function M.new(hw,config,id,boot)
       clean.cargo=require('autobuilder.storage.returns').cleanCargo(p.cargo)
       if p.depot then clean.depot={x=p.depot.x,y=p.depot.y,z=p.depot.z,heading=p.depot.heading} end
       clean.miningResources=U.copy(p.miningResources)
-      if p.miningRoute then clean.miningRoute={entry={x=p.miningRoute.entry.x,y=p.miningRoute.entry.y,z=p.miningRoute.entry.z}} end
+      if p.miningRoute then clean.miningRoute={entry={x=p.miningRoute.entry.x,y=p.miningRoute.entry.y,z=p.miningRoute.entry.z},fuelTarget=p.miningRoute.fuelTarget} end
       if p.explorationHome then clean.explorationHome=E.cleanHome(p.explorationHome) end
       if p.miningArea then clean.miningArea={min={x=p.miningArea.min.x,y=p.miningArea.min.y,z=p.miningArea.min.z},max={x=p.miningArea.max.x,y=p.miningArea.max.y,z=p.miningArea.max.z}} end
     elseif message.type=='ack' then clean.requestId=p.requestId

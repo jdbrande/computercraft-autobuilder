@@ -582,7 +582,7 @@
       "version": "0.26.0"
     },
     {
-      "bytes": 8029,
+      "bytes": 8216,
       "path": "autobuilder/core/network.lua",
       "roles": [
         "controller",
@@ -592,7 +592,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "f181d3ce36809b76091007ecc570a9ee97df4a982b63031e5cd98db2da652992",
+      "sha256": "6e02cbf38be61c4e8d662765d8d59eacefd97bfa45e933c878202f6164768543",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/network.lua",
       "version": "0.26.0"
     },
@@ -1031,7 +1031,7 @@
       "version": "0.26.0"
     },
     {
-      "bytes": 13520,
+      "bytes": 13866,
       "path": "autobuilder/resources/fuel_budget.lua",
       "roles": [
         "controller",
@@ -1041,7 +1041,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "a872ad60888fdb08cee22eefc5daf7cea401b1e9bb061c22f2e6a2f5857ecb23",
+      "sha256": "7269e9b32c8559bd0ee62d25ca156c4da6f1cc8de24dee9d747f287cf7343074",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/resources/fuel_budget.lua",
       "version": "0.26.0"
     },
@@ -1316,7 +1316,7 @@
       "version": "0.26.0"
     },
     {
-      "bytes": 4664,
+      "bytes": 4935,
       "path": "autobuilder/workers/agent.lua",
       "roles": [
         "controller",
@@ -1326,7 +1326,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "baeae906ca12dce048fe2f5086418d6edad9904d182ddd3c1c2fcc7076cdf912",
+      "sha256": "4a09bfa728a55a7eb1f0969b30ed08d051058a9b5a71b9935b711c33b3ee4fad",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/workers/agent.lua",
       "version": "0.26.0"
     },

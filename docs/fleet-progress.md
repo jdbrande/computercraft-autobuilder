@@ -1168,3 +1168,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   the explicit bounded-excursion forecast; navigation still enforces actual reserves.
   Full suites and native acceptance remain mandatory parent gates. Neither declined
   item is treated as finished, and no external blocker exists.
+
+- A final mining departure check exposed a worker/controller target mismatch:
+  the worker could demand1,000 fuel after an apparently affordable assignment.
+  Validated telemetry now carries its departure target even for idle explorers;
+  initial and prospective budgets include it while active trips retain remaining
+  work budgets. Arithmetic, telemetry and prospective-demand regressions pass.
+  The superseded0.26 full run was stopped before restarting on this final source.
