@@ -629,7 +629,7 @@ full runtime fixture with two independent Crafty turtles.
 
 ### Task 22: Parallel factory native acceptance and integration
 
-- [ ] Document configuration, ownership, bottlenecks, measured rates and limitations.
+- [x] Document configuration, ownership, bottlenecks, measured rates and limitations.
   Run native two-Crafty acceptance with finite batches and restart. Correct defects
   with failing regressions. Run all Lua/Python/release checks, one whole-branch
   review and required fix pass, integrate/push, then continue remaining requirements.

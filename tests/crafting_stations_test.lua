@@ -36,3 +36,11 @@ test('private worker completion stays owned and collecting until physical centra
   assert(q:progress(12,{jobId=j.id,phase='work',progress=4})); eq(j.status,'collecting')
   assert(q:progress(12,{jobId=j.id,phase='completed',progress=4})); eq(j.status,'collecting')
 end)
+
+
+test('legacy crafting endpoints cannot alias a configured private station',function()
+  for _,field in ipairs({'input','output'}) do
+    local legacy={[field]='buffer'}
+    assert(not pcall(C.load,{craftingStation=legacy,craftingStations={station}}),'legacy '..field..' aliases private buffer')
+  end
+end)

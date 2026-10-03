@@ -319,7 +319,7 @@ function M.new(app,config,e,queue)
         end
         if complete then r.operation=r.operation+1; r.jobId=nil; r.jobIds=nil; r.status='running'; r.error=nil; save()
         elseif blocked then r.status='blocked'; r.error=blocked; save() end
-      elseif op.type=='CRAFT' and (r.privateCraft or not r.jobId and #(config.craftingStations or {})>0) then
+      elseif op.type=='CRAFT' and (r.privateCraft or self.parallel:owns(r) or not r.jobId and #(config.craftingStations or {})>0) then
         self.parallel:schedule(r,op)
       else
         local job=r.jobId and s.jobs[r.jobId]

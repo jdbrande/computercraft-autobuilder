@@ -14,7 +14,7 @@ stations, one-item transfers, interrupted physical staging/crafting/collection,
 lost acknowledgements and older shared-furnace drainage; suite487 passed. Additional
 short-stock and measured-status cases pass, including counts for older jobs without
 timing fields. Final pre-review gate:489 Lua tests and all16 Python tests passed;
-release generation/check and whitespace checks passed. Independent review pending.
+release generation/check and whitespace checks passed. Independent review found two Important recovery defects and one minor alias-validation defect.
 
 A regression reproduced a liveness bug during integration: waiting private batches
 were consuming every controller action while an older shared furnace owner needed
@@ -22,6 +22,16 @@ to finish. Private staging now yields to the existing owner. Private worker fuel
 reserves are also excluded from its buffer view: the controller's central input
 claim already protects fuel reserves, so exact staged recipe ingredients remain
 usable. Private worker receipts cannot credit central stock.
+
+The review regressions failed before their fixes: a reboot could expose staged
+private ingredients through changed shared-storage configuration; a crash after
+batch creation could fall back to duplicate legacy crafting; legacy station names
+could alias private endpoints. Startup now validates saved ownership before stock
+observation, private mode is saved before submission and recovered from old batch
+ownership, and configuration checks include legacy endpoints. Regression recovery
+restores valid configuration and verifies exact final production. Final gate:492 Lua tests and16 Python tests passed; release generation/check and
+whitespace checks passed. The native acceptance below predates these
+configuration/checkpoint fixes; their exact recovery is regression-tested.
 
 ## Native Minecraft acceptance — 2026-10-03
 

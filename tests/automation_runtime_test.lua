@@ -541,6 +541,7 @@ local function parallelFixture()
   end})
   second.we.os.getComputerID=function() return 13 end; second.we.fs=S.fs()
   f.cc.turtleFuelReserveItems={}; f.cc.craftingBatchSize=2
+  f.cc.craftingStation.input=''; f.cc.craftingStation.output=''
   f.cc.craftingStations={{id='west',workerId=12,buffer='buffer',input='input',output='output'},
     {id='east',workerId=13,buffer='buffer2',input='input2',output='output2'}}
   f.wc.craftingStation.buffer='buffer'; f.wc.turtleFuelReserveItems={}
@@ -692,4 +693,56 @@ test('factory status reports measured collection rates and station ownership wit
   assert(text:find('stations=2',1,true)); assert(text:find('delivered=16',1,true)); assert(text:find('/s',1,true))
   assert(text:find('west',1,true) and text:find('east',1,true)); eq(f.h.transfers,before)
   assert(f.c.state.factoryLines[2]:find('collected=8',1,true),'legacy completed jobs disappeared from station totals')
+end)
+
+
+test('reboot refuses to reclassify an owned private station as shared inventory',function()
+  local f=parallelFixture(); local original=U.copy(f.cc); f.cc.craftingStations={original.craftingStations[1]}
+  f.c=Runtime.new(f.cc,f.ce); f:request(16)
+  local staged
+  for _=1,30 do
+    assert(f.c:tick()); assert(f.c:workStep())
+    for _,j in pairs(f.c.state.automation.jobs) do if j.privateReady then staged=j end end
+    if staged then break end
+  end
+  assert(staged,'first private batch never staged'); eq(f.h.inventories.buffer[1].count,8)
+  local before=f.h.transfers
+  for _,field in ipairs({'storage','furnace','supply','legacy','station'}) do
+    local changed=U.copy(original); changed.craftingStations={U.copy(original.craftingStations[2])}
+    if field=='storage' then changed.storageInventories={'store','buffer'}
+    elseif field=='furnace' then changed.furnaces={'buffer'}
+    elseif field=='supply' then changed.supply.inventory='buffer'
+    elseif field=='legacy' then changed.craftingStation.input='buffer'
+    else changed.craftingStations[1].buffer='buffer' end
+    local ok,why=pcall(Runtime.new,require('autobuilder.config').load(changed),f.ce)
+    assert(not ok and tostring(why):find('owned private',1,true),'accepted conflicting '..field..': '..tostring(why))
+    eq(f.h.transfers,before); eq(f.h.inventories.buffer[1].count,8)
+  end
+  f.cc=original; f.c=Runtime.new(f.cc,f.ce); f:finish()
+  eq(f.h:count(mc('stone_bricks')),16); eq(f.h.crafts+f.other.h.crafts,4)
+end)
+
+test('private batch checkpoint cannot fall back to duplicate legacy work after a crash',function()
+  local f=parallelFixture(); f:request(16)
+  local submit=f.c.automation.queue.submit; local crashed=false
+  f.c.automation.queue.submit=function(q,...)
+    local job=submit(q,...)
+    if job.privateStation then crashed=true; error('power loss after private batch checkpoint') end
+    return job
+  end
+  assert(not pcall(function() for _=1,20 do f:step() end end)); assert(crashed)
+  local stations=U.copy(f.cc.craftingStations); f.cc.craftingStations={}; f.ce.packets={}
+  f.c=Runtime.new(f.cc,f.ce)
+  eq(f.c.state.automation.requests[f.id].privateCraft,true)
+  -- Older checkpoints may predate the marker fix: saved ownership still routes work.
+  f.c.state.automation.requests[f.id].privateCraft=nil; f.c:save(); f.c=Runtime.new(f.cc,f.ce)
+  for _=1,100 do f:step() end
+  local batches=0
+  for _,j in pairs(f.c.state.automation.jobs) do
+    assert(j.privateStation,'duplicate legacy operation appeared after private batch checkpoint')
+    batches=batches+j.batches
+  end
+  eq(batches,2); eq(f.h:count(mc('stone_bricks')),8)
+  f.cc.craftingStations=stations; f.c=Runtime.new(f.cc,f.ce); f:finish()
+  eq(f.h:count(mc('stone_bricks')),16); eq(f.h.crafts+f.other.h.crafts,4)
 end)

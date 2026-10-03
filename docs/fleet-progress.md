@@ -10,9 +10,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Inventory ownership integrated and pushed at `e66daa5`.
 - Fuel distribution/rescue integrated and pushed at `c0d1aa5`:470 Lua/16 Python
   tests and native acceptance including final review regressions.
-- Current branch: `milestone/0.16.0`, capacity and parallel factory.
-- Current task: native two-Crafty acceptance, status/documentation and final checks
-  for capacity and parallel staging/collection (Task22).
+- Capacity and parallel factory completed:492 Lua/16 Python tests, native
+  two-Crafty acceptance and regression-backed final review fixes.
+- Next task: native binary schematic import, then chunk-loading integration.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -38,9 +38,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 10: mining intelligence | Surveys, observed resources, protection, routes and exhaustion | Persist hazard/inaccessibility/density evidence and apply ranking |
 | 11: fuel management | Configurable fuels, durable stations, automatic refuel and native rescue accepted; budgets deny unsafe trips | Per-mission budget presentation for every role and fleet-wide predictive fuel forecasting |
 | 12: logistics network | Journaled point-to-point courier and supply batch executors | Pickup/destination capacity reservations, automatic station routing and dispatch |
-| 13: storage abstraction | Durable count claims and physical/available/reserved/transit/expected/project views accepted in 0.14.0 | Destination capacity and concurrent physical ownership |
+| 13: storage abstraction | Durable count claims and physical/available/reserved/transit/expected/project views accepted in 0.14.0 | Native slot capacity and private station ownership accepted in0.16; general courier integration remains |
 | 14: continuous forecasting | Acquisition targets and shortages | Proactive per-project coverage of all physical/expected states |
-| 15: parallel crafting | One exclusive Crafty station | Multiple stations and finite tasks backed by ingredient/output leases |
+| 15: parallel crafting | Two native private Crafty stations with input/output leases, finite batches and restart acceptance | Automatic capacity-based batch sizing, cross-role pipeline integration |
 | 16: processing network | Furnace lanes and fuel partitioning | Generic machine providers, timing/capacity forecasts and supported processors |
 | 17: renewables | Managed trees, crops, column farms with replant/return journals | Provider coverage/reserve policies for registered additional farms |
 | 18: builder fleet | Owned regions and movement reservations | Concurrent multi-builder acceptance with independent supply and dependencies |
@@ -250,3 +250,13 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Computers120–122 are shut down; observer/station force-load tickets removed.
   Final pre-review gate:489 Lua/16 Python tests, regenerated0.16.0 release/check and
   whitespace validation. Whole-branch review is next.
+
+- Parallel-factory review found two Important recovery defects and one minor
+  configuration alias defect. Three regressions failed then passed: saved private
+  inventories cannot become shared stock; a crash cannot switch a partly assigned
+  private operation to legacy crafting; legacy endpoints cannot alias private
+  stations. Final full-suite gate is running. Automatic smaller batches for
+  first-time high-yield recipes remain tracked with dynamic crafting scaling.
+
+- Task22 final gate:492 Lua/16 Python tests, release generation/check and whitespace
+  checks passed. Reviewed fixes are complete; integrating0.16 and continuing0.17.

@@ -85,3 +85,10 @@ Legacy shared-stock crafting, furnace operations, mining and supply retain their
 existing physical barrier. This milestone allows concurrent private crafters;
 cross-role continuous production, broader courier routing and dynamic role
 allocation remain required work in [fleet progress](fleet-progress.md).
+
+Configuration changes do not release saved station ownership. Startup rejects a
+shared storage/furnace/supply/fuel/legacy endpoint that aliases an unfinished
+private station, or assigns its inventories to a different station contract.
+Restore the previous configuration, let the owned work drain, then reconfigure.
+Private operation routing is checkpointed before batch creation and recovered
+from existing batches, including older checkpoints without the routing marker.

@@ -37,6 +37,7 @@ function M.new(config,e)
     if config.initialPosition then state.position.known=true; state.position.source='configured' end
   end
   validateState(state,config.role,id)
+  if config.role=='controller' then require('autobuilder.factory.stations').validateSaved(config,state) end
   -- UTC prevents a restored older snapshot from reusing the last boot's IDs.
   state.boot=math.max(state.boot+1,math.floor(clock()*1000))
   local self={state=state,config=config,page=0,motionVersion=0,busy=false,input=''}

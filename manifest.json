@@ -462,7 +462,7 @@
       "version": "0.16.0"
     },
     {
-      "bytes": 23981,
+      "bytes": 24006,
       "path": "autobuilder/core/production_service.lua",
       "roles": [
         "controller",
@@ -472,7 +472,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "e0211b90a9b277c93024f4d47ee11b66a8ab8a5819eb5f2ca4f74d5ea0d14554",
+      "sha256": "af985e205617865b38b305544eb1dc2896fdb70c14365ebff40d4c0079f21a73",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/production_service.lua",
       "version": "0.16.0"
     },
@@ -507,7 +507,7 @@
       "version": "0.16.0"
     },
     {
-      "bytes": 14872,
+      "bytes": 14980,
       "path": "autobuilder/core/runtime.lua",
       "roles": [
         "controller",
@@ -517,7 +517,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "2b938ccb01d0e9160549cdf96cb6cc3b5976a66421389b18a148a0e225cba535",
+      "sha256": "684c37ab2f1dad455ddc6adca95e61d2d74dee46675f322f5281995d6eae87b6",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/runtime.lua",
       "version": "0.16.0"
     },
@@ -612,7 +612,7 @@
       "version": "0.16.0"
     },
     {
-      "bytes": 12013,
+      "bytes": 12149,
       "path": "autobuilder/factory/parallel.lua",
       "roles": [
         "controller",
@@ -622,7 +622,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "5edc808d40f812acb2e3b6bdcc2496a929ad0ba1f3f38aabd3d64d9e65f1f4a2",
+      "sha256": "9159ab0e251d8e6196744c6132ba81b444278a10e9ee67ae6b92fe15cb0b5bc9",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/factory/parallel.lua",
       "version": "0.16.0"
     },
@@ -657,7 +657,7 @@
       "version": "0.16.0"
     },
     {
-      "bytes": 2150,
+      "bytes": 3937,
       "path": "autobuilder/factory/stations.lua",
       "roles": [
         "controller",
@@ -667,7 +667,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "9452cb7c5fabed36c91b608eccfb6e2ceae60a47aee0a8c5ed1b15817548a342",
+      "sha256": "8858d17ebb7fd48eb21f59063b7a8bda558bec8c18c41c83d9988814adca67ac",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/factory/stations.lua",
       "version": "0.16.0"
     },

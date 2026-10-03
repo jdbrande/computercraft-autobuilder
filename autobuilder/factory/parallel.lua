@@ -14,7 +14,9 @@ function M.new(app,config,e,queue,production)
     end
     table.sort(jobs,function(a,b) return a.productionBatch<b.productionBatch end); return jobs
   end
+  function self:owns(r) return #jobsFor(r)>0 end
   function self:schedule(r,op)
+    if not r.privateCraft then F.commit(r,save,function() r.privateCraft=true end) end
     local jobs=jobsFor(r); local scheduled,complete,why=0,true,nil
     for _,j in ipairs(jobs) do
       assert(j.productionBatch==scheduled,'private craft batch coverage changed')

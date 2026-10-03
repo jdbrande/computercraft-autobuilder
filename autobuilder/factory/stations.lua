@@ -30,7 +30,12 @@ function M.validate(config)
   end
   local localStation=config.craftingStation
   assert(type(localStation.buffer)=='string','invalid crafting buffer')
-  if localStation.buffer~='' then claim(localStation) end
+  if localStation.buffer~='' then claim(localStation)
+  else
+    for _,field in ipairs({'input','output'}) do
+      if localStation[field]~='' then occupied[localStation[field]]=true end
+    end
+  end
   local count=0
   for i,station in pairs(stations) do
     count=count+1; assert(U.integer(i) and i>=1 and i<=#stations and M.valid(station),'invalid crafting station')
@@ -38,5 +43,39 @@ function M.validate(config)
     ids[station.id]=true; workers[station.workerId]=true; claim(station)
   end
   assert(count==#stations,'sparse crafting station array')
+end
+-- Configuration is not an ownership release. Validate before runtime startup can
+-- observe shared stock or dispatch any consumer of a saved private inventory.
+function M.validateSaved(config,state)
+  local shared={}
+  for _,names in ipairs({config.storageInventories,config.furnaces}) do
+    for _,name in ipairs(names) do shared[name]=true end
+  end
+  shared[config.supply.inventory]=true
+  for _,station in ipairs(config.fuel.stations) do shared[station.inventory]=true end
+  for _,field in ipairs({'buffer','input','output'}) do shared[config.craftingStation[field]]=true end
+  local owners={}
+  for _,job in pairs((state.automation or {}).jobs or {}) do
+    if job.privateStation and job.status~='completed' then
+      for _,field in ipairs({'buffer','input','output'}) do owners[job.privateStation[field]]=job.privateStation end
+    end
+  end
+  for _,lease in pairs((state.capacityLedger or {}).leases or {}) do
+    if lease.status=='held' then
+      for name,node in pairs(lease.nodes) do if node.exclusive then owners[name]=owners[name] or true end end
+    end
+  end
+  for name,owner in pairs(owners) do
+    assert(not shared[name],'owned private inventory cannot become shared: '..name)
+    for _,station in ipairs(config.craftingStations) do
+      for _,field in ipairs({'buffer','input','output'}) do
+        if station[field]==name then
+          assert(type(owner)=='table' and station.workerId==owner.workerId
+            and station.buffer==owner.buffer and station.input==owner.input and station.output==owner.output,
+            'owned private inventory cannot change station: '..name)
+        end
+      end
+    end
+  end
 end
 return M
