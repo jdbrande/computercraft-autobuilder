@@ -1,7 +1,9 @@
 local U=require('autobuilder.core.util')
 local Recipes=require('autobuilder.factory.recipes')
 local Fuel=require('autobuilder.factory.fuel')
+local Providers=require('autobuilder.resources.providers')
 local M={}
+local function bounded(n) assert(U.integer(n) and n>=0 and n<=100000000,'expanded item count exceeds limit'); return n end
 local function keys(t) local out={}; for k in pairs(t) do out[#out+1]=k end; table.sort(out); return out end
 local function counts(t)
   assert(type(t)=='table','item counts required')
@@ -16,43 +18,83 @@ function M.expand(requirements,stock,options)
       assert(not seen[item],'material substitution cycle'); seen[item]=true
       item=options.substitutions[item]; assert(U.shortString(item,128),'invalid substitute item')
     end
-    resolved[item]=(resolved[item] or 0)+n
+    resolved[item]=bounded((resolved[item] or 0)+n)
   end
   requirements=resolved
   local registry=options.recipes or Recipes
-  local p={raw={},operations={},missing={},reserveMissing={},available=U.copy(stock),requirements=U.copy(requirements)}
+  local p={raw={},operations={},missing={},reserveMissing={},available=U.copy(stock),requirements=U.copy(requirements),graph={nodes={}}}
   local visiting,visited={},{}
+  local visitedCount=0
   local function validate(item,depth)
     assert(depth<=128,'recipe dependency depth exceeded'); assert(not visiting[item],'recipe cycle at '..item)
     if visited[item] then return end
     visiting[item]=true
     local r=registry.get(item)
-    if r then for _,ingredient in ipairs(keys(r.ingredients)) do validate(ingredient,depth+1) end end
+    visitedCount=visitedCount+1; assert(visitedCount<=4096,'recipe graph item limit exceeded')
+    if r then
+      assert((r.kind=='craft' or r.kind=='smelt') and U.integer(r.yield) and r.yield>=1 and r.yield<=64,'invalid planner recipe')
+      assert(type(r.ingredients)=='table' and next(r.ingredients),'recipe needs ingredients')
+      for ingredient,n in pairs(r.ingredients) do
+        assert(U.shortString(ingredient,128) and U.integer(n) and n>=1 and n<=64,'invalid planner ingredient')
+      end
+      for _,ingredient in ipairs(keys(r.ingredients)) do validate(ingredient,depth+1) end
+    end
     visiting[item]=nil; visited[item]=true
   end
   for _,item in ipairs(keys(requirements)) do validate(item,1) end
+  local nodeCount=0
+  local function demand(item,n)
+    local node=p.graph.nodes[item]
+    if not node then
+      nodeCount=nodeCount+1; assert(nodeCount<=4096,'resource graph item limit exceeded')
+      node={item=item,required=0,available=stock[item] or 0,produced=0,projectRequired=requirements[item] or 0,inputs={}}
+      p.graph.nodes[item]=node
+    end
+    node.required=bounded(node.required+n); return node
+  end
   -- Reserves are removed from usable stock before any production demand is allocated.
   for item,n in pairs(options.turtleFuelReserveItems or {}) do
-    assert(U.integer(n) and n>=0,'invalid turtle fuel reserve')
+    assert(U.shortString(item,128),'invalid turtle fuel reserve item'); bounded(n)
+    if n>0 then demand(item,n).reserved=n end
     local shortage=math.max(0,n-(p.available[item] or 0))
     if shortage>0 then p.reserveMissing[item]=shortage; p.missing[item]=shortage end
     p.available[item]=math.max(0,(p.available[item] or 0)-n)
   end
+  local physical=U.copy(p.available); local lots={}; local steps=0
   local smelts=0
   local function need(item,n)
-    if n==0 then return end
+    bounded(n); if n==0 then return {} end
+    steps=steps+1; assert(steps<=65536,'resource expansion step limit exceeded')
+    local node=demand(item,n); local dependencies={}
     local r=registry.get(item)
-    if not r then p.raw[item]=(p.raw[item] or 0)+n end
+    if not r then p.raw[item]=bounded((p.raw[item] or 0)+n) end
     local used=math.min(p.available[item] or 0,n)
     p.available[item]=(p.available[item] or 0)-used; n=n-used
-    if n==0 then return end
-    if not r then p.missing[item]=(p.missing[item] or 0)+n; return end
+    local original=math.min(physical[item] or 0,used)
+    physical[item]=(physical[item] or 0)-original; local planned=used-original
+    for _,lot in ipairs(lots[item] or {}) do
+      local take=math.min(planned,lot.count)
+      if take>0 then dependencies[lot.id]=true; lot.count=lot.count-take; planned=planned-take end
+      if planned==0 then break end
+    end
+    assert(planned==0,'planned inventory provenance mismatch')
+    if n==0 then return dependencies end
+    if not r then p.missing[item]=bounded((p.missing[item] or 0)+n); return dependencies end
     local batches=math.ceil(n/r.yield); local inputs={}
-    for _,ingredient in ipairs(keys(r.ingredients)) do inputs[ingredient]=r.ingredients[ingredient]*batches; need(ingredient,inputs[ingredient]) end
-    p.operations[#p.operations+1]={type=r.kind=='craft' and 'CRAFT' or 'SMELT',kind=r.kind,item=item,batches=batches,
-      quantity=batches*r.yield,inputs=inputs,ingredients=U.copy(inputs)}
+    local before={}
+    for _,ingredient in ipairs(keys(r.ingredients)) do
+      inputs[ingredient]=bounded(r.ingredients[ingredient]*batches)
+      node.inputs[ingredient]=bounded((node.inputs[ingredient] or 0)+inputs[ingredient])
+      for id in pairs(need(ingredient,inputs[ingredient])) do before[id]=true end
+    end
+    local id=#p.operations+1; assert(id<=4096,'resource plan operation limit exceeded')
+    local quantity=bounded(batches*r.yield); node.produced=bounded(node.produced+quantity)
+    p.operations[id]={id=id,dependencies=keys(before),type=r.kind=='craft' and 'CRAFT' or 'SMELT',kind=r.kind,item=item,batches=batches,
+      quantity=quantity,inputs=inputs,ingredients=U.copy(inputs)}
+    dependencies[id]=true; lots[item]=lots[item] or {}; lots[item][#lots[item]+1]={id=id,count=quantity-n}
     p.available[item]=(p.available[item] or 0)+batches*r.yield-n
-    if r.kind=='smelt' then smelts=smelts+batches end
+    if r.kind=='smelt' then smelts=bounded(smelts+batches) end
+    return dependencies
   end
   for _,item in ipairs(keys(requirements)) do need(item,requirements[item]) end
   -- Reserves were already deducted above. Round for each separately scheduled furnace task.
@@ -66,8 +108,16 @@ function M.expand(requirements,stock,options)
   end
   fuel.reserved=(options.turtleFuelReserveItems or {})[fuel.item] or 0
   fuel.missing=math.max(0,fuel.items-(p.available[fuel.item] or 0)); p.fuel=fuel
-  if fuel.missing>0 then p.missing[fuel.item]=(p.missing[fuel.item] or 0)+fuel.missing end
+  if fuel.missing>0 then p.missing[fuel.item]=bounded((p.missing[fuel.item] or 0)+fuel.missing) end
   p.available[fuel.item]=math.max(0,(p.available[fuel.item] or 0)-fuel.items)
+  if fuel.items>0 then demand(fuel.item,fuel.items).fuel=fuel.items end
+  for item,node in pairs(p.graph.nodes) do
+    node.deficit=math.max(0,node.required-node.available); node.missing=p.missing[item] or 0
+    if node.produced>0 then
+      -- Describe the recipe actually expanded, not an alternative acquisition.
+      for _,candidate in ipairs(Providers.candidates(item,options)) do if candidate.recipe then node.provider=candidate; break end end
+    else node.provider,node.error=Providers.select(item,options,{available=node.available,required=node.required,acquisitionOnly=true}) end
+  end
   return p
 end
 return M

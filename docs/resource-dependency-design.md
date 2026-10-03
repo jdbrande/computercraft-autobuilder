@@ -25,7 +25,7 @@ abandoning offline owners. Raw mining targets keep the existing measured-stock
 and physical-return reconciliation rules.
 
 Graph nodes aggregate required quantities across roots and recipes, original
-usable stock, deficit, planned production, raw shortage, provider and input edges.
+physical stock (including fuel held for the separately counted reserve demand), deficit, planned production, raw shortage, provider and input edges.
 Each operation identifies earlier operations producing its inputs. Preserve
 batch surplus accounting; do not blindly coalesce operations across consumers.
 Validate recipe cycles, depth, yields, ingredient counts, expanded count limits,

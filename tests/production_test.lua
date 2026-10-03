@@ -336,3 +336,45 @@ test('material progress keeps live stock counts after acquisition while factory 
   eq(r.materials[mc('cobblestone')].count,2)
   eq(r.materials[mc('cobblestone')].status,'ready'); assert(r.acquired)
 end)
+
+test('dependency graph aggregates shared demand without counting planned surplus as original stock',function()
+  local p=require('autobuilder.blueprint.planner').expand({[mc('oak_slab')]=6,[mc('oak_stairs')]=8},
+    {[mc('oak_planks')]=2,[mc('oak_log')]=2,[mc('oak_stairs')]=4})
+  local nodes=assert(p.graph,'explicit dependency graph missing').nodes
+  local planks=nodes[mc('oak_planks')]; eq(planks.required,9); eq(planks.available,2)
+  eq(planks.deficit,7); eq(planks.produced,8); eq(planks.inputs[mc('oak_log')],2)
+  eq(nodes[mc('oak_stairs')].projectRequired,8); eq(nodes[mc('oak_stairs')].produced,4)
+  eq(nodes[mc('oak_log')].deficit,0); eq(nodes[mc('oak_log')].provider.type,'storage')
+  eq(planks.provider.type,'crafting'); eq(p.available[mc('oak_planks')],1)
+  eq(#p.operations,4); eq(#p.operations[1].dependencies,0)
+  eq(p.operations[2].dependencies[1],p.operations[1].id)
+  eq(#p.operations[4].dependencies,2)
+  eq(p.operations[4].dependencies[1],p.operations[1].id)
+  eq(p.operations[4].dependencies[2],p.operations[3].id)
+end)
+
+test('dependency graph includes reserve and processing fuel without crediting expected output',function()
+  local p=require('autobuilder.blueprint.planner').expand({[mc('stone_bricks')]=4},{[mc('coal')]=1},
+    {turtleFuelReserveItems={[mc('coal')]=2}})
+  local n=assert(p.graph,'explicit dependency graph missing').nodes
+  eq(n[mc('coal')].required,3); eq(n[mc('coal')].available,1)
+  eq(n[mc('coal')].deficit,2); eq(n[mc('coal')].missing,2)
+  eq(n[mc('cobblestone')].required,4); eq(n[mc('cobblestone')].missing,4)
+  eq(n[mc('stone')].available,0); eq(n[mc('stone')].produced,4)
+  eq(n[mc('stone_bricks')].inputs[mc('stone')],4)
+end)
+
+test('planner rejects malformed recipes and bounded expansion before producing a graph',function()
+  local P=require('autobuilder.blueprint.planner')
+  for _,recipe in ipairs({{kind='craft',yield=0,ingredients={raw=1}},
+    {kind='craft',yield=1,ingredients={raw=-1}}, {kind='unknown',yield=1,ingredients={raw=1}},
+    {kind='craft',yield=0/0,ingredients={raw=1}}, {kind='craft',yield=1,ingredients={}}}) do
+    local registry={get=function(item) if item=='root' then return recipe end end}
+    assert(not pcall(P.expand,{root=1},{},{recipes=registry}),'malformed recipe accepted')
+  end
+  local registry={get=function(item) if item=='root' then return {kind='craft',yield=1,ingredients={raw=64}} end end}
+  assert(not pcall(P.expand,{root=100000000},{},{recipes=registry}),'unbounded expanded demand accepted')
+  assert(not pcall(P.expand,{a=100000000,b=100000000},{},{substitutions={a='root',b='root'}}),'aggregate overflow accepted')
+  local cycle={get=function(item) return {kind='craft',yield=1,ingredients={[item=='a' and 'b' or 'a']=1}} end}
+  assert(not pcall(P.expand,{a=1},{a=1},{recipes=cycle}),'stock must not hide an invalid recipe cycle')
+end)

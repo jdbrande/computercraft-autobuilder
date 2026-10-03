@@ -7,7 +7,7 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
 - Current branch: `milestone/0.13.0`, resource dependency graph and provider registry.
-- Next: finish provider selection, expose aggregated dependency nodes/operations,
+- Next: integrate provider selection and aggregated dependency nodes/operations,
   integrate acquisition and operator visibility, then inventory ownership and fuel
   delivery/rescue in dependency order. Continue through all rows below.
 - No external blocker is currently established. Missing implementation is remaining
@@ -90,3 +90,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   passed after the missing-module failure; full Lua suite passed 410/410. Defaults
   preserve legacy providers, preferences are validated, stock/online availability
   guide selection. Runtime provider dispatch and graph accounting remain next.
+
+- Task 10: explicit dependency graph and bounded recipe expansion implemented;
+  shared intermediates retain producer dependencies. Focused red-green cases and
+  full Lua suite passed 413/413. Node available is original physical stock,
+  reserved fuel is explicit demand, and planned output remains separate.

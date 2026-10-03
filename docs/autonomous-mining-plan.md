@@ -401,16 +401,16 @@ exploration, mining, tree_farm, farm, crafting, smelting.
 **Interfaces:** `Planner.expand` keeps existing outputs and adds `graph.nodes`:
 item-keyed nodes with `required`, `available`, `deficit`, `produced`, `missing`,
 `projectRequired`, `provider`, and aggregate `inputs`; operations add `id` and
-`dependencies` of earlier producer operation IDs. Node `available` is usable
-original stock, not expected output. Provider metadata is explanatory planning
+`dependencies` of earlier producer operation IDs. Node `available` is original physical
+stock, not expected output; reserved fuel is included in node demand. Provider metadata is explanatory planning
 state; only refreshed physical inventories establish completed acquisition.
 
-- [ ] Write cases with two roots sharing planks, intermediate/final stock and
+- [x] Write cases with two roots sharing planks, intermediate/final stock and
   surplus: aggregate exact demand without treating planned surplus as stock.
   Check operation dependencies precede consumers and fuel shortages are represented.
   Include malformed yield/count, excessive expansion, cycles and substitutions.
   Observe failures before changing implementation.
-- [ ] Add graph accounting to the existing traversal and bounded validation.
+- [x] Add graph accounting to the existing traversal and bounded validation.
   Reuse provider descriptors; no alternate hardware executor or second queue.
   Preserve old operation ordering and stock/fuel behavior. Run focused and full
   suites and commit after passing.
