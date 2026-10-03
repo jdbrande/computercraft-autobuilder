@@ -682,3 +682,51 @@ operator documentation, `docs/validation-0.17.0.md`, progress ledger, release.
   inspection. Fix discovered bugs with regressions. Document exact evidence and
   limits, generate/check release, conduct one final whole-branch review/fix pass,
   integrate/push and continue chunk loading and every remaining requirement.
+
+## Milestone0.18: loaded mission compatibility
+
+Spec: [chunk-loading design](chunk-loading-design.md). Continue native execution.
+Review focus: claiming future loading from a heartbeat, negative chunk boundaries,
+coverage omitted on a return/supply route, offline-loader reassignment, persisted
+jobs admitted after configuration changes. Test each at the owning boundary.
+
+### Task 26: Coverage geometry, hardware and durable provider claims
+
+**Files:** `autobuilder/core/chunks.lua`, config, `tests/chunks_test.lua`, suite list.
+**Interfaces:** `chunks.area(job,telemetry)` returns a conservative bounded chunk
+rectangle; `chunks.new(state,config,save)` provides `reserve(job,worker)` and
+`release(jobId)`; `chunks.probe(environment,state,config)` reports actual stationary
+chunky hardware. Shared pure validators serve telemetry/assignment integration.
+
+- [ ] Write/run failing boundary, missing/dead/moving-provider, explicit-area,
+  configured-anchor-without-hardware, exact duplicate, save rollback/reboot and
+  release tests. Expected: missing module or coverage refusal, no physical work.
+- [ ] Implement default enforced policy, bounded mission geometry and immutable
+  durable claims using configured areas or current-chunk anchors. Run focused/full
+  Lua tests; expected all pass. Commit reusable coverage contract.
+
+### Task 27: Queue admission, worker guards and protocol integration
+
+**Files:** runtime, workflows/mining queues, network/task/mining messages, agent,
+executor/navigation, setup sharing, runtime tests and explicit loaded test fixtures.
+
+- [ ] Add failing covered/uncovered simultaneous work, old worker, depot/side-route,
+  changed duplicate grant, offline loader, default-deny movement and reboot tests.
+  Expected: uncovered work cannot create movement intent or acquire an owner.
+- [ ] Wire coverage claims before assignment, preserve them through reconciliation,
+  validate/clean loaded envelopes, advertise real anchors and prevent reassignment.
+  Add movement enforcement separate from traffic reservations. Existing simulations
+  explicitly declare their loaded terrain; no production test-only bypass.
+- [ ] Run relevant/full Lua and Python tests, fix regressions and commit. Expected:
+  covered independent work continues; unknown territory reports exact chunk errors.
+
+### Task 28: Chunk status, setup, native loading acceptance and integration
+
+- [ ] Document operator assurances, anchor setup, migration, radius0 coverage and
+  lost-provider recovery; expose status and share policy without anchor roles.
+- [ ] Bootstrap distant real chunky anchors, remove operator force loading and
+  verify retained ticking plus a cross-chunk mission and uncovered-area refusal.
+  Correct defects with regressions and record independent world evidence.
+- [ ] Run all tests/release checks, one final whole-branch review and required fix
+  pass. Integrate/push and continue recovery/logistics/scaling/site preparation and
+  every other unfinished requirement without a milestone handoff pause.

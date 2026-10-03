@@ -13,9 +13,10 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Capacity and parallel factory completed:492 Lua/16 Python tests, native
   two-Crafty acceptance and regression-backed final review fixes.
 - Capacity/parallel factory integrated and pushed at `345b833`.
-- Native schematic milestone completed:508 Lua/18 Python tests, both native
-  construction trials and review correction passed. Integrating0.17; chunk-loading
-  compatibility is next.
+- Native schematic support integrated/pushed at `9a27b1b`:508 Lua/18 Python tests,
+  both native construction trials and review correction passed.
+- Current branch: `milestone/0.18.0`. Task26: explicit loaded-area coverage and
+  stationary chunky-turtle provider claims; queue/movement enforcement follows.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
