@@ -620,9 +620,9 @@ production receipts, focused runtime tests.
 **Files:** parallel factory service, production planner/service, workflow integration,
 full runtime fixture with two independent Crafty turtles.
 
-- [ ] Add failing parallel/splitting, short stock, partial stage/collection, missing
+- [x] Add failing parallel/splitting, short stock, partial stage/collection, missing
   capacity, controller/worker restart, lost ack and independent blocked-station cases.
-- [ ] Reserve inputs/private stations/output slots; journal staged inputs and final
+- [x] Reserve inputs/private stations/output slots; journal staged inputs and final
   collection; split exact finite operations across idle eligible stations. Release
   only reconciled complete jobs. Run full tests and commit. Expected: two workers
   craft concurrently with conserved quantities and no duplicate production.

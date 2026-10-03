@@ -11,8 +11,8 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Fuel distribution/rescue integrated and pushed at `c0d1aa5`:470 Lua/16 Python
   tests and native acceptance including final review regressions.
 - Current branch: `milestone/0.16.0`, capacity and parallel factory.
-- Current task: durable measured destination capacity (Task19), followed by private
-  Crafty station contracts, staging/collection and concurrent batch scheduling.
+- Current task: native two-Crafty acceptance, status/documentation and final checks
+  for capacity and parallel staging/collection (Task22).
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -228,3 +228,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Task20: private station validation/capability, private-buffer Crafty execution,
   durable collecting state and suppression of premature central-stock credit pass
   five new regressions, including worker reboot. Full suite:481 Lua tests passed.
+
+- Task21: two real runtime Crafty modules execute private finite batches concurrently.
+  Central staging/collection use journaled transfers, count claims and concrete output
+  slots; partial transfers, three interruption points and lost acknowledgements pass.
+  A failing regression found that private staging starved an older furnace owner;
+  waiting batches now yield execution so the shared owner can drain. Full suite487
+  passed; an additional short-stock/two-batch regression also passes. Native120–122
+  acceptance is running with48 requested stone bricks and64 starting stone.

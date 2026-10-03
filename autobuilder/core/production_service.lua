@@ -7,6 +7,7 @@ function M.new(app,config,e,queue)
   local s=queue.state; s.requestSequence=s.requestSequence or 0
   local self={machines={},laneCursor=0}; local save=function() return app:save() end
   self.ledger=require('autobuilder.storage.ledger').new(app.state,save)
+  self.parallel=require('autobuilder.factory.parallel').new(app,config,e,queue,self)
   function self:request(requirements,key,options)
     options=options or {}
     assert(type(requirements)=='table' and next(requirements),'resource request needs item quantities')
@@ -46,6 +47,13 @@ function M.new(app,config,e,queue)
     return ok,not ok and tostring(err) or nil
   end
   local function localReceipt(job)
+    if job.privateStation then
+      local flow=job.factoryFlow
+      if not flow then return end
+      local sequence=(flow.stage.stockSequence or 0)+(flow.collect.stockSequence or 0)
+      if sequence==0 then return end
+      return {withdrawn=U.copy(flow.stage.withdrawn or {}),delivered={[job.item]=flow.collect.delivered or 0},sequence=sequence}
+    end
     local p=job.production
     if not p or not p.stockSequence then return end
     local withdrawn=U.copy(p.withdrawn or {})
@@ -64,12 +72,13 @@ function M.new(app,config,e,queue)
       local lease=self.ledger.state.leases[j.id]
       if lease and lease.status=='held' then
         local receipt=localReceipt(j)
-        if receipt then assert(self:acceptReceipt(j,receipt)) end
+        if receipt then self.ledger:receipt(j.id,receipt.withdrawn,receipt.delivered,{},receipt.sequence) end
         lease=self.ledger.state.leases[j.id]
         if j.status=='completed' then
           -- Older Crafty workers can acknowledge completion without counters.
           -- Their exclusive job completion already guarantees exact output.
           if not require('autobuilder.factory.factory').equal(lease.delivered,j.stockOutputs) then
+            assert(not j.privateStation,'private factory output has not reached shared storage')
             local withdrawn=j.type=='CRAFT' and j.stockInputs or lease.withdrawn
             self.ledger:receipt(j.id,withdrawn,j.stockOutputs,{},lease.sequence+1)
           end
@@ -310,6 +319,8 @@ function M.new(app,config,e,queue)
         end
         if complete then r.operation=r.operation+1; r.jobId=nil; r.jobIds=nil; r.status='running'; r.error=nil; save()
         elseif blocked then r.status='blocked'; r.error=blocked; save() end
+      elseif op.type=='CRAFT' and (r.privateCraft or not r.jobId and #(config.craftingStations or {})>0) then
+        self.parallel:schedule(r,op)
       else
         local job=r.jobId and s.jobs[r.jobId]
         if op.type=='CRAFT' and (not job or job.status~='completed') and not hasWorker('crafting') then
@@ -379,6 +390,7 @@ function M.new(app,config,e,queue)
   local function step()
     for id in pairs(self.machines) do if not s.jobs[id] then self.machines[id]=nil end end
     if app.state.assignmentRecovery then return true end
+    if self.parallel:step() then return true end
     local all={}
     for _,job in pairs(s.jobs) do if job.type=='SMELT' then all[#all+1]=job end end
     table.sort(all,function(a,b) return a.id<b.id end)

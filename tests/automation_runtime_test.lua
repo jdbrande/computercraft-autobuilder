@@ -502,7 +502,7 @@ end)
 
 test('private Crafty worker only consumes and produces in its configured buffer across reboot',function()
   local f=fixture(); local h=f.h; h.inventories.buffer={[1]={name=mc('stone'),count=4}}
-  f.wc.craftingStation.buffer='buffer'; f.wc=require('autobuilder.config').load(f.wc)
+  f.wc.craftingStation.buffer='buffer'; f.wc.turtleFuelReserveItems[mc('stone')]=4; f.wc=require('autobuilder.config').load(f.wc)
   f.w=Runtime.new(f.wc,f.we)
   local job={id='task:7:999',type='CRAFT',item=mc('stone_bricks'),quantity=4,batches=1,workerId=12,preferredWorker=12,
     privateStation={id='west',workerId=12,buffer='buffer',input='input',output='output'}}
@@ -530,4 +530,156 @@ test('private worker output receipt cannot credit or release shared stock before
   assert(p:acceptReceipt(j,{withdrawn={[mc('stone')]=4},delivered={[mc('stone_bricks')]=4},sequence=1}))
   eq(next(p.ledger.state.leases[j.id].delivered),nil)
   eq(next(p.ledger.state.leases[j.id].withdrawn),nil)
+end)
+
+local function parallelFixture()
+  local f=fixture(); local second=fixture(); f.other=second
+  local h=f.h; h.inventories.store={[1]={name=mc('stone'),count=40}}
+  for _,name in ipairs({'buffer','buffer2','input2','output2'}) do h.inventories[name]={} end
+  second.h.inventories=setmetatable({}, {__index=function(_,name)
+    return h.inventories[({input='input2',output='output2'})[name] or name]
+  end})
+  second.we.os.getComputerID=function() return 13 end; second.we.fs=S.fs()
+  f.cc.turtleFuelReserveItems={}; f.cc.craftingBatchSize=2
+  f.cc.craftingStations={{id='west',workerId=12,buffer='buffer',input='input',output='output'},
+    {id='east',workerId=13,buffer='buffer2',input='input2',output='output2'}}
+  f.wc.craftingStation.buffer='buffer'; f.wc.turtleFuelReserveItems={}
+  second.wc.craftingStation={buffer='buffer2',input='input2',output='output2',inputSide='up',outputSide='down'}
+  second.wc.turtleFuelReserveItems={}
+  local C=require('autobuilder.config'); f.cc=C.load(f.cc); f.wc=C.load(f.wc); second.wc=C.load(second.wc)
+  f.c=Runtime.new(f.cc,f.ce); f.w=Runtime.new(f.wc,f.we); second.w=Runtime.new(second.wc,second.we)
+  f.maxConcurrent=0; f.droppedAcks=0
+  function f:pumpAll(env)
+    local packets=env.packets; env.packets={}
+    for _,p in ipairs(packets) do
+      local target=p.to==7 and self.c or p.to==12 and self.w or p.to==13 and self.other.w
+      assert(target,'unexpected destination')
+      if self.dropAcks and p.message.type=='task_ack' then self.droppedAcks=self.droppedAcks+1
+      else
+        local ok,why=target:receive(p.message.sender,p.message,p.protocol)
+        if not ok then self.rejections=self.rejections or {}; self.rejections[#self.rejections+1]=p.message.type..': '..tostring(why) end
+      end
+    end
+  end
+  function f:step()
+    self.ce.now=self.ce.now+1; self.we.now=self.ce.now; self.other.we.now=self.ce.now
+    assert(self.c:tick()); self:pumpAll(self.ce); assert(self.c:workStep()); self.h:smelt()
+    local concurrent=0
+    for _,worker in ipairs({self,self.other}) do
+      assert(worker.w:tick()); assert(worker.w:workStep()); self:pumpAll(worker.we)
+      local t=worker.w.state.currentTask
+      if t and t.type=='CRAFT' and t.phase~='completed' and t.phase~='blocked' then concurrent=concurrent+1 end
+    end
+    self.maxConcurrent=math.max(self.maxConcurrent,concurrent); self:pumpAll(self.ce)
+  end
+  function f:request(n)
+    for _,worker in ipairs({self,self.other}) do assert(worker.w:tick()); self:pumpAll(worker.we) end; self:pumpAll(self.ce)
+    local ok,id=self.c:command('request minecraft:stone_bricks '..(n or 32)); assert(ok,id); self.id=id
+  end
+  function f:finish(limit)
+    for _=1,limit or 400 do
+      self:step()
+      if self.c.state.automation.requests[self.id].status=='completed' and not self.w.state.currentTask and not self.other.w.state.currentTask then return end
+    end
+    local r=self.c.state.automation.requests[self.id]
+    local errors={tostring(r.error)}
+    for _,j in pairs(self.c.state.automation.jobs) do errors[#errors+1]=j.id..' '..j.status..' '..tostring(j.error or j.stockError) end
+    error('parallel factory did not finish: '..table.concat(errors,'; '))
+  end
+  return f
+end
+
+test('two private Crafty workers share one exact finite operation and release all claims',function()
+  local f=parallelFixture(); f:request(31); f:finish()
+  eq(f.h:count(mc('stone_bricks')),32); eq(f.h:count(mc('stone')),8)
+  eq(f.h.crafts+f.other.h.crafts,8); eq(f.maxConcurrent,2)
+  assert(f.h.crafts>0 and f.other.h.crafts>0)
+  for _,lease in pairs(f.c.state.inventoryLedger.leases) do eq(lease.status,'released') end
+  for _,lease in pairs(f.c.state.capacityLedger.leases) do eq(lease.status,'released') end
+  for _,name in ipairs({'buffer','buffer2','input','input2','output','output2'}) do eq(next(f.h.inventories[name]),nil) end
+end)
+
+test('parallel factory keeps independent work moving while one private station is disconnected',function()
+  local f=parallelFixture(); f.other.h.offline='input2'; f:request(32)
+  for _=1,160 do f:step() end
+  assert(f.h.crafts>0); eq(f.other.h.crafts,0)
+  local blocked=f.other.w.state.currentTask; assert(blocked and blocked.phase=='blocked')
+  local before=f.h:count(mc('stone_bricks')); assert(before>0 and before<32)
+  f.other.h.offline=nil; assert(f.c:command('resume '..blocked.id)); f:pumpAll(f.ce); f:finish()
+  eq(f.h:count(mc('stone_bricks')),32); eq(f.h.crafts+f.other.h.crafts,8)
+end)
+
+test('parallel production holds output capacity before touching ingredients',function()
+  local f=parallelFixture()
+  for i=2,27 do f.h.inventories.store[i]={name=mc('dirt'),count=64} end
+  f:request(16); for _=1,30 do f:step() end
+  eq(f.h:count(mc('stone')),40); eq(f.h.crafts+f.other.h.crafts,0)
+  eq(next(f.h.inventories.buffer),nil); eq(next(f.h.inventories.buffer2),nil)
+  for i=10,27 do f.h.inventories.store[i]=nil end
+  f:finish(); eq(f.h:count(mc('stone_bricks')),16)
+end)
+
+test('parallel factory reconciles interrupted staging craft and collection across runtime reboots',function()
+  local f=parallelFixture(); f:request(24)
+  local staged=false
+  f.h.afterTransfer=function(_,target)
+    if target=='buffer' and not staged then staged=true; f.ce.fs.fault.open='/autobuilder/data/controller.state.tmp' end
+  end
+  assert(not pcall(function() for _=1,80 do f:step() end end)); assert(staged)
+  f.ce.fs.fault.open=nil; f.ce.packets={}; f.c=Runtime.new(f.cc,f.ce)
+  local crafted=false
+  f.h.afterCraft=function()
+    if not crafted then crafted=true; f.we.fs.fault.open='/autobuilder/data/worker.state.tmp' end
+  end
+  assert(not pcall(function() for _=1,100 do f:step() end end)); assert(crafted)
+  f.we.fs.fault.open=nil; f.we.packets={}; f.w=Runtime.new(f.wc,f.we)
+  local collected=false
+  f.h.afterTransfer=function(source,target)
+    if source=='buffer' and target=='store' and not collected then collected=true; f.ce.fs.fault.open='/autobuilder/data/controller.state.tmp' end
+  end
+  assert(not pcall(function() for _=1,120 do f:step() end end)); assert(collected)
+  f.ce.fs.fault.open=nil; f.ce.packets={}; f.c=Runtime.new(f.cc,f.ce)
+  f.dropAcks=true; for _=1,30 do f:step() end; assert(f.droppedAcks>0)
+  f.dropAcks=false; f.w=Runtime.new(f.wc,f.we); f.other.w=Runtime.new(f.other.wc,f.other.we)
+  f:finish(); eq(f.h:count(mc('stone_bricks')),24); eq(f.h:count(mc('stone')),16)
+  eq(f.h.crafts+f.other.h.crafts,6)
+end)
+
+test('pending private staging lets an older shared furnace owner finish its physical work',function()
+  local f=parallelFixture()
+  f.h.inventories.store[2]={name=mc('cobblestone'),count=1}; f.h.inventories.store[3]={name=mc('coal'),count=1}
+  local j=f.c.automation.queue:submit('SMELT',{item=mc('stone'),quantity=1,batches=1,furnaceLane='furnace'},{})
+  j.status='running'; f.c:save()
+  f:request(16); f:finish(); eq(j.status,'completed'); eq(f.h:count(mc('stone_bricks')),16)
+end)
+
+test('parallel factory reconciles one-item physical transfers without overclaiming output',function()
+  local f=parallelFixture()
+  for _,env in ipairs({f.ce,f.other.we}) do
+    local call=env.peripheral.call
+    env.peripheral.call=function(name,method,...)
+      if method=='pushItems' then local target,slot,n,toSlot=...; return call(name,method,target,slot,math.min(n,1),toSlot) end
+      return call(name,method,...)
+    end
+  end
+  f:request(16); f:finish(800); eq(f.h:count(mc('stone_bricks')),16); eq(f.h:count(mc('stone')),24)
+  eq(f.h.crafts+f.other.h.crafts,4); eq(f.maxConcurrent,2)
+end)
+
+test('two private batches cannot spend the same short ingredient stock',function()
+  local f=parallelFixture(); f.h.inventories.store[1].count=8
+  local jobs={}
+  for _,station in ipairs(f.cc.craftingStations) do
+    jobs[#jobs+1]=f.c.automation.queue:submit('CRAFT',{item=mc('stone_bricks'),quantity=8,batches=2,
+      preferredWorker=station.workerId,privateStation=U.copy(station),privateReady=false,
+      stockInputs={[mc('stone')]=8},stockOutputs={[mc('stone_bricks')]=8}},{})
+  end
+  for _=1,160 do f:step() end
+  eq(f.h.crafts+f.other.h.crafts,2); eq(f.h:count(mc('stone_bricks')),8); eq(f.h:count(mc('stone')),0)
+  local completed=0; for _,j in ipairs(jobs) do if j.status=='completed' then completed=completed+1 end end
+  eq(completed,1)
+  f.h.inventories.store[20]={name=mc('stone'),count=8}
+  for _=1,160 do f:step() end
+  for _,j in ipairs(jobs) do eq(j.status,'completed') end
+  eq(f.h.crafts+f.other.h.crafts,4); eq(f.h:count(mc('stone_bricks')),16)
 end)

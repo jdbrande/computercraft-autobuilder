@@ -48,6 +48,7 @@ function M.new(app,config,e,network,clock)
         if t.privateStation then
           assert(require('autobuilder.factory.stations').matches(t.privateStation,config,s.id),'private crafting station does not match worker configuration')
           craftConfig=U.copy(config); craftConfig.storageInventories={t.privateStation.buffer}
+          craftConfig.turtleFuelReserveItems={} -- the controller already protected fuel in shared stock
         end
         self.engine=require(module).new(t,e,craftConfig,save)
       else self.engine=require(module).new(t,e,config,app.navigation,save) end
