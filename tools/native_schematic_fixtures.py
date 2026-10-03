@@ -23,6 +23,12 @@ def main():
         (ROOT/(name+'.gz')).write_bytes(gzip_bytes(payload,level,strategy))
     (ROOT/'optional.gz').write_bytes(gzip_bytes(payload,optional=True))
     (ROOT/'empty.gz').write_bytes(gzip_bytes(b''))
+    import sys
+    sys.path.insert(0, str(ROOT.parents[1]))
+    from test_schem_converter import fixture
+    for version in (2,3):
+        (ROOT/('sponge-v%d.bin'%version)).write_bytes(fixture(version))
+        (ROOT/('sponge-v%d.gz'%version)).write_bytes(gzip_bytes(fixture(version)))
 
 if __name__ == '__main__':
     main()

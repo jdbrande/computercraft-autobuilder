@@ -266,3 +266,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Task23: bounded native gzip decoder passes four new RED→GREEN cases and the
   full496-test Lua suite. Pinned LibDeflate source SHA verified; license retained.
   CRC/header/size/trailing-data checks and cooperative expansion bounds are covered.
+
+- Task24: typed NBT/Sponge v2/v3 conversion passes seven new RED→GREEN cases,
+  native/Python differential checks, full503 Lua tests and18 Python tests. Required
+  air/states/offsets and recomputed quantities survive; unsupported metadata is
+  explicit. Import command integration and native acceptance are next.

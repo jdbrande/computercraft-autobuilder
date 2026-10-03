@@ -662,10 +662,10 @@ before any physical effect; raw NBT detection belongs to Task24.
 **Interfaces:** `nbt.decode(bytes)` returns typed root compound;
 `sponge.decode(bytes)` returns validated schema1, using Task23 for gzip detection.
 
-- [ ] Write/run failing raw/gzip versions2/3, offset/palette/state/required-air,
+- [x] Write/run failing raw/gzip versions2/3, offset/palette/state/required-air,
   paired/slab quantities, entities/biomes and malformed tag/length/depth/node/
   dimension/varint cases. Expected: missing modules, no partial blueprint.
-- [ ] Implement bounded typed parsing and schema1 conversion; reuse quantity and
+- [x] Implement bounded typed parsing and schema1 conversion; reuse quantity and
   schema validation. Run native Lua and Python differential tests; expected equal
   blueprint values and precise refusal. Run full suite and commit.
 
