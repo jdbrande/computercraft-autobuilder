@@ -124,3 +124,16 @@ test('failed traffic replanning discards its incomplete route and retries after 
   assert(n:goTo(target));eq(U.distance(pose,target),0);eq(w.digs,0)
   assert(not saved.detour)
 end)
+
+
+test('an exhausted traffic cache is checkpointed away so changed traffic can retry',function()
+  local U=require('autobuilder.core.util');local w=require('tests.build_world').new();local pose=U.copy(w.pose)
+  local target={x=3,y=2,z=0};local saved
+  pose.detour={target=U.copy(target),count=16,blocked={},path={},index=1}
+  for i=1,16 do pose.detour.blocked[i..',9,0']=true end
+  local n=require('autobuilder.core.navigation').new(w.turtle,pose,{minimumFuelReserve=0},function() saved=U.copy(pose);return true end)
+  n.trafficObstacle=function() return {x=1,y=2,z=0} end
+  assert(not n:goTo(target));eq(pose.detour,nil);eq(saved.detour,nil)
+  n.trafficObstacle=function() return nil end
+  assert(n:goTo(target));eq(U.distance(pose,target),0);eq(w.digs,0)
+end)
