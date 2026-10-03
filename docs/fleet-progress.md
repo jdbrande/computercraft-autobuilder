@@ -676,3 +676,33 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   repair cases. Current Python rerun passes18; focused affected suites pass73.
   Normal pipeline, shared construction/mining grants and these regressions are
   ready for a checkpoint commit; the remaining0.23 work continues on this branch.
+
+- Native uneven-terrain trial2 reached `built`: three glass blocks verified, three
+  cobblestone fill cells independently confirmed, two dirt cleared/returned, both
+  workers idle at home with5398/5936 finite fuel. Supply, return and mining deposit
+  chests are empty. The rig was shut down and test force-load tickets removed.
+  See [intermediate site acceptance](validation-site-preparation.md) for setup,
+  the fill-selection bug,8 MB quota requirement, restarts and exact scope limits.
+- Managed harvesting now requires controller mutation grants for both digging
+  and replanting. Its own registered crop cells are authorized; soil/column bases,
+  foreign farms, offline workers and concurrent ownership remain protected. New
+  permission tests exposed an older soil-inspection movement wait loop. The worker
+  now persists that observation before returning above the crop; a regression
+  reproduces independent movement/work grants and restarts between those stages.
+
+- Shared mutation protection now includes legacy PREPARE_SITE canonical waypoints.
+  Its own declared access above the depot may be cleared without exempting the
+  container, other workers' homes, fuel infrastructure or arbitrary nearby cells.
+  New failing guard/access tests pass, as do renewable and logistics-node checks.
+  Legacy native-style pilot regression is running with the added grants.
+- Renewable admission also excludes overlapping active farm columns before ownership,
+  preventing two assigned workers from indefinitely denying each other's grants.
+  Focused renewable/protection/coordination/production coverage passes90 cases;
+  additional chunk/runtime/provider checks pass.
+
+- Legacy automatic clearing→normal preparation→construction passes its actual
+  controller/worker restart regression with mutation grants. The shared protection
+  step now covers construction, mining, legacy clearing and managed harvesting.
+  Focused site/protection/renewable/exploration/node coverage passes60 cases, and
+  chunk/runtime/provider coverage passes70. Release generation/check and whitespace
+  checks pass; no new native harvesting claim is made.

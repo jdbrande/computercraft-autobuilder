@@ -149,11 +149,10 @@ function M.new(task,e,config,nav,save)
       local intent=task.intent; local now=inventory()
       if intent.kind~='dig' or intent.index~=task.index or not equal(intent.target,target) then return blocked('invalid site dig intent','ambiguous') end
       if not found and gained(intent.inventory,now) or found and equal(intent.block,b) and equal(intent.inventory,now) then
-        task.intent=nil; persist()
+        task.intent=nil; persist();if nav.workDone then nav.workDone() end
       else return blocked('ambiguous site dig outcome; target and inventory do not prove completion','ambiguous') end
     end
     local ok,why=fuelReady(); if not ok then return blocked(why,'fuel') end
-    if nav.guard then ok,why=nav.guard(pose,target); if not ok then return blocked(why or 'reservation pending','inaccessible') end end
     if found then
       if not natural[b.name] or (config.protectedBlocks or {})[b.name] or b.state and (b.state.waterlogged==true or b.state.waterlogged=='true') then
         return blocked('site clearing refuses protected or non-natural block: '..b.name,'unsupported')
@@ -175,6 +174,8 @@ function M.new(task,e,config,nav,save)
       end
       local k=key(target); local attempts=task.attempts[k] or 0
       if attempts>=4 then return blocked('site falling block dig limit reached; make terrain safe before resuming','attempt_limit') end
+      if not nav.workGuard then return blocked('controller mutation permission required','inaccessible') end
+      ok,why=nav.workGuard(target);if not ok then return blocked(why or 'movement reservation pending','inaccessible') end
       local selected=t.select(slot); if not selected then return blocked('cannot select site cargo slot','inventory_full') end
       task.attempts[k]=attempts+1
       task.intent={kind='dig',index=task.index,target=U.copy(target),block=U.copy(b),inventory=inventory()}; persist()
@@ -183,12 +184,12 @@ function M.new(task,e,config,nav,save)
       local present,actual,readError=inspect(suffix); if readError then return blocked(readError,'ambiguous') end
       local after=inventory(); local intent=task.intent
       if result and gained(intent.inventory,after) and (not present or equal(actual,b)) then
-        task.intent=nil; persist()
+        task.intent=nil; persist();if nav.workDone then nav.workDone() end
         -- A falling block may replace the removed block immediately. Never
         -- infer this on reboot, where the physical dig result is unavailable.
         return true
       elseif present and equal(actual,b) and equal(intent.inventory,after) then
-        task.intent=nil; persist(); return blocked(detail or 'site block could not be removed','inaccessible')
+        task.intent=nil; persist();if nav.workDone then nav.workDone() end; return blocked(detail or 'site block could not be removed','inaccessible')
       end
       return blocked('ambiguous site dig outcome; drops were not safely collected','ambiguous')
     end

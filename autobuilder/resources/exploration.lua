@@ -232,23 +232,24 @@ function M.record(records,trip,report)
   r.observations={}; for i=math.max(1,#keys-63),#keys do r.observations[#r.observations+1]=positions[keys[i]] end
   return true
 end
-function M.protectedAreas(state,config,exceptProject,skipMiningBase)
+function M.protectedAreas(state,config,exceptProject,skipMiningBase,purpose)
   local boxes=U.copy(config.restrictedAreas or {})
-  for _,b in ipairs(require('autobuilder.storage.nodes').protected(config,state)) do boxes[#boxes+1]=b end
+  local home=purpose and purpose.home
+  for _,b in ipairs(require('autobuilder.storage.nodes').protected(config,state,home)) do boxes[#boxes+1]=b end
   for name,p in pairs((state.automation or {}).projects or {}) do
     if name~=exceptProject then
       if p.protectedBounds then boxes[#boxes+1]=U.copy(p.protectedBounds)
       elseif config.exploration.enabled then error('exploration requires project protection migration') end
     end
   end
-  if config.depot then boxes[#boxes+1]={min={x=config.depot.x,y=config.depot.y-1,z=config.depot.z},max={x=config.depot.x,y=config.depot.y+2,z=config.depot.z}} end
+  if config.depot then boxes[#boxes+1]={min={x=config.depot.x,y=config.depot.y-1,z=config.depot.z},max={x=config.depot.x,y=config.depot.y+(home and U.distance(home,config.depot)==0 and 0 or 2),z=config.depot.z}} end
   if not skipMiningBase and M.box(config.exploration.baseProtection) then boxes[#boxes+1]=U.copy(config.exploration.baseProtection) end
   for _,w in pairs(state.workers or {}) do
     local h=w.telemetry and w.telemetry.explorationHome
     if h then
       for _,b in ipairs(h.protectedAreas) do boxes[#boxes+1]=U.copy(b) end
       local d=h.depot
-      boxes[#boxes+1]={min={x=d.x,y=d.y-1,z=d.z},max={x=d.x,y=d.y+2,z=d.z}}
+      boxes[#boxes+1]={min={x=d.x,y=d.y-1,z=d.z},max={x=d.x,y=d.y+(home and purpose.owner==w.id and U.distance(home,d)==0 and 0 or 2),z=d.z}}
       -- A cleared exit is traversal-only. Coalesce straight runs to bound messages.
       local segment,last,axis,direction
       for _,p in ipairs(h.exitRoute) do

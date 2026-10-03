@@ -106,9 +106,9 @@ repair and mining require the same mutation grants; generated door halves reserv
 both cells atomically. Exploration geometry includes registered infrastructure and
 filters irrelevant distant boxes before enforcing its protection-payload bound.
 
-Fluid containment, safe access to fully sealed foundations, the remaining legacy
-and renewable mutation paths and native acceptance remain unfinished. Automatic
-final defect repair is implemented and under regression validation. Eight-cell preparation batches currently favor bounded debris
+Fluid containment, safe access to fully sealed foundations and multiworker native
+acceptance remain unfinished. Shared mutation protection now includes legacy clearing
+and managed harvesting. Automatic final repair passes runtime regression tests. Eight-cell preparation batches currently favor bounded debris
 handling over travel throughput; workload scaling can tune that batch boundary.
 
 ## Remaining mutation paths

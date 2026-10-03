@@ -109,6 +109,13 @@ function M.new(task,e,config,nav,save,treeMode)
     task.site=task.site+1; task.cursor=nil; task.harvestedSite=nil; task.stage='harvest'
     if task.site>#farm.sites or task.delivered+total(snapshot(),task.item)>=task.quantity then task.stage='deposit'; task.passFinished=true end
   end
+  local function finishMutation()
+    task.intent=nil;task.plantSoilSite=nil;persist();if nav.workDone then nav.workDone() end;return true
+  end
+  local function permit(target)
+    if not nav.workGuard then return false,'controller mutation permission required' end
+    return nav.workGuard(target)
+  end
   local function finishDig(i,after)
     local gained=total(after,task.item)-total(i.inventory,task.item)
     if gained<0 then return false,'harvest inventory decreased unexpectedly' end
@@ -119,7 +126,7 @@ function M.new(task,e,config,nav,save,treeMode)
     if i.block.name==spec.block then task.harvestedSite=true end
     if spec.seed and (not spec.tree or i.target.y==farm.sites[task.site].y) then task.stage='plant'
     else task.cursor=task.cursor-1 end
-    task.intent=nil; return persist()
+    return finishMutation()
   end
   local function recover()
     local i=task.intent; if not i then return true end
@@ -127,16 +134,16 @@ function M.new(task,e,config,nav,save,treeMode)
     local present,b,why=inspect('Down'); if why then return false,why end
     local after=snapshot()
     if i.kind=='dig' then
-      if present and same(i.block,b) and equalInventory(after,i.inventory) then task.intent=nil; return persist() end
+      if present and same(i.block,b) and equalInventory(after,i.inventory) then return finishMutation() end
       if not present then return finishDig(i,after) end
       return false,'ambiguous harvest outcome: block or inventory differs'
     elseif i.kind=='plant' then
       local item=after[i.slot]; local count=item and item.count or 0
       if item and item.name~=i.item then return false,'planting slot changed during recovery' end
       if present and b.name==i.block and count==i.before-1 then
-        task.intent=nil; task.missingItem=nil; task.missingCount=nil; nextSite(); return persist()
+        task.missingItem=nil; task.missingCount=nil; nextSite(); return finishMutation()
       end
-      if not present and count==i.before then task.intent=nil; return persist() end
+      if not present and count==i.before then return finishMutation() end
       return false,'ambiguous planting outcome: block/inventory do not match intent'
     elseif i.kind=='drop' then
       if not present or not containers[b.name] then return false,'depot chest missing during delivery recovery' end
@@ -233,11 +240,16 @@ function M.new(task,e,config,nav,save,treeMode)
     if task.stage=='plant' then
       if present then return block('planting target changed before planting','ambiguous') end
       local slot,before=slotFor(spec.seed); if not slot then return missing() end
-      -- Inspect soil from the empty crop cell, then return above it before placing.
-      ok,err=nav:goTo(target); if not ok then return block(err,'inaccessible') end
-      local ground,base,readError=inspect('Down')
-      ok,err=move(stand); if not ok then return block(err,'inaccessible') end
-      if readError or not ground or (spec.tree and not soil[base.name]) or (not spec.tree and base.name~='minecraft:farmland') then return block(readError or 'planting soil is missing or unsupported','unsupported') end
+      if task.plantSoilSite~=task.site then
+        -- Save the observation before the ascent: its movement grant may arrive
+        -- on a later tick or after reboot. Repeating the descent would consume
+        -- that grant and prevent replanting indefinitely.
+        ok,err=nav:goTo(target); if not ok then return block(err,'inaccessible') end
+        local ground,base,readError=inspect('Down')
+        if readError or not ground or (spec.tree and not soil[base.name]) or (not spec.tree and base.name~='minecraft:farmland') then return block(readError or 'planting soil is missing or unsupported','unsupported') end
+        task.plantSoilSite=task.site;return persist()
+      end
+      ok,err=permit(target);if not ok then return block(err,'protected') end
       assert(t.select(slot),'cannot select planting item')
       task.intent={kind='plant',stand=stand,target=target,slot=slot,item=spec.seed,before=before,block=spec.tree and spec.seed or spec.block}; persist()
       local callOK,result,detail=pcall(t.placeDown)
@@ -259,6 +271,7 @@ function M.new(task,e,config,nav,save,treeMode)
     if b.name==spec.block and spec.seed and not slotFor(spec.seed) then return missing() end
     local slot,empty=freeSlot()
     if empty<2 then return returnToDepot('inventory') end
+    ok,err=permit(target);if not ok then return block(err,'protected') end
     assert(t.select(slot),'cannot select harvest slot')
     task.intent={kind='dig',stand=stand,target=target,block=U.copy(b),inventory=snapshot()}; persist()
     local callOK,result,detail=pcall(t.digDown)

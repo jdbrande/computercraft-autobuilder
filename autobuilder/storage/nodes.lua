@@ -98,10 +98,11 @@ function M.validateSaved(config,state)
     end
   end
 end
-function M.protected(config,state)
+function M.protected(config,state,accessHome)
   local areas,seen={},{}
   local function box(p,buffer)
     local b={min={x=p.x,y=p.y-(buffer and 1 or 0),z=p.z},max={x=p.x,y=p.y+(buffer and 2 or 0),z=p.z}}
+    if buffer and accessHome and U.distance(p,accessHome)==0 then b.max.y=p.y end
     local key=p.x..','..b.min.y..','..p.z..':'..b.max.y
     if not seen[key] then areas[#areas+1]=b;seen[key]=true end
   end

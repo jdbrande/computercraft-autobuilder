@@ -200,3 +200,59 @@ test('structural admission rechecks preparation proof at the final chunk ownersh
     assert(not j.workerId);assert(not (s.chunkLedger and s.chunkLedger.leases[j.id]))
   end
 end)
+
+test('registered farm mutations reserve only their own renewable cells',function()
+ local c,s,j=fixture();s.automation.jobs={};j.type='FARM';j.farm=U.copy(c.farms[1]);j.item='minecraft:wheat';s.automation.jobs[j.id]=j
+ local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+ local target={x=30,y=1,z=0};local from={x=30,y=2,z=0}
+ assert(Q:reserve(13,j.id,from,target,s.workers,true),'own registered crop was denied')
+ assert(not Q:reserve(13,j.id,target,{x=30,y=0,z=0},s.workers,true),'farm soil could be removed')
+ assert(not Q:reserve(13,j.id,{x=40,y=2,z=0},{x=40,y=1,z=0},s.workers,true),'foreign farm was authorized')
+ s.workers['99']={id=99,online=false,telemetry={position={x=30,y=1,z=0,known=true}}}
+ assert(not Q:reserve(13,j.id,from,target,s.workers,true),'offline occupant was ignored')
+ s.workers['99']=nil;c.restrictedAreas={{min=target,max=target}}
+ assert(not Q:reserve(13,j.id,from,target,s.workers,true),'registered farm bypassed explicit protection')
+end)
+
+test('renewable grants preserve column bases and reject changed or concurrently owned farms',function()
+ local c,s,j=fixture();s.automation.jobs={};j.type='HARVEST';j.farm=U.copy(c.treeFarms[1]);s.automation.jobs[j.id]=j
+ local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+ local p={x=40,y=1,z=0};local from={x=40,y=2,z=0}
+ assert(Q:reserve(13,j.id,from,p,s.workers,true))
+ local other=U.copy(j);other.id='other-harvest';other.workerId=14;other.bounds=nil;s.automation.jobs[other.id]=other
+ assert(not Q:reserve(13,j.id,from,p,s.workers,true),'overlapping farm owner was ignored')
+ other.status='completed';j.farm.sites[1].x=41
+ assert(not Q:reserve(13,j.id,{x=41,y=2,z=0},{x=41,y=1,z=0},s.workers,true),'changed registered farm contract was accepted')
+ c.farms={{kind='bamboo',sites={{x=60,y=1,z=0}},maxHeight=4}};j.type='FARM';j.farm=U.copy(c.farms[1]);j.bounds=nil
+ assert(not Q:reserve(13,j.id,{x=60,y=2,z=0},{x=60,y=1,z=0},s.workers,true),'renewable column base was removed')
+ assert(Q:reserve(13,j.id,{x=60,y=3,z=0},{x=60,y=2,z=0},s.workers,true))
+ assert(not Q:reserve(13,j.id,{x=60,y=6,z=0},{x=60,y=5,z=0},s.workers,true),'column height limit escaped')
+end)
+
+test('farm admission keeps overlapping renewable work queued until the first owner settles',function()
+ local c,s=fixture();s.automation.jobs={};s.automation.sequence=0
+ s.workers={['13']={id=13,online=true,telemetry={status='idle',capabilities={farming=true}}},['14']={id=14,online=true,telemetry={status='idle',capabilities={farming=true}}}}
+ local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+ local first=Q:submit('FARM',{farm=U.copy(c.farms[1]),item='minecraft:wheat',quantity=1})
+ local second=Q:submit('FARM',{farm=U.copy(c.farms[1]),item='minecraft:wheat',quantity=1})
+ eq(Q:assign(s.workers).id,first.id);first.status='running'
+ assert(not Q:assign(s.workers),'second farm owner would deadlock both mutation grants');eq(second.workerId,nil)
+ first.status='completed';eq(Q:assign(s.workers).id,second.id)
+end)
+
+test('legacy preparation grants only canonical access above its own home while preserving infrastructure',function()
+ local c,s,j=fixture();s.automation.jobs={};c.depot={x=0,y=2,z=0}
+ c.logistics.nodes[1].buffers={{inventory='buffer',position=U.copy(c.depot)}}
+ s.workers['13']={id=13,telemetry={depot=U.copy(c.depot),position={x=0,y=2,z=0,known=true}}}
+ j.type='PREPARE_SITE';j.sitePlan=require('autobuilder.build.site').plan({x=0,y=2,z=0,heading='north'});j.bounds=U.copy(j.sitePlan.bounds);s.automation.jobs[j.id]=j
+ local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+ assert(Q:reserve(13,j.id,{x=0,y=2,z=0},{x=0,y=3,z=0},s.workers,true),'own above-depot access denied')
+ assert(not Q:reserve(13,j.id,{x=0,y=2,z=0},{x=0,y=1,z=0},s.workers,true),'depot container could be dug')
+ assert(not Q:reserve(13,j.id,{x=1,y=3,z=0},{x=1,y=3,z=1},s.workers,true),'non-waypoint change was accepted')
+ c.fuel.stations={{position={x=0,y=2,z=0}}}
+ assert(not Q:reserve(13,j.id,{x=0,y=2,z=0},{x=0,y=3,z=0},s.workers,true),'fuel infrastructure was exempted with access')
+ c.fuel.stations={};s.workers['14']={id=14,telemetry={depot=U.copy(c.depot)}}
+ assert(not Q:reserve(13,j.id,{x=0,y=2,z=0},{x=0,y=3,z=0},s.workers,true),'another registered home lost protection')
+ s.workers['14']=nil;j.sitePlan.points[1].x=1
+ assert(not Q:reserve(13,j.id,{x=0,y=2,z=0},{x=0,y=3,z=0},s.workers,true),'changed canonical access was accepted')
+end)

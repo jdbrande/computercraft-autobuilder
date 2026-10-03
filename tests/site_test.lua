@@ -38,7 +38,7 @@ local function setup(w,task,config,save,pose)
   task=task or {type='PREPARE_SITE',sitePlan=Site.plan(w.pose)}
   config=config or {depot=U.copy(task.sitePlan.start),minimumFuelReserve=5,movementRetries=1}
   pose=pose or U.copy(w.pose); save=save or function() return true end
-  local nav=N.new(w.turtle,pose,config,save)
+  local nav=N.new(w.turtle,pose,config,save);nav.workGuard=function() return true end
   return Site.new(task,{turtle=w.turtle},config,nav,save),nav,config
 end
 local function run(engine)
@@ -151,9 +151,9 @@ end)
 
 test('site reservation wait and failed dig checkpoint never remove blocks',function()
   local w=fixture(); w.blocks['0,3,0']={name='minecraft:stone'}; local m,nav=setup(w)
-  nav.guard=function() return false,'reservation pending' end
+  nav.workGuard=function() return false,'movement reservation pending' end
   assert(not m:step()); eq(w.digs,0); eq(m.task.progress,0)
-  nav.guard=function() return true end; assert(m:resume()); assert(m:step()); eq(w.digs,1)
+  nav.workGuard=function() return true end; assert(m:resume()); assert(m:step()); eq(w.digs,1)
   w=fixture(); w.blocks['0,3,0']={name='minecraft:stone'}
   local task={type='PREPARE_SITE',sitePlan=require('autobuilder.build.site').plan(w.pose)}
   m=setup(w,task,nil,function() if task.intent then return false,'disk full' end; return true end)
@@ -187,4 +187,13 @@ test('site falling gravel stops after four removals and paused tasks do not dig'
   local m=setup(w); assert(not run(m)); eq(w.digs,4); assert(m.task.error:find('falling'))
   w=fixture(); w.blocks['0,3,0']={name='minecraft:stone'}; m=setup(w); m.task.paused=true
   m:step(); eq(w.digs,0); eq(w.pose.y,2)
+end)
+
+test('legacy site refuses mutation without a dedicated work grant',function()
+ local w=fixture();w.blocks['0,3,0']={name='minecraft:stone'};local engine,nav=setup(w)
+ nav.guard=function() return true end;nav.workGuard=nil
+ local ok=engine:step();eq(w.digs,0);assert(not ok);assert(not engine.task.intent)
+ local allow=false;nav.workGuard=function() return allow,'movement reservation pending' end
+ assert(engine:resume());assert(not engine:step());eq(w.digs,0)
+ allow=true;assert(engine:resume());assert(engine:step());eq(w.digs,1)
 end)

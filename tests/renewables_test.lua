@@ -61,6 +61,22 @@ local function setup(kind,quantity)
   local durable; local function save() durable=U.copy(task); return true end
   local function executor()
     local nav=N.new(w.t,U.copy(w.pose),config,save)
+    if not w.noWorkGuard then nav.workGuard=function() return w.permitMutation~=false,'movement reservation pending' end end
+    nav.workDone=function() w.releasedMutations=(w.releasedMutations or 0)+1 end
+    if w.reservations then
+      local key=require('autobuilder.core.pathfinding').key
+      nav.guard=function(_,target)
+        w.workGrant=nil
+        if w.moveGrant==key(target) then return true end
+        w.moveGrant=key(target);return false,'movement reservation pending'
+      end
+      nav.afterMove=function() w.moveGrant=nil end
+      nav.workGuard=function(target)
+        if w.workGrant==key(target) then return true end
+        w.workGrant=key(target);return false,'movement reservation pending'
+      end
+      nav.workDone=function() w.workGrant=nil;w.releasedMutations=(w.releasedMutations or 0)+1 end
+    end
     return require(kind=='oak' and 'autobuilder.resources.logger' or 'autobuilder.resources.farmer').new(task,{turtle=w.t},config,nav,save)
   end
   local function restart() task=U.copy(durable); return executor(),task end
@@ -126,4 +142,30 @@ test('failed renewable checkpoint prevents the physical harvest action',function
   local nav=N.new(w.t,U.copy(w.pose),config,function() return true end)
   local e=require('autobuilder.resources.farmer').new(task,{turtle=w.t},config,nav,function() return false,'disk full' end)
   assert(not pcall(function() e:step() end)); eq(w.digs,0); assert(not e:step())
+end)
+
+test('managed farm requires a separate mutation grant for harvesting and replanting',function()
+ for _,missing in ipairs({true,false}) do
+  local w,task,config,new=setup('wheat');w.noWorkGuard=missing;w.permitMutation=false
+  w.blocks['3,1,0']={name='minecraft:wheat',state={age=7}};w.blocks['3,0,0']={name='minecraft:farmland',state={}};w.items[1]={name='minecraft:wheat_seeds',count=1}
+  local engine=new();run(engine,task);eq(w.digs,0);eq(task.phase,'blocked');assert(not task.intent)
+  w.noWorkGuard=false;w.permitMutation=true;engine=new();assert(engine:resume())
+  assert(engine:step());eq(w.digs,1);eq(w.plants,0)
+  w.permitMutation=false;run(engine,task);eq(task.phase,'blocked');eq(w.plants,0);assert(not task.intent)
+  w.permitMutation=true;assert(engine:resume());run(engine,task)
+  eq(task.phase,'completed');eq(w.digs,1);eq(w.plants,1);eq(w.releasedMutations,2)
+ end
+end)
+
+test('farm soil inspection and planting resume with independent movement and mutation grants',function()
+ local w,task,config,new,restart=setup('wheat');w.reservations=true
+ w.blocks['3,1,0']={name='minecraft:wheat',state={age=7}};w.blocks['3,0,0']={name='minecraft:farmland',state={}};w.items[1]={name='minecraft:wheat_seeds',count=1}
+ local engine=new();local rebooted=false
+ for _=1,600 do
+  if task.phase=='blocked' then assert(task.error:find('movement reservation pending',1,true),task.error);assert(engine:resume()) end
+  engine:step()
+  if task.plantSoilSite and not rebooted then engine,task=restart();rebooted=true end
+  if task.phase=='completed' then break end
+ end
+ eq(task.phase,'completed');assert(rebooted);eq(w.digs,1);eq(w.plants,1);eq(task.delivered,1)
 end)

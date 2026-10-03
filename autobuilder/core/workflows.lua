@@ -245,9 +245,9 @@ function M.new(state,save,clock,id,chunks,config)
     if j.poseRecovery and j.poseRecovery.status=='held' then return false,'pose recovery owns movement cells' end
     local targets={target}
     if work then
-      if not config or not ({BUILD=true,REPAIR=true,CLEAR=true,PREPARE_REGION=true,MINE=true})[j.type]
+      if not config or not ({BUILD=true,REPAIR=true,CLEAR=true,PREPARE_REGION=true,PREPARE_SITE=true,MINE=true,FARM=true,HARVEST=true})[j.type]
         or j.siteWork and j.siteWork.stage=='verify' then return false,'task cannot reserve physical changes' end
-      if j.type~='MINE' then
+      if j.type~='MINE' and j.type~='FARM' and j.type~='HARVEST' and j.type~='PREPARE_SITE' then
         local planned;for _,b in ipairs(j.blocks or {}) do if U.distance(b,target)==0 then planned=b;break end end
         if not planned then return false,'mutation target is not in the immutable task' end
         local placement=require('autobuilder.build.placement').plan(planned)

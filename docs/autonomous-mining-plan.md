@@ -916,7 +916,7 @@ requirements until all acceptance below passes.
 
 - [x] Add native inspection survey reports and validated bounded contracts; distinguish
   observed terrain from hidden/blocked cells. Persist progress and retry safely.
-- [ ] Share infrastructure/worker/route protection before every mutation and admission;
+- [x] Share infrastructure/worker/route protection before every mutation and admission;
   reserve independent preparation regions and access envelopes durably. Test paused,
   offline, conflicting workers, changed plans and failed saves.
 
@@ -930,7 +930,7 @@ requirements until all acceptance below passes.
 
 ### Task45: Verified regions, normal pipeline and native acceptance
 
-- [ ] Require verified foundations/clearance before dependent builders, allow unaffected
+- [x] Require verified foundations/clearance before dependent builders, allow unaffected
   regions to continue and recheck after changing terrain. Retain correct partial builds.
 - [ ] Run actual multiworker runtime and native uneven-terrain survey→level→fill→clear→
   verify→build acceptance. Record counts, retained infrastructure, restarts and limits.
