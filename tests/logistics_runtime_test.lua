@@ -405,3 +405,37 @@ test('pose recovery keeps paused and unrelated courier blocks intact',function()
     assert(f.worker:updateGPS());eq(f.worker.state.currentTask.phase,'blocked');eq(f.stats.pulled,pulled)
   end
 end)
+
+test('GPS heading probe recovers a courier turn across both controller and worker reboots',function()
+  local f=fixture();f.inventories.stage[1]={name='minecraft:stone',count=9}
+  f.we.gps={locate=function() return f.world.pose.x,f.world.pose.y,f.world.pose.z end};f:reboot(false,true)
+  local original=f.world.turtle.turnRight;local interrupted=false
+  f.world.turtle.turnRight=function()
+    local ok,why=original()
+    if ok and not interrupted then interrupted=true;error('power lost after actual turn') end
+    return ok,why
+  end
+  -- The test world only supplied forward before; backtracking must be physical too.
+  f.world.turtle.back=function()
+    local p=f.world.pose;local d=({north={0,-1},east={1,0},south={0,1},west={-1,0}})[p.heading]
+    p.x=p.x-d[1];p.z=p.z-d[2];return true
+  end
+  local ok,id=f.controller:command('transport minecraft:stone 9 source destination');assert(ok,id)
+  for _=1,200 do f:step();if interrupted then break end end
+  assert(interrupted);local origin=U.copy(f.world.pose);f:reboot(true,true);assert(f.worker:updateGPS());eq(f.worker.state.position.heading,nil)
+  local rebooted=false;local lost={}
+  f.filter=function(p)
+    if (p.m.type=='task_pose_grant' or p.m.type=='task_pose_ack') and not lost[p.m.type] then lost[p.m.type]=true;return false end
+  end
+  for _=1,350 do
+    f:step()
+    local r=f.worker.state.poseRecovery
+    if r and r.stage=='probe' and not rebooted then
+      assert(U.distance(f.world.pose,origin)==1);f:reboot(true,true);rebooted=true
+    end
+    if f.controller.state.automation.jobs[id].status=='completed' then break end
+  end
+  assert(rebooted,'physical heading probe was not exercised');assert(lost.task_pose_grant and lost.task_pose_ack)
+  eq(f.controller.state.automation.jobs[id].status,'completed');eq(f.stats.pulled,9);eq(f.stats.dropped,9)
+  eq(f.worker.state.poseRecovery,nil);eq(f.controller.state.automation.jobs[id].poseRecovery.status,'settled')
+end)

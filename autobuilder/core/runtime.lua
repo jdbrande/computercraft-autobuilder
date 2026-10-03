@@ -81,6 +81,7 @@ function M.new(config,e)
   local gps=require('autobuilder.core.gps').new(e.gps,config.gps)
   self.mining=require('autobuilder.core.mining_service').new(self,config,e,network,clock)
   self.automation=require('autobuilder.core.automation_service').new(self,config,e,network,clock)
+  if self.agent then self.poseRecovery=require('autobuilder.workers.pose_recovery').new(self,config,e,network,clock,gps) end
   if config.role=='controller' then
     self.firstBuild=require('autobuilder.core.first_build').new(self,config,e)
     state.view='guide'
@@ -93,13 +94,21 @@ function M.new(config,e)
       state.status=task.phase or 'task_paused';self:save()
     end
   end
-  function self:confirmPose(fix,heading)
-    if not self.navigation or not U.heading(heading) then return false,'worker and explicit heading required' end
-    local ok,err=self.navigation:reconcile(fix,heading); if not ok then return false,err end
-    state.position.source='manual'; state.status=state.currentTask and (state.currentTask.phase or 'task_paused') or 'idle'
+  function self:poseRecovered()
     restoreCoverage()
     if self.mining.poseRecovered then self.mining:poseRecovered() end
     if self.automation.poseRecovered then self.automation:poseRecovered() end
+    if state.status=='recovery_required' and U.heading(state.position.heading) then
+      state.status=state.currentTask and (state.currentTask.phase or 'task_paused') or 'idle'
+    end
+    return self:save()
+  end
+  function self:confirmPose(fix,heading)
+    if not self.navigation or not U.heading(heading) then return false,'worker and explicit heading required' end
+    if state.poseRecovery then return false,'automatic pose probe owns movement; restore GPS and settle its origin first' end
+    local ok,err=self.navigation:reconcile(fix,heading); if not ok then return false,err end
+    state.position.source='manual'; state.status=state.currentTask and (state.currentTask.phase or 'task_paused') or 'idle'
+    self:poseRecovered()
     self:report('INFO','Operator confirmed position and heading'); return self:save()
   end
   function self:updateGPS()
@@ -110,15 +119,17 @@ function M.new(config,e)
     if self.busy or revision~=self.motionVersion then return true end
     local p=state.position
     if fix then
+      if state.poseRecovery then
+        local ok,why=self.poseRecovery:observe(fix)
+        if not ok then state.gpsError=why;self:save();return false,why end
+        p.source='gps';p.lastFix=clock();state.gpsError=nil;return self:save()
+      end
       local changed=p.known and (p.x~=fix.x or p.y~=fix.y or p.z~=fix.z)
       if changed then self:report('WARN','GPS corrected local position') end
       local ok,why=self.navigation:reconcile(fix)
       if not ok then state.gpsError=why;state.status='recovery_required';self:save();return false,why end
       p.source='gps'; p.lastFix=clock(); state.gpsError=nil
-      restoreCoverage()
-      if self.mining.poseRecovered then self.mining:poseRecovered() end
-      if self.automation.poseRecovered then self.automation:poseRecovered() end
-      if state.status=='recovery_required' and U.heading(p.heading) then state.status=state.currentTask and 'task_paused' or 'idle' end
+      self:poseRecovered()
     else
       p.source=p.known and 'local' or 'unknown'
       if state.gpsError~=err then self:report('WARN',err) end
@@ -176,6 +187,13 @@ function M.new(config,e)
     if not self.agent then return self.automation:step() end
     local task=state.currentTask
     if task and task.type and task.type~='MINE' and not config.automation.enabled then return true end
+    if self.poseRecovery:needed() then
+      self.busy=true;self.motionVersion=self.motionVersion+1
+      local ok,result,err=pcall(self.poseRecovery.step,self.poseRecovery)
+      self.busy=false
+      if not ok then error(result,0) end
+      return result,err
+    end
     if task and task.phase~='completed' then
       local covered,why=require('autobuilder.core.chunks').execution(config,state)
       if not covered then

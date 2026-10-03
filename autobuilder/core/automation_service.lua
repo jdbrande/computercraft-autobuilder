@@ -3,7 +3,7 @@ local Coordination=require('autobuilder.core.workflows')
 local M={}
 function M.new(app,config,e,network,clock)
   if config.role=='worker' then return require('autobuilder.workers.executor').new(app,config,e,network,clock) end
-  local queue=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,app.state.id,app.chunks)
+  local queue=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,app.state.id,app.chunks,config)
   local production=require('autobuilder.core.production_service').new(app,config,e,queue)
   local fuel=require('autobuilder.core.fuel_service').new(app,config,e,queue,production,clock)
   local rescue=require('autobuilder.core.fuel_rescue_service').new(app,config,e,queue,production,network,clock)
@@ -69,6 +69,14 @@ function M.new(app,config,e,network,clock)
         j.blocks=nil; app:save(); return send(sender,'task_ack',{jobId=j.id})
       end
       return true
+    elseif m.type=='task_pose_reserve' then
+      local granted,why=queue:reservePose(sender,j.id,p.sequence,p.origin,app.state.workers)
+      send(sender,'task_pose_grant',{jobId=j.id,sequence=p.sequence,origin=U.copy(p.origin),granted=granted==true})
+      return granted,why
+    elseif m.type=='task_pose_done' then
+      local ok,why=queue:finishPose(sender,j.id,p.sequence,p.origin)
+      if ok then return send(sender,'task_pose_ack',{jobId=j.id,sequence=p.sequence,origin=U.copy(p.origin)}) end
+      return false,why
     elseif m.type=='task_reserve' then
       local granted,err=queue:reserve(sender,j.id,p.from,p.target,app.state.workers)
       send(sender,'task_grant',{jobId=j.id,target=p.target,granted=granted==true}); return granted,err

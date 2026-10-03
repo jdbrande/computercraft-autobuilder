@@ -807,11 +807,11 @@ pose-related blocks after a complete trusted pose.
 **Interfaces:** one atomic recovery-cell grant keyed by owner/task/sequence/origin;
 worker probes once with persistent intent and derives heading from actual GPS delta.
 
-- [ ] Add failing all-neighbor ownership, exact duplicate, coverage/protection,
+- [x] Add failing all-neighbor ownership, exact duplicate, coverage/protection,
   competing worker, checkpoint rollback and reboot tests. Implement atomic claims.
-- [ ] Add failing physical probe/reboot/no-GPS/no-fuel/obstacle/receipt tests and
+- [x] Add failing physical probe/reboot/no-GPS/no-fuel/obstacle/receipt tests and
   actual runtime task continuation; implement driver and validated protocol.
-- [ ] Run focused/full tests and fix regressions. Commit complete autonomous recovery.
+- [x] Run focused/full tests and fix regressions. Commit complete autonomous recovery.
 
 ### Task34: Native interrupted-action acceptance and integration
 

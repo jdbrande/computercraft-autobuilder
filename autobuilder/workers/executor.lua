@@ -89,6 +89,7 @@ function M.new(app,config,e,network,clock)
     end
   end
   app.navigation.guard=function(from,target)
+    if s.poseRecovery then return app.poseRecovery:guard(from,target) end
     if not s.currentTask or not config.automation.enabled then return true end
     local r=s.motionReservation; local id=s.currentTask.id
     if r and r.jobId==id and r.granted and U.distance(r.target,target)==0 then return true end
@@ -97,6 +98,7 @@ function M.new(app,config,e,network,clock)
     return false,'movement reservation pending'
   end
   app.navigation.afterMove=function()
+    if s.poseRecovery then return end
     if not s.currentTask then return end
     local r=s.motionReservation
     if r then send('task_position',{jobId=r.jobId,from=r.from,target=r.target}); s.motionReservation=nil; save() end
@@ -107,6 +109,7 @@ function M.new(app,config,e,network,clock)
     if previous and (m.boot<previous.boot or (m.boot==previous.boot and m.sequence<=previous.sequence)) then return false,'stale task control' end
     s.lastTaskControl={boot=m.boot,sequence=m.sequence}; save()
     local p=m.payload; local t=s.currentTask
+    if m.type=='task_pose_grant' or m.type=='task_pose_ack' then return app.poseRecovery:handle(m.type,p) end
     if m.type=='task_fuel_freeze' or m.type=='task_fuel_consume' or m.type=='task_fuel_release' then
       local recovery=app.fuelRecovery; if not recovery then return false,'fuel recovery unavailable' end
       local method=({task_fuel_freeze='freeze',task_fuel_consume='consume',task_fuel_release='release'})[m.type]

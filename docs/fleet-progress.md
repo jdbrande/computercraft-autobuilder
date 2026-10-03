@@ -366,3 +366,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   exactly once; paused/unrelated blocks are preserved. Regression also fixed disabled
   worker automation executing a saved task and retained saved chunk boundaries after
   policy opt-out. Atomic heading-probe claims are the next implementation step.
+
+- Task33:581 Lua/18 Python tests passed. Atomic origin-plus-four-neighbor claims
+  reject conflicting workers, regions, protection and missing coverage. Heading
+  probes journal before one physical move, derive direction only from GPS, return
+  to origin and retain claims until acknowledged settlement. Actual courier runtime
+  recovers turn/probe reboots and lost grant/ack packets, delivering9 items once.
+  Unit tests cover post-backtrack reboot, GPS outage/mismatch, fuel, obstruction,
+  pause, disable and failed persistence. Native GPS acceptance follows.
