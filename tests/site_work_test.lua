@@ -69,6 +69,7 @@ test('preparation contracts reject arbitrary fill gravity invalid preservation a
   bad=U.copy(j);bad.siteWork.stage='fill';bad.blocks[1].name='minecraft:sand';assert(not M.validContract(bad))
   bad=U.copy(j);bad.blocks[3]=U.copy(bad.blocks[1]);assert(not M.validContract(bad))
   j.id='task:7:1';assert(require('autobuilder.core.task_messages').validate('task_assign',{job=j}))
+  bad=U.copy(j);bad.type='BUILD';assert(not require('autobuilder.core.task_messages').validate('task_assign',{job=bad}),'preparation metadata accepted on ordinary build')
 end)
 
 test('preparation placement reconciles one consumed item across reboot and rejects unrelated inventory loss',function()

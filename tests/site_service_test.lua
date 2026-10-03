@@ -141,3 +141,47 @@ test('preparation retains root receipts until both evidence checkpoints contain 
   e.fs.fault.open=nil;service:workTick(p,plan);assert(not first.report)
   e.fs.files[path]='corrupt';local backup=assert(service:evidence(p,plan,region));eq(backup.preparation.lastJob,first.id);assert(not backup.preparation.jobId)
 end)
+
+test('missing site evidence retains active physical ownership then resurveys before issuing new work',function()
+  local e,c,app,q,p,plan,service=surveyedFixture();service:startWork(p,plan)
+  for _=1,8 do service:workTick(p,plan) end
+  local first;for _,j in pairs(q.state.jobs) do if j.type=='PREPARE_REGION' then first=j;break end end
+  assert(first);local region=first.siteWork.region
+  p.site.work.active={[tostring(region)]={region=region}};p.site.work.cursor=plan.regionCount+1
+  first.workerId=12;first.status='running'
+  local _,path=service:evidence(p,plan,region);e.fs.files[path]=nil;e.fs.files[path..'.bak']=nil
+  local before=q.state.sequence
+  for _=1,5 do service:workTick(p,plan) end
+  eq(q.state.sequence,before);eq(first.status,'running');eq(first.workerId,12)
+  first.status='completed';first.completedAt=100;first.progress=#first.blocks;first.report={counts={correct=#first.blocks},entries={}}
+  for _=1,10 do service:workTick(p,plan) end
+  local recovery
+  for _,j in pairs(q.state.jobs) do if j.type=='SURVEY_SITE' and j.status~='completed' then recovery=j end end
+  assert(recovery,'lost evidence did not produce a new read-only survey');eq(recovery.siteSurvey.region,region)
+  recovery.workerId=12;recovery.status='completed';recovery.progress=#recovery.siteSurvey.columns
+  recovery.siteReport={identity=plan.identity,region=region,observations={}}
+  for _,col in ipairs(recovery.siteSurvey.columns) do recovery.siteReport.observations[#recovery.siteReport.observations+1]={x=col.x,y=col.minY,z=col.z,status='empty',name='minecraft:air'} end
+  for _=1,8 do service:workTick(p,plan) end
+  local record=assert(service:evidence(p,plan,region));eq(record.jobId,recovery.id);assert(not service:prepared(p,plan,region))
+  local newJob=q.state.jobs[record.preparation.jobId];assert(newJob and newJob.id~=first.id,'retired contract was reused after resurvey')
+end)
+
+test('advanced region evidence reconciles an older controller root without stranding a completed owner',function()
+  local e,c,app,q,p,plan,service=surveyedFixture();service:startWork(p,plan)
+  for _=1,8 do service:workTick(p,plan) end
+  local j;for _,candidate in pairs(q.state.jobs) do if candidate.type=='PREPARE_REGION' then j=candidate;break end end
+  local region=j.siteWork.region;p.site.work.active={[tostring(region)]={region=region}};p.site.work.cursor=plan.regionCount+1
+  j.workerId=12;j.status='completed';j.completedAt=100;j.progress=#j.blocks;j.report={counts={correct=#j.blocks},entries={}}
+  local done=j.progress;service:workTick(p,plan)
+  j.status='running';j.progress=0;j.completedAt=nil;j.report=nil
+  service:workTick(p,plan)
+  eq(j.status,'completed');eq(j.progress,done);eq(j.completedAt,100);assert(not j.blocks)
+end)
+
+test('a saved prepared marker with unresolved defects is rejected as invalid evidence',function()
+  local e,c,app,q,p,plan,service=surveyedFixture()
+  local record,path=service:evidence(p,plan,1)
+  record.preparation={status='prepared',stage='verified',cursor=1,sequence=2,failed=1,defects={},verifiedFill=true,verifiedClear=true}
+  assert(require('autobuilder.core.checkpoint').new(e.fs,e.textutils,path):save(record))
+  assert(not service:prepared(p,plan,1),'unresolved defects certified as prepared')
+end)

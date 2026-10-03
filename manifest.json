@@ -257,7 +257,7 @@
       "version": "0.23.0"
     },
     {
-      "bytes": 13073,
+      "bytes": 18036,
       "path": "autobuilder/build/site_service.lua",
       "roles": [
         "controller",
@@ -267,7 +267,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "0b4d2626ebda53c5a9234014f11c4f835b205d763c7bd145575f982dc76df1a7",
+      "sha256": "7088aa73328369ef4a2d6b317f17074c43081b9baf1db39670b327ce31f50a1b",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/build/site_service.lua",
       "version": "0.23.0"
     },
@@ -687,7 +687,7 @@
       "version": "0.23.0"
     },
     {
-      "bytes": 9881,
+      "bytes": 10050,
       "path": "autobuilder/core/task_messages.lua",
       "roles": [
         "controller",
@@ -697,7 +697,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "629a07abffd2d86db9f5d13b289f5b824bf82c8c584eb6594c279880cce5dae8",
+      "sha256": "75c31713bfdb111b0d5548c454e47a3c37d798bb057e593b936f8e81da320ea1",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/task_messages.lua",
       "version": "0.23.0"
     },
@@ -717,7 +717,7 @@
       "version": "0.23.0"
     },
     {
-      "bytes": 21879,
+      "bytes": 21889,
       "path": "autobuilder/core/workflows.lua",
       "roles": [
         "controller",
@@ -727,7 +727,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "c8fa91ac7d6bd9ae8330a060f3deb7f760b9d51f3b5e1095b2629477d7b65cd4",
+      "sha256": "4c706f6ca2c398a7be328caba3f4668bd0c84583c43b5b6f6fbf6d7ff0bdf277",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/workflows.lua",
       "version": "0.23.0"
     },

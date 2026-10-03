@@ -465,3 +465,22 @@ test('build level surveys excavates returns debris fills holes and verifies a re
   assert(w.blocks['2,-1,0'] and w.blocks['3,-1,0'],'foundation not filled');eq(p.site.work.blocked,0)
   local returns=0;for _,r in pairs(c.state.automation.returns) do eq(r.status,'completed');returns=returns+1 end;assert(returns>0,'debris was not collected')
 end)
+
+test('leveling runtime recovers both lost region files without abandoning excavation or duplicating effects',function()
+  local w,ce,we,c,b,step,reboot=fixture({site={minY=-2,maxY=15}})
+  w.blocks['2,1,0']={name='minecraft:dirt',state={}};w.blocks['2,0,0']={name='minecraft:stone',state={}};w.blocks['3,-2,0']={name='minecraft:stone',state={}}
+  assert(c:command('build import /example.json terrain_recovery'));assert(c:command('build level terrain_recovery'))
+  local lost=false
+  for _=1,5000 do
+    step();local p=c.state.automation.projects.terrain_recovery
+    if not lost and w.digs>0 and p.phase=='preparing_site' then
+      for path in pairs(ce.fs.files) do if path:find('/sites/terrain_recovery/',1,true) then ce.fs.files[path]=nil end end
+      c,b=reboot();lost=true
+    end
+    if p.phase=='site_ready' and not b.state.currentTask then break end
+  end
+  local p=c.state.automation.projects.terrain_recovery
+  assert(p.phase=='site_ready',p.phase..':'..tostring(p.error));assert(lost);eq(w.digs,1);eq(w.places,2)
+  local surveys=0;for _,j in pairs(c.state.automation.jobs) do if j.type=='SURVEY_SITE' then surveys=surveys+1 end end;assert(surveys>=2)
+  eq(w.blocks['2,0,0'].name,'minecraft:stone');assert(w.blocks['2,-1,0'] and w.blocks['3,-1,0']);assert(not w.blocks['2,1,0'])
+end)

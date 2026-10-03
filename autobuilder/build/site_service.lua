@@ -25,6 +25,19 @@ function M.new(app,config,e,queue,production)
     if record.identity~=plan.identity or record.region~=region or not U.shortString(record.jobId,160)
       or not U.integer(record.clearanceY) or record.clearanceY<plan.bounds.max.y or record.clearanceY>plan.maxY
       or not Survey.validReport(contract(plan,region,record.clearanceY),record.report,true) then return nil,'invalid site evidence' end
+    local w=record.preparation
+    if record.recovery~=nil and (not U.integer(record.recovery) or record.recovery<0) then return nil,'invalid site recovery generation' end
+    if w~=nil then
+      if type(w)~='table' or not ({working=true,prepared=true,blocked=true})[w.status]
+        or not ({clear=true,fill=true,verify_fill=true,verify_clear=true,verified=true})[w.stage]
+        or not U.integer(w.sequence) or w.sequence<1 or not U.integer(w.cursor) or w.cursor<0 or w.cursor>262145
+        or not U.integer(w.failed) or w.failed<0 or type(w.defects)~='table' or #w.defects>64
+        or w.epoch~=nil and (not U.integer(w.epoch) or w.epoch<0)
+        or w.jobId~=nil and not U.shortString(w.jobId,160)
+        or w.nextCursor~=nil and (not U.integer(w.nextCursor) or w.nextCursor<1 or w.nextCursor>262145)
+        or w.status=='prepared' and (w.stage~='verified' or w.failed~=0 or w.verifiedFill~=true or w.verifiedClear~=true)
+        or w.status=='working' and w.stage=='verified' then return nil,'invalid preparation evidence' end
+    end
     return record,path
   end
   function self:start(p,plan)
@@ -117,12 +130,70 @@ function M.new(app,config,e,queue,production)
     end end
     work.omitted=(work.omitted or 0)+(report.omittedEntries or 0)
   end
+  local function cargoSettled(p,j,a)
+    if j.workerId then
+      local returnId=p.returnRequests['site:'..j.id];local r=returnId and s.returns[returnId]
+      if not (r and r.status=='completed' and r.owner==j.workerId and U.finite(r.settledAt) and r.settledAt>(j.completedAt or 0)) then
+        local worker=app.state.workers[tostring(j.workerId)];local t=worker and worker.telemetry
+        if not worker or not worker.online or not worker.lastSeen or worker.lastSeen<=(j.completedAt or 0) or not t
+          or t.task==j.id or not require('autobuilder.storage.returns').validCargo(t.cargo) or t.cargo.error then a.error='Waiting for fresh preparation cargo receipt';return false end
+        if next(t.cargo.items) then
+          if not r then
+            r=production.returns:request(j.workerId,'project:'..p.name..':site:'..j.id)
+            F.commit(p,save,function() p.returnRequests['site:'..j.id]=r.id end)
+          end
+          a.error='Waiting for preparation debris return '..r.id;return false
+        end
+      end
+    end
+    return true
+  end
+  local function recoverEvidence(p,plan,a)
+    local prefix=p.name..':site:'..p.site.generation..':'..a.region..':work:'
+    local owners={};local epoch=a.recoveries or 0
+    for _,j in pairs(s.jobs) do if j.key and j.key:sub(1,#prefix)==prefix then
+      epoch=math.max(epoch,tonumber(j.key:sub(#prefix+1):match('^(%d+):')) or 0)
+      if j.status~='completed' then a.error='Missing site evidence; retaining physical owner of '..j.id;return false end
+      if j.workerId and (not owners[j.workerId] or (j.completedAt or 0)>(owners[j.workerId].completedAt or 0)) then owners[j.workerId]=j end
+    end end
+    for _,j in pairs(owners) do if not cargoSettled(p,j,a) then return false end end
+    if not a.recovery then
+      F.commit(p,save,function()
+        a.recoveries=epoch+1;a.recovery={attempt=1,clearanceY=p.protectedBounds.max.y}
+      end);return true
+    end
+    local recovery=a.recovery;local j=recovery.jobId and s.jobs[recovery.jobId]
+    if not j then
+      local payload=contract(plan,a.region,recovery.clearanceY);payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
+      j=queue:submit('SURVEY_SITE',payload,{},p.name..':site:'..p.site.generation..':'..a.region..':resurvey:'..a.recoveries..':'..recovery.attempt)
+      F.commit(p,save,function() recovery.jobId=j.id;p.jobs[#p.jobs+1]=j.id end);return true
+    end
+    if j.status~='completed' then a.error='Re-surveying missing evidence with '..j.id;return false end
+    if not j.siteReport then
+      F.commit(p,save,function() recovery.attempt=recovery.attempt+1;recovery.jobId=nil end);return true
+    end
+    assert(Survey.validReport(j,j.siteReport,true),'recovery survey lacks valid observations')
+    local blocked=false;for _,o in ipairs(j.siteReport.observations) do if o.status=='blocked' then blocked=true end end
+    if blocked and recovery.clearanceY<plan.maxY then
+      local expanded=U.copy(p.protectedBounds);expanded.max.y=math.min(plan.maxY,recovery.clearanceY+8)
+      if E.conflicts(app.state,expanded) then a.error='Higher recovery survey overlaps owned mining territory';return false end
+      F.commit(p,save,function()
+        p.protectedBounds=expanded;recovery.clearanceY=expanded.max.y;recovery.attempt=recovery.attempt+1;recovery.jobId=nil
+      end);j.siteReport=nil;j.siteSurvey.columns=nil;assert(save());return true
+    end
+    local record={identity=plan.identity,region=a.region,jobId=j.id,clearanceY=j.clearanceY,report=U.copy(j.siteReport),recovery=a.recoveries}
+    local cp=store(p,plan,a.region);assert(cp:save(record));assert(cp:save(record))
+    F.commit(p,save,function() a.recovery=nil;a.error=nil end)
+    j.siteReport=nil;j.siteSurvey.columns=nil
+    for _,old in pairs(s.jobs) do if old.key and old.key:sub(1,#prefix)==prefix then old.blocks=nil;old.report=nil end end
+    assert(save());return true
+  end
   local function workRegion(p,plan,a)
     local record,why=self:evidence(p,plan,a.region)
-    if not record then a.error='Site evidence unavailable: '..tostring(why);assert(save());return false end
+    if not record then a.error='Site evidence unavailable: '..tostring(why);return recoverEvidence(p,plan,a) end
     local cp=store(p,plan,a.region)
     if not record.preparation then
-      record.preparation={status='working',stage='clear',cursor=1,sequence=1,defects={},failed=0}
+      record.preparation={status='working',stage='clear',cursor=1,sequence=1,epoch=record.recovery or 0,defects={},failed=0}
       for _,o in ipairs(record.report.observations) do if o.status=='blocked' then
         record.preparation.status='blocked';record.preparation.defects[#record.preparation.defects+1]=U.copy(o)
       end end
@@ -131,6 +202,17 @@ function M.new(app,config,e,queue,production)
     local work=record.preparation
     assert(({working=true,prepared=true,blocked=true})[work.status] and U.integer(work.sequence) and work.sequence>=1,'invalid saved preparation state')
     local retired=work.lastJob and s.jobs[work.lastJob]
+    if retired and retired.status~='completed' then
+      local receipt=work.lastReceipt;local w=receipt and app.state.workers[tostring(receipt.owner)];local t=w and w.telemetry
+      if not receipt or not U.integer(receipt.owner) or not U.finite(receipt.at) or not U.integer(receipt.progress)
+        or receipt.progress<0 or receipt.progress>512 or retired.workerId and retired.workerId~=receipt.owner
+        or not w or not w.online or not t or t.task==retired.id or not w.lastSeen or w.lastSeen<=receipt.at then
+        a.error='Waiting for preparation receipt reconciliation '..retired.id;return false
+      end
+      F.commit(retired,save,function()
+        retired.workerId=receipt.owner;retired.status='completed';retired.phase='completed';retired.progress=receipt.progress;retired.completedAt=receipt.at
+      end)
+    end
     if retired and (retired.blocks or retired.report) then
       -- A failed prior promotion may leave only the primary advanced. Make the
       -- backup contain consumed evidence before deleting the worker's report.
@@ -148,25 +230,11 @@ function M.new(app,config,e,queue,production)
       local j=assert(s.jobs[work.jobId],'preparation task ownership missing')
       if j.status~='completed' then return false end
       assert(j.report and type(j.report.counts)=='table','preparation task lacks durable inspection receipt')
-      if j.siteWork.stage~='verify' and j.workerId then
-        local returnId=p.returnRequests['site:'..j.id];local r=returnId and s.returns[returnId]
-        if not (r and r.status=='completed' and r.owner==j.workerId and U.finite(r.settledAt) and r.settledAt>(j.completedAt or 0)) then
-          local worker=app.state.workers[tostring(j.workerId)];local t=worker and worker.telemetry
-          if not worker or not worker.online or not worker.lastSeen or worker.lastSeen<=(j.completedAt or 0) or not t
-            or t.task==j.id or not require('autobuilder.storage.returns').validCargo(t.cargo) or t.cargo.error then a.error='Waiting for fresh preparation cargo receipt';return false end
-          if next(t.cargo.items) then
-            if not r then
-              r=production.returns:request(j.workerId,'project:'..p.name..':site:'..j.id)
-              F.commit(p,save,function() p.returnRequests['site:'..j.id]=r.id end)
-            end
-            a.error='Waiting for preparation debris return '..r.id;return false
-          end
-        end
-      end
+      if j.siteWork.stage~='verify' and not cargoSettled(p,j,a) then return false end
       local failed=0;for status,n in pairs(j.report.counts) do if status~='correct' then failed=failed+n end end
       if failed>0 then collectDefects(work,j.report);work.failed=work.failed+failed end
       local retry=j.report.counts.inventory_full and j.report.counts.inventory_full>0
-      work.lastJob=j.id;work.jobId=nil;work.sequence=work.sequence+1
+      work.lastJob=j.id;work.lastReceipt={owner=j.workerId,at=j.completedAt or 0,progress=j.progress};work.jobId=nil;work.sequence=work.sequence+1
       if not retry then work.cursor=work.nextCursor or 0 end
       work.nextCursor=nil
       -- The next tick rolls this evidence into the backup before root pruning.
@@ -184,7 +252,7 @@ function M.new(app,config,e,queue,production)
     local payload,nextCursor=plan:work(a.region,record,work.stage,work.cursor,8,work.fill)
     if not payload then work.cursor=0;assert(cp:save(record));return true end
     payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
-    local j=queue:submit('PREPARE_REGION',payload,{},p.name..':site:'..p.site.generation..':'..a.region..':work:'..work.sequence)
+    local j=queue:submit('PREPARE_REGION',payload,{},p.name..':site:'..p.site.generation..':'..a.region..':work:'..(work.epoch or 0)..':'..work.sequence)
     work.jobId=j.id;work.nextCursor=nextCursor;assert(cp:save(record))
     local linked=false;for _,id in ipairs(p.jobs) do if id==j.id then linked=true end end
     if not linked then F.commit(p,save,function() p.jobs[#p.jobs+1]=j.id end) end

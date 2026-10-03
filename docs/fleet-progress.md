@@ -543,3 +543,13 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Survey-derived leveling service gate:668 Lua/18 Python tests passed; release0.23
   generation/check and whitespace checks passed. Committing this intermediate
   service and continuing evidence recovery and normal per-region build gates.
+
+- Region evidence recovery retains all physical task owners, waits for fresh cargo
+  acknowledgement/central return and then surveys again. New recovery epochs prevent
+  completed work IDs from being reused. Runtime deletion of both region files during
+  excavation still finishes leveling with exactly one dig and two fills after reboot.
+- A regression reproduced an older controller root stranding a completed worker even
+  though its region file had consumed the receipt. Region evidence now retains the
+  bounded owner/progress/time receipt and reconciles only after fresh worker telemetry
+  no longer claims that task. Invalid prepared markers with unresolved defects are
+  rejected. Preparation metadata is refused on unrelated task types.
