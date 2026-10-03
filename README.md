@@ -1,9 +1,13 @@
-# Autobuilder 0.12.0
+# Autobuilder 0.18.0
 
 Development direction: [full fleet requirements](docs/fleet-requirements.md) and
 [milestone 1 autonomous exploration design](docs/autonomous-mining-design.md).
 The full fleet roadmap remains in progress. The current release behavior is documented below.
 See the [0.12.0 acceptance report](docs/validation-0.12.0.md) for automated and live Minecraft results.
+
+**Loaded missions:** [configure chunk coverage](docs/chunk-loading.md) before dispatch.
+Use stationary Advanced Peripherals chunky turtles or explicitly assured loaded
+areas. `chunks` reports missing coverage and retained loader ownership.
 
 **Automatic exploration:** [configure explorers](docs/autonomous-mining.md) with
 `setup exploration` on the controller and `setup miner explore` on miners.

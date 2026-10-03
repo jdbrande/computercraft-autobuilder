@@ -15,8 +15,8 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Capacity/parallel factory integrated and pushed at `345b833`.
 - Native schematic support integrated/pushed at `9a27b1b`:508 Lua/18 Python tests,
   both native construction trials and review correction passed.
-- Current branch: `milestone/0.18.0`. Task27: queue/movement coverage enforcement;
-  final suite and native chunky-turtle acceptance follow.
+- Current branch: `milestone/0.18.0`. Task28: native chunky-turtle acceptance, operator setup/status, documentation
+  and final review. Task27 passed526 Lua/18 Python tests.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -54,7 +54,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 24: worker states | Heartbeats, task/fuel/pose/errors | Equipment/software health and full recovery-state presentation |
 | 25: rescue | Native identity-checked fuel delivery, original-task recovery, offline ownership and journal preservation | Reachable inventory recovery and broader blocked-route recovery missions |
 | 26: offline owners | Ownership survives timeout/restart | Extend to new leases and configurable recovery commands |
-| 27: chunk loading | Explicit operator-loaded envelope assumption | Installed-mod integration, loaded mission checks and unsupported-area blocking |
+| 27: chunk loading | Strict bounded coverage, durable stationary chunky claims, native cross-chunk construction and offline-loader refusal | 0.18 final review/integration; preserve during infrastructure/scaling work |
 | 28–29: protection/traffic | Protected projects/depots/routes, cell reservations | Global station/farm registration, larger fleet deadlock/routing checks |
 | 30–31: priorities/scheduling | Capabilities, dependencies and exclusive jobs | Priority/cost/fuel/chunk scheduling, dynamic roles and simultaneous projects |
 | 32–34: monitor, commands, logs | Terminal screens and role/project commands, rotating logs | Monitor fleet dashboard, consistent fleet/project/resource/recovery commands, structured significant events |
@@ -300,3 +300,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Existing hardware simulations explicitly declare their loaded terrain. Failed
   queue checkpoints roll back ownership and geometry; physical recovery keeps its
   owner and requires assured coverage before a missing historical grant can move.
+
+- Task28 native: anchors140/141 kept distant chunks64,64 and65,64 loaded after
+  vanilla fixture tickets were removed. Builder143 placed/verified4 bricks across
+  the boundary in55.48s with a controller142 reboot. Uncovered chunk66,64 never
+  acquired a worker. Offline141 blocked a new verification; reconnect resumed it
+  with4 correct cells. Final leases released; builder1906 fuel, anchors2000 each.
+  Fixture shut down and physical anchors removed; AP ticket expiry is asynchronous.
+- Task28 pre-review gate:529 Lua/18 Python, release0.18 generation/check and
+  whitespace checks passed. Operator chunk status/setup and migration guide added.

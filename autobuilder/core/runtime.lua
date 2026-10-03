@@ -120,6 +120,7 @@ function M.new(config,e)
       local ok,why=self.agent:tick(clock())
       if not ok then self:report('WARN',why) end
     end
+    if state.view=='chunks' then self.chunks:describe() end
     if self.automation.preflight then self.automation:preflight() end
     self.mining:tick()
     self.automation:tick()
@@ -191,6 +192,10 @@ function M.new(config,e)
   function self:command(line)
     line=line:match('^%s*(.-)%s*$')
     local called,ok,result=pcall(function()
+      if line=='chunks' then
+        if self.agent then state.telemetry=self.agent:telemetry() end
+        state.view='chunks';return true,self.chunks:describe()
+      end
       if line=='setup' or line=='7' or line:match('^setup%s') then
         if self.busy then return false,'Wait for the current turtle step to finish, then type setup again.' end
         self.nextProgram='setup'; self.nextProgramArgs={}

@@ -173,6 +173,34 @@ function M.new(state,config,save)
       if lease.status=='held' and j and (j.physicalComplete or j.status=='completed') then self:release(id) end
     end
   end
+  function self:describe()
+    local c=config.chunkLoading;local lines={'Chunk coverage '..(c.enabled and 'enforced' or 'DISABLED (legacy opt out)')}
+    lines[#lines+1]='Assured rectangles: '..#c.areas
+    for _,a in ipairs(c.areas) do lines[#lines+1]=a.minX..','..a.minZ..' to '..a.maxX..','..a.maxZ end
+    local details={}
+    for _,w in pairs(state.workers or {}) do
+      local a=w.telemetry and w.telemetry.chunkAnchor
+      if a then details[#details+1]='Anchor '..w.id..' chunk '..a.x..','..a.z..(w.online and ' online' or ' offline') end
+    end
+    if c.anchor then
+      local a=state.telemetry and state.telemetry.chunkAnchor
+      details[#details+1]=a and ('Local anchor chunk '..a.x..','..a.z) or 'Local anchor unavailable: check chunky hardware and settled pose'
+    end
+    for id,lease in pairs(s.leases) do if lease.status=='held' then
+      local missing={}
+      for key,p in pairs(lease.providers) do if p.kind=='anchor' then
+        local w=(state.workers or {})[tostring(p.workerId)];local a=w and w.telemetry and w.telemetry.chunkAnchor
+        if not w or not w.online or not a or a.x..','..a.z~=key then missing[#missing+1]=p.workerId..'@'..key end
+      end end
+      table.sort(missing)
+      details[#details+1]=id..' held for '..lease.workerId..(#missing>0 and ('; offline/lost providers '..table.concat(missing,' ')) or '')
+    end end
+    for _,jobs in ipairs({state.jobs or {},(state.automation or {}).jobs or {}}) do
+      for id,j in pairs(jobs) do if j.coverageError then details[#details+1]=id..' '..j.coverageError end end
+    end
+    table.sort(details);for _,line in ipairs(details) do lines[#lines+1]=line end
+    state.chunksLines=lines;return table.concat(lines,'\n')
+  end
   function self:release(id)
     local old=s.leases[id];if not old or old.status=='released' then return true end
     local lease=U.copy(old);lease.status='released'

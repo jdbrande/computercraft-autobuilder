@@ -1,5 +1,9 @@
 # Start here: controller 1 and one builder
 
+Current main enforces loaded mission coverage. Before starting work, configure
+[stationary chunky anchors or explicitly assured areas](chunk-loading.md), including
+the depot and routes. Run `chunks` to check coverage; unknown territory stays queued.
+
 Use **one of your seven online workers** for this first test: a small, 28-block
 cathedral detail. Leave the other six parked outside the work area. You do not
 need to reinstall them. These steps update the controller and chosen worker to

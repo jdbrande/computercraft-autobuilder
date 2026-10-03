@@ -3,11 +3,11 @@ local U=require('autobuilder.core.util')
 local M={}
 function M.reply(e,config,workers,sender,message)
   if config.role~='controller' or not workers[tostring(sender)] or type(message)~='table'
-    or message.version~=1 or message.type~='setup_request' or not U.shortString(message.requestId,64)
-    or config.supply.inventory=='' and not config.fuel.enabled then return false,'setup profile unavailable' end
+    or message.version~=1 or message.type~='setup_request' or not U.shortString(message.requestId,64) then return false,'setup profile unavailable' end
+  local chunks={enabled=config.chunkLoading.enabled,anchor=false,areas=U.copy(config.chunkLoading.areas)}
   local fuel=U.copy(config.fuel); fuel.stations={} -- station ownership stays on the controller
   return e.rednet.send(sender,{version=1,type='setup_profile',requestId=message.requestId,
-    fuel=fuel,supply=config.supply.inventory~='' and {inventory=config.supply.inventory,side=config.supply.side} or nil},config.protocol..'.setup')
+    chunkLoading=chunks,fuel=fuel,supply=config.supply.inventory~='' and {inventory=config.supply.inventory,side=config.supply.side} or nil},config.protocol..'.setup')
 end
 function M.fetch(e,config)
   local request=tostring(e.os.getComputerID())..':'..tostring(e.os.epoch('utc'))
@@ -21,6 +21,15 @@ function M.fetch(e,config)
     if sender==nil then break end
     if sender==config.controllerId and type(m)=='table' and m.version==1 and m.type=='setup_profile' and m.requestId==request
       then
+      local chunks
+      if type(m.chunkLoading)=='table' then
+        local c=m.chunkLoading
+        local ok=pcall(require('autobuilder.core.chunks').validate,{chunkLoading={enabled=c.enabled,anchor=false,areas=c.areas}})
+        if ok then
+          chunks={enabled=c.enabled,anchor=false,areas={}}
+          for _,a in ipairs(c.areas) do chunks.areas[#chunks.areas+1]=require('autobuilder.core.chunks').cleanArea(a) end
+        end
+      end
       local fuel
       if m.fuel~=nil then
         local ok=pcall(require('autobuilder.resources.fuel').validate,m.fuel,{})
@@ -31,7 +40,7 @@ function M.fetch(e,config)
       end
       local supply=type(m.supply)=='table' and U.shortString(m.supply.inventory,128)
         and ({front=true,up=true,down=true})[m.supply.side] and m.supply or nil
-      if supply or fuel then return {inventory=supply and supply.inventory,side=supply and supply.side,fuel=fuel} end
+      if supply or fuel or chunks then return {chunkLoading=chunks,inventory=supply and supply.inventory,side=supply and supply.side,fuel=fuel} end
     end
   end
   error('Controller '..config.controllerId..' did not provide setup settings. Update it, run setup there first, then reboot it and retry.')

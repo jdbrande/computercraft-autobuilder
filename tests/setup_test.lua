@@ -344,3 +344,26 @@ test('fuel setup copies only validated profile fields and ignores cyclic unknown
   local profile=require('autobuilder.setup_share').fetch(e,C.load({role='worker',controllerId=1}))
   eq(profile.fuel.enabled,true); eq(profile.fuel.extra,nil)
 end)
+
+test('chunk setup shares only validated assurances and never turns workers into anchors',function()
+  local Share=require('autobuilder.setup_share');local ce=env('controller',{})
+  local cfg=C.load({chunkLoading={areas={{minX=-2,maxX=1,minZ=-1,maxZ=0}}}})
+  assert(Share.reply(ce,cfg,{['8']={}},8,{version=1,type='setup_request',requestId='8:1000'}))
+  local we=env('worker',{'yes'});we.rednet.receive=function() return 1,ce.packet.message end
+  assert(require('autobuilder.setup_wizard').run({'chunks'},we))
+  local c=C.load(settings(we));eq(c.chunkLoading.enabled,true);eq(c.chunkLoading.anchor,false);eq(c.chunkLoading.areas[1].minX,-2)
+  eq(we.turtle.calls,0);eq(we.turtle.fuel,100)
+  ce.packet.message.chunkLoading.anchor=true;ce.packet.message.chunkLoading.extra=ce.packet.message.chunkLoading
+  local p=Share.fetch(we,c);eq(p.chunkLoading.anchor,false);eq(p.chunkLoading.extra,nil)
+  ce.packet.message.chunkLoading.areas[1].maxX=-3;ce.packet.message.fuel=nil
+  assert(not pcall(Share.fetch,we,c),'invalid loaded area copied')
+end)
+
+test('anchor setup requires actual chunky hardware and saves a stationary role without fuel use',function()
+  local w=env('worker',{'yes'});local original=w.fs.files['/autobuilder/settings.lua']
+  assert(not pcall(require('autobuilder.setup_wizard').run,{'anchor'},w));eq(w.fs.files['/autobuilder/settings.lua'],original)
+  local old=w.peripheral.getType;w.peripheral.getType=function(side) return side=='left' and 'chunky' or old(side) end
+  assert(require('autobuilder.setup_wizard').run({'anchor'},w));local c=C.load(settings(w))
+  eq(c.chunkLoading.anchor,true);eq(c.initialPosition.x,12);eq(c.mining.enabled,false);eq(c.automation.building,false)
+  eq(w.turtle.calls,0);eq(w.turtle.fuel,100)
+end)

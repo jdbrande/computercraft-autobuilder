@@ -710,14 +710,14 @@ chunky hardware. Shared pure validators serve telemetry/assignment integration.
 **Files:** runtime, workflows/mining queues, network/task/mining messages, agent,
 executor/navigation, setup sharing, runtime tests and explicit loaded test fixtures.
 
-- [ ] Add failing covered/uncovered simultaneous work, old worker, depot/side-route,
+- [x] Add failing covered/uncovered simultaneous work, old worker, depot/side-route,
   changed duplicate grant, offline loader, default-deny movement and reboot tests.
   Expected: uncovered work cannot create movement intent or acquire an owner.
-- [ ] Wire coverage claims before assignment, preserve them through reconciliation,
+- [x] Wire coverage claims before assignment, preserve them through reconciliation,
   validate/clean loaded envelopes, advertise real anchors and prevent reassignment.
   Add movement enforcement separate from traffic reservations. Existing simulations
   explicitly declare their loaded terrain; no production test-only bypass.
-- [ ] Run relevant/full Lua and Python tests, fix regressions and commit. Expected:
+- [x] Run relevant/full Lua and Python tests, fix regressions and commit. Expected:
   covered independent work continues; unknown territory reports exact chunk errors.
 
 ### Task 28: Chunk status, setup, native loading acceptance and integration

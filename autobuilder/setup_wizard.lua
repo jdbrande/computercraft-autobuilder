@@ -217,6 +217,7 @@ local function worker(e,overrides,config)
   local found,block=e.turtle.inspect()
   assert(found and block and containers[block.name],'Supply chest changed. Leave the turtle parked, then rerun setup.')
   overrides.depot=U.copy(position); overrides.initialPosition=U.copy(position)
+  if profile.chunkLoading then overrides.chunkLoading=U.copy(profile.chunkLoading) end
   overrides.supply=U.copy(overrides.supply or {}); overrides.supply.inventory=profile.inventory; overrides.supply.side=profile.side
   overrides.automation=U.copy(overrides.automation or {}); overrides.automation.enabled=true; overrides.automation.building=true
   e.print('Step 4/4: fuel and save')
@@ -260,7 +261,7 @@ local function explorationController(e,overrides,config)
   local ok,why=E.validate(chosen); assert(ok,why)
   e.print('Search bounds: '..describe(chosen.bounds.min)..' through '..describe(chosen.bounds.max))
   e.print('Protected base: '..describe(low)..' through '..describe(high))
-  e.print('Software does not load chunks. Keep every search cell and depot loaded and within modem coverage.')
+  e.print('Missions require assured loaded areas or registered stationary chunky anchors. Keep modem coverage along the route.')
   if not yes(e,'Is this operating boundary loaded, reachable and protected as shown? yes/no') then return false end
   chosen.revision=(config.exploration.revision or 0)+1
   overrides.exploration=chosen; return true
@@ -385,8 +386,8 @@ local function loadFuel(e)
   end
 end
 function M.run(args,e,opts)
-  assert(#args==0 or (#args==1 and (args[1]=='fuel' or args[1]=='builder' or args[1]=='controller' or args[1]=='miner' or args[1]=='factory' or args[1]=='crafter' or args[1]=='exploration'))
-    or (#args==2 and args[1]=='miner'),'Usage: setup [builder|controller|miner [resource]|factory|crafter|fuel]')
+  assert(#args==0 or (#args==1 and (args[1]=='chunks' or args[1]=='anchor' or args[1]=='fuel' or args[1]=='builder' or args[1]=='controller' or args[1]=='miner' or args[1]=='factory' or args[1]=='crafter' or args[1]=='exploration'))
+    or (#args==2 and args[1]=='miner'),'Usage: setup [builder|controller|miner [resource]|factory|crafter|fuel|chunks|anchor]')
   if args[1]=='miner' and args[2] and args[2]~='explore' then assert(miningResources(args[2])) end
   assert(not e.fs.exists('/.autobuilder-install/transaction'),'Run /installer.lua --recover before setup')
   local original=IO.read(e.fs,settingsPath)
@@ -405,7 +406,25 @@ function M.run(args,e,opts)
     if not retry(e,tostring(why)..'. Attach a wireless modem to this computer/turtle.') then return cancel(e) end
   end
   local pose
-  if args[1]=='fuel' then
+  if args[1]=='chunks' then
+    local profile=require('autobuilder.setup_share').fetch(e,config)
+    assert(profile.chunkLoading,'Controller did not provide a valid chunk policy')
+    overrides.chunkLoading=U.copy(profile.chunkLoading)
+    -- Sharing never changes the local hardware role.
+    overrides.chunkLoading.anchor=config.chunkLoading.anchor
+    e.print('Loaded-area policy copied from controller. Assured rectangles: '..#profile.chunkLoading.areas)
+  elseif args[1]=='anchor' then
+    local found=false
+    for _,side in ipairs({'left','right'}) do if e.peripheral.getType(side)=='chunky' then found=true end end
+    assert(found,'Attach an enabled Advanced Peripherals chunky upgrade before anchor setup')
+    pose=require('autobuilder.core.gps').new(e.gps,config.gps):locate()
+    if not pose then pose=ask(e,'Stationary turtle block position: x y z',coordinate) end
+    overrides.initialPosition=U.copy(pose)
+    overrides.chunkLoading={enabled=true,anchor=true,areas={}}
+    overrides.mining=U.copy(overrides.mining or {});overrides.mining.enabled=false
+    overrides.automation={enabled=true,building=false,crafting=false,courier=false,logging=false,farming=false}
+    e.print('Stationary chunky anchor at '..describe(pose)..'. It will not receive ordinary work.')
+  elseif args[1]=='fuel' then
     assert(config.depot,'Set up this worker depot before enabling automatic fuel')
     local profile=require('autobuilder.setup_share').fetch(e,config)
     assert(profile.fuel and profile.fuel.enabled,'Configure and enable fuel on the controller first')
@@ -422,7 +441,7 @@ function M.run(args,e,opts)
     if args[1]=='miner' then pose=miner(e,overrides,config,args[2]) else pose=worker(e,overrides,config) end
     if not pose then return cancel(e) end
   end
-  local exploring=args[1]=='miner' and args[2]=='explore'
+  local exploring=args[1]=='anchor' or args[1]=='miner' and args[2]=='explore'
   if not yes(e,pose and not exploring and 'Save settings and load slot 15 coal/charcoal or coal blocks if needed? yes/no' or 'Save these settings? yes/no') then return cancel(e) end
   persist(e,config,overrides,pose,original,preparation)
   if pose and not exploring then loadFuel(e) end
