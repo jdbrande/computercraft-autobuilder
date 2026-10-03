@@ -1246,3 +1246,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   power loss after a partial pull:65 placements,64 supplied items, empty staging
   and released ownership. Python18 tests, generated release verification and
   whitespace checks pass. Complete Lua and native acceptance are next.
+
+- Started0.28 design in `.worktrees/continuous-pipeline`: automatic builds will use
+  verified site regions and existing finite builder supply requests instead of
+  waiting for a full-schematic stock target. Explicit prepare/start remains.
+  Ruling: bounded supply journals already provide ownership and restart semantics;
+  a second project-consumption ledger is unnecessary for fleet-wide overlap.
+  Cost: each builder still waits during its own top-up; other builders/providers
+  supply concurrency. Implementation and acceptance remain pending.

@@ -1189,3 +1189,27 @@ must survive retired block payloads; expected mining is not physical cargo; stal
 telemetry cannot revive completed work; lookahead cannot lock the only supply chest
 or make preparation mine unnecessary fill; no new request may duplicate an active
 finite request solely because a report repeats.
+
+## Milestone0.28: overlapping automatic construction and material production
+
+Spec: [continuous pipeline design](continuous-pipeline-design.md). Inline execution
+in `.worktrees/continuous-pipeline` follows0.27 while prior acceptance runs finish.
+Standing user authorization covers design and Git decisions; preserve ordered
+integration and do not pause for routine milestone approvals.
+
+### Task59: Automatic run admission through existing supply ownership
+
+- [ ] Add failing controller cases for empty-stock automatic region creation,
+  explicit prepare/start, saved legacy owned requests and pause/reboot.
+- [ ] Persist per-run automatic streaming mode, begin only verified preparation
+  regions and reuse finite supply-production requests; never rewrite active claims.
+- [ ] Preserve actor/request linkage and final settlement across generation changes.
+  Run focused project, supply and production tests; document behavior and commit.
+
+### Task60: Full pipeline and release acceptance
+
+- [ ] Add actual miner/factory/multiple-builder overlap regression with finite stock,
+  partial transfer and restart, measured item conservation and final drain.
+- [ ] Run native acceptance where useful, one final review and consolidated fixes,
+  full Lua/Python/release/diff checks. Update permanent evidence and progress,
+  integrate/push in dependency order, then continue every remaining requirement.
