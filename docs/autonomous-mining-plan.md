@@ -884,15 +884,15 @@ config capability negotiation and actual runtime tests.
 
 **Files:** projects, controller return service, project and full-chain tests.
 
-- [ ] Reproduce premature built with pending worker acknowledgement/cargo/supply.
+- [x] Reproduce premature built with pending worker acknowledgement/cargo/supply.
   Track participation across phases; share retirement linkage checks where useful.
-- [ ] Add settling phase and automatic home/unload requests. Require reconciled
+- [x] Add settling phase and automatic home/unload requests. Require reconciled
   inventories, claims and worker release/home evidence before built/verified; preserve
   compatible reassignment and stream retirement. Test restart and independent actors.
 
 ### Task41: Native home/cargo acceptance and integration
 
-- [ ] Exercise remote finite-cargo return, post-effect restart and independent world
+- [x] Exercise remote finite-cargo return, post-effect restart and independent world
   inspection. Record setup, counts, fuel, claims, cleanup and limits.
 - [ ] Run full Lua/Python/release gates, one final whole-branch review/fix pass, update
   running progress and docs, integrate/push and continue all fleet requirements.

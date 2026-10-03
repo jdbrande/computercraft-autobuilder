@@ -133,3 +133,31 @@ test('native runtime home return settles mixed cargo after drop and collection r
   eq(f.apps[7].state.capacityLedger.leases[j.id].status,'released');eq(f.apps[7].state.inventoryLedger.leases[j.id].status,'released')
   local receipt=f.apps[12].state.completedTasks[j.id];eq(receipt.homeReceipt.deposited['minecraft:stone'],5)
 end)
+
+test('project completion waits for native worker home return cargo collection and fresh acknowledgement',function()
+  local f=fixture();local C=require('tests.loaded_config')
+  f.configs[7].build.enabled=true;f.configs[7].build.origin={x=6,y=0,z=5};f.configs[7]=C.load(f.configs[7]);f:reboot(7)
+  f.configs[12].automation.building=true;f.configs[12].depot={x=2,y=1,z=0};f.configs[12]=C.load(f.configs[12]);f:reboot(12)
+  f.worlds[12].items[1]={name='minecraft:stone',count=4}
+  local bp={schema=1,size={x=2,y=1,z=1},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=2}},metadata={},requirements={['minecraft:stone']=2}}
+  f.envs[7].textutils.unserializeJSON=f.envs[7].textutils.unserialize
+  f.envs[7].fs.files['/settlement.json']=f.envs[7].textutils.serialize(bp)
+  local app=f.apps[7];assert(app:command('build import /settlement.json settlement'));assert(app:command('build auto settlement'))
+  local settling=false;local rebooted=false;f.rejectDrop=true
+  for _=1,600 do
+    f:cycle();local p=f.apps[7].state.automation.projects.settlement
+    if p.phase=='settling' then settling=true end
+    if settling and not rebooted then f:reboot(7);f:reboot(12);rebooted=true end
+    local t=f.apps[12].state.currentTask
+    if t and t.returning and t.homeRetryable then
+      eq(p.phase,'settling');eq(F.count(f.inventories.base,'minecraft:stone'),24);f.rejectDrop=false;f.loseAck=true
+    end
+    if p.phase=='built' then
+      assert(settling,'project declared built before worker settlement');assert(not f.apps[12].state.currentTask)
+      break
+    end
+  end
+  local p=f.apps[7].state.automation.projects.settlement;eq(p.phase,'built');assert(rebooted)
+  eq(f.worlds[12].pose.x,2);eq(f.worlds[12].pose.z,0);eq(f.worlds[12].items[1],nil)
+  eq(F.count(f.inventories.base,'minecraft:stone'),26);eq(next(f.inventories.a),nil);eq(p.report.counts.correct,2)
+end)

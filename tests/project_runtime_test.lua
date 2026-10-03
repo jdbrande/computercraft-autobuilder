@@ -3,18 +3,44 @@ local IS=require('tests.install_support')
 local function fixture(options)
   options=options or {}
   local w=require('tests.build_world').new(); w.items[1]={name='minecraft:stone',count=8}
+  local storage=require('tests.managed_logistics_support').new()
+  storage.inventories={stock={[1]={name='minecraft:stone',count=8}},home={},stage={}}
+  if options.expansion then storage.size=1 end
+  w.blocks['0,1,0']={name='minecraft:chest',state={}}
+  w.blocks['0,2,-1']={name='minecraft:chest',state={}}
+  w.turtle.getItemSpace=function(slot) return 64-w.turtle.getItemCount(slot) end
+  local function move(from,to,slot,n,target)
+    local item=from[slot];if not item then return false end
+    for i=target or 1,target or 3 do
+      if not to[i] or to[i].name==item.name and to[i].count<64 then
+        local count=math.min(n,item.count,64-(to[i] and to[i].count or 0))
+        to[i]=to[i] or {name=item.name,count=0};to[i].count=to[i].count+count
+        item.count=item.count-count;if item.count==0 then from[slot]=nil end;return count>0
+      end
+    end
+    return false
+  end
+  w.turtle.dropDown=function(n)
+    assert(w.pose.x==0 and w.pose.y==2 and w.pose.z==0)
+    return move(w.items,storage.inventories.home,w.selected,n)
+  end
+  w.turtle.suck=function(n)
+    assert(w.pose.x==0 and w.pose.y==2 and w.pose.z==0 and w.pose.heading=='north')
+    local slot=next(storage.inventories.stage);if not slot then return false end
+    return move(storage.inventories.stage,w.items,slot,n,w.selected)
+  end
   local function env(id)
     local codec=require('tests.support').codec(); codec.unserializeJSON=codec.unserialize; codec.serializeJSON=codec.serialize
     local e={fs=IS.fs(),textutils=codec,now=100,packets={}}
     e.os={getComputerID=function() return id end,epoch=function() return e.now*1000 end}
     e.rednet={isOpen=function() return true end,open=function() end,send=function(to,m,p) e.packets[#e.packets+1]={to=to,m=U.copy(m),protocol=p}; return true end}
     e.peripheral={getNames=function() return {'right'} end,getType=function() return 'modem' end,
-      call=function(name,method) if method=='isWireless' then return true end; if method=='size' then return 1 end; assert(method=='list'); return {[1]={name='minecraft:stone',count=8}} end}
+      call=function(name,method,...) if method=='isWireless' then return true end; return storage.e.peripheral.call(name,method,...) end}
     return e
   end
   local ce,we=env(7),env(12); we.turtle=w.turtle
-  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},turtleFuelReserveItems={},clearSite=options.clearSite or false,build={enabled=true,origin={x=2,y=0,z=0},rotation=options.rotation or 0,mirrorX=options.mirrorX or false},autoDepotExpansion={enabled=options.expansion~=nil,freeSlots=0},depotExpansion=options.expansion or {}})
-  local wc=C.load({role='worker',controllerId=7,automation={building=true},clearSite=options.clearSite or false,minimumFuelReserve=0,initialPosition=U.copy(w.pose)})
+  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},turtleFuelReserveItems={},supply={inventory='stage',side='front'},logistics={nodes={{id='home',inventory='stock',position={x=-3,y=1,z=0},buffers={{inventory='home',position={x=0,y=2,z=0}}}}}},clearSite=options.clearSite or false,build={enabled=true,origin={x=2,y=0,z=0},rotation=options.rotation or 0,mirrorX=options.mirrorX or false},autoDepotExpansion={enabled=options.expansion~=nil,freeSlots=0},depotExpansion=options.expansion or {}})
+  local wc=C.load({role='worker',controllerId=7,automation={building=true},clearSite=options.clearSite or false,minimumFuelReserve=0,depot=U.copy(w.pose),supply={inventory='stage',side='front'},initialPosition=U.copy(w.pose)})
   local R=require('autobuilder.core.runtime'); local c,b=R.new(cc,ce),R.new(wc,we)
   local blueprint={schema=1,size={x=2,y=1,z=1},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=2}},metadata={},requirements={['minecraft:stone']=2}}
   ce.fs.files['/example.json']=ce.textutils.serialize(options.blueprint or blueprint)
@@ -24,7 +50,7 @@ local function fixture(options)
   end
   local function step()
     ce.now=ce.now+1; we.now=ce.now
-    b:tick(); pump(we,c); c:tick(); pump(ce,b); b:workStep(); pump(we,c); pump(ce,b)
+    b:tick(); pump(we,c); c:tick(); pump(ce,b); c:workStep(); b:workStep(); pump(we,c); pump(ce,b)
   end
   return w,ce,we,c,b,step,function() c=R.new(cc,ce); b=R.new(wc,we); return c,b end
 end
@@ -314,4 +340,50 @@ test('JSON import persists the same single file snapshot that passed validation'
   assert(c:command('build import /example.json snapshot')); eq(reads,1)
   local p=c.state.automation.projects.snapshot; eq(ce.fs.files[p.path],original)
   assert(c:command('build analyze snapshot'))
+end)
+
+test('project settlement waits for linked claims requests and acknowledgements then accepts safe reassignment',function()
+  local w,ce,we,c,b,step=fixture()
+  assert(c:command('build import /example.json settlement'));assert(c:command('build prepare settlement'))
+  for _=1,3 do step() end
+  local s=c.state.automation;local p=s.projects.settlement
+  local j=c.automation.queue:submit('VERIFY',{project=p.name,projectRun=p.run,blocks={{x=2,y=0,z=0,name='minecraft:stone',state={}}}},{})
+  j.workerId=12;j.status='completed';j.completedAt=ce.now
+  p.phase='settling';p.settlement={target='built'}
+  local worker=c.state.workers['12'];worker.telemetry.cargo={items={},limits={}}
+  worker.telemetry.task=nil;worker.telemetry.status='idle';worker.lastSeen=ce.now
+  c.automation.projects:tick();eq(p.phase,'settling');assert(p.error:find('fresh acknowledgement',1,true))
+  worker.lastSeen=ce.now+1;worker.telemetry.position.x=8
+  c.automation.projects:tick();eq(p.phase,'settling');local rid=assert(p.returnRequests['12'])
+  local nextJob=c.automation.queue:submit('BUILD',{blocks={{x=20,y=0,z=0,name='minecraft:stone',state={}}}},{})
+  nextJob.workerId=12;nextJob.status='assigned';worker.telemetry.task=nextJob.id;worker.telemetry.status='working'
+  c.state.capacityLedger.leases[j.id]={status='held'}
+  s.requests[p.requestId].status='waiting'
+  c.automation.projects:tick();eq(p.phase,'settling');eq(s.returns[rid].status,'completed')
+  s.requests[p.requestId].status='completed';c.automation.projects:tick();eq(p.phase,'settling')
+  c.state.capacityLedger.leases[j.id].status='released';c.automation.projects:tick();eq(p.phase,'built')
+  eq(p.actors['12'].settled.reassigned,nextJob.id)
+end)
+
+test('project remembers a production miner after its completed task is pruned',function()
+  local w,ce,we,c,b,step=fixture()
+  assert(c:command('build import /example.json settlement'));assert(c:command('build prepare settlement'))
+  for _=1,3 do step() end
+  local s=c.state.automation;local p=s.projects.settlement;local r=s.requests[p.requestId]
+  c.state.jobs['old-mine']={id='old-mine',workerId=99,status='completed',completedAt=101};r.mines={stone='old-mine'}
+  c.automation.projects:tick();assert(p.actors['99']);c.state.jobs['old-mine']=nil
+  p.phase='settling';p.settlement={target='built'};c.automation.projects:tick()
+  eq(p.phase,'settling');assert(p.error:find('99',1,true))
+end)
+
+test('project pause before home job creation prevents return admission until resumed',function()
+  local w,ce,we,c,b,step=fixture();assert(c:command('build import /example.json paused'));step()
+  local p=c.state.automation.projects.paused;p.phase='settling';p.settlement={target='built'}
+  p.actors={['12']={after=0}};p.returnRequests={};w.pose.x=8
+  local worker=c.state.workers['12'];worker.telemetry.position.x=8
+  c.automation.projects:tick();local rid=assert(p.returnRequests['12'])
+  assert(c:command('build pause paused'));c:workStep()
+  local r=c.state.automation.returns[rid];local j=c.state.automation.jobs[r.jobId]
+  assert(not j.returnReady,'paused project granted home ownership')
+  assert(c:command('build resume paused'));c:workStep();assert(j.returnReady)
 end)

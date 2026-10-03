@@ -77,7 +77,7 @@ local function fixture()
     ce.now=ce.now+1; we.now=ce.now
     self.worker:tick(); self:pump(we,self.controller)
     self.controller:tick(); self:pump(ce,self.worker)
-    self.worker:workStep(); self:pump(we,self.controller); self:pump(ce,self.worker)
+    self.controller:workStep(); self.worker:workStep(); self:pump(we,self.controller); self:pump(ce,self.worker)
   end
   function f:reboot(controller,worker)
     if controller then ce.packets={}; self.controller=Runtime.new(cc,ce) end

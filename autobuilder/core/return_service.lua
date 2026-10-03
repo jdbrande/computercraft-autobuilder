@@ -21,6 +21,24 @@ function M.new(app,config,e,queue,production)
     end)
     return r
   end
+  function self:releaseToTask(id,taskId)
+    local r=s.returns[id];local task=s.jobs[taskId] or (app.state.jobs or {})[taskId]
+    if not r or r.status=='completed' or not r.key or r.key:sub(1,8)~='project:' then return false end
+    local job=r.jobId and s.jobs[r.jobId];local w=app.state.workers[tostring(r.owner)];local t=w and w.telemetry
+    if job and (job.returnReady or job.workerId) then return false end
+    if not task or task.returnManaged or task.workerId~=r.owner or task.status=='completed'
+      or not w.online or not t or t.task~=taskId or not w.lastSeen or w.lastSeen<(task.created or 0)
+      or not Cargo.validCargo(t.cargo) or t.cargo.error or next(t.cargo.items) then return false end
+    for _,name in ipairs({'inventoryLedger','capacityLedger','chunkLedger'}) do
+      local lease=job and (app.state[name] or {}).leases and app.state[name].leases[job.id]
+      if lease and lease.status=='held' then return false end
+    end
+    F.commit(s,save,function()
+      if job then job.status='completed';job.cancelled=true;job.error=nil end
+      r.status='completed';r.reassignedTo=taskId;r.settledAt=w.lastSeen;r.error=nil
+    end)
+    return true
+  end
   local function eligible(job)
     local w=app.state.workers[tostring(job.preferredWorker)];local t=w and w.telemetry
     assert(w and w.online and t and t.status=='idle' and not t.task and not Q.workerBusy(app.state,w.id,job.id),'waiting for idle return worker')
@@ -107,7 +125,7 @@ function M.new(app,config,e,queue,production)
     for _,r in ipairs(requests) do
       local job=r.jobId and s.jobs[r.jobId]
       if not job then
-        job=queue:submit('RETURN_HOME',{preferredWorker=r.owner,returnManaged=true,returnRequest=r.id,returnReady=false},{},r.id)
+        job=queue:submit('RETURN_HOME',{preferredWorker=r.owner,returnManaged=true,returnRequest=r.id,returnReady=false,paused=r.paused},{},r.id)
         F.commit(r,save,function() r.jobId=job.id;r.status='running' end)
       end
       if job.status=='completed' then
@@ -117,7 +135,13 @@ function M.new(app,config,e,queue,production)
           and job.completedAt and w.lastSeen and w.lastSeen>job.completedAt then
           F.commit(r,save,function() r.status='completed';r.error=nil;r.settledAt=w.lastSeen end)
         else r.error='waiting for fresh home position and empty cargo acknowledgement' end
-      elseif not job.paused then
+      elseif job.paused then
+        for _,flow in pairs(job.returnFlow and job.returnFlow.collect or {}) do if flow.intent then
+          local status,why=F.protect(function() return F.reconcileTransfer(flow,e,save) end)
+          if status=='blocked' then r.error=why else production:syncClaims(false) end
+          return true
+        end end
+      else
         if not job.returnReady or job.workerFinished then
           local status,why=F.protect(function()
             if job.workerFinished then return collect(job) end

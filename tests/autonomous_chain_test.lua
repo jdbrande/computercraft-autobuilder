@@ -90,7 +90,7 @@ local function fixture(options)
     for _,slot in ipairs({1,2,5,6}) do change(crafty.slots,slot,mc('stone'),-1) end
     change(crafty.slots,13,mc('stone_bricks'),4); f.stats.crafts=f.stats.crafts+1; return true
   end
-  local cw=U.copy(common); cw.role='worker'; cw.controllerId=7; cw.initialPosition={x=-10,y=2,z=0,heading='north'}; cw.automation={crafting=true}
+  local cw=U.copy(common); cw.role='worker'; cw.controllerId=7; cw.initialPosition={x=-10,y=2,z=0,heading='north'}; cw.depot=U.copy(cw.initialPosition); cw.automation={crafting=true}
   f.craft=actor(24,cw,t); f.craft.slots=crafty.slots
   local w=require('tests.build_world').new(); w.blocks['0,1,0']={name=mc('chest'),state={}}
   w.turtle.getItemSpace=function(slot) return 64-w.turtle.getItemCount(slot) end

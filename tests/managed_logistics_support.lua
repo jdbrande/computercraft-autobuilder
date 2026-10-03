@@ -17,7 +17,9 @@ function M.new()
     assert(method=='pushItems','unexpected '..method)
     local destination,slot,limit,target=...;assert(destination~=f.offline,'destination disconnected')
     local to=assert(f.inventories[destination]);local item=inv[slot]
-    if not item or to[target] and to[target].name~=item.name then return 0 end
+    if not item then return 0 end
+    if not target then for i=1,f.size or 3 do if not to[i] or to[i].name==item.name and to[i].count<64 then target=i;break end end end
+    if not target or to[target] and to[target].name~=item.name then return 0 end
     local n=math.min(limit,item.count,64-(to[target] and to[target].count or 0),f.partial or 64)
     if n==0 then return 0 end
     to[target]=to[target] or {name=item.name,count=0};to[target].count=to[target].count+n

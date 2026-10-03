@@ -431,14 +431,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   All final review findings fixed; native evidence recorded. Integrating then
   continuing home unloading and project settlement without a handoff pause.
 
--0.22 Task38 foundation: bounded nonreserved cargo manifests and strict protocol
+- 0.22 Task38 foundation: bounded nonreserved cargo manifests and strict protocol
   cleaning; journaled home travel/drop executor uses existing R.delta and preserves
   fuel/tools. Seven home tests and network tests pass, including partial drops,
   post-effect restart, ambiguous reserved-slot mutation and failed receipt saves.
   Existing runtime/logistics focused suites pass. Controller return collection and
   project completion gate are in progress; no native acceptance claimed yet.
 
--0.22 Task39: controller returns reserve private/central capacity and output-only
+- 0.22 Task39: controller returns reserve private/central capacity and output-only
   counts atomically, retain the worker through exact collection, and acknowledge
   only afterward. Runtime mixed-cargo test passes both post-drop and post-collection
   restarts, lost acknowledgement, partial transfers and protected fuel slots.
@@ -447,3 +447,16 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   existing private return collection and its runtime regression pass afterward.
   Grant rollback, yielding-worker/cargo changes, node rebinding, loaded central
   geometry and exact acknowledged receipt tests pass. Project barrier follows.
+
+- Task40: final VERIFY now enters settling; linked production/supply/mining actors
+  persist across phases and pruning. Claims, receipts and fresh home/empty telemetry
+  gate completion; compatible empty durable reassignment releases an unclaimed return.
+  Project and full-chain runtime fixtures now exercise real storage/home settlement.
+- New RED→GREEN cases cover paused pending collection reconciliation and pause before
+  home job creation. Native171 returned5 stone+3 dirt after post-drop/post-collection
+  reboots, retaining reserved2 coal+pickaxe and1988 fuel. Central/private world counts
+  match;170/171 shut down and all five fixture/observer loading tickets removed.
+  Permanent evidence: [0.22 acceptance](validation-0.22.0.md). Final gates in progress.
+
+- Task40 complete gate:622 Lua/18 Python passed; release0.22 generation/check and
+  whitespace clean. Final whole-branch review/fix pass follows before integration.

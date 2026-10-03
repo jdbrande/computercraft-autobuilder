@@ -114,3 +114,26 @@ test('owned home cargo prevents a new shared factory observer until collection s
   assert(not Q.canOfferSupply(f.app.state,{type='BUILD'}),'new supply overlapped return ownership')
   f:deposit(j);f:step(20);eq(j.status,'completed');assert(Q.factoryCanRun(f.app.state,craft))
 end)
+
+test('unclaimed project home request releases an empty actor only to another durable task',function()
+  for _,mode in ipairs({'safe','manual','owned','cargo','unowned','save'}) do
+    local f=fixture();local r=f.returns:request(12,mode=='manual' and 'manual' or 'project:sample:run:1:worker:12')
+    if mode=='owned' then f:step() end
+    local j=f.queue:submit('BUILD',{blocks={{x=8,y=0,z=0,name='minecraft:stone',state={}}}},{})
+    j.workerId=mode=='unowned' and 13 or 12;j.status='assigned'
+    local w=f.app.state.workers['12'];w.telemetry.task=j.id;w.telemetry.status='working';w.lastSeen=101
+    if mode~='cargo' then w.telemetry.cargo={items={},limits={}} end
+    if mode=='save' then f.app.save=function() return false,'disk full' end end
+    local ok,result=pcall(f.returns.releaseToTask,f.returns,r.id,j.id)
+    if mode=='safe' then assert(ok and result);eq(r.status,'completed');eq(r.reassignedTo,j.id)
+    else assert(not ok or not result);assert(f.queue.state.returns[r.id].status~='completed') end
+  end
+end)
+
+test('paused home collection reconciles its pending native effect without another transfer',function()
+  local f=fixture();local r=f.returns:request(12);f:step();local j=f:returnJob(r);f:deposit(j)
+  f.crashTransfer=true;pcall(function() f:step() end);assert(f.crashed)
+  local pending;for _,flow in pairs(j.returnFlow.collect) do if flow.intent then pending=flow end end;assert(pending)
+  f.crashed=false;j.paused=true;local transfers=f.transfers;f:step()
+  eq(pending.intent,nil);eq(f.transfers,transfers);assert(j.status~='completed')
+end)

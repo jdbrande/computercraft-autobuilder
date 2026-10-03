@@ -67,7 +67,30 @@ Limits:64 nodes,8 buffers per node,64 target item types per node, targets1..1000
 and batches1..64 further bounded by native stack/capacity measurements. Aggregate
 production requests above1000000 report a finite-request error. Shared inventory
 isolation still limits cross-role throughput. Broader project supply forecasting,
-worker scaling, global traffic recovery and final home return remain required work.
+worker scaling and global traffic recovery remain required work.
+
+## Home return and project completion
+
+`worker return ID` requests an updated worker to return safely and unload nonreserved
+cargo. `returns` shows request state and actionable blockers. Register a logistics
+private buffer whose stand equals that worker's configured depot, with central room
+for its cargo. The buffer must be empty and distinct from supply/fuel/factory chests.
+A front-facing supply chest and a downward home buffer can share one depot stand.
+An empty worker needs only its known depot and loaded travel route.
+
+The worker retains fuel/tool/reserved slots and rejects unsupported NBT cargo. It
+journals every drop. The controller reserves private and central slot capacity,
+journals collection, and acknowledges completion only after exact central delivery.
+Full/disconnected containers retain ownership and retry. Never clear saved journals
+or move owned cargo to bypass a blocker. Offline owners retain their claims.
+
+After successful final verification a project enters `settling`. All linked work,
+stock/capacity/loading claims and supply receipts must drain. Participating workers
+need fresh home/empty-cargo evidence, or safe empty-cargo reassignment to another
+durable task. Only then does the project become `built` or `verified`. Configure depots
+for stationary crafting workers too. Pause/resume includes automatic home requests;
+an already performed collection is still reconciled while paused. See the
+[0.22 acceptance report](validation-0.22.0.md) for native evidence and limits.
 
 ## Existing builder supply and legacy transport
 

@@ -84,7 +84,108 @@ function M.new(app,config,e,queue,production)
     p.total=mode=='VERIFY' and a.volume or mode=='CLEAR' and a.airCount or #a.blocks
     p.generation=p.generation+1; p.cursor=1; p.jobs={}; p.regionJobs={}; p.completed=0; p.report={counts={},entries={}}
   end
+  local function linked(p,allRuns)
+    local work,requests={},{}
+    if p.requestId and (allRuns or p.includeProduction~=false) then requests[p.requestId]=true end
+    for id,j in pairs(s.jobs) do
+      if j.project==p.name and (allRuns or (j.projectRun or 0)==(p.run or 0)) then
+        work[id]=j;local prefix='supply:'..id..':'
+        for rid,r in pairs(s.requests) do if r.key and r.key:sub(1,#prefix)==prefix then requests[rid]=true end end
+      end
+    end
+    local function mine(id)
+      local j=(app.state.jobs or {})[id]
+      while j and not work[j.id] do work[j.id]=j;j=j.childId and app.state.jobs[j.childId] end
+    end
+    for rid in pairs(requests) do
+      local r=s.requests[rid]
+      if r then
+        for _,id in pairs(r.mines or {}) do mine(id) end
+        for _,id in pairs(r.harvests or {}) do if s.jobs[id] then work[id]=s.jobs[id] end end
+        for _,gid in pairs(r.acquisitions or {}) do
+          local g=(app.state.exploration or {}).groups and app.state.exploration.groups[gid]
+          if g then for _,id in ipairs(g.tripIds) do mine(id) end end
+        end
+      end
+      for id,j in pairs(s.jobs) do
+        if j.productionRequest==rid or j.key and j.key:sub(1,#rid+1)==rid..':' then work[id]=j end
+      end
+    end
+    return work,requests
+  end
+  local function actors(p,work)
+    p.actors=p.actors or {};local changed=false
+    for _,j in pairs(work) do if j.workerId then
+      local id=tostring(j.workerId);local a=p.actors[id]
+      if not a then a={after=0};p.actors[id]=a;changed=true end
+      local after=j.completedAt or j.created or 0
+      if after>a.after then a.after=after;a.settled=nil;changed=true end
+    end end
+    if changed then assert(save()) end
+  end
+  local function startRun(p,productionLinked)
+    p.run=p.run and p.run+1 or (p.phase=='built' or p.phase=='verified') and 1 or 0;p.actors={};p.returnRequests={};p.settlement=nil;p.includeProduction=productionLinked
+  end
+  local function settle(p,work,requests)
+    local why;local active={}
+    if app.chunks then app.chunks:reconcile() end
+    for rid in pairs(requests) do
+      local r=s.requests[rid]
+      if r and r.status~='completed' then why=why or 'Waiting for production '..rid end
+    end
+    for id,j in pairs(work) do
+      if j.status~='completed' and not j.physicalComplete then
+        why=why or 'Waiting for project task '..id
+        if j.workerId then active[tostring(j.workerId)]=true end
+      end
+      for _,ledger in ipairs({'inventoryLedger','capacityLedger','chunkLedger'}) do
+        local lease=(app.state[ledger] or {}).leases and app.state[ledger].leases[id]
+        if lease and lease.status=='held' then why=why or 'Waiting for '..ledger..' claim '..id end
+      end
+      if s.supply and s.supply.owner==j.workerId then why=why or 'Waiting for supply receipt '..tostring(s.supply.jobId) end
+    end
+    p.returnRequests=p.returnRequests or {}
+    for id,a in pairs(p.actors or {}) do if not a.settled then
+      local w=app.state.workers[id];local t=w and w.telemetry
+      local cargo=t and t.cargo
+      if not w or not w.online or not t or not w.lastSeen or w.lastSeen<=a.after then
+        why=why or 'Waiting for fresh acknowledgement from worker '..id
+      elseif active[id] then why=why or 'Waiting for project worker '..id
+      elseif not require('autobuilder.storage.returns').validCargo(cargo) or cargo.error then
+        why=why or 'Worker '..id..' needs supported cargo telemetry: '..tostring(cargo and cargo.error or 'update worker software')
+      else
+        local request=p.returnRequests[id] and s.returns[p.returnRequests[id]]
+        local newTask=t.task and (s.jobs[t.task] or (app.state.jobs or {})[t.task])
+        local reassigned=newTask and newTask.workerId==w.id and not work[newTask.id] and not newTask.returnManaged
+        if not next(cargo.items) and reassigned and (not request or request.status=='completed'
+          or production.returns:releaseToTask(request.id,newTask.id)) then
+          a.settled={at=w.lastSeen,reassigned=newTask.id};assert(save())
+        elseif not t.task and t.status=='idle' and t.position and t.position.known and U.heading(t.position.heading)
+          and U.position(t.depot) and U.distance(t.position,t.depot)==0 and not next(cargo.items)
+          and not require('autobuilder.core.workflows').workerBusy(app.state,w.id) then
+          a.settled={at=w.lastSeen,home=U.copy(t.depot)};assert(save())
+        else
+          if not request then
+            request=production.returns:request(w.id,'project:'..p.name..':run:'..(p.run or 0)..':worker:'..id)
+            p.returnRequests[id]=request.id;assert(save())
+          end
+          why=why or 'Worker '..id..' return: '..(request.error or request.status)
+        end
+      end
+    end end
+    for _,rid in pairs(p.returnRequests) do
+      local r=s.returns[rid]
+      if not r or r.status~='completed' then why=why or 'Waiting for home return '..rid end
+    end
+    if why then p.error=why;assert(save());return end
+    p.phase=p.settlement.target;p.settlement.completedAt=e.os and e.os.epoch and e.os.epoch('utc')/1000 or 0;p.error=nil;assert(save())
+  end
   local function pauseProduction(p,paused)
+    for _,rid in pairs(p.returnRequests or {}) do
+      local r=s.returns[rid];local j=r and r.jobId and s.jobs[r.jobId]
+      if r then r.paused=paused end
+      if j and j.status~='completed' then j.paused=paused;if not paused then j.resumeRequested=true end end
+    end
     local r=p.requestId and s.requests[p.requestId]; if not r then return end
     r.paused=paused
     for _,id in pairs(r.acquisitions or {}) do app.mining.jobs:setAcquisitionPaused(id,paused) end
@@ -162,7 +263,8 @@ function M.new(app,config,e,queue,production)
     end
     assert(#a.issues==0,'Unsupported palette or entity data; inspect build analyze before unattended work')
     if action=='prepare' or action=='auto' then
-      assert(not ({building=true,clearing=true,verifying=true,repairing=true})[p.phase],'Project is already active; use pause/resume')
+      assert(not ({building=true,clearing=true,verifying=true,repairing=true,settling=true})[p.phase],'Project is already active; use pause/resume')
+      if not p.run or p.phase=='built' or p.phase=='verified' then startRun(p,true) end
       if action=='auto' then p.autoStart=true end
       if not next(a.requirements) then
         p.preparedEmpty=true; p.requestId=nil; p.phase='ready'; save(); return true,'No materials required'
@@ -170,6 +272,8 @@ function M.new(app,config,e,queue,production)
       local r=production:request(a.requirements,'project:'..p.name,{projectName=p.name}); p.requestId=r.id; p.phase='preparing'; save(); return true,r.id
     elseif action=='start' or action=='verify' or action=='repair' or action=='clear' then
       assert(config.build.enabled,'Set build.enabled=true and configure the build origin first')
+      assert(p.phase~='settling','Project still owns worker or inventory settlement; wait for completion')
+      if not p.run or p.phase=='built' or p.phase=='verified' then startRun(p,action=='start' and p.phase~='built' and p.phase~='verified') end
       for _,id in ipairs(p.jobs) do assert(s.jobs[id].status=='completed','Project still owns unfinished tasks; pause/resume instead') end
       if action=='clear' then assert(config.clearSite,'Set clearSite=true before clearing schematic air cells') end
       if action=='start' then
@@ -194,6 +298,8 @@ function M.new(app,config,e,queue,production)
       s.retiredBlueprints=nil; save()
     end
     for _,p in pairs(s.projects) do
+      local work,requests=linked(p);actors(p,work)
+      if p.phase=='settling' and not p.paused then settle(p,work,requests) end
       if p.phase=='preparing' and s.requests[p.requestId].status=='completed' then p.phase='ready'; save() end
       if p.phase=='ready' and p.autoStart and not p.paused then
         local ok,err=pcall(self.command,self,{'build','start',p.name})
@@ -226,7 +332,7 @@ function M.new(app,config,e,queue,production)
             if not p.regionJobs[dep] then ready=false else deps[#deps+1]=p.regionJobs[dep] end
           end
           if ready then
-            local j=queue:submit(p.mode,{blocks=region.blocks,project=p.name,region=region.id,clearanceY=a.clearanceY,deferConnections=p.mode~='VERIFY',stockOnly=p.stockOnly,preferredWorker=p.preferredWorker},deps,p.name..':'..p.generation..':'..region.id)
+            local j=queue:submit(p.mode,{blocks=region.blocks,project=p.name,projectRun=p.run or 0,region=region.id,clearanceY=a.clearanceY,deferConnections=p.mode~='VERIFY',stockOnly=p.stockOnly,preferredWorker=p.preferredWorker},deps,p.name..':'..p.generation..':'..region.id)
             p.jobs[#p.jobs+1]=j.id; p.regionJobs[region.id]=j.id; p.cursor=p.cursor+1; save()
           end
         elseif active==0 and p.cursor>#regions then
@@ -236,7 +342,9 @@ function M.new(app,config,e,queue,production)
             p.afterBuild=true; beginPhase(p,'VERIFY',a)
           else
             local problems=0; for key,n in pairs(p.report.counts) do if key~='correct' then problems=problems+n end end
-            p.phase=problems>0 and 'needs_repair' or p.afterBuild and 'built' or 'verified'; p.afterBuild=nil
+            if problems>0 then p.phase='needs_repair'
+            else p.settlement={target=p.afterBuild and 'built' or 'verified'};p.phase='settling' end
+            p.afterBuild=nil
           end
           save()
         end
@@ -246,23 +354,23 @@ function M.new(app,config,e,queue,production)
   function self:retire(name,advance)
     local p=project(name)
     assert(p.phase=='built' or p.phase=='verified','Only verified projects can be retired')
-    local remove,requests={},{}
-    if p.requestId then requests[p.requestId]=true end
-    for id,j in pairs(s.jobs) do
-      if j.project==name then
-        local prefix='supply:'..id..':'
-        for requestId,r in pairs(s.requests) do
-          if r.key and r.key:sub(1,#prefix)==prefix then requests[requestId]=true end
-        end
+    local linkedWork,requests=linked(p,true);local remove,returns={},{}
+    local prefix='project:'..name..':'
+    for id,r in pairs(s.returns or {}) do
+      if r.key and r.key:sub(1,#prefix)==prefix then
+        if r.status~='completed' then return false,'Waiting for worker home settlement' end
+        local shared=false
+        for other,q in pairs(s.projects) do if other~=name then
+          for _,rid in pairs(q.returnRequests or {}) do if rid==id then shared=true end end
+        end end
+        if not shared then returns[id]=true;if r.jobId and s.jobs[r.jobId] then linkedWork[r.jobId]=s.jobs[r.jobId] end end
       end
     end
     for id in pairs(requests) do
       if s.requests[id] and s.requests[id].status~='completed' then return false,'Waiting for batch material/fuel production to finish' end
     end
     for id,j in pairs(s.jobs) do
-      local factory=false
-      for requestId in pairs(requests) do if j.key and j.key:sub(1,#requestId+1)==requestId..':' then factory=true end end
-      if j.project==name or factory then
+      if linkedWork[id] then
         if j.status~='completed' then return false,'Waiting for batch jobs to finish' end
         if j.workerId then
           local w=app.state.workers[tostring(j.workerId)]
@@ -279,6 +387,7 @@ function M.new(app,config,e,queue,production)
     if app.chunks then app.chunks:reconcile() end
     for id in pairs(remove) do s.jobs[id]=nil end
     for id in pairs(requests) do s.requests[id]=nil end
+    for id in pairs(returns) do s.returns[id]=nil end
     s.projects[name]=nil; cache[name]=nil
     if s.currentProject==name then s.currentProject=nil end
     s.retiredBlueprints=s.retiredBlueprints or {}; s.retiredBlueprints[#s.retiredBlueprints+1]=p.path

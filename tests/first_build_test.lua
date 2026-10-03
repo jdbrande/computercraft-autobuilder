@@ -10,7 +10,20 @@ local function fixture()
     world.turtle[action]=function() local ok,err=move(); if ok then world.fuel=world.fuel-1 end; return ok,err end
   end
   local stock={[1]={name='minecraft:cobbled_deepslate',count=13},[2]={name='minecraft:sandstone',count=15}}
-  local stage={}
+  local stage={};local storage=require('tests.managed_logistics_support').new()
+  storage.size=27;storage.inventories={stock=stock,stage=stage,home={}}
+  world.blocks['0,1,0']={name='minecraft:chest',state={}}
+  world.turtle.dropDown=function(n)
+    assert(world.pose.x==0 and world.pose.y==2 and world.pose.z==0,'wrong return position')
+    local v=world.items[world.selected];if not v then return false end
+    local home=storage.inventories.home
+    for slot=1,27 do if not home[slot] or home[slot].name==v.name and home[slot].count<64 then
+      local moved=math.min(n,v.count,64-(home[slot] and home[slot].count or 0))
+      home[slot]=home[slot] or {name=v.name,count=0};home[slot].count=home[slot].count+moved
+      v.count=v.count-moved;if v.count==0 then world.items[world.selected]=nil end;return moved>0
+    end end
+    return false
+  end
   world.blocks['0,2,-1']={name='minecraft:chest',state={}}
   world.turtle.getItemSpace=function(slot) return 64-world.turtle.getItemCount(slot) end
   world.turtle.suck=function(n)
@@ -26,21 +39,15 @@ local function fixture()
     local e={fs=IS.fs(),textutils=codec,now=100,packets={},screen={}}
     e.os={getComputerID=function() return id end,epoch=function() return e.now*1000 end}
     e.rednet={isOpen=function() return true end,open=function() end,send=function(to,m,p) e.packets[#e.packets+1]={to=to,m=U.copy(m),protocol=p}; return true end}
-    e.peripheral={getNames=function() return {'right'} end,getType=function() return 'modem' end,call=function(name,method,target,slot,n)
+    e.peripheral={getNames=function() return {'right'} end,getType=function() return 'modem' end,call=function(name,method,...)
       if method=='isWireless' then return true end
-      if method=='list' then return U.copy(name=='stock' and stock or stage) end
-      if method=='size' then return 27 end
-      assert(method=='pushItems' and name=='stock' and target=='stage')
-      local item=assert(stock[slot]); local count=math.min(item.count,n)
-      assert(not stage[1] or stage[1].name==item.name)
-      stage[1]={name=item.name,count=count+(stage[1] and stage[1].count or 0)}
-      item.count=item.count-count; if item.count==0 then stock[slot]=nil end; return count
+      return storage.e.peripheral.call(name,method,...)
     end}
     e.term={getSize=function() return 51,19 end,clear=function() e.screen={} end,setCursorPos=function(_,y) e.row=y end,write=function(s) e.screen[e.row]=s end}
     return e
   end
   local ce,we=env(1),env(8); we.turtle=world.turtle
-  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},supply={inventory='stage'},build={enabled=true,origin={x=8,y=0,z=0}}})
+  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},logistics={nodes={{id='base',inventory='stock',position={x=-3,y=1,z=0},buffers={{inventory='home',position={x=0,y=2,z=0}}}}}},supply={inventory='stage'},build={enabled=true,origin={x=8,y=0,z=0}}})
   local wc=C.load({role='worker',controllerId=1,initialPosition=U.copy(world.pose),depot=U.copy(world.pose),supply={inventory='stage'},automation={building=true}})
   local R=require('autobuilder.core.runtime'); local c,b=R.new(cc,ce),R.new(wc,we)
   local function pump(from,to)
@@ -48,7 +55,7 @@ local function fixture()
   end
   local function step()
     ce.now=ce.now+1; we.now=ce.now
-    b:tick(); pump(we,c); c:tick(); pump(ce,b); b:workStep(); pump(we,c); pump(ce,b)
+    b:tick(); pump(we,c); c:tick(); pump(ce,b); c:workStep(); b:workStep(); pump(we,c); pump(ce,b)
   end
   step()
   return {world=world,ce=ce,we=we,c=c,b=b,cc=cc,stock=stock,stage=stage,step=step,
@@ -92,7 +99,7 @@ test('automatic first build clears terrain then builds and verifies across a cle
   end
   local p=f.c.state.automation.projects.first_cathedral_test
   assert(p and p.phase=='built',f.ce.textutils.serialize({first=f.c.state.firstBuild,project=p,task=f.b.state.currentTask,jobs=f.c.state.automation.jobs}))
-  assert(restarted); eq(f.world.places,28); eq(p.report.counts.correct,64)
+  assert(restarted);eq(next(f.world.items),nil);assert(require('autobuilder.factory.factory').count(f.stock,'minecraft:stone')>0);eq(f.world.places,28); eq(p.report.counts.correct,64)
   eq(p.transform.origin.x,plan.origin.x); eq(p.transform.origin.z,plan.origin.z)
   assert(f.world.blocks['0,2,-1'].name=='minecraft:chest'); assert(f.world.fuel>=100)
 end)
