@@ -307,6 +307,8 @@ function M.new(state,save,clock,controllerId,config,chunks)
     if p.delivered<j.progress.delivered then return false,'stale progress' end
     if j.exploration then
       if not E.report(p.exploration,j.exploration) or p.exploration.cursor>193 or p.delivered<0 then return false,'invalid exploration result' end
+      local initial=p.exploration.initialDelivered or 0
+      if initial>p.delivered or initial<((j.progress.exploration or {}).initialDelivered or 0) then return false,'invalid initial cargo receipt' end
       if p.phase=='completed' and (not p.exploration.result or p.held~=0 or stock==nil) then return false,'exploration completion needs unloaded inventory and live stock' end
       local previous=U.copy(j);local sectorId=j.exploration.sectorId
       local sector=U.copy(exploration.sectors[sectorId]);local group=exploration.groups[j.exploration.groupId]

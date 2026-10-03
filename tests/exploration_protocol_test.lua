@@ -36,3 +36,12 @@ test('exploration partial results and return requests use bounded report fields'
   p.exploration.result='quota'; for n=1,65 do p.exploration.observations[n]={x=n,y=0,z=0,name='minecraft:stone'} end
   assert(not MM.validate('mine_progress',p))
 end)
+
+
+test('initial depot cargo receipts are optional bounded and cannot exceed physical delivery',function()
+  local p={jobId='mine:1:1:1',phase='completed',delivered=2,held=0,
+    exploration={result='quota',cursor=1,clearedRouteCount=0,observations={},initialDelivered=2}}
+  assert(MM.validate('mine_progress',p));eq(MM.clean('mine_progress',p).exploration.initialDelivered,2)
+  for _,value in ipairs({-1,1.5,3,'2',1000001}) do p.exploration.initialDelivered=value;assert(not MM.validate('mine_progress',p)) end
+  p.exploration.initialDelivered=nil;assert(MM.validate('mine_progress',p))
+end)

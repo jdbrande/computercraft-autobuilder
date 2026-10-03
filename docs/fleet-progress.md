@@ -1112,3 +1112,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   the change and passes after, preserving all21 packets in order. Runtime/navigation
   checks pass. Controller212 was restarted from its saved files with this fix; no
   worker ownership or cargo was reset. Final full-suite evidence will use this source.
+
+- The single final0.25 review found three reproducible Important learning errors:
+  inspected turtles became permanent hazards, long returns evicted discovered hazards,
+  and preloaded depot cargo falsely credited unvisited sectors. Consolidated fixes now
+  keep physical turtles on the transient reservation/retry path, retain unresolved
+  negative evidence ahead of clear travel, and journal initial cargo separately from
+  attributed mined yield. Total acquisition receipts remain unchanged; old reports
+  conservatively add no mined yield. Regressions cover both scanner/inspection paths,
+  a70-cell hazardous trip and its next route, initial-unload recovery, malformed/regressing
+  counters and legacy reports. Focused exploration/miner/runtime tests pass. No second
+  review is planned. Final native regression extension and complete gates remain pending.

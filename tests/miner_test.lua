@@ -139,7 +139,7 @@ local function explorer(w,task,save,pose)
   n.workGuard=function() return true end
   local inv=require('autobuilder.storage.inventory').new(w.turtle,{reservedSlots={15,16}})
   local scan=require('autobuilder.resources.scanner').new({peripheral=w.peripheral},{radius=8,side='left',cooldown=0,ttl=10,maxCost=0},function() return w.time end)
-  return require('autobuilder.resources.miner').new(task,{turtle=w.turtle},c,n,inv,scan,save or function() return true end,function() return w.time end),p,c
+  return require('autobuilder.resources.miner').new(task,{turtle=w.turtle},c,n,inv,scan,save or function() return true end,function() return w.time end),p,c,n
 end
 test('explorer digs assigned route and returns a measured partial survey result',function()
   local w=W.new(); w.blocks['1,0,0']='minecraft:stone'; w.blocks['3,1,1']='minecraft:iron_ore'
@@ -269,4 +269,50 @@ test('exploration clear evidence follows movement reconciliation and excludes re
   w=W.new();m=explorer(w);w.turtle.forward=function() return false,'movement reservation pending: worker occupies destination' end
   local ok=run(m,w);assert(not ok);eq(w.pose.x,0)
   for _,p in ipairs(m.task.explorationProgress.evidence or {}) do assert(p.x~=1,'denied move became geological evidence') end
+end)
+
+
+test('physical turtle inspection and scanner sightings never become durable terrain hazards',function()
+  for _,scanner in ipairs({false,true}) do
+    local w=W.new();if not scanner then w.peripheral.getType=function() return nil end end
+    w.blocks['1,0,0']='computercraft:turtle_normal';local m,_,_,nav=explorer(w);local reserved=false
+    nav.guard=function(_,to) if to.x==1 then reserved=true end;return false,'movement reservation pending' end
+    assert(not run(m,w,2000));assert(reserved);eq(m.task.phase,'blocked');assert(m.task.error:find('movement reservation pending',1,true));eq(#w.dug,0)
+    w.blocks['1,0,0']=nil;nav.guard=function() return true end;assert(m:resume());assert(run(m,w,2000))
+    for _,p in ipairs(m.task.explorationProgress.evidence or {}) do assert(p.name~='computercraft:turtle_normal') end
+    w=W.new();if not scanner then w.peripheral.getType=function() return nil end end
+    w.blocks['3,1,1']='computercraft:turtle_advanced';m=explorer(w);assert(not run(m,w,2000));eq(m.task.phase,'blocked');eq(#w.dug,0)
+    w.blocks['3,1,1']=nil;assert(m:resume());assert(run(m,w,2000))
+    for _,list in ipairs({m.task.explorationProgress.evidence or {},m.task.explorationProgress.observations}) do
+      for _,p in ipairs(list) do assert(p.name~='computercraft:turtle_advanced') end
+    end
+  end
+end)
+
+test('long mining returns retain blocking coordinates and avoid them on subsequent routes',function()
+  local E=require('autobuilder.resources.exploration');local w=W.new();w.blocks['70,0,0']='minecraft:lava'
+  local route={};for x=1,70 do route[#route+1]={x=x,y=0,z=0} end
+  local task={id='mine:long',item='minecraft:raw_iron',quantity=2,exploration={version=1,groupId='acquire:1',sectorId='8,0,0',
+    depot={x=0,y=0,z=0},bounds={min={x=70,y=0,z=0},max={x=71,y=1,z=1}},envelope={min={x=0,y=0,z=0},max={x=71,y=1,z=1}},
+    entry={x=70,y=0,z=0},exitRoute={},route=route,cursor=1,protectedAreas={}}}
+  local m=explorer(w,task);assert(run(m,w,2000));eq(task.explorationProgress.result,'route_blocked')
+  local records={};assert(E.record(records,task,task.explorationProgress,0));local r=records['8,0,0']
+  assert(#r.evidence<=64);local text=table.concat(E.describe('8,0,0',r),'\n');assert(text:find('70,0,0 liquid minecraft:lava',1,true))
+  local ctx={config={exploration={bounds=task.exploration.envelope},maxTravelDistance=1024,minimumFuelReserve=0,mining={pathBudget=256,returnMargin=0}},
+    depot={x=0,y=0,z=0},exitRoute={},protectedAreas={},activeJobs={},availableFuel=1000,records=records}
+  local g=assert(E.plan({id='next',bounds={min={x=71,y=0,z=0},max={x=71,y=0,z=0}}},ctx))
+  for _,p in ipairs(g.route) do assert(not (p.x==70 and p.y==0 and p.z==0),'subsequent route ignored retained lava') end
+end)
+
+test('initial depot cargo survives unload recovery without inventing a successful mining location',function()
+  local E=require('autobuilder.resources.exploration');local w=W.new();w.items[1]={name='minecraft:raw_iron',count=2}
+  local m=explorer(w);assert(run(m,w));eq(m.task.delivered,2);eq(#w.dug,0)
+  eq(m.task.explorationProgress.initialDelivered,2)
+  local records={};assert(E.record(records,m.task,m.task.explorationProgress,2))
+  local h=records['0,0,0'].outcomes['minecraft:raw_iron'];eq(h.delivered,2);eq(h.mined,0);eq(h.successful,0)
+  local task=U.copy(m.task);task.phase='unload';task.delivered=0;task.returnReason='initial';task.explorationProgress.initialDelivered=0
+  task.depositIntent={slot=1,name='minecraft:raw_iron',before=2};local restored=explorer(w,task,nil,U.copy(w.pose))
+  assert(run(restored,w));eq(task.delivered,2);eq(task.explorationProgress.initialDelivered,2);eq(w.stock['minecraft:raw_iron'],2)
+  local legacy=U.copy(task.explorationProgress);legacy.initialDelivered=nil;records={};assert(E.record(records,task,legacy,2))
+  h=records['0,0,0'].outcomes['minecraft:raw_iron'];eq(h.delivered,2);eq(h.mined,0);eq(h.successful,0)
 end)

@@ -76,7 +76,7 @@ function M.candidates(records,c,item,start)
       end end
       sector.known=matching>0;sector.density=matching/math.max(1,seen,#sector.surveyed)
       local outcome=(r.outcomes or {})[item] or {}
-      sector.yield=(outcome.delivered or 0)/math.max(1,outcome.trips or 0);sector.hazards=0
+      sector.yield=(outcome.mined or 0)/math.max(1,outcome.trips or 0);sector.hazards=0
       for _,p in ipairs(r.evidence or {}) do if p.kind~='clear' and P.inside(p,sector.bounds) then sector.hazards=sector.hazards+1 end end
       sector.distance=U.distance(start,sector.bounds.min)
       result[#result+1]=sector
@@ -104,7 +104,7 @@ function M.describe(id,r)
     local matching=0;local material=Materials.get(item)
     for _,p in ipairs(r.observations or {}) do if material and material.blocks[p.name] then matching=matching+1 end end
     local density=matching/math.max(1,#(r.observations or {}),searched)
-    lines[#lines+1]=item..' density='..string.format('%.3f',density)..' searched='..searched..' delivered='..(h.delivered or 0)
+    lines[#lines+1]=item..' density='..string.format('%.3f',density)..' searched='..searched..' delivered='..(h.delivered or 0)..' mined='..(h.mined or 0)
     lines[#lines+1]='trips='..(h.trips or 0)..' successful='..(h.successful or 0)..' empty='..(h.empty or 0)..' inaccessible='..(h.inaccessible or 0)..' last='..(h.lastResult or 'unknown')
   end
   for _,p in ipairs(r.evidence or {}) do
@@ -236,6 +236,7 @@ local function ownedEvidence(p,g)
 end
 function M.report(r,g)
   return type(r)=='table' and (r.result==nil or results[r.result]==true)
+    and (r.initialDelivered==nil or U.integer(r.initialDelivered) and r.initialDelivered>=0 and r.initialDelivered<=1000000)
     and U.integer(r.cursor) and r.cursor>=1 and r.cursor<=193
     and U.integer(r.clearedRouteCount) and r.clearedRouteCount>=0 and r.clearedRouteCount<=1024
     and M.list(r.observations,64,function(p) return U.position(p) and U.shortString(p.name,128) end)
@@ -247,7 +248,11 @@ function M.addEvidence(progress,p,kind,name,reason)
   assert(validEvidence(entry),'invalid physical mining evidence')
   local entries=progress.evidence or {};progress.evidence=entries
   for i=#entries,1,-1 do if P.key(entries[i])==P.key(entry) then table.remove(entries,i) end end
-  entries[#entries+1]=entry;if #entries>64 then table.remove(entries,1) end
+  entries[#entries+1]=entry
+  if #entries>64 then
+    local oldest=1;for i,v in ipairs(entries) do if v.kind=='clear' then oldest=i;break end end
+    table.remove(entries,oldest)
+  end
 end
 local function box(b) return {min=point(b.min),max=point(b.max)} end
 function M.cleanHome(h)
@@ -265,7 +270,7 @@ function M.cleanGeometry(g)
   return out
 end
 function M.cleanReport(r)
-  local out={result=r.result,cursor=r.cursor,clearedRouteCount=r.clearedRouteCount,observations={}}
+  local out={result=r.result,cursor=r.cursor,clearedRouteCount=r.clearedRouteCount,initialDelivered=r.initialDelivered,observations={}}
   for _,p in ipairs(r.observations) do local v=point(p); v.name=p.name; out.observations[#out.observations+1]=v end
   if r.evidence then out.evidence={};for _,p in ipairs(r.evidence) do M.addEvidence(out,p,p.kind,p.name,p.reason) end end
   return out
@@ -273,14 +278,17 @@ end
 function M.record(records,trip,report,delivered)
   delivered=delivered or (trip.progress or {}).delivered or 0
   if not U.integer(delivered) or delivered<0 then return nil,'invalid delivered yield' end
-  if not M.report(report,trip.exploration) then return nil,'invalid exploration progress' end
+  if not M.report(report,trip.exploration) or report.initialDelivered and report.initialDelivered>delivered then return nil,'invalid exploration progress' end
   local g=trip.exploration; local r=records[g.sectorId] or {surveys={},observations={}}; records[g.sectorId]=r
   r.surveys=r.surveys or {}; r.observations=r.observations or {}
   r.outcomes=r.outcomes or {}
   local h=r.outcomes[trip.item] or {trips=0,delivered=0,successful=0,empty=0,inaccessible=0}
-  r.outcomes[trip.item]=h;h.trips=h.trips+1;h.delivered=h.delivered+delivered
-  if delivered>0 then h.successful=h.successful+1 end
-  if report.result=='survey_exhausted' and delivered==0 then h.empty=h.empty+1 end
+  -- Older reports cannot distinguish initial depot cargo from mined output.
+  local mined=report.initialDelivered~=nil and delivered-report.initialDelivered or 0
+  if h.mined==nil then h.mined=0;h.successful=0 end
+  r.outcomes[trip.item]=h;h.trips=h.trips+1;h.delivered=h.delivered+delivered;h.mined=h.mined+mined
+  if mined>0 then h.successful=h.successful+1 end
+  if report.result=='survey_exhausted' and (delivered==0 or report.initialDelivered~=nil and mined==0) then h.empty=h.empty+1 end
   if report.result=='route_blocked' then h.inaccessible=h.inaccessible+1 end
   h.lastResult=report.result
   local visited=coverage(r.surveys[trip.item])

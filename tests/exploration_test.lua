@@ -111,9 +111,9 @@ test('sector ranking uses observed density confirmed yield and hazard cost befor
   local function first() return E.candidates(records,c,'minecraft:coal',{x=0,y=0,z=0})[1] end
   eq(first().id,'1,0,0');eq(first().density,1)
   records['1,0,0'].observations[2].name='minecraft:stone'
-  records['1,0,0'].outcomes['minecraft:coal']={delivered=4,trips=2}
+  records['1,0,0'].outcomes['minecraft:coal']={delivered=4,mined=4,trips=2}
   eq(first().id,'1,0,0');eq(first().yield,2)
-  records['0,0,0'].outcomes['minecraft:coal']={delivered=4,trips=2}
+  records['0,0,0'].outcomes['minecraft:coal']={delivered=4,mined=4,trips=2}
   records['0,0,0'].evidence={{x=3,y=0,z=0,kind='liquid',name='minecraft:lava'}}
   eq(first().id,'1,0,0')
   records['1,0,0'].surveys['minecraft:coal']={exhausted=true,bounds=E.sectors(c)[2].bounds,cursor=193}

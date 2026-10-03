@@ -160,7 +160,7 @@ test('terminal mining history is atomic idempotent and survives controller resta
   local trip=assert(jobs:assign(workers,{}));local sector=trip.exploration.sectorId
   local before=U.copy(trip)
   local p={jobId=trip.id,phase='completed',delivered=3,held=0,
-    exploration={result='survey_exhausted',cursor=2,observations={},clearedRouteCount=0}}
+    exploration={initialDelivered=0,result='survey_exhausted',cursor=2,observations={},clearedRouteCount=0}}
   fail=true;assert(not pcall(jobs.progress,jobs,trip.workerId,p,8))
   eq(trip.status,before.status);eq(trip.physicalComplete,nil);eq(trip.progress.delivered,0)
   eq(state.exploration.sectors[sector],nil);eq(group.status,'running')
@@ -176,11 +176,11 @@ test('sector history separates empty search from inaccessible routes and retains
   local E=require('autobuilder.resources.exploration');local jobs,s,w=fixture()
   jobs:requestAcquisition('minecraft:coal',1,0,'history');local trip=assert(jobs:assign(w,{}));local records={}
   for _,result in ipairs({'survey_exhausted','route_blocked','paused'}) do
-    assert(E.record(records,trip,{result=result,cursor=2,observations={},clearedRouteCount=0},0))
+    assert(E.record(records,trip,{initialDelivered=0,result=result,cursor=2,observations={},clearedRouteCount=0},0))
   end
   local r=records[trip.exploration.sectorId].outcomes['minecraft:coal']
   eq(r.trips,3);eq(r.delivered,0);eq(r.successful,0);eq(r.empty,1);eq(r.inaccessible,1);eq(r.lastResult,'paused')
-  trip.item='minecraft:cobblestone';assert(E.record(records,trip,{result='quota',cursor=2,observations={},clearedRouteCount=0},5))
+  trip.item='minecraft:cobblestone';assert(E.record(records,trip,{initialDelivered=0,result='quota',cursor=2,observations={},clearedRouteCount=0},5))
   eq(records[trip.exploration.sectorId].outcomes['minecraft:cobblestone'].delivered,5);eq(r.delivered,0)
 end)
 
@@ -199,4 +199,17 @@ test('sector retry preserves history and refuses active offline-owned territory 
   fail=false;assert(jobs:retrySector(id));local r=s.exploration.sectors[id]
   eq(next(r.surveys),nil);eq(#r.evidence,0);eq(#r.observations,1);eq(r.outcomes['minecraft:coal'].inaccessible,1)
   assert(not jobs:retrySector('unknown'));eq(trip.workerId,1)
+end)
+
+
+test('initial cargo accounting cannot regress or be inflated in an owned exploration receipt',function()
+  local jobs,s,w=fixture();jobs:requestAcquisition('minecraft:coal',4,0,'initial');local j=assert(jobs:assign(w,{}))
+  local p={jobId=j.id,phase='work',delivered=2,held=0,
+    exploration={cursor=1,observations={},clearedRouteCount=0,initialDelivered=2}}
+  assert(jobs:progress(j.workerId,p,2));p.exploration.initialDelivered=1;assert(not jobs:progress(j.workerId,p,2))
+  p.exploration.initialDelivered=3;assert(not jobs:progress(j.workerId,p,2))
+  eq(j.progress.exploration.initialDelivered,2)
+  p.exploration.initialDelivered=2;p.delivered=3;p.phase='completed';p.exploration.result='quota'
+  assert(jobs:progress(j.workerId,p,3));local h=s.exploration.sectors[j.exploration.sectorId].outcomes['minecraft:coal']
+  eq(h.delivered,3);eq(h.mined,1);eq(h.successful,1)
 end)

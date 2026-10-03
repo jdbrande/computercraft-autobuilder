@@ -3,6 +3,7 @@ local P=require('autobuilder.core.pathfinding')
 local Materials=require('autobuilder.resources.materials')
 local E=require('autobuilder.resources.exploration')
 local M={}
+local transient={['computercraft:turtle_normal']=true,['computercraft:turtle_advanced']=true}
 local forbidden={['minecraft:water']=true,['minecraft:lava']=true,['minecraft:bedrock']=true,
   ['minecraft:chest']=true,['minecraft:trapped_chest']=true,['minecraft:barrel']=true,
   ['minecraft:spawner']=true,['minecraft:ender_chest']=true}
@@ -20,7 +21,7 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
     exitCells[P.key(g.depot)]=true
     for _,p in ipairs(g.route) do travel[#travel+1]=p; routeCells[P.key(p)]=true end
     for _,p in ipairs(g.surveyed or {}) do surveyed[P.key(p)]=true end
-    task.explorationProgress=task.explorationProgress or {cursor=g.cursor,observations={},clearedRouteCount=0}
+    task.explorationProgress=task.explorationProgress or {cursor=g.cursor,observations={},clearedRouteCount=0,initialDelivered=0}
     task.survey=task.explorationProgress.cursor
     nav.clearExit=function(p) return task.phase~='completed' and exitCells[P.key(p)]==true end
   end
@@ -47,18 +48,19 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
   local function passable(p)
     if not P.inside(p,c.bounds) or restricted(p) or avoided[P.key(p)] then return false end
     local name=observed[P.key(p)]
-    return not name or name=='minecraft:air' or name=='minecraft:cave_air' or diggable(name,p)
+    return not name or name=='minecraft:air' or name=='minecraft:cave_air' or transient[name] or diggable(name,p)
   end
   local function evidence(p,kind,name,reason)
     if g then E.addEvidence(task.explorationProgress,p,kind,name,reason and tostring(reason):sub(1,128)) end
   end
   local function sighting(p,name)
-    if not g or not P.inside(p,g.bounds) then return end
+    if not g or transient[name] or not P.inside(p,g.bounds) then return end
     local entries=task.explorationProgress.observations
     for i=#entries,1,-1 do if same(entries[i],p) then table.remove(entries,i) end end
     local v=point(p);v.name=name;entries[#entries+1]=v;if #entries>64 then table.remove(entries,1) end
   end
   local function obstacle(p,b,reason)
+    if transient[b.name] then return end
     local liquid=b.name=='minecraft:water' or b.name=='minecraft:lava'
       or b.state and (b.state.waterlogged==true or b.state.waterlogged=='true')
     evidence(p,liquid and 'liquid' or not diggable(b.name,p) and 'protected' or 'blocked',b.name,reason)
@@ -79,7 +81,12 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
     if item and item.name~=d.name then return false,'deposit slot changed during recovery' end
     local current=item and item.count or 0
     if current>d.before then return false,'deposit inventory grew during recovery' end
-    if d.name==task.item then task.delivered=task.delivered+d.before-current end
+    if d.name==task.item then
+      local delivered=d.before-current;task.delivered=task.delivered+delivered
+      if g and task.returnReason=='initial' and task.explorationProgress.initialDelivered~=nil then
+        task.explorationProgress.initialDelivered=task.explorationProgress.initialDelivered+delivered
+      end
+    end
     task.depositIntent=nil; persist(); return true
   end
   local function equal(a,b)
@@ -124,6 +131,10 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
       else return false,'ambiguous exploration dig outcome; preserve target and inventory' end
     end
     if present then
+      if transient[b.name] then
+        if nav.guard then nav.guard(pose,p) end
+        return false,'movement reservation pending: physical turtle occupies destination'
+      end
       sighting(p,b.name)
       if g and kind=='return' then obstacle(p,b,'return route obstructed');return false,'return route obstructed; no excavation authorized' end
       if g and b.state and (b.state.waterlogged==true or b.state.waterlogged=='true') then obstacle(p,b,'waterlogged exploration obstacle');return false,'waterlogged exploration obstacle' end
