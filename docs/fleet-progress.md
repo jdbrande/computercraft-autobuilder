@@ -1040,3 +1040,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   the controller's explicit assurance rectangle (now20 chunks), then restarted it.
   All three pending debris returns completed; preparation and building continued
   concurrently. This was fixture configuration, without extra stock or terrain edits.
+
+- The48-block four-worker simulation completed placement but stalled at43 verified
+  cells because idle workers remained at inspection destinations. The nil-path fix
+  prevented a crash but could not move an occupied goal. A focused actual-runtime
+  regression reproduced the stall. Denied movement now identifies the physical
+  blocker and requests an ordinary managed home return only for an online, idle,
+  unowned, capable worker away from its depot at that exact destination. Offline,
+  busy, paused and already-home workers retain their protections. One physical
+  regression and36 runtime/coordination/logistics checks pass; the large run is
+  restarting. Preliminary full-suite runs were terminated after this new finding
+  and cannot serve as final acceptance. No extra review pass was requested.

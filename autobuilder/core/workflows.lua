@@ -301,10 +301,10 @@ function M.new(state,save,clock,id,chunks,config)
     end
     for _,destination in ipairs(reservations) do
       local occupied=s.cells[key(destination)]
-      if occupied and occupied.owner~=owner then return false,'position reserved by worker '..occupied.owner end
+      if occupied and occupied.owner~=owner then return false,'position reserved by worker '..occupied.owner,occupied.owner end
       for _,w in pairs(workers or {}) do
         local p=w.telemetry and w.telemetry.position
-        if w.id~=owner and p and p.known and key(p)==key(destination) then return false,'worker occupies destination' end
+        if w.id~=owner and p and p.known and key(p)==key(destination) then return false,'worker occupies destination',w.id end
       end
     end
     local before=U.copy(s.cells)

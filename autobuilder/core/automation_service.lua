@@ -103,7 +103,16 @@ function M.new(app,config,e,network,clock)
       if ok then return send(sender,'task_pose_ack',{jobId=j.id,sequence=p.sequence,origin=U.copy(p.origin)}) end
       return false,why
     elseif m.type=='task_reserve' then
-      local granted,err=queue:reserve(sender,j.id,p.from,p.target,app.state.workers,p.work)
+      local granted,err,blocker=queue:reserve(sender,j.id,p.from,p.target,app.state.workers,p.work)
+      if not granted and not p.work and blocker then
+        local w=app.state.workers[tostring(blocker)];local t=w and w.telemetry
+        if w and w.online and t and t.status=='idle' and not t.task and not Coordination.workerBusy(app.state,w.id)
+          and (t.capabilities or {}).returnCargoV1 and t.position and t.position.known
+          and U.position(t.position) and U.position(t.depot) and U.distance(t.position,p.target)==0
+          and U.distance(t.position,t.depot)>0 then
+          production.returns:request(w.id,'traffic:'..j.id..':'..(queue.state.returnSequence+1))
+        end
+      end
       send(sender,'task_grant',{jobId=j.id,target=p.target,granted=granted==true,work=p.work,reason=err and tostring(err):sub(1,512)}); return granted,err
     elseif m.type=='task_position' then return queue:position(sender,j.id,p.from,p.target)
     elseif m.type=='task_supply_done' then

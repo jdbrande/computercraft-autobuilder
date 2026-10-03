@@ -186,3 +186,19 @@ test('fleet status and limits use normal controller commands persist across rebo
   assert(not c:command('fleet limit mining 4 2'));assert(not c:command('fleet limit missing 0 1'))
   c=R.new(cfg('controller'),e);eq(require('autobuilder.core.scaling').limits(c.state,c.config,'mining').max,3)
 end)
+
+test('traffic home requests never displace offline busy paused or already home workers',function()
+  for _,mode in ipairs({'idle','offline','busy','paused','home'}) do
+    local e=env(7);local c=require('autobuilder.core.runtime').new(cfg('controller'),e);c.config.chunkLoading.enabled=false
+    local target={x=1,y=1,z=0,known=true};local from={x=0,y=1,z=0,known=true}
+    c.state.workers['12']={id=12,online=true,boot=1,sequence=0,telemetry={status='work',position=from}}
+    c.state.workers['13']={id=13,online=mode~='offline',boot=2,sequence=0,telemetry={status=mode=='paused' and 'paused' or 'idle',
+      position=target,depot=mode=='home' and target or {x=5,y=1,z=0},capabilities={returnCargoV1=true}}}
+    local j=c.automation.queue:submit('VERIFY',{blocks={{x=1,y=0,z=0,name='minecraft:stone',state={}}}},{})
+    j.workerId=12;j.status='running'
+    if mode=='busy' then c.state.jobs.other={id='other',workerId=13,status='running'} end
+    local ok=c.automation:handle(12,{type='task_reserve',boot=1,sequence=1,payload={jobId=j.id,from=from,target=target}})
+    assert(not ok);local n=0;for _ in pairs(c.state.automation.returns) do n=n+1 end
+    eq(n,mode=='idle' and 1 or 0)
+  end
+end)

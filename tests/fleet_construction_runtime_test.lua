@@ -185,3 +185,21 @@ test('late registered construction workers automatically ramp preparation and bu
     assert(not next(f.inventories['home'..id]) and not next(f.inventories['supply'..id]))
   end
 end)
+
+
+test('an idle construction worker vacates a verifier destination through a managed home return',function()
+  local f=fixture({width=1,scaling=true});local blocker=f.worlds[13]
+  for axis,value in pairs({x=4,y=1,z=0}) do blocker.pose[axis]=value;f.apps[13].state.position[axis]=value end
+  f.blocks['4,0,0']={name='minecraft:stone',state={}}
+  local j=f.apps[7].automation.queue:submit('VERIFY',{preferredWorker=12,clearanceY=2,
+    blocks={{x=4,y=0,z=0,name='minecraft:stone',state={}}}},{})
+  for _=1,500 do
+    f:cycle()
+    if j.status=='completed' and not f.apps[12].state.currentTask and not f.apps[13].state.currentTask
+      and U.distance(blocker.pose,f.configs[13].depot)==0 then break end
+  end
+  eq(j.status,'completed');eq(j.report.counts.correct,1)
+  eq(U.distance(blocker.pose,f.configs[13].depot),0);assert(not f.apps[13].state.currentTask)
+  local returns=0;for _,r in pairs(f.apps[7].state.automation.returns) do returns=returns+1;eq(r.owner,13) end
+  eq(returns,1);eq(f.blocks['4,0,0'].name,'minecraft:stone')
+end)

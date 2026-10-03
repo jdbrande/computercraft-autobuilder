@@ -59,3 +59,8 @@ regions without leaving useful workers idle behind neighboring queued regions.
 Crafting demand includes the unexpanded output of its current production operation.
 Collected output reduces demand; worker-local crafting progress does not count as
 central delivery. Replanned operations exclude earlier-generation batch quantities.
+
+When an idle, unowned worker blocks another worker's exact movement destination,
+the controller requests its normal managed return home. Active, offline and paused
+owners retain their positions and claims. Return coverage, fuel and cargo checks
+remain in force; blocked traffic never authorizes digging through a turtle.
