@@ -609,9 +609,9 @@ standing authorization; no milestone handoff pause.
 **Files:** config, worker capability/task validation, Crafty executor, workflows,
 production receipts, focused runtime tests.
 
-- [ ] Add failing incompatible-station, private-buffer-only, completed/collecting
+- [x] Add failing incompatible-station, private-buffer-only, completed/collecting
   and duplicate-progress cases. Validate unique inventories and worker ownership.
-- [ ] Implement capability-gated private station execution and durable worker-finish
+- [x] Implement capability-gated private station execution and durable worker-finish
   acknowledgement without central output credit. Legacy execution stays exclusive.
   Run tests and commit. Expected: workers cannot mutate shared stock in this mode.
 

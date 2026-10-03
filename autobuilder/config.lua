@@ -11,7 +11,8 @@ M.defaults={
   maxWorkers=128, dedupLimit=512, dedupTTL=120,
   storageInventories={}, providerPreferences={}, fuel=require('autobuilder.resources.fuel').defaults,
   furnaces={}, smeltingFuelItem='minecraft:coal', smeltingWaitSteps=600, turtleFuelReserveItems={['minecraft:coal']=64},
-  craftingStation={input='',output='',inputSide='up',outputSide='down'},
+  craftingStation={buffer='',input='',output='',inputSide='up',outputSide='down'},
+  craftingStations={},craftingBatchSize=2,
   automation={enabled=true,building=false,crafting=false,courier=false,logging=false,farming=false},
   build={enabled=false,autoSite=false,origin={x=0,y=64,z=0},rotation=0,mirrorX=false,mirrorZ=false,regionSize=8},
   blueprintDir='/autobuilder/blueprints', clearSite=false,
@@ -35,7 +36,7 @@ local function merge(dst,src)
     if type(v)=='table' and type(dst[k])=='table' then
       -- These maps/lists are user-defined rather than schema objects.
       if k=='values' or k=='returns' or k=='stations' or k=='providerPreferences' or k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
-        or k=='furnaces' or k=='turtleFuelReserveItems' or k=='treeFarms' or k=='farms' or k=='depotExpansion' then dst[k]=U.copy(v)
+        or k=='craftingStations' or k=='furnaces' or k=='turtleFuelReserveItems' or k=='treeFarms' or k=='farms' or k=='depotExpansion' then dst[k]=U.copy(v)
       else merge(dst[k],v) end
     else dst[k]=U.copy(v) end
   end
@@ -99,6 +100,8 @@ function M.load(overrides)
   for k,v in pairs(c.automation) do assert(type(v)=='boolean','invalid automation flag '..k) end
   for _,k in ipairs({'building','crafting','courier','logging','farming'}) do c.capabilities[k]=c.automation.enabled and c.automation[k] or nil end
   c.capabilities.sitePreparation=c.capabilities.building and true or nil
+  require('autobuilder.factory.stations').validate(c)
+  c.capabilities.isolatedCraftingV1=c.capabilities.crafting and c.craftingStation.buffer~='' and true or nil
   assert(U.position(c.build.origin) and ({[0]=true,[90]=true,[180]=true,[270]=true})[c.build.rotation],'invalid build transform')
   assert(type(c.build.enabled)=='boolean' and type(c.build.autoSite)=='boolean' and type(c.build.mirrorX)=='boolean' and type(c.build.mirrorZ)=='boolean','invalid build flags')
   assert(U.integer(c.build.regionSize) and c.build.regionSize>=1 and c.build.regionSize<=8,'regionSize must be 1..8')

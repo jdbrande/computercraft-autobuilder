@@ -59,7 +59,7 @@ function M.new(app,config,e,network,clock)
       if p.stockReceipt then local ok,err=production:acceptReceipt(j,p.stockReceipt); if not ok then return false,err end end
       local ok,err=queue:progress(sender,p); if not ok then return false,err end
       if p.phase~='paused' and p.phase~='blocked' then j.resumeRequested=nil end
-      if j.status=='completed' then
+      if j.status=='completed' or j.workerFinished then
         j.completedAt=j.completedAt or clock()
         j.blocks=nil; app:save(); return send(sender,'task_ack',{jobId=j.id})
       end
@@ -103,7 +103,7 @@ function M.new(app,config,e,network,clock)
     if clock()-last<config.heartbeatInterval then return true end
     last=clock()
     for _,j in pairs(queue.state.jobs) do
-      if j.workerId and j.status~='completed' then
+      if j.workerId and j.status~='completed' and not j.workerFinished then
         if j.paused then send(j.workerId,'task_pause',{jobId=j.id})
         elseif j.status=='paused' or j.resumeRequested then send(j.workerId,'task_resume',{jobId=j.id}) end
         if j.missingItem and j.supplyId and not j.paused and config.supply.inventory~='' and j.type~='CRAFT'

@@ -43,7 +43,13 @@ function M.new(app,config,e,network,clock)
     local t=s.currentTask
     if not self.engine or self.engine.task~=t then
       local module=modules[t.type]; assert(module,'No worker executor for '..tostring(t.type))
-      if t.type=='CRAFT' then self.engine=require(module).new(t,e,config,save)
+      if t.type=='CRAFT' then
+        local craftConfig=config
+        if t.privateStation then
+          assert(require('autobuilder.factory.stations').matches(t.privateStation,config,s.id),'private crafting station does not match worker configuration')
+          craftConfig=U.copy(config); craftConfig.storageInventories={t.privateStation.buffer}
+        end
+        self.engine=require(module).new(t,e,craftConfig,save)
       else self.engine=require(module).new(t,e,config,app.navigation,save) end
     end
     return self.engine
@@ -106,6 +112,7 @@ function M.new(app,config,e,network,clock)
       if t then return t.id==j.id,'worker already has a task' end
       local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end
+      if j.privateStation and not require('autobuilder.factory.stations').matches(j.privateStation,config,s.id) then return false,'private crafting station does not match worker configuration' end
       s.currentTask=U.copy(j); s.currentTask.phase='setup'; s.status='setup'; self.engine=nil; save(); return true
     end
     if not t or t.id~=p.jobId then return false,'task ID mismatch' end

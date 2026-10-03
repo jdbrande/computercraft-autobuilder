@@ -55,6 +55,7 @@ function M.storageBusy(state)
   return false
 end
 function M.factoryCanRun(state,job)
+  if job.privateStation and not job.privateReady then return false,'waiting for staged private crafting inputs' end
   if job.stockInputs then
     local lease=state.inventoryLedger and state.inventoryLedger.leases[job.id]
     if not lease or lease.status~='held' then return false,job.stockError or 'waiting for durable ingredient reservation' end
@@ -66,7 +67,7 @@ function M.factoryCanRun(state,job)
       local active=other.workerId or other.status=='running' or p and (p.furnace or p.intent or (p.loaded or 0)>0 or (p.crafted or 0)>0)
       local sameBank=job.type=='SMELT' and other.type=='SMELT' and job.productionRequest
         and job.productionRequest==other.productionRequest and job.productionOperation==other.productionOperation
-      if active and not sameBank then return false,'waiting for factory operation '..other.id end
+      if active and not sameBank and not (job.privateStation and other.privateStation) then return false,'waiting for factory operation '..other.id end
     end
   end
   return true
@@ -111,6 +112,7 @@ function M.new(state,save,clock,id)
           for wid,w in pairs(workers) do
             local t=w.telemetry
             if w.online and t and t.status=='idle' and not t.task and t.capabilities and t.capabilities[j.requiredCapability]
+              and (not j.privateStation or t.capabilities.isolatedCraftingV1)
               and (not j.preferredWorker or j.preferredWorker==w.id)
               and not M.workerBusy(state,w.id,j.id) then ids[#ids+1]=tonumber(wid) end
           end
@@ -132,13 +134,14 @@ function M.new(state,save,clock,id)
   function self:progress(owner,p)
     local j=s.jobs[p.jobId]
     if not j or j.workerId~=owner then return false,'task owner mismatch' end
-    if j.status=='completed' then return true end
+    if j.status=='completed' or j.workerFinished then return true end
     if (p.progress or 0)<j.progress then return false,'stale task progress' end
     if j.type=='RESCUE' and p.fuelDelivered~=nil and (p.fuelDelivered<(j.fuelDelivered or 0) or p.fuelDelivered>j.quantity) then return false,'invalid rescue delivery counter' end
     j.progress=p.progress or 0; j.phase=p.phase; j.error=p.error; j.missingItem=p.missingItem
     if j.type=='RESCUE' and p.fuelDelivered~=nil then j.fuelDelivered=p.fuelDelivered end
     j.missingCount=p.missingCount; j.supplyId=p.supplyId; j.report=U.copy(p.report)
     j.status=p.phase=='completed' and 'completed' or p.phase=='blocked' and 'blocked' or p.phase=='paused' and 'paused' or 'running'
+    if j.privateStation and p.phase=='completed' then j.workerFinished=true; j.status='collecting' end
     persist(); return true
   end
   function self:reserve(owner,jobId,from,target,workers)

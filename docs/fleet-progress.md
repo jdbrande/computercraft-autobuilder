@@ -224,3 +224,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Task19: six capacity regressions failed before implementation and now pass.
   Claims allocate concrete slot quantities using native limits; exclusive station
   ownership survives reboot, and failed multi-inventory saves roll back atomically.
+
+- Task20: private station validation/capability, private-buffer Crafty execution,
+  durable collecting state and suppression of premature central-stock credit pass
+  five new regressions, including worker reboot. Full suite:481 Lua tests passed.

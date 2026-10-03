@@ -40,6 +40,7 @@ function M.new(app,config,e,queue)
     return ok,why
   end
   function self:acceptReceipt(job,receipt)
+    if job.privateStation then return true end -- worker receipts describe private stock, not central delivery
     if not job.stockInputs then return true end -- exclusive legacy job
     local ok,err=pcall(self.ledger.receipt,self.ledger,job.id,receipt.withdrawn,receipt.delivered,{},receipt.sequence)
     return ok,not ok and tostring(err) or nil

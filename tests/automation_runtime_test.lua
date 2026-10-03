@@ -499,3 +499,35 @@ test('fleet runtime rescues a stranded worker and resumes its original task acro
   for _,j in pairs(f.c.state.automation.jobs) do if j.type=='RESCUE' then rescues=rescues+1; eq(j.status,'completed'); eq(j.rescueSettled,true) end end
   eq(rescues,1); assert(not v.fuelRecovery:active()); eq(f.w.state.position.x,0); eq(f.w.state.currentTask,nil)
 end)
+
+test('private Crafty worker only consumes and produces in its configured buffer across reboot',function()
+  local f=fixture(); local h=f.h; h.inventories.buffer={[1]={name=mc('stone'),count=4}}
+  f.wc.craftingStation.buffer='buffer'; f.wc=require('autobuilder.config').load(f.wc)
+  f.w=Runtime.new(f.wc,f.we)
+  local job={id='task:7:999',type='CRAFT',item=mc('stone_bricks'),quantity=4,batches=1,workerId=12,preferredWorker=12,
+    privateStation={id='west',workerId=12,buffer='buffer',input='input',output='output'}}
+  local wrong=U.copy(job); wrong.privateStation.buffer='store'
+  local before=h.transfers
+  local ok,why=f.w.automation:handle(7,{type='task_assign',boot=1,sequence=1,payload={job=wrong}})
+  assert(not ok and why:find('station'),'mismatched private station accepted'); eq(h.transfers,before)
+  assert(f.w.automation:handle(7,{type='task_assign',boot=1,sequence=2,payload={job=job}}))
+  local stock=U.copy(h.inventories.store)
+  for i=1,45 do
+    assert(f.w:workStep())
+    if i==7 then f.w=Runtime.new(f.wc,f.we) end
+    if f.w.state.currentTask.phase=='completed' then break end
+  end
+  eq(f.w.state.currentTask.phase,'completed'); eq(h.crafts,1)
+  assert(require('autobuilder.factory.factory').equal(h.inventories.store,stock),'private crafter changed shared stock')
+  eq(require('autobuilder.factory.factory').count(h.inventories.buffer,mc('stone_bricks')),4)
+end)
+
+test('private worker output receipt cannot credit or release shared stock before collection',function()
+  local f=fixture(); local q=f.c.automation.queue; local p=f.c.automation.production
+  local j=q:submit('CRAFT',{item=mc('stone_bricks'),quantity=4,privateStation={id='west',workerId=12,buffer='buffer',input='input',output='output'},
+    stockInputs={[mc('stone')]=4},stockOutputs={[mc('stone_bricks')]=4}},{})
+  assert(p.ledger:reserve(j.id,j.stockInputs,j.stockOutputs,{[mc('stone')]=4}))
+  assert(p:acceptReceipt(j,{withdrawn={[mc('stone')]=4},delivered={[mc('stone_bricks')]=4},sequence=1}))
+  eq(next(p.ledger.state.leases[j.id].delivered),nil)
+  eq(next(p.ledger.state.leases[j.id].withdrawn),nil)
+end)
