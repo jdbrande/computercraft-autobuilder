@@ -451,15 +451,15 @@ modify `tests/run.lua`.
 
 **Interfaces:** `Ledger.new(state,save)` stores `state.inventoryLedger`;
 `reserve(id,inputs,outputs,physical,options)` atomically grants or returns nil/reason;
-`receipt(id,withdrawn,delivered,transit)` applies cumulative measured counters;
+`receipt(id,withdrawn,delivered,transit,sequence)` applies cumulative measured counters;
 `release(id)` requires completed outputs and empty transit; `cancel(id)` only
 retires unstarted claims. `view(item,physical,demand)` returns physical, available,
 reserved, transit, expected, demand; protected reserve passed during grants.
 
-- [ ] Add failing cases for competing multi-item claims, duplicate/changed IDs,
+- [x] Add failing cases for competing multi-item claims, duplicate/changed IDs,
   malformed counts, partial/duplicate receipts, offline restart, release/cancel
   guards, unknown physical stock, and rollback on failed/throwing checkpoint.
-- [ ] Implement bounded maps and transactional persistent mutations; no hardware
+- [x] Implement bounded maps and transactional persistent mutations; no hardware
   effects or automatic lease expiration. Run focused and full Lua tests; commit.
 
 ### Task 13: Factory reservation gates and physical receipts

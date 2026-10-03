@@ -116,3 +116,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Inventory ownership design selected: durable count grants plus measured
   cumulative receipts, keeping factory exclusivity until independent station
   staging/slot journals exist. Tasks 12–14 define implementation and acceptance.
+
+- Task12 durable ledger implemented: five focused tests passed after missing-module
+  RED; full suite 425/425 after correcting a test-registration edit. Atomic claims,
+  immutable identities, ordered partial receipts, restart and save rollback pass.
+  Runtime factory gates and receipts remain Task13; ledger alone does not yet
+  coordinate physical consumers.

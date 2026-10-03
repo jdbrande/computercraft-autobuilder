@@ -22,6 +22,7 @@ the old exclusive behavior during migration. Worker crafting journals count
 confirmed withdrawals; bounded cumulative receipts update the controller claim.
 Furnace counters already expose exact loaded inputs/fuel and delivered output.
 Receipt updates are monotonic/idempotent and cannot exceed the declared contract.
+Explicit receipt sequences order transit changes; changed duplicate receipts fail.
 Completion releases unused claims only after physical completion evidence; a
 never-started cancellation cannot discard transit or withdrawals.
 
@@ -38,3 +39,18 @@ owners and checkpoint failures preserve grants. Runtime tests verify no factory
 hardware call or worker assignment before reservation, safe shortage recovery and
 normal full-chain completion. Live acceptance should exercise the new counters
 on the existing furnace/Crafty rig. Extend resource status with the logical views.
+
+## Integration details
+
+New task payloads carry `stockInputs` and `stockOutputs`; the controller queue
+checks the ledger before assignment, and furnace stepping checks the same gate.
+The production tick reconciles existing grants before considering new ones.
+Old saved tasks without these fields keep the existing exclusive execution path.
+
+Crafting transfer journals record cumulative withdrawals only after physical
+reconciliation; output delivery already has a cumulative counter. Stock receipts
+carry these counters with their journal sequence. The controller validates them
+against the granted contract before applying progress. Furnace loaded/fuelLoaded
+and delivered counters supply equivalent local receipts. Completed legacy worker
+reports remain authoritative under the retained exclusive barrier; version and
+capability negotiation will later require richer receipts for concurrent lanes.
