@@ -233,3 +233,14 @@ test('region lookahead exposes enough separated work for every useful builder',f
   local n=0;for _,j in pairs(s.automation.jobs) do if j.workerId then n=n+1 end end
   eq(n,4)
 end)
+
+
+test('crafting allocation includes unexpanded operation output and subtracts only collected current-generation batches',function()
+  local s,c=fixture(2);local S=require('autobuilder.core.scaling')
+  s.automation.requests={r={id='r',status='running',privateCraft=true,operation=1,replans=1,plan={operations={{type='CRAFT',quantity=256}}}}}
+  for i=1,2 do local j=job(s,'craft'..i,'CRAFT',8);j.privateStation={};j.productionRequest='r';j.productionOperation=1;j.productionGeneration=1 end
+  local done=job(s,'done','CRAFT',8);done.privateStation={};done.productionRequest='r';done.productionOperation=1;done.productionGeneration=1;done.status='completed'
+  local old=job(s,'old','CRAFT',128);old.privateStation={};old.productionRequest='r';old.productionOperation=1;old.productionGeneration=0;old.status='completed'
+  local j=s.automation.jobs.craft1;j.progress=2;j.factoryFlow={collect={delivered=4}}
+  local view=S.snapshot(s,c,{},100);eq(view.crafting.remaining,244);eq(view.crafting.desired,2)
+end)

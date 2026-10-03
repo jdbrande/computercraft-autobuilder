@@ -50,6 +50,7 @@ local function owner(j)
 end
 local function units(j)
   if j.type=='MINE' or not j.type then return math.max(0,(j.quantity or 0)-(j.progress and j.progress.delivered or 0)) end
+  if j.type=='CRAFT' then return math.max(0,(j.quantity or 0)-(j.factoryFlow and j.factoryFlow.collect and j.factoryFlow.collect.delivered or j.production and j.production.delivered or j.delivered or 0)) end
   if j.siteSurvey then return math.max(0,math.max(1,#(j.siteSurvey.columns or {}))-(j.progress or 0)) end
   if j.blocks then return math.max(0,#j.blocks-(j.progress or 0)) end
   return math.max(0,(j.quantity or j.batches or 1)-(j.delivered or type(j.progress)=='number' and j.progress or 0))
@@ -64,7 +65,7 @@ local function ready(state,j)
 end
 function M.snapshot(state,c,counts,now,workers)
   if workers and workers~=state.workers then state=setmetatable({workers=workers},{__index=state}) end
-  c=c or {};counts=counts or {};local view,owned,projectUnits={},{},{}
+  c=c or {};counts=counts or {};local view,owned,projectUnits,craftCovered={},{},{},{}
   for _,role in ipairs(M.roles) do
     view[role]={active=0,idle=0,queue=0,ready=0,remaining=0,desired=0,rate=1/secondsPerUnit[role]};owned[role]={};projectUnits[role]={}
     local metric=state.fleet and state.fleet.metrics and state.fleet.metrics[role]
@@ -74,6 +75,10 @@ function M.snapshot(state,c,counts,now,workers)
     end
   end
   local function add(j,mining)
+    local request=j.privateStation and ((state.automation or {}).requests or {})[j.productionRequest]
+    if request and not j.cancelled and j.productionOperation==request.operation and (j.productionGeneration or 0)==(request.replans or 0) then
+      craftCovered[request.id]=(craftCovered[request.id] or 0)+(j.quantity or 0)
+    end
     local role=M.role(j);if not role or j.status=='completed' or j.physicalComplete then return end
     local r=view[role];local id=owner(j)
     if id then owned[role][id]=true else r.queue=r.queue+1;if ready(state,j) then r.ready=r.ready+1 end end
@@ -86,6 +91,12 @@ function M.snapshot(state,c,counts,now,workers)
   end
   for _,j in pairs(state.jobs or {}) do add(j,true) end
   for _,j in pairs((state.automation or {}).jobs or {}) do add(j,false) end
+  for id,r in pairs((state.automation or {}).requests or {}) do
+    local op=r.plan and r.plan.operations and r.plan.operations[r.operation]
+    if r.status~='completed' and r.privateCraft and op and op.type=='CRAFT' then
+      view.crafting.remaining=view.crafting.remaining+math.max(0,op.quantity-(craftCovered[id] or 0))
+    end
+  end
   for name,p in pairs((state.automation or {}).projects or {}) do if not p.paused then
     local structural=({building=true,verifying=true,repairing=true,clearing=true})[p.phase]
     if structural then

@@ -55,3 +55,7 @@ Implementation and acceptance progress is recorded in [fleet progress](fleet-pro
 Region lookahead exposes two candidates per eligible worker, with a four-region
 floor and64-region ceiling, so the one-cell separation rule can admit alternating
 regions without leaving useful workers idle behind neighboring queued regions.
+
+Crafting demand includes the unexpanded output of its current production operation.
+Collected output reduces demand; worker-local crafting progress does not count as
+central delivery. Replanned operations exclude earlier-generation batch quantities.

@@ -1012,3 +1012,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   The long construction rerun was superseded by this producer-window change and is
   now running with periodic diagnostic snapshots; its earlier interrupted run is
   not passing evidence. Initial Python gate passed all18 tests.
+
+- Private crafting now estimates the whole current production operation beyond its
+  bounded queued batches, subtracting collected current-generation output. A focused
+  test reproduced severe undercounting; a128-brick actual-runtime request now uses
+  both private stations with default zero minimum, collects exactly128 output,
+  releases capacity and drains allocation to zero. Scaling and factory runtime
+  focused checks pass. This extends the same backlog treatment already used for
+  bounded construction/preparation queues.

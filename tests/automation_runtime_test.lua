@@ -908,3 +908,17 @@ test('crafting role limits gate new private stock while scale down drains owned 
   for _,j in pairs(f.c.state.automation.jobs) do if j.privateStation and j.id~=staged.id then assert(not j.factoryFlow) end end
   f.cc.scaling.roles.crafting={min=2,max=2};f:finish();eq(f.h:count(mc('stone_bricks')),16)
 end)
+
+
+test('large private crafting demand automatically uses both stations and drains without minimum overrides',function()
+  local f=parallelFixture();f.cc.scaling.roles.crafting.min=0
+  f.h.inventories.store={[1]={name=mc('stone'),count=64},[2]={name=mc('stone'),count=64}}
+  f:request(128);f:finish(1400)
+  eq(f.h:count(mc('stone_bricks')),128);eq(f.h:count(mc('stone')),0)
+  assert(f.maxConcurrent>=2,'unexpanded operation backlog never admitted the second Crafty station')
+  assert(f.h.crafts>0 and f.other.h.crafts>0)
+  for _=1,3 do f:step() end
+  local r=require('autobuilder.core.scaling').snapshot(f.c.state,f.cc,{},f.ce.now).crafting
+  eq(r.active,0);eq(r.desired,0);eq(f.c.state.fleet.metrics.crafting.units,128)
+  for _,lease in pairs(f.c.state.capacityLedger.leases) do eq(lease.status,'released') end
+end)
