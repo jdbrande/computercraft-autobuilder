@@ -1,5 +1,13 @@
 local U=require('autobuilder.core.util')
 local Materials=require('autobuilder.resources.materials')
+local E=require('autobuilder.resources.exploration')
+local function same(a,b)
+  if type(a)~=type(b) then return false end
+  if type(a)~='table' then return a==b end
+  for k,v in pairs(a) do if not same(v,b[k]) then return false end end
+  for k in pairs(b) do if a[k]==nil then return false end end
+  return true
+end
 local M={}
 function M.new(app,config,e,network,clock)
   local s=app.state; local self={}; local lastSend=-math.huge; local lastStorage=-math.huge
@@ -11,7 +19,7 @@ function M.new(app,config,e,network,clock)
   end
   if s.role=='controller' then
     self.storage=require('autobuilder.storage.storage').new(e.peripheral,config.storageInventories)
-    self.jobs=require('autobuilder.core.jobs').new(s,save,clock,s.id)
+    self.jobs=require('autobuilder.core.jobs').new(s,save,clock,s.id,config)
     function self:refresh()
       local ok,err=self.storage:refresh(); s.storageError=err
       if ok then s.resourceCounts=U.copy(self.storage.counts) else s.resourceCounts={} end
@@ -50,6 +58,12 @@ function M.new(app,config,e,network,clock)
       for _,job in pairs(s.jobs) do
         if job.status~='completed' then
           for _,id in ipairs(job.dependencies or {}) do referenced[id]=true end
+        end
+      end
+      for _,g in pairs((s.exploration or {}).groups or {}) do
+        for _,id in ipairs(g.tripIds) do
+          local j=s.jobs[id]
+          if j and not j.physicalComplete then referenced[id]=true end
         end
       end
       local stamped,removed,visited={},{},{}
@@ -97,6 +111,12 @@ function M.new(app,config,e,network,clock)
           return false,err
         end
       end
+      if count>0 then
+        for _,g in pairs((s.exploration or {}).groups or {}) do
+          local ids={}; for _,id in ipairs(g.tripIds) do if s.jobs[id] then ids[#ids+1]=id end end; g.tripIds=ids
+        end
+        local ok,err=save(); if not ok then return false,err end
+      end
       return true,count
     end
     function self:tick()
@@ -105,10 +125,17 @@ function M.new(app,config,e,network,clock)
       if not self.storage.valid then return true end
       if s.assignmentRecovery then return true end
       if clock()-lastSend<config.heartbeatInterval then return true end
+      if config.exploration.enabled then
+        local ready=self:refresh(); if not ready then return true end
+      end
+      for _,j in pairs(s.jobs) do
+        local g=j.exploration and s.exploration.groups[j.exploration.groupId]
+        if g and not j.physicalComplete and (g.paused or s.exploration.paused or not config.exploration.enabled) then send(j.workerId,'mine_return',{jobId=j.id}) end
+      end
       local job=self.jobs:assign(s.workers,self.storage.counts)
       if job then
         lastSend=clock()
-        send(job.workerId,'mine_assign',{jobId=job.id,item=job.item,quantity=job.quantity,miningArea=job.miningArea,miningResources=job.miningResources})
+        send(job.workerId,'mine_assign',{jobId=job.id,item=job.item,quantity=job.quantity,miningArea=job.miningArea,miningResources=job.miningResources,exploration=job.exploration})
       end
       return true
     end
@@ -138,7 +165,7 @@ function M.new(app,config,e,network,clock)
     function self:step() return true end
   else
     s.completedMining=s.completedMining or {}
-    if config.mining.enabled then
+    if config.mining.enabled or s.currentTask and s.currentTask.exploration then
       self.inventory=require('autobuilder.storage.inventory').new(e.turtle,{reservedSlots={15,16},fuelSlot=15})
       self.scanner=require('autobuilder.resources.scanner').new(e,config.scanner,clock)
       local ok,err=self.scanner:recover(); assert(ok,err)
@@ -152,37 +179,47 @@ function M.new(app,config,e,network,clock)
     function self:command() return false,'Enter mining commands on the controller' end
     function self:handle(sender,m)
       if sender~=config.controllerId then return false,'not configured controller' end
-      if not config.mining.enabled then return false,'mining disabled on worker' end
+      if not config.mining.enabled and not (s.currentTask and s.currentTask.exploration) then return false,'mining disabled on worker' end
       local p=m.payload
       if m.type=='mine_assign' then
+        if p.exploration then
+          if not config.capabilities.explorationV1 or not E.geometry(p.exploration) then return false,'exploration capability or geometry invalid' end
+          if not same(p.exploration.depot,{x=config.depot.x,y=config.depot.y,z=config.depot.z}) then return false,'assigned depot differs from worker depot' end
+          if not same(p.exploration.exitRoute,config.mining.exitRoute) then return false,'assigned clear exit differs from worker config' end
+        end
         if not Materials.accepts(config.mining.resources,p.item) then return false,'assigned item is outside configured mining resources' end
         if p.miningResources~=nil and not Materials.sameResources(p.miningResources,config.mining.resources) then return false,'assigned mining resources differ from local config' end
         if s.completedMining[p.jobId] then
-          return send(sender,'mine_progress',{jobId=p.jobId,phase='completed',delivered=s.completedMining[p.jobId],held=0})
+          local r=s.completedMining[p.jobId]
+          return send(sender,'mine_progress',{jobId=p.jobId,phase='completed',delivered=type(r)=='table' and r.delivered or r,held=0,exploration=type(r)=='table' and r.exploration or nil})
         end
         if require('autobuilder.core.receipts').archived(s,'completedMining',p.jobId) then return false,'Old acknowledged mine was archived; restore the matching controller checkpoint' end
         if s.currentTask then
-          if s.currentTask.id==p.jobId and s.currentTask.item==p.item and s.currentTask.quantity==p.quantity then return true end
+          if s.currentTask.id==p.jobId and s.currentTask.item==p.item and s.currentTask.quantity==p.quantity and same(s.currentTask.exploration,p.exploration) then return true end
           return false,'worker already owns a different task'
         end
-        s.currentTask={id=p.jobId,type='MINE',item=p.item,quantity=p.quantity,phase='setup',delivered=0,miningArea=U.copy(p.miningArea),miningResources=U.copy(p.miningResources or config.mining.resources or {})}
-        s.status='setup'; save(); return true
+        s.currentTask={id=p.jobId,type='MINE',item=p.item,quantity=p.quantity,exploration=p.exploration and E.cleanGeometry(p.exploration),phase='setup',delivered=0,miningArea=U.copy(p.miningArea),miningResources=U.copy(p.miningResources or config.mining.resources or {})}
+        s.status='setup'; local ok,err=save()
+        if not ok then s.currentTask=nil; s.status='idle'; return false,err end
+        return true
       elseif m.type=='mine_ack' then
         if s.currentTask and s.currentTask.id==p.jobId and s.currentTask.phase=='completed' then
-          require('autobuilder.core.receipts').record(s,'completedMining',p.jobId,s.currentTask.delivered); s.currentTask=nil; self.miner=nil; s.status='idle'; save(); return true
+          local receipt=s.currentTask.exploration and {delivered=s.currentTask.delivered,exploration=E.cleanReport(s.currentTask.explorationProgress)} or s.currentTask.delivered
+          require('autobuilder.core.receipts').record(s,'completedMining',p.jobId,receipt); s.currentTask=nil; self.miner=nil; s.status='idle'; save(); return true
         end
         return false,'unexpected job acknowledgement'
+      elseif m.type=='mine_return' and s.currentTask and s.currentTask.id==p.jobId and s.currentTask.exploration then return miner():requestReturn()
       elseif m.type=='mine_resume' and s.currentTask and s.currentTask.id==p.jobId then
         return miner():resume()
       end
       return false,'unexpected mining message'
     end
     function self:tick()
-      if s.currentTask and (not s.currentTask.type or s.currentTask.type=='MINE') and config.mining.enabled and clock()-lastSend>=config.heartbeatInterval then
+      if s.currentTask and (not s.currentTask.type or s.currentTask.type=='MINE') and (config.mining.enabled or s.currentTask.exploration) and clock()-lastSend>=config.heartbeatInterval then
         lastSend=clock(); local task=s.currentTask
         local err=task.error and tostring(task.error):gsub('[%c]',' '):sub(1,512)
         send(config.controllerId,'mine_progress',{jobId=task.id,phase=task.phase or 'blocked',
-          delivered=task.delivered or 0,held=self.inventory:getCount(task.item),error=err,assignedQuantity=task.quantity})
+          delivered=task.delivered or 0,held=self.inventory:getCount(task.item),error=err,assignedQuantity=task.quantity,exploration=task.exploration and (task.explorationProgress or {cursor=task.exploration.cursor,clearedRouteCount=0,observations={}})})
       end
       return true
     end
@@ -194,13 +231,13 @@ function M.new(app,config,e,network,clock)
       end
     end
     function self:step()
-      if not config.mining.enabled or not s.currentTask or s.currentTask.phase=='completed' then return true end
+      if not s.currentTask or not config.mining.enabled and not s.currentTask.exploration or s.currentTask.phase=='completed' then return true end
       if not Materials.accepts(config.mining.resources,s.currentTask.item)
         or s.currentTask.miningResources~=nil and not Materials.sameResources(s.currentTask.miningResources,config.mining.resources) then
         if s.currentTask.phase~='blocked' then s.currentTask.resumePhase=s.currentTask.phase end
         s.currentTask.phase='blocked'; s.currentTask.error='Assigned mining resources differ from local config; restore original resources'; save(); return true
       end
-      if s.currentTask.miningArea then
+      if s.currentTask.miningArea and not s.currentTask.exploration then
         for _,edge in ipairs({'min','max'}) do for _,axis in ipairs({'x','y','z'}) do
           if s.currentTask.miningArea[edge][axis]~=config.mining.bounds[edge][axis] then
             s.currentTask.phase='blocked'; s.currentTask.error='Assigned mining area differs from local config; restore original bounds'; save(); return true
@@ -208,6 +245,7 @@ function M.new(app,config,e,network,clock)
         end end
       end
       local m=miner()
+      if s.currentTask.exploration and not config.mining.enabled then m:requestReturn() end
       if s.currentTask.phase=='blocked' then return true end
       local ok,err=m:step(); s.status=s.currentTask.phase
       if not ok then app:report('WARN','Mining job '..s.currentTask.id..': '..tostring(err)) end

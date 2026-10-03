@@ -221,3 +221,36 @@ test('legacy completed mines wait for a new observation before retirement',funct
   c.mining:tick(); assert(c.state.jobs.legacy)
   c.state.workers['12'].lastSeen=101; ce.now=102; c.mining:tick(); eq(c.state.jobs.legacy,nil)
 end)
+test('exploration runtime preserves partial receipts across controller and worker reboot',function()
+  local w,ce,we,c,worker,cc,wc=fixture()
+  cc.exploration={enabled=true,base={x=0,y=0,z=0},bounds={min={x=0,y=0,z=0},max={x=3,y=1,z=1}},baseProtection={min={x=0,y=-1,z=0},max={x=0,y=-1,z=0}},dimensionMinY=-64,dimensionMaxY=319}
+  wc.mining.mode='explore'; wc.mining.exitRoute={}; wc.capabilities.explorationV1=true
+  local R=require('autobuilder.core.runtime'); c=R.new(cc,ce); worker=R.new(wc,we)
+  w.blocks['3,1,1']='minecraft:iron_ore'
+  worker:tick(); pump(we,c); pump(ce,worker)
+  local group=assert(c.mining.jobs:requestAcquisition('minecraft:raw_iron',2,0,'test'))
+  local rebooted=false; local trip
+  for i=1,1000 do
+    ce.now=100+i; we.now=ce.now; w.time=ce.now
+    c:tick(); pump(ce,worker); worker:tick(); worker:workStep(); pump(we,c); pump(ce,worker)
+    if worker.state.currentTask then trip=worker.state.currentTask.id end
+    if not rebooted and worker.state.currentTask and worker.state.currentTask.phase=='work' then
+      c=R.new(cc,ce); worker=R.new(wc,we); rebooted=true
+    end
+    if trip and not worker.state.currentTask and c.state.jobs[trip] and c.state.jobs[trip].physicalComplete then break end
+  end
+  assert(rebooted,'explorer never dispatched'); eq(w.stock['minecraft:raw_iron'],1); eq(w.pose.x,0)
+  eq(c.state.exploration.groups[group.id].status,'running'); eq(worker.state.currentTask,nil)
+  local receipt=worker.state.completedMining[trip]; eq(receipt.delivered,1); eq(receipt.exploration.result,'survey_exhausted')
+  local original=c.state.jobs[trip]
+  assert(worker.mining:handle(7,{type='mine_assign',payload={jobId=trip,item=original.item,quantity=original.quantity,exploration=original.exploration}}))
+  eq(worker.state.currentTask,nil)
+end)
+test('explorer rejects a duplicate assignment whose saved geometry changed',function()
+  local _,_,_,_,worker,_,wc=fixture(); wc.mining.mode='explore'; wc.capabilities.explorationV1=true
+  local g={version=1,groupId='acquire:1',sectorId='0,0,0',bounds={min={x=1,y=0,z=0},max={x=2,y=0,z=0}},envelope={min={x=0,y=0,z=0},max={x=3,y=0,z=0}},depot={x=0,y=0,z=0},entry={x=1,y=0,z=0},exitRoute={},route={{x=1,y=0,z=0}},protectedAreas={},cursor=1}
+  local p={jobId='mine:immutable',item='minecraft:raw_iron',quantity=1,exploration=g}
+  assert(worker.mining:handle(7,{type='mine_assign',payload=p})); assert(worker.state.currentTask.exploration)
+  p.exploration.bounds.max.x=3
+  assert(not worker.mining:handle(7,{type='mine_assign',payload=p}))
+end)
