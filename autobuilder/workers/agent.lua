@@ -10,6 +10,7 @@ function M.new(state,config,network,turtle,save,chunkProbe)
     local p=state.position
     local capabilities=U.copy(config.capabilities or {telemetry=true})
     capabilities.returnCargoV1=config.automation and config.automation.enabled==true and type(turtle.getItemDetail)=='function' or false
+    capabilities.supplyStationV1=config.automation and config.automation.enabled==true or false
     local cargo=capabilities.returnCargoV1 and require('autobuilder.storage.returns').observe(turtle,config) or nil
     capabilities.fuelV1=config.fuel and config.fuel.enabled or false
     capabilities.chunkCoverageV1=config.chunkLoading and config.chunkLoading.enabled==true or false

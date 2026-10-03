@@ -40,6 +40,7 @@ function M.new(config,e)
   if config.role=='controller' then
     require('autobuilder.factory.stations').validateSaved(config,state)
     require('autobuilder.storage.nodes').validateSaved(config,state)
+    require('autobuilder.storage.supply').validateSaved(config,state.automation or {})
   end
   -- UTC prevents a restored older snapshot from reusing the last boot's IDs.
   state.boot=math.max(state.boot+1,math.floor(clock()*1000))

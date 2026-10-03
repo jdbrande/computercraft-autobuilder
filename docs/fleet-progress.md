@@ -706,3 +706,49 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Focused site/protection/renewable/exploration/node coverage passes60 cases, and
   chunk/runtime/provider coverage passes70. Release generation/check and whitespace
   checks pass; no new native harvesting claim is made.
+
+- Multiworker acceptance exposed a configuration prerequisite: supply currently
+  targets one global chest at each worker's depot, while home returns need private
+  buffers. Sharing the physical depot would let idle workers block later returns.
+  Task45 now includes registered per-worker supply endpoints using the existing
+  journal and lease. Dynamic quotas and fluid/sealed-foundation work remain required.
+
+- Registered per-worker supply endpoints now retain endpoint identity through
+  controller staging recovery and worker grants, reject shared/private inventory
+  aliases and refuse mismatched worker depots before staging. A failing regression
+  caught configuration failures creating replacement production requests; that
+  path now waits without manufacturing stock. Supply remains one durable batch at
+  a time; independent workers continue construction after their pickups.
+- The new actual two-builder simulation exposed a head-on survey route deadlock.
+  Navigation now reuses bounded pathfinding after confirmed worker-occupancy
+  denial, persists its detour across reboot and reserves each physical step.
+  Focused restart/protection/fuel/coverage checks pass. The integrated two-builder
+  case is still running; no concurrent construction acceptance is claimed yet.
+
+- The two-builder runtime passes: both workers survey, prepare and build independent
+  regions; preparation/build ownership overlaps, all10 blocks verify, two missing
+  foundations fill, and two excavated dirt return centrally. Separate supplies
+  survive a lost grant and controller/worker restart after physical pickup. Both
+  workers finish empty with finite fuel and all private chests/supply ownership drain.
+- That run exposed depot headings being omitted from cleaned telemetry. Headings now
+  validate and survive transmission, allowing front-facing station identity checks.
+  Broader routing validation exposed an idle courier occupying a reusable delivery
+  stand. Managed couriers now return home before completion; the two-courier
+  partial-delivery/restart case passes with explicit final-home assertions.
+
+- The multiworker snapshot passes all712 Lua tests and18 Python tests. Native rig
+  190–194 is in progress with two builders, two miners, ten glass targets, four
+  raised logs and two missing foundation cells. The staged test envelope is loaded;
+  this is not dynamic role-quota acceptance yet.
+- A fixture error assigned the front supply modems' peripheral IDs to the wrong
+  face. Corrected the modem NBT without adding materials. That disconnection exposed
+  repeated production requests for a hardware error: supply now returns an explicit
+  observed-stock-shortage signal, and only that signal can request production.
+  A RED→GREEN disconnect/reconnect regression confirms no spurious requests.
+- The accumulated pre-fix request history exposed CraftOS's execution timeout while
+  saving a253 KB checkpoint. Compact native serialization and batched Adler modular
+  reductions reduce the same checkpoint to118 KB without yielding in transactions.
+  A large legacy-checksum/compact-encoding regression passes. The native controller
+  resumed its original saved ownership and staged cargo; journals were not reset.
+  These two post-snapshot fixes pass79 focused regression/coordination/logistics and
+  managed-runtime cases. A full final current-tree gate remains required.

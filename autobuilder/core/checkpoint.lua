@@ -2,7 +2,12 @@ local M={}
 -- Adler-32 uses exact integer arithmetic even on Lua's double-number runtime.
 local function checksum(s)
   local a,b=1,0
-  for i=1,#s do a=(a+s:byte(i))%65521; b=(b+a)%65521 end
+  -- Batch reductions without yielding inside a transaction. Even the largest
+  -- intermediate sum stays below 2^32, exactly representable by Lua doubles.
+  for start=1,#s,4096 do
+    for i=start,math.min(start+4095,#s) do a=a+s:byte(i);b=b+a end
+    a=a%65521;b=b%65521
+  end
   return b*65536+a
 end
 function M.new(fs,codec,path)
@@ -32,8 +37,8 @@ function M.new(fs,codec,path)
     local ok,err=pcall(function()
       assert(type(value)=='table','checkpoint must be a table')
       local dir=fs.getDir(path); if dir~='' then fs.makeDir(dir) end
-      local payload=codec.serialize(value)
-      local raw=codec.serialize({version=1,payload=payload,checksum=checksum(payload)})
+      local payload=codec.serialize(value,{compact=true})
+      local raw=codec.serialize({version=1,payload=payload,checksum=checksum(payload)},{compact=true})
       local h,why=fs.open(path..'.tmp','w'); assert(h,why)
       h.write(raw); h.close()
       assert(read(path..'.tmp'),'temporary checkpoint did not validate')

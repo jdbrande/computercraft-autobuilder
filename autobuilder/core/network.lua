@@ -15,7 +15,7 @@ local function telemetry(p)
   if p.poseRecovery~=nil and (not TaskMessages.validPoseReport(p.poseRecovery)
     or p.poseRecovery.stage~='settled' and p.poseRecovery.jobId~=p.task) then return false end
   if p.cargo~=nil and not require('autobuilder.storage.returns').validCargo(p.cargo) then return false end
-  if p.depot~=nil and not U.position(p.depot) then return false end
+  if p.depot~=nil and (not U.position(p.depot) or p.depot.heading~=nil and not U.heading(p.depot.heading)) then return false end
   if p.explorationHome~=nil and not E.home(p.explorationHome) then return false end
   local pos=p.position
   if type(pos)~='table' or type(pos.known)~='boolean' then return false end
@@ -101,7 +101,7 @@ function M.new(hw,config,id,boot)
       if p.chunkAnchor then clean.chunkAnchor={provider=p.chunkAnchor.provider,x=p.chunkAnchor.x,z=p.chunkAnchor.z} end
       clean.poseRecovery=TaskMessages.poseReport(p.poseRecovery)
       clean.cargo=require('autobuilder.storage.returns').cleanCargo(p.cargo)
-      if p.depot then clean.depot={x=p.depot.x,y=p.depot.y,z=p.depot.z} end
+      if p.depot then clean.depot={x=p.depot.x,y=p.depot.y,z=p.depot.z,heading=p.depot.heading} end
       clean.miningResources=U.copy(p.miningResources)
       if p.explorationHome then clean.explorationHome=E.cleanHome(p.explorationHome) end
       if p.miningArea then clean.miningArea={min={x=p.miningArea.min.x,y=p.miningArea.min.y,z=p.miningArea.min.z},max={x=p.miningArea.max.x,y=p.miningArea.max.y,z=p.miningArea.max.z}} end

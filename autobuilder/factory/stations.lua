@@ -52,6 +52,7 @@ function M.validateSaved(config,state)
     for _,name in ipairs(names) do shared[name]=true end
   end
   shared[config.supply.inventory]=true
+  for _,station in ipairs(config.supplyStations or {}) do shared[station.inventory]=true end
   for _,station in ipairs(config.fuel.stations) do shared[station.inventory]=true end
   for _,field in ipairs({'buffer','input','output'}) do shared[config.craftingStation[field]]=true end
   local owners={}

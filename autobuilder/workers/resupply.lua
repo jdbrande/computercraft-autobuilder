@@ -141,6 +141,7 @@ function M.new(task,e,config,nav,save)
   end
   local function step()
     local r=task.supplyRequest
+    if r and r.station then assert(require('autobuilder.storage.supply').matchesWorker(r.station,config,r.station.workerId),'owned supply station differs from worker configuration') end
     if not r then return true end
     if not r.granted then return false,'waiting for supply grant' end
     assert(U.shortString(r.item,128) and U.integer(r.amount) and r.amount>0 and r.amount<=64 and U.integer(r.count) and r.amount<=r.count,'invalid supply grant')

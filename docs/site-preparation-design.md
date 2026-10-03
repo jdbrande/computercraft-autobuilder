@@ -142,3 +142,30 @@ Fill selection compares unreserved stock with the survey's bounded possible fill
 volume and checks eligible acquisition workers. A small unreplenishable debris pile
 must not strand the project when another suitable fill is replenishable. This bound
 only chooses the material: physical inspection still determines supply quantities.
+
+## Prerequisite for multiple construction workers
+
+The current supply chest is global, but home-return buffers belong to individual
+worker depots. Pointing several workers at one depot would leave returning idle
+workers blocking that physical stand. Add optional registered `supplyStations`,
+keyed by worker ID, with inventory, depot stand and transfer side. Each worker keeps
+its local supply configuration; controller grants must match it before transfer.
+Defaults retain the existing single-chest installation.
+
+Use the current supply journal and receipt identity. Persist the chosen endpoint
+with each batch and reject configuration changes while it is owned. Validate that
+station inventories cannot alias storage, fuel, crafting or private return buffers.
+Protect their actual containers and stands from excavation. Keep the existing one
+active supply transfer while builders work independently; measure this ceiling in
+scaling acceptance before replacing the existing supply/storage coordination.
+
+This prerequisite was identified while checking multiworker site acceptance. It is
+part of Task45 and sections18/21/44, not a substitute for the remaining fluid and
+sealed-foundation preparation work.
+
+Multiworker route prerequisite: confirmed worker-occupancy denials trigger bounded
+256-node pathfinding around observed occupied cells. The route survives worker
+restart; every step still requires normal reservations, coverage, protection and
+fuel. At most16 excluded traffic cells are retained per waypoint. Failure to find
+a bounded route remains visible and does not permit digging or entering a denied
+cell. This does not establish arbitrary-maze routing or unlimited deadlock recovery.

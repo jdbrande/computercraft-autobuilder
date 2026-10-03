@@ -77,6 +77,7 @@ function M.validate(kind,p)
     if p.supplyId and not U.shortString(p.supplyId,160) then return false,'invalid supply identity' end
     if kind=='task_supply' or kind=='task_supply_done' or kind=='task_supply_ack' then
       if not U.shortString(p.supplyId,160) or p.supplyId:sub(1,#p.jobId+8)~=p.jobId..':supply:' or not p.supplyId:sub(#p.jobId+9):match('^%d+$') then return false,'supply batch identity required' end
+      if p.station~=nil and (kind~='task_supply' or not require('autobuilder.storage.supply').validStation(p.station)) then return false,'invalid supply station grant' end
     end
     if kind=='task_fuel_freeze' then
       if not U.position(p.position) or not U.shortString(p.item,128) or not U.integer(p.quantity) or p.quantity<1 or p.quantity>64

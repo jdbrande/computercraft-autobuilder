@@ -87,7 +87,10 @@ test('real controller and two courier runtimes conserve finite stock through reb
   assert(restarted and blocked);eq(r.status,'completed');assert(f.maxActive>=2,'no concurrent couriers')
   eq(F.count(f.inventories.site,'minecraft:stone'),24);eq(F.count(f.inventories.base,'minecraft:stone'),0)
   eq(F.count(f.inventories.base,'minecraft:dirt'),7)
-  for _,id in ipairs({12,13}) do assert(not next(f.worlds[id].items));assert(f.worlds[id].fuel<2000 and f.worlds[id].fuel>0) end
+  for _,id in ipairs({12,13}) do
+    assert(not next(f.worlds[id].items));assert(f.worlds[id].fuel<2000 and f.worlds[id].fuel>0)
+    eq(U.distance(f.worlds[id].pose,f.configs[id].depot),0)
+  end
   for _,lease in pairs(f.apps[7].state.capacityLedger.leases) do eq(lease.status,'released') end
   for _,lease in pairs(f.apps[7].state.chunkLedger.leases) do eq(lease.status,'released') end
 end)

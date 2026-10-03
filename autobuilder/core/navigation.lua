@@ -102,7 +102,47 @@ function M.new(turtle,pose,config,save)
     if not U.position(target) then return false,'invalid target' end
     if not U.position(pose) or not pose.known or pose.uncertain or pose.pending then return false,'pose unknown or uncertain' end
     if U.distance(pose,target)>(config.maxTravelDistance or 256) then return false,'travel distance exceeds limit' end
-    -- Conservative axis route; stops at obstacles. A* is a later milestone.
+    -- Reuse bounded pathfinding only after confirmed traffic denial. Every
+    -- physical step still obtains a fresh reservation and obeys fuel/coverage.
+    -- ponytail: 256-node detours; larger global routes need hierarchical planning.
+    local P=require('autobuilder.core.pathfinding')
+    if pose.detour and U.distance(pose.detour.target,target)>0 then pose.detour=nil end
+    local obstacle=self.trafficObstacle and self.trafficObstacle()
+    if obstacle then
+      local d=pose.detour or {target={x=target.x,y=target.y,z=target.z},blocked={},count=0}
+      if not d.blocked[P.key(obstacle)] then
+        if d.count>=16 then return false,'movement reservation pending: traffic detour limit reached' end
+        d.blocked[P.key(obstacle)]=true;d.count=d.count+1;d.path=nil
+      end
+      if not d.path then
+        local box={min={},max={}}
+        for _,axis in ipairs({'x','y','z'}) do box.min[axis]=math.min(pose[axis],target[axis])-2;box.max[axis]=math.max(pose[axis],target[axis])+2 end
+        local path=P.find(pose,target,function(p) return U.position(p) and P.inside(p,box) and not d.blocked[P.key(p)] and allowed(p) end,256)
+        if not path then return false,'movement reservation pending: no bounded traffic detour' end
+        d.path=path;d.index=1
+      end
+      pose.detour=d;local ok,why=persist();if not ok then return false,why end
+    end
+    if pose.detour then
+      local d=pose.detour
+      while d.index<=#d.path do
+        local point=d.path[d.index]
+        if U.distance(pose,point)==0 then d.index=d.index+1
+        else
+          if U.distance(pose,point)~=1 then pose.detour=nil;local ok,why=persist();if not ok then return false,why end;return self:goTo(target) end
+          local action
+          if point.y~=pose.y then action=point.y>pose.y and 'up' or 'down'
+          else
+            local heading=point.x~=pose.x and (point.x>pose.x and 'east' or 'west') or (point.z>pose.z and 'south' or 'north')
+            local ok,why=self:face(heading);if not ok then return false,why end;action='forward'
+          end
+          local ok,why=step(action);if not ok then return false,why end
+        end
+      end
+      pose.detour=nil;local ok,why=persist();if not ok then return false,why end
+      return true
+    end
+    -- Ordinary unobstructed travel keeps the inexpensive axis route.
     for _,axis in ipairs({'y','x','z'}) do
       while pose[axis]~=target[axis] do
         local positive=target[axis]>pose[axis]

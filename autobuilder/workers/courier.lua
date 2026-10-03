@@ -30,7 +30,13 @@ function M.new(task,e,config,nav,save)
     if task.phase=='blocked' then return false,task.error end
     if not nav.pose.known or nav.pose.pending or nav.pose.uncertain then return block('trusted position required for courier') end
     task.phase='work'; reconcile()
-    if task.delivered>=task.quantity then task.phase='completed'; persist(); return true end
+    if task.delivered>=task.quantity then
+      if task.logistics then
+        if s.stage~='home' then return switch('home') end
+        local ok,err=R.travel(s,task,nav,config.depot,persist,t,config);if not ok then return block(err) end
+      end
+      task.phase='completed'; persist(); return true
+    end
     local target=s.stage=='source' and task.source or task.destination
     local ok,err=R.travel(s,task,nav,target,persist); if not ok then return block(err) end
     local suffix,why=R.container(t,'down'); if not suffix then return block(why) end
@@ -60,7 +66,10 @@ function M.new(task,e,config,nav,save)
     s.intent={kind='drop',slot=s.slot,item=task.item,limit=s.held,before=R.snapshot(t)}; persist()
     t.dropDown(s.held); local moved=reconcile()
     if moved==0 then return block('destination container full or unavailable') end
-    if task.delivered>=task.quantity then task.phase='completed'; persist(); return true end
+    if task.delivered>=task.quantity then
+      if task.logistics then return switch('home') end
+      task.phase='completed'; persist(); return true
+    end
     if s.held==0 then s.slot=nil; return switch('source') end
     return true
   end

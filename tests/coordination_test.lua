@@ -189,6 +189,27 @@ test('empty failed supply claim is released so material production can acquire i
   assert(requested); eq(f.h.transfers,0)
 end)
 
+test('misconfigured registered supply waits without producing replacement stock',function()
+  local f=runtime(); local queue=f.c.automation.queue
+  f.c.config.supplyStations={{workerId=12,inventory='privateSupply',side='front',position={x=40,y=64,z=0,heading='north'}}}
+  local build=queue:submit('BUILD',{blocks={block}},{})
+  build.workerId=12; build.status='blocked'; build.missingItem=mc('stone'); build.missingCount=1; build.supplyId=build.id..':supply:1'
+  f.c:tick()
+  assert(build.supplyError:find('matching worker depot',1,true));eq(f.h.transfers,0);eq(queue.state.supply,nil)
+  eq(next(queue.state.requests),nil)
+end)
+
+test('disconnected supply endpoint does not create repeated production requests',function()
+  local f=runtime();local queue=f.c.automation.queue
+  f.h.inventories.stage=nil
+  local j=queue:submit('BUILD',{blocks={block}},{})
+  j.workerId=12;j.status='blocked';j.missingItem=mc('stone');j.missingCount=1;j.supplyId=j.id..':supply:1'
+  for _=1,4 do f.ce.now=f.ce.now+2;f.c:tick() end
+  eq(next(queue.state.requests),nil);eq(f.h.transfers,0)
+  f.h.inventories.stage={};f.ce.now=f.ce.now+2;f.c:tick()
+  eq(f.h.inventories.stage[1].count,1);eq(f.h.transfers,1)
+end)
+
 test('partially staged supply recovers before production queues a factory reservation',function()
   local f=runtime(); local queue=f.c.automation.queue
   local build=queue:submit('BUILD',{blocks={block}},{})

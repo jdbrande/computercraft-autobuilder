@@ -57,3 +57,56 @@ test('mining capability cannot be advertised while its engine is disabled',funct
   local c=require('autobuilder.config').load({capabilities={mining=true}})
   assert(not c.capabilities.mining)
 end)
+
+test('navigation detours an occupied route with reservations and retains its path across reboot',function()
+  local U=require('autobuilder.core.util');local P=require('autobuilder.core.pathfinding')
+  local w=require('tests.build_world').new();local pose=U.copy(w.pose);local saved;local pending;local granted=false
+  local occupied={x=1,y=2,z=0};local target={x=3,y=2,z=0};local n
+  local function boot()
+    n=require('autobuilder.core.navigation').new(w.turtle,pose,{minimumFuelReserve=0},function() saved=U.copy(pose);return true end)
+    n.guard=function(_,to)
+      if U.distance(to,occupied)==0 then pending=U.copy(to);return false,'movement reservation pending: worker occupies destination' end
+      if not pending or U.distance(pending,to)>0 then pending=U.copy(to);granted=false;return false,'movement reservation pending' end
+      return granted,'movement reservation pending'
+    end
+    n.trafficObstacle=function() if pending and U.distance(pending,occupied)==0 then return U.copy(pending) end end
+    n.afterMove=function() pending=nil;granted=false;assert(U.distance(pose,occupied)>0) end
+  end
+  boot();local rebooted=false;local done=false
+  for _=1,60 do
+    done=n:goTo(target);if done then break end
+    if pose.detour and not rebooted and U.distance(pose,{x=0,y=2,z=0})>0 then pose=U.copy(saved);boot();rebooted=true end
+    granted=true
+  end
+  assert(done,'worker remained behind occupied cell');assert(rebooted);eq(P.key(pose),P.key(target));eq(w.digs,0)
+end)
+
+test('traffic detours cannot bypass protected space exhausted fuel or an occupied goal',function()
+  local U=require('autobuilder.core.util')
+  for _,mode in ipairs({'protection','fuel','goal','coverage'}) do
+    local w=require('tests.build_world').new();local p=U.copy(w.pose)
+    local config={minimumFuelReserve=0}
+    if mode=='protection' then
+      config.restrictedAreas={{min={x=-2,y=0,z=-2},max={x=5,y=4,z=2}}}
+    elseif mode=='fuel' then w.turtle.getFuelLevel=function() return 0 end end
+    local n=require('autobuilder.core.navigation').new(w.turtle,p,config,function() return true end)
+    local target={x=3,y=2,z=0}
+    n.trafficObstacle=function() return mode=='goal' and target or {x=1,y=2,z=0} end
+    if mode=='coverage' then n.coverageGuard=function() return false,'UNLOADED_AREA' end end
+    assert(not n:goTo(target));eq(U.distance(w.pose,{x=0,y=2,z=0}),0);eq(w.digs,0)
+  end
+end)
+
+test('checkpoint uses compact native encoding and retains legacy Adler checksums for large payloads',function()
+  local fs=S.fs();local base=S.codec();local compact=0
+  local codec={unserialize=base.unserialize,serialize=function(value,options)
+    assert(options and options.compact==true,'checkpoint serialization is not compact');compact=compact+1;return base.serialize(value)
+  end}
+  local payload=base.serialize({text=string.rep('large checkpoint\n',6000)})
+  local a,b=1,0;for i=1,#payload do a=(a+payload:byte(i))%65521;b=(b+a)%65521 end
+  fs.files.large=base.serialize({version=1,payload=payload,checksum=b*65536+a})
+  local cp=require('autobuilder.core.checkpoint').new(fs,codec,'large')
+  local old=assert(cp:load());assert(cp:save(old));eq(compact,2)
+  local saved=base.unserialize(fs.files.large);eq(saved.checksum,b*65536+a)
+  eq(cp:load().text,old.text)
+end)

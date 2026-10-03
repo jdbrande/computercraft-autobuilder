@@ -932,6 +932,9 @@ requirements until all acceptance below passes.
 
 - [x] Require verified foundations/clearance before dependent builders, allow unaffected
   regions to continue and recheck after changing terrain. Retain correct partial builds.
+- [x] Add registered per-worker supply endpoints using existing batch journals,
+  endpoint identity checks and private-inventory validation, so separate home
+  depots can supply independent construction workers without shared idle stands.
 - [ ] Run actual multiworker runtime and native uneven-terrain survey→level→fill→clear→
   verify→build acceptance. Record counts, retained infrastructure, restarts and limits.
 - [ ] Complete Lua/Python/release gates and one final whole-branch review/fix pass;

@@ -191,3 +191,33 @@ test('managed courier reports cumulative physical pickups and drops across both 
     eq(w.chests['3,0,0'].items.count,5);eq(w.chests['0,0,0'].items.count,27)
   end
 end)
+
+test('registered worker supply persists its endpoint and rejects reassignment across restart',function()
+ local w=wired();w.inventories.stageA={};w.inventories.stageB={}
+ local stations={{workerId=12,inventory='stageA',side='front',position={x=0,y=1,z=0,heading='north'}},
+  {workerId=13,inventory='stageB',side='down',position={x=4,y=1,z=0}}}
+ local state={};local ex,saved=supply(w,state,{supplyStations=stations})
+ w.crash=true;assert(not ex:offer('a',12,'minecraft:stone',4))
+ eq(w.inventories.stageA[1].count,4);eq(next(w.inventories.stage),nil);eq(state.supply.station.inventory,'stageA')
+ state=saved();ex=supply(w,state,{supplyStations=stations});eq(ex:offer('a',12,'minecraft:stone',4),4);eq(w.transfers,1)
+ local changed=U.copy(stations);changed[1].inventory='stageB';local ok=pcall(supply,w,state,{supplyStations=changed});assert(not ok,'owned endpoint changed across restart')
+ assert(not ex:offer('b',13,'minecraft:stone',2));eq(next(w.inventories.stageB),nil)
+ w.inventories.stageA={};assert(ex:release('a'));eq(ex:offer('b',13,'minecraft:stone',2),2)
+ eq(w.inventories.stageB[1].count,2);eq(state.supply.station.inventory,'stageB')
+end)
+
+test('registered supply configuration rejects aliases duplicate owners and missing front headings',function()
+ local C=require('tests.loaded_config');local station={workerId=12,inventory='privateSupply',side='front',position={x=3,y=2,z=0,heading='north'}}
+ assert(C.load({supplyStations={station}}))
+ for _,change in ipairs({
+  function(c) c.supplyStations[1].position.heading=nil end,
+  function(c) c.supplyStations[1].workerId=-1 end,
+  function(c) c.supplyStations[2]=U.copy(station);c.supplyStations[2].inventory='other' end,
+  function(c) c.supplyStations[2]=U.copy(station);c.supplyStations[2].workerId=13 end,
+  function(c) c.storageInventories={'privateSupply'} end,
+  function(c) c.supply={inventory='privateSupply'} end,
+  function(c) c.craftingStation={input='privateSupply'} end,
+ }) do
+  local cfg={supplyStations={U.copy(station)}};change(cfg);assert(not pcall(C.load,cfg),'unsafe supply station configuration accepted')
+ end
+end)

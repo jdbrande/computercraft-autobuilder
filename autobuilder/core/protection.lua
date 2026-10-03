@@ -76,6 +76,9 @@ function M.areas(state,config,exceptProject,skipMiningBase,purpose)
     box(d,1,1,home and purpose.owner==w.id and U.position(d) and U.distance(home,d)==0 and 0 or 2)
   end
   for _,station in ipairs((config.fuel or {}).stations or {}) do box(station.position,1,0,2) end
+  for _,station in ipairs(config.supplyStations or {}) do
+    box(station.position,0,0,0);box(require('autobuilder.storage.supply').container(station),0,0,0)
+  end
   for _,farms in ipairs({config.farms or {},config.treeFarms or {}}) do
     for _,farm in pairs(farms) do if not purpose or farm~=purpose.farm then
       for _,p in ipairs(farm.sites or {}) do box(p,1,1,(farm.maxHeight or 8)+2) end

@@ -110,6 +110,11 @@ function M.new(app,config,e,network,clock)
     return false,'movement reservation pending'
   end
   app.navigation.guard=function(from,target) return reserve(from,target) end
+  app.navigation.trafficObstacle=function()
+    local r=s.motionReservation
+    if r and not r.work and not r.granted and s.currentTask and r.jobId==s.currentTask.id and r.reason
+      and (r.reason=='worker occupies destination' or r.reason:find('position reserved by worker ',1,true)==1) then return U.copy(r.target) end
+  end
   app.navigation.workGuard=function(target) return reserve(app.navigation.pose,target,true) end
   app.navigation.workDone=function()
     if s.motionReservation and s.motionReservation.work then s.motionReservation=nil;return save() end
@@ -195,6 +200,9 @@ function M.new(app,config,e,network,clock)
       local r=s.motionReservation
       if r and r.jobId==p.jobId and (r.work==true)==(p.work==true) and U.distance(r.target,p.target)==0 then r.granted=p.granted;r.reason=p.reason;save();return true end
     elseif m.type=='task_supply' and t.supplyRequest and t.supplyRequest.item==p.item and t.supplyRequest.id==p.supplyId then
+      if p.station and not require('autobuilder.storage.supply').matchesWorker(p.station,config,s.id) then return false,'supply station differs from worker configuration' end
+      if t.supplyRequest.station and not require('autobuilder.factory.factory').equal(t.supplyRequest.station,p.station) then return false,'supply station changed during grant' end
+      t.supplyRequest.station=U.copy(p.station)
       t.supplyRequest.granted=true; t.supplyRequest.amount=p.count; save(); return true
     end
     return false,'unexpected task response'
@@ -306,7 +314,7 @@ function M.new(app,config,e,network,clock)
         engine():step(); s.status=t.phase; save(); return true
       end
       if t.error and tostring(t.error):find('movement reservation pending',1,true) and s.motionReservation
-        and (s.motionReservation.granted or t.siteWork and s.motionReservation.work and s.motionReservation.reason) then resumeTask()
+        and (s.motionReservation.granted or app.navigation.trafficObstacle() or t.siteWork and s.motionReservation.work and s.motionReservation.reason) then resumeTask()
       elseif (t.logisticsRetryable or t.homeRetryable) and clock()-(t.lastLogisticsRetry or 0)>=config.heartbeatInterval then
         t.lastLogisticsRetry=clock();resumeTask();save()
       elseif t.blockedCategory=='immature' and clock()-(t.lastFarmRetry or 0)>=config.farmRetrySeconds then

@@ -513,3 +513,36 @@ test('preparation supplies only the inspected missing support instead of mining 
   assert(requested);eq(j.status,'completed');eq(f.world.places,1);eq(f.world.blocks['3,0,0'].name,'minecraft:stone')
   eq(next(f.controller.state.jobs),nil);eq(next(f.controller.state.automation.requests),nil)
 end)
+
+
+test('registered supply rejects wrong worker endpoint and changed duplicate grants before pulling',function()
+  local f=fixture();f:startBuild()
+  f.filter=function(p) return p.m.type~='task_supply' end
+  for _=1,300 do f:step();if f.worker.state.currentTask and f.worker.state.currentTask.supplyRequest then break end end
+  local task=f.worker.state.currentTask;local request=assert(task.supplyRequest)
+  local station={workerId=12,inventory='stage',side='down',position={x=0,y=2,z=0}}
+  local sequence=100000
+  local function grant(s)
+    sequence=sequence+1
+    return f.worker:receive(7,{version=1,sender=7,boot=f.controller.state.boot,sequence=sequence,id='7:'..f.controller.state.boot..':'..sequence,
+      type='task_supply',payload={jobId=task.id,supplyId=request.id,item=request.item,count=1,station=s}},f.controller.config.protocol)
+  end
+  for _,change in ipairs({function(s) s.workerId=13 end,function(s) s.inventory='other' end,
+    function(s) s.position.x=1 end,function(s) s.side='up' end}) do
+    local bad=U.copy(station);change(bad);assert(not grant(bad));assert(not request.granted)
+  end
+  assert(grant(station));assert(request.granted);eq(f.stats.pulled,0)
+  assert(not grant(nil));eq(request.station.inventory,'stage')
+  f:reboot(true,true)
+  eq(f.worker.state.currentTask.supplyRequest.station.inventory,'stage')
+  -- The original accepted grant can finish even when its duplicate was lost.
+  f.filter=nil;local ok,err=f:complete(600);assert(ok,f.ce.textutils.serialize({worker=f.worker.state.currentTask,supply=f.controller.state.automation.supply,stats=f.stats,jobs=f.controller.state.automation.jobs}));eq(f.stats.pulled,2);eq(f.world.places,2)
+end)
+
+test('supply protocol rejects malformed station identity and station metadata on receipts',function()
+  local V=require('autobuilder.core.task_messages')
+  local p={jobId='task:7:1',supplyId='task:7:1:supply:1',item='minecraft:stone',count=1,
+    station={workerId=12,inventory='stage',side='front',position={x=0,y=2,z=0,heading='north'}}}
+  assert(V.validate('task_supply',p));assert(not V.validate('task_supply_done',p));assert(not V.validate('task_supply_ack',p))
+  p.station.position.heading=nil;assert(not V.validate('task_supply',p))
+end)

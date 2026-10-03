@@ -29,6 +29,32 @@ requirements. Repair requires a free nonreserved slot before digging. It also ch
 replacement inventory before removing an existing block. An external supply adapter
 is not required by these executors.
 
+## Multiple worker depots
+
+Register each builder's wired supply chest on the controller:
+
+```lua
+supplyStations = {
+  { workerId=181, inventory="minecraft:chest_903", side="front",
+    position={x=640,y=301,z=0,heading="north"} },
+  { workerId=183, inventory="minecraft:chest_904", side="front",
+    position={x=656,y=301,z=0,heading="north"} },
+}
+```
+
+Each worker configures the same `depot` position/heading and its own
+`supply={inventory="minecraft:chest_903",side="front"}` (use that worker's actual
+wired name). Separate registered home-return buffers collect debris. Supply chests
+must not alias stock, furnace, fuel, crafting or return inventories. Registered
+stations take priority; workers without one use the legacy `supply.inventory`.
+Both controller and workers must run the version advertising `supplyStationV1`.
+
+A supply batch retains its endpoint across restart. Drain an owned batch before
+changing its station configuration. The controller serializes staging through the
+existing supply lease; workers can prepare/build concurrently after collection.
+Confirmed traffic conflicts use bounded reserved detours. An occupied destination
+or a route outside the search/coverage/fuel limits remains a visible wait.
+
 ## Supported placement
 
 `blockstates.classify(name,state)` returns a status and optional explanation.

@@ -141,18 +141,23 @@ function M.new(app,config,e,network,clock)
       if j.workerId and j.status~='completed' and not j.workerFinished then
         if j.paused then send(j.workerId,'task_pause',{jobId=j.id})
         elseif j.status=='paused' or j.resumeRequested then send(j.workerId,'task_resume',{jobId=j.id}) end
-        if j.missingItem and j.supplyId and not j.paused and config.supply.inventory~='' and j.type~='CRAFT'
+        if j.missingItem and j.supplyId and not j.paused and (config.supply.inventory~='' or #config.supplyStations>0) and j.type~='CRAFT'
           and not (queue.state.completedSupplyBatches or {})[j.supplyId] then
           self.supply=self.supply or require('autobuilder.storage.supply').new(queue.state,config,e,function() return app:save() end)
-          local n,err
+          local n,err,needsStock
           local staged=queue.state.supply
-          if not Coordination.canOfferSupply(app.state,j) then
+          local station=require('autobuilder.storage.supply').station(config,j.workerId)
+          local worker=app.state.workers[tostring(j.workerId)];local t=worker and worker.telemetry
+          if station.workerId and (not t or not (t.capabilities or {}).supplyStationV1 or not U.position(t.depot)
+            or U.distance(t.depot,station.position)~=0 or station.side=='front' and t.depot.heading~=station.position.heading) then
+            err='registered supply station requires a matching worker depot and supplyStationV1'
+          elseif not Coordination.canOfferSupply(app.state,j) then
             -- Resend a prior grant without moving shared inventory. Its worker
             -- must be able to drain staging and release the production barrier.
             if staged and staged.jobId==j.supplyId and staged.owner==j.workerId and staged.offered and not staged.intent then n=staged.amount
             else err='supply waits for the active factory operation' end
-          else n,err=self.supply:offer(j.supplyId,j.workerId,j.missingItem,math.min(config.supply.batch,j.missingCount or config.supply.batch)) end
-          if n and n>0 then send(j.workerId,'task_supply',{jobId=j.id,supplyId=j.supplyId,item=j.missingItem,count=n})
+          else n,err,needsStock=self.supply:offer(j.supplyId,j.workerId,j.missingItem,math.min(config.supply.batch,j.missingCount or config.supply.batch)) end
+          if n and n>0 then send(j.workerId,'task_supply',{jobId=j.id,supplyId=j.supplyId,item=j.missingItem,count=n,station=station.workerId and station or nil})
           else
             j.supplyError=err
             -- A failed initial offer can claim an empty chest before discovering
@@ -160,10 +165,13 @@ function M.new(app,config,e,network,clock)
             -- free stage so production can obtain stock for this same batch ID.
             local unoffered=queue.state.supply
             if unoffered and not unoffered.offered and not unoffered.intent and (unoffered.staged or 0)==0 then
-              local ok,items=pcall(e.peripheral.call,config.supply.inventory,'list')
+              local destination=(unoffered.station or require('autobuilder.storage.supply').station(config,unoffered.owner)).inventory
+              local ok,items=pcall(e.peripheral.call,destination,'list')
               if ok and type(items)=='table' and not next(items) then queue.state.supply=nil; app:save() end
             end
-            production:request({[j.missingItem]=math.min(config.supply.batch,j.missingCount or config.supply.batch)},'supply:'..j.id..':'..j.missingItem,{stockOnly=j.stockOnly})
+            if needsStock then
+              production:request({[j.missingItem]=math.min(config.supply.batch,j.missingCount or config.supply.batch)},'supply:'..j.id..':'..j.missingItem,{stockOnly=j.stockOnly})
+            end
           end
         end
       end
