@@ -1130,3 +1130,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   confirmed nine stored cobblestone (eight mined plus one explicit preload), empty
   home cargo and1,846 finite fuel. Both computers are off and their eight test chunks
   are unloaded. See validation-0.25.0.md. Complete Lua gates remain running.
+
+- Started0.26 mission fuel planning in isolated `.worktrees/fuel-forecast`, based on
+  the0.25 native-evidence commit. The existing fuel-focused baseline passes. Design
+  and Tasks53–55 extend shared bounded-excursion budgets, validated telemetry,
+  proactive station targets and final dispatch admission. No0.26 implementation
+  is claimed yet.0.24 native and0.24/0.25 complete Lua gates continue independently.
