@@ -1,9 +1,13 @@
-# Autobuilder 0.18.0
+# Autobuilder 0.19.0
 
 Development direction: [full fleet requirements](docs/fleet-requirements.md) and
 [milestone 1 autonomous exploration design](docs/autonomous-mining-design.md).
 The full fleet roadmap remains in progress. The current release behavior is documented below.
 See the [0.12.0 acceptance report](docs/validation-0.12.0.md) for automated and live Minecraft results.
+
+**Managed hauling:** [register logistics nodes](docs/logistics.md) for automatic
+stock targets and reserved parallel couriers. `haul` requests a transfer and
+`logistics` reports physical receipts, ownership and shortages.
 
 **Loaded missions:** [configure chunk coverage](docs/chunk-loading.md) before dispatch.
 Use stationary Advanced Peripherals chunky turtles or explicitly assured loaded

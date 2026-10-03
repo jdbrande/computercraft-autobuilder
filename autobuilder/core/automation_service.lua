@@ -15,6 +15,10 @@ function M.new(app,config,e,network,clock)
   function self:command(line)
     local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
     if args[1]=='fuel' then app.state.view='fuel'; return true,fuel:describe()
+    elseif args[1]=='logistics' then app.state.view='logistics';return true,production.logistics:describe()
+    elseif args[1]=='haul' then
+      assert(#args==5,'Usage: haul <item> <count> <source-node> <destination-node>')
+      local r=production.logistics:request(args[2],tonumber(args[3]),args[4],args[5]);return true,r.id
     elseif args[1]=='factory' then app.state.view='factory'; return true,production.parallel:describe()
     elseif args[1]=='production' or args[1]=='8' then app.state.view='production'; return true,'Material team: different workers gather each missing resource'
     elseif args[1]=='resource' then
@@ -99,6 +103,7 @@ function M.new(app,config,e,network,clock)
       app.state.assignmentRecovery=nil; app:save()
     end
     if app.state.view=='fuel' then fuel:describe() end
+    if app.state.view=='logistics' then production.logistics:describe() end
     if app.state.view=='factory' then production.parallel:describe() end
     production:tick(); projects:tick(); infrastructure:tick(); cathedral:tick()
     production:syncClaims()

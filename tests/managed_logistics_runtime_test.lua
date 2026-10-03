@@ -91,3 +91,10 @@ test('real controller and two courier runtimes conserve finite stock through reb
   for _,lease in pairs(f.apps[7].state.capacityLedger.leases) do eq(lease.status,'released') end
   for _,lease in pairs(f.apps[7].state.chunkLedger.leases) do eq(lease.status,'released') end
 end)
+
+test('operator haul and logistics commands expose managed node progress',function()
+  local f=fixture();local app=f.apps[7]
+  local ok,why=app:command('haul minecraft:stone 8 base site');assert(ok,why)
+  eq(app.state.automation.hauls['haul:1'].quantity,8)
+  assert(app:command('logistics'));eq(app.state.view,'logistics');assert(app.state.logisticsLines[1]:find('nodes=2',1,true))
+end)

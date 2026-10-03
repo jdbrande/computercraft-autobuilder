@@ -155,3 +155,43 @@ test('fuel fill cannot consume source stock while a managed haul owns staged inv
   local fuel=require('autobuilder.core.fuel_service').new(f.app,f.config,f.e,f.queue,f.production,function() return f.now end)
   local before=f.transfers;fuel:step();eq(f.transfers,before)
 end)
+
+test('automatic node targets subtract inbound ownership across restart and stop when stock is satisfied',function()
+  local f=fixture();f.config.logistics.nodes[2].targets={[item]=16};f:step(25)
+  local jobs=f:jobs();eq(#jobs,2)
+  local requests=0;for _ in pairs(f.queue.state.hauls) do requests=requests+1 end;eq(requests,1)
+  f:boot(true);f:step(15);eq(#f:jobs(),2)
+  for _,j in ipairs(f:jobs()) do f:deliver(j) end;f:step(30)
+  eq(F.count(f.inventories.site,item),16);eq(F.count(f.inventories.base,item),8);eq(#f:jobs(),2)
+  eq(next(f.queue.state.requests),nil)
+end)
+
+test('automatic routing chooses nearest surplus and protects each source target',function()
+  local f=fixture();f.config.logistics.nodes[1].targets={[item]=24};f.config.logistics.nodes[2].targets={[item]=8}
+  f.config.storageInventories[3]='near';f.inventories.near={[1]={name=item,count=10}};f.inventories.nearBuffer={}
+  f.config.logistics.nodes[3]={id='near',inventory='near',position={x=10,y=0,z=0},buffers={{inventory='nearBuffer',position={x=12,y=1,z=0}}},targets={[item]=2}}
+  f:step(25);local j=assert(f:jobs()[1]);eq(j.logistics.source.id,'near');eq(j.quantity,8)
+  eq(F.count(f.inventories.base,item),24);eq(F.count(f.inventories.near,item),2)
+end)
+
+test('automatic shortages enter production once and wait for its durable completion before hauling',function()
+  local f=fixture();f.inventories.base[2]=nil;f.config.logistics.nodes[2].targets={[item]=8};f:step(5)
+  local r;local count=0;for _,request in pairs(f.queue.state.requests) do r=request;count=count+1 end
+  eq(count,1);eq(r.requirements[item],8);eq(#f:jobs(),0)
+  f:boot(true);f:step(10);count=0;for _ in pairs(f.queue.state.requests) do count=count+1 end;eq(count,1)
+  f.inventories.base[2]={name=item,count=8};f:step(10);eq(#f:jobs(),0)
+  f.queue.state.requests[r.id].status='completed';f:step(20);eq(#f:jobs(),1)
+  f:deliver(f:jobs()[1]);f:step(20);eq(F.count(f.inventories.site,item),8)
+end)
+
+test('courier registration order chooses its nearest private pickup instead of another parked worker stand',function()
+  local f=fixture();f.app.state.workers['12'].online=false
+  f.config.logistics.nodes[1].buffers[2].position={x=2,y=1,z=4}
+  f.config.logistics.nodes[2].buffers[2].position={x=22,y=1,z=4}
+  f.app.state.workers['13'].telemetry.position={x=2,y=1,z=4,known=true}
+  f.service:request(item,16,'base','site','nearest');f:step(12)
+  local first=f:jobs()[1];eq(first.preferredWorker,13);eq(first.logistics.pickup.inventory,'b')
+  eq(first.logistics.drop.inventory,'d') -- keep matching independent station lanes
+  f.app.state.workers['12'].online=true;f.app.state.workers['12'].telemetry.position={x=2,y=1,z=0,known=true}
+  f:step(12);local second=f:jobs()[2];eq(second.logistics.pickup.inventory,'a');eq(second.logistics.drop.inventory,'c')
+end)

@@ -22,7 +22,9 @@ work, and schedules finite batches until each target is satisfied. If registered
 stock is insufficient it uses the existing production request graph. Manual haul
 keeps its explicitly chosen source and reports shortages there.
 
-Each batch selects one exclusive empty source buffer and destination buffer,
+Each batch prefers the chosen worker’s nearest free pickup and its nearest free
+destination buffer, using independent station lanes where available. It owns one
+exclusive empty source buffer and destination buffer,
 reserves the exact source count and concrete final destination slots, then stages
 only its item into the pickup buffer. Turtle suction cannot select a mixed chest
 slot, so private staging is necessary. Several buffer pairs allow concurrent

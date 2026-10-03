@@ -7,6 +7,7 @@ function M.new(app,config,e,queue,production)
   local s=queue.state;s.hauls=s.hauls or {};s.haulSequence=s.haulSequence or 0
   local save=function() return app:save() end
   local capacity=require('autobuilder.storage.capacity').new(app.state,save)
+  s.logisticsProduction=s.logisticsProduction or {};s.logisticsStatus=s.logisticsStatus or {}
   local self={capacity=capacity,cursor=0}
   local function jobs(r)
     local out={};for _,j in pairs(s.jobs) do if j.haulRequest==r.id then out[#out+1]=j end end
@@ -40,8 +41,13 @@ function M.new(app,config,e,queue,production)
     if s.supply then return false,'waiting for builder supply collection' end
     return true
   end
-  local function availableBuffer(node)
-    for _,b in ipairs(node.buffers) do
+  local function availableBuffer(node,position)
+    local ordered=U.copy(node.buffers)
+    table.sort(ordered,function(a,b)
+      local da,db=U.distance(a.position,position),U.distance(b.position,position)
+      return da<db or da==db and a.inventory<b.inventory
+    end)
+    for _,b in ipairs(ordered) do
       local busy=false
       for _,j in pairs(s.jobs) do if j.logistics and j.status~='completed' then
         if j.logistics.pickup.inventory==b.inventory or j.logistics.drop.inventory==b.inventory then busy=true end
@@ -53,7 +59,7 @@ function M.new(app,config,e,queue,production)
     local ids={}
     for _,w in pairs(app.state.workers or {}) do
       local t=w.telemetry
-      if w.online and t and t.status=='idle' and not t.task and t.capabilities and t.capabilities.logisticsV1
+      if w.online and t and t.status=='idle' and not t.task and t.position and t.position.known and U.position(t.position) and t.capabilities and t.capabilities.logisticsV1
         and t.capabilities.courier and not Q.workerBusy(app.state,w.id) then ids[#ids+1]=w.id end
     end
     table.sort(ids);return ids[1]
@@ -77,7 +83,8 @@ function M.new(app,config,e,queue,production)
     local allowed,why=canRun();if not allowed then r.error=why;assert(save());return false end
     local owner=idleWorker();if not owner then r.error='waiting for an idle logisticsV1 courier';assert(save());return false end
     local from,to=Nodes.get(config,r.source),Nodes.get(config,r.destination)
-    local pickup,drop=availableBuffer(from),availableBuffer(to)
+    local pickup=availableBuffer(from,app.state.workers[tostring(owner)].telemetry.position)
+    local drop=pickup and availableBuffer(to,pickup.position)
     if not pickup or not drop then r.error='waiting for empty private logistics buffers';assert(save());return false end
     local n=math.min(config.logistics.batchSize,r.quantity-allocated,sourceCount(from,r.item))
     if n==0 then r.error='source stock missing: '..r.source..' '..r.item;assert(save());return false end
@@ -177,6 +184,63 @@ function M.new(app,config,e,queue,production)
     end
     F.commit(job,save,function() job.logisticsReady=true;job.status='queued';job.error=nil end);return 'ready'
   end
+  local function outstanding(node,item,inbound)
+    local n=0
+    for _,r in pairs(s.hauls) do
+      if r.status~='completed' and r.item==item and (inbound and r.destination or r.source)==node.id then
+        local moved=0
+        for _,j in ipairs(jobs(r)) do
+          local f=j.logisticsFlow
+          if f then moved=moved+(inbound and (f.collect.delivered or 0) or (f.stage.withdrawn or {})[item] or 0) end
+        end
+        n=n+r.quantity-moved
+      end
+    end
+    return n
+  end
+  local function restock()
+    local nodes=U.copy(config.logistics.nodes);table.sort(nodes,function(a,b) return a.id<b.id end)
+    for _,node in ipairs(nodes) do
+      local items={};for item in pairs(node.targets or {}) do items[#items+1]=item end;table.sort(items)
+      for _,item in ipairs(items) do
+        local _,physical=F.sources(e,{storageInventories={node.inventory}},item)
+        local need=node.targets[item]-physical-outstanding(node,item,true)
+        local key=node.id..':'..item
+        s.logisticsStatus[key]=nil
+        if need>0 then
+          local request=s.logisticsProduction[item] and s.requests[s.logisticsProduction[item]]
+          if request and request.status~='completed' then
+            s.logisticsStatus[key]='waiting for production '..request.id..': '..(request.error or request.status)
+          else
+            local candidates={}
+            for _,source in ipairs(nodes) do if source.id~=node.id then
+              local _,stock=F.sources(e,{storageInventories={source.inventory}},item)
+              local free=stock-((source.targets or {})[item] or 0)-outstanding(source,item,false)
+              if free>0 then candidates[#candidates+1]={node=source,count=free,distance=U.distance(source.position,node.position)} end
+            end end
+            table.sort(candidates,function(a,b) return a.distance<b.distance or a.distance==b.distance and a.node.id<b.node.id end)
+            if candidates[1] then
+              local source=candidates[1]
+              self:request(item,math.min(need,source.count),source.node.id,node.id,'restock:'..key..':'..(s.haulSequence+1))
+              return true
+            end
+            local transit=false
+            for _,r in pairs(s.hauls) do if r.item==item and r.status~='completed' then transit=true end end
+            if transit then s.logisticsStatus[key]='waiting for owned cargo to settle before forecasting shortage'
+            else
+              assert(app.mining:refresh())
+              local target=(app.mining.storage.counts[item] or 0)+need
+              assert(target<=1000000,'logistics production target exceeds finite request limit')
+              local r=production:request({[item]=target},'logistics-stock:'..item)
+              s.logisticsProduction[item]=r.id;s.logisticsStatus[key]='acquiring '..need..' '..item..' through '..r.id
+              assert(save());return true
+            end
+          end
+        end
+      end
+    end
+    return false
+  end
   function self:tick()
     for _,r in pairs(s.hauls) do if r.status~='completed' then
       local delivered=0;for _,j in ipairs(jobs(r)) do if j.status=='completed' then delivered=delivered+j.quantity end end
@@ -206,12 +270,20 @@ function M.new(app,config,e,queue,production)
       local ok,result=pcall(schedule,r)
       if not ok then r.error=tostring(result);assert(save()) elseif result then return true end
     end
+    local ok,result=pcall(restock)
+    if not ok then s.logisticsError=tostring(result);assert(save())
+    else s.logisticsError=nil;if result then return true end end
     return false
   end
   function self:describe()
     local lines={'LOGISTICS nodes='..#config.logistics.nodes}
+    if s.logisticsError then lines[#lines+1]=s.logisticsError end
+    for key,why in pairs(s.logisticsStatus) do lines[#lines+1]=key..' '..why end
     for _,r in pairs(s.hauls) do lines[#lines+1]=r.id..' '..r.status..' '..r.item..' '..(r.delivered or 0)..'/'..r.quantity..' '..(r.error or '') end
-    return table.concat(lines,'; ')
+    for _,j in pairs(s.jobs) do if j.logistics and j.status~='completed' then
+      lines[#lines+1]=j.id..' worker='..tostring(j.workerId or j.preferredWorker)..' '..j.status..' '..(j.error or j.coverageError or '')
+    end end
+    app.state.logisticsLines=lines;return table.concat(lines,'; ')
   end
   return self
 end

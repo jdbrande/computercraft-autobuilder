@@ -332,3 +332,18 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   recovery with finite fuel. Regression fixes also cover coverage of registered
   remote stock and shared legacy/fuel consumer isolation. Native acceptance and
   automatic restocking remain Task31.
+
+- Task31 restocking simulations pass: desired stock subtracts inbound commitments,
+  protects source targets, ranks sources and requests production once across restart.
+  Native150–152 initial trial exposed pickup selection sending a courier toward
+  another parked worker. A RED→GREEN regression now chooses nearest free pickup
+  and drop buffers. The staged rig was reset with independent lanes; retest running.
+
+- Task31 native acceptance: one automatic48-stone restock, six8-item batches,
+  two concurrent couriers, controller and settled-action worker restart, and
+  disconnected destination collection/reconnect. Independent world reads:16 stone
+  plus7 dirt at source,48 stone at destination, all buffers/turtles empty, finite
+  fuel1748/1892. All count/capacity/chunk leases released; no extra work.
+  Native fixture setup corrections and interrupted-move limitation are recorded in
+  [0.19 acceptance](validation-0.19.0.md). Pre-review gate557 Lua/18 Python and
+  release/diff checks passed; final whole-branch review follows.

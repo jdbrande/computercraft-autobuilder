@@ -1,4 +1,72 @@
-# Supply and transport
+# Managed physical logistics
+
+A controller can keep registered destination nodes stocked automatically, or accept
+an explicit `haul minecraft:stone 32 base site`. `logistics` displays requests,
+worker ownership, shortages and errors. Each node's wired stock inventory belongs
+to the central storage view. Couriers physically move items between private buffers;
+this requires wired observation/staging access to both nodes.
+
+Controller settings example (coordinates name your actual containers and stands):
+
+```lua
+storageInventories={'minecraft:chest_1','minecraft:chest_2'},
+logistics={batchSize=64,nodes={
+  {id='base',inventory='minecraft:chest_1',position={x=0,y=64,z=0},
+    buffers={{inventory='minecraft:chest_3',position={x=4,y=65,z=0}},
+             {inventory='minecraft:chest_4',position={x=4,y=65,z=4}}}},
+  {id='site',inventory='minecraft:chest_2',position={x=32,y=64,z=0},
+    buffers={{inventory='minecraft:chest_5',position={x=36,y=65,z=0}},
+             {inventory='minecraft:chest_6',position={x=36,y=65,z=4}}},
+    targets={['minecraft:stone']=48}}
+}}
+```
+
+Stock coordinates identify the stock container. Each buffer coordinate is the
+**turtle stand immediately above its chest/barrel**, not the container itself.
+Private buffers must start empty, belong to the same wired network as the controller,
+and stay outside storageInventories. They cannot double as fuel, supply or factory
+inventories. Register actual positions; a wired peripheral name does not reveal them.
+Node containers, buffer chests, stands and overhead access are protected from mining.
+Protect connecting cables and other infrastructure with restrictedAreas.
+
+Workers need `automation={courier=true}`, known poses, a configured depot, finite
+fuel sufficient for the trip, wireless communication and loaded terrain. Updated
+workers advertise logisticsV1 automatically. Configure actual loaded-area assurances
+or stationary chunky anchors as described in [chunk loading](chunk-loading.md).
+Loading envelopes include registered stock containers as well as courier routes.
+
+Use multiple buffer pairs and independent travel lanes for parallel haulers. Pickup
+selection prefers the chosen worker's nearest free buffer; drop selection prefers
+its nearest free destination buffer. Overlapping narrow corridors still use cell
+reservations; automatic resolution of every fleet deadlock remains later traffic work.
+
+Automatic targets subtract inbound committed cargo and preserve each source's own
+target stock. Sources rank by distance, then node ID. A missing item creates a normal
+production request. Existing hauls settle before another shortage forecast for that
+item, and produced stock waits for the production request's durable completion.
+Manual hauls keep their selected source and report its shortage rather than silently
+changing nodes. Batches shrink to measured stack and concrete destination capacity.
+
+A batch reserves source quantities, both private buffers and final destination slots
+before staging or travel. Shared legacy consumers and fuel staging wait while those
+stocks are owned. Several couriers can operate concurrently on independent private
+buffers. A worker's final drop enters collecting; the controller measures transfer
+into final stock before releasing count, capacity, worker and loading ownership.
+
+Restarts and duplicate messages preserve cumulative receipts. A full destination
+buffer retries at heartbeat intervals. Disconnected wired collection retries when
+it becomes accessible again. Foreign contents or ambiguous journal deltas retain
+ownership and report an error; never clear journals to make them disappear. Offline
+workers keep their claims. Active endpoint coordinates/names cannot be changed or
+removed through configuration, though target quantities may be adjusted.
+
+Limits:64 nodes,8 buffers per node,64 target item types per node, targets1..1000000,
+and batches1..64 further bounded by native stack/capacity measurements. Aggregate
+production requests above1000000 report a finite-request error. Shared inventory
+isolation still limits cross-role throughput. Broader project supply forecasting,
+worker scaling, global traffic recovery and final home return remain required work.
+
+## Existing builder supply and legacy transport
 
 Configure a dedicated wired staging inventory and its Turtle-facing side:
 
@@ -12,7 +80,7 @@ supply. Storage names come from `storageInventories`; the staging inventory is n
 used as its own source. `turtleFuelReserveItems` remains in storage, including when
 coal is requested as a construction or crafting material.
 
-## Controller staging
+### Controller staging
 
 `Supply.new(queue.state, config, environment, save)` uses `environment.peripheral`.
 `offer(batchId, owner, item, count)` returns the granted count or nil/error. A grant is
@@ -37,7 +105,7 @@ The worker persists pending receipts outside its current task and retries after 
 reboot or task completion until acknowledged. A receipt ID persisted before pulling
 closes the crash window between final transfer accounting and receipt promotion.
 
-## Worker resupply
+### Worker resupply
 
 `Resupply.new(task, environment, config, navigation, save):step()` returns true only
 when resupply is complete. Otherwise it returns false/error. `resupply in progress`
@@ -64,7 +132,7 @@ selected-slot increase and rejects changes to other slots or an unexpected item.
 Foreign material is retained with its unresolved intent for inspection. No items
 are dropped into the world.
 
-## Courier jobs
+### Legacy courier jobs
 
 `Courier.new(task, environment, config, navigation, save)` exposes `step()` and
 `resume()`. A job supplies `source`, `destination`, `item`, and positive `quantity`.
@@ -90,6 +158,6 @@ partial transfers, fuel reserves, interrupted hardware calls, duplicate grants,
 reservation waits, foreign cargo, full inventories/chests, multiple trips and resume.
 `tests/logistics_runtime_test.lua` also drives real controller/worker runtimes through
 build shortages, wired staging, movement reservations, placement, courier commands,
-reboots, duplicate grants and lost receipt acknowledgments. A live Minecraft
-acceptance run is still needed for peripheral naming, chunk loading
-and server protection behavior.
+reboots, duplicate grants and lost receipt acknowledgments. The0.12 native construction acceptance covers builder resupply; the0.19
+acceptance exercises the managed node routing described above. Server protection
+plugins beyond this local instance remain environment-specific.
