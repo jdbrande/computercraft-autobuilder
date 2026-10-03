@@ -54,6 +54,23 @@ function M.new(app,config,e,queue)
   end
   local function acquire(r,item,target)
     local material=progress(r,item,target); local count=material.count
+    r.acquisitions=r.acquisitions or {}
+    local groupId=r.acquisitions[item]
+    local legacy=r.mines[item] and app.state.jobs[r.mines[item]]
+    if Materials.get(item) and (groupId or (config.exploration or {}).enabled) and not (legacy and legacy.status~='completed') and (groupId or count<target) then
+      local group=groupId and app.state.exploration.groups[groupId]
+      if not group then
+        local why; group,why=app.mining.jobs:requestAcquisition(item,target,count,r.id..':'..item)
+        if not group then return blocked(material,why) end
+        r.acquisitions[item]=group.id; save()
+      end
+      group=app.mining.jobs:refreshAcquisition(group.id,count)
+      material.groupId=group.id; material.status=group.status; material.workers={}
+      for _,id in ipairs(group.tripIds) do local j=app.state.jobs[id]; if j and j.workerId and not j.physicalComplete then material.workers[#material.workers+1]=j.workerId end end
+      if group.status=='completed' then material.status='ready'; return true end
+      if not hasWorker('explorationV1',item) then return blocked(material,'No online exploration-capable worker for '..item) end
+      material.error=group.error; return false
+    end
     if count>=target then material.status='ready'; return true end
     if Materials.get(item) then
       local id=r.mines[item]; local existing=id and app.state.jobs[id]

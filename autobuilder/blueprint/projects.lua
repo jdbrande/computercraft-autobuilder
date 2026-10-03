@@ -2,6 +2,7 @@ local U=require('autobuilder.core.util')
 local Hash=require('autobuilder.install.sha256')
 local IO=require('autobuilder.install.io')
 local Cooperate=require('autobuilder.core.cooperate')
+local E=require('autobuilder.resources.exploration')
 local M={}
 function M.new(app,config,e,queue,production)
   local s=queue.state; local cache={}; local self={}
@@ -36,6 +37,13 @@ function M.new(app,config,e,queue,production)
       if index>1 then r.dependencies={regions[index-1].id} end
     end
     return regions
+  end
+  if (config.exploration or {}).enabled then
+    local changed=false
+    for _,p in pairs(s.projects) do
+      if not p.protectedBounds then p.protectedBounds=E.projectBounds(p.transform,data(p).size); changed=true end
+    end
+    if changed then assert(save()) end
   end
   local function analysis(p,verifySource)
     -- Commands recheck the immutable import even when its derived arrays are cached.
@@ -79,6 +87,7 @@ function M.new(app,config,e,queue,production)
   local function pauseProduction(p,paused)
     local r=p.requestId and s.requests[p.requestId]; if not r then return end
     r.paused=paused
+    for _,id in pairs(r.acquisitions or {}) do app.mining.jobs:setAcquisitionPaused(id,paused) end
     for _,id in pairs(r.mines or {}) do
       local j=(app.state.jobs or {})[id]
       -- Assigned miners return safely; pause prevents claiming a new tunnel.
@@ -100,11 +109,14 @@ function M.new(app,config,e,queue,production)
       local source,err=require('autobuilder.blueprint.schematic').load(e.fs,e.textutils,name); assert(source,err)
       local title=args[4] or name:match('([^/]+)%.json$'); assert(title and title:match('^[%w_-]+$') and #title<=64,'Invalid project name')
       assert(not s.projects[title],'Project exists; import under a new name')
+      local transform=importTransform and require('autobuilder.config').load({build=importTransform}).build or config.build
+      local protection=E.projectBounds(transform,source.size)
+      assert(not E.conflicts(app.state,protection),'Project conflicts with owned exploration territory; wait for miners to return')
       local raw=IO.read(e.fs,name); local path=config.blueprintDir..'/'..title..'.json'
       if e.fs.exists(path) then assert(IO.read(e.fs,path)==raw,'Blueprint destination already exists with different content')
       else IO.write(e.fs,path..'.tmp',raw); e.fs.move(path..'.tmp',path) end
       local transform=importTransform and require('autobuilder.config').load({build=importTransform}).build or config.build
-      local p={name=title,path=path,hash=Hash.digest(raw),phase='imported',transform=U.copy(transform),jobs={},regionJobs={},generation=0}
+      local p={protectedBounds=protection,name=title,path=path,hash=Hash.digest(raw),phase='imported',transform=U.copy(transform),jobs={},regionJobs={},generation=0}
       s.projects[title]=p; s.currentProject=title; save(); return true,'Imported '..title
     end
     local p=project(name); s.currentProject=p.name

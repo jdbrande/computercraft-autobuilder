@@ -247,3 +247,11 @@ test('cathedral real runtimes prepare stocked materials build verify retire and 
   package.loaded['autobuilder.blueprint.catalog']=prior
   assert(ok,err)
 end)
+test('project import refuses a volume occupied by an exploration claim',function()
+  local _,ce,_,c=fixture()
+  c.state.jobs.claim={id='claim',type='MINE',workerId=99,status='running',exploration={bounds={min={x=2,y=0,z=0},max={x=3,y=2,z=1}},route={}}}
+  local ok,err=c:command('build import /example.json conflict'); assert(not ok,'import must reject owned excavation'); assert(tostring(err):find('exploration'))
+  eq(c.state.automation.projects.conflict,nil)
+  c.state.jobs.claim.physicalComplete=true
+  assert(c:command('build import /example.json safe')); assert(c.state.automation.projects.safe.protectedBounds)
+end)

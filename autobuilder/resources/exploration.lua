@@ -171,11 +171,35 @@ function M.record(records,trip,report)
 end
 function M.protectedAreas(state,config)
   local boxes=U.copy(config.restrictedAreas or {})
+  for _,p in pairs((state.automation or {}).projects or {}) do
+    if p.protectedBounds then boxes[#boxes+1]=U.copy(p.protectedBounds)
+    elseif config.exploration.enabled then error('exploration requires project protection migration') end
+  end
+  if config.depot then boxes[#boxes+1]={min={x=config.depot.x,y=config.depot.y-1,z=config.depot.z},max={x=config.depot.x,y=config.depot.y+2,z=config.depot.z}} end
   if M.box(config.exploration.baseProtection) then boxes[#boxes+1]=U.copy(config.exploration.baseProtection) end
   for _,w in pairs(state.workers or {}) do
     local h=w.telemetry and w.telemetry.explorationHome
     if h then for _,b in ipairs(h.protectedAreas) do boxes[#boxes+1]=U.copy(b) end end
   end
   return boxes
+end
+function M.projectBounds(transform,size)
+  local x,z=size.x,size.z
+  if transform.rotation==90 or transform.rotation==270 then x,z=z,x end
+  local o=transform.origin
+  return {min={x=o.x,y=o.y,z=o.z},max={x=o.x+x-1,y=o.y+size.y+1,z=o.z+z-1}}
+end
+function M.conflicts(state,box)
+  for _,j in pairs(state.jobs or {}) do
+    if j.workerId and not j.physicalComplete and j.status~='completed' then
+      local g=j.exploration
+      if g then
+        if M.overlaps(box,g.bounds) then return true end
+        for _,p in ipairs(g.route) do if P.inside(p,box) then return true end end
+        for _,p in ipairs(g.exitRoute or {}) do if P.inside(p,box) then return true end end
+      end
+    end
+  end
+  return false
 end
 return M
