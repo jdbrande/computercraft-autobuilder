@@ -1,6 +1,11 @@
 # Autonomous material gathering for schematic builds
 
-Status: detailed design for review, 2026-10-02. Implementation has not started.
+Status: milestone 1 design, confirmed by the supplied fleet requirements on
+2026-10-02. Implementation has not started.
+
+The [fleet requirements](fleet-requirements.md) define the complete product and
+milestone order. This document specifies autonomous exploration, the first
+milestone requested in sections 41 and 42 of those requirements.
 
 ## Outcome and scope
 
@@ -15,6 +20,14 @@ supported schematics. It includes several miners sharing a request for the same
 material. Parallel crafting, wild tree harvesting, broader placement support, and
 large fleet throughput improvements are subsequent work. Existing managed farms
 and manually stocked items remain valid sources for non-mining ingredients.
+
+The final fleet must run acquisition, processing, crafting, transport and building
+concurrently wherever dependencies permit. Keeping the current factory/storage
+barrier in this milestone is a temporary compatibility constraint. Later inventory
+reservations and production work will replace that barrier; it is not the target
+fleet architecture. Automatic fuel distribution, rescue, broader harvesting,
+capability negotiation and supported chunk-loading integration remain required
+parts of the full product, in the user's stated milestone order.
 
 Acceptance requires a small schematic to reach verified completion after at least
 two miners discover and supply its ingredients without configured deposit
@@ -38,6 +51,13 @@ or every resource can be completed unattended.
 
 The design extends these components rather than introducing another scheduler,
 database, network library, or generic agent framework.
+
+Keep the boundary resource request -> provider -> physical job. Record
+`provider='exploration'` on the new acquisition group. Reuse capability-based
+assignment and the existing job/worker identifiers; do not permanently bind a
+turtle to the miner role or implement a speculative provider framework now.
+The existing recipe planner, furnace pool, farms, builder regions and verification
+are starting points for later milestones, not systems to discard and recreate.
 
 ## Approach
 

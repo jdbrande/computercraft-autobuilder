@@ -1,5 +1,9 @@
 # Autobuilder 0.11.0
 
+Development direction: [full fleet requirements](docs/fleet-requirements.md) and
+[milestone 1 autonomous exploration design](docs/autonomous-mining-design.md).
+These describe planned work; the current release behavior is documented below.
+
 **Automatic materials and multiple miners:** [follow this guide](docs/material-team.md).
 Use `setup miner stone,coal`, `setup miner sand`, and other resource profiles on
 different turtles. `build auto NAME` gathers, crafts/smelts, builds and verifies.
