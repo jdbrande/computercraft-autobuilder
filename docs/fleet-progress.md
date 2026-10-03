@@ -15,8 +15,8 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Capacity/parallel factory integrated and pushed at `345b833`.
 - Native schematic support integrated/pushed at `9a27b1b`:508 Lua/18 Python tests,
   both native construction trials and review correction passed.
-- Current branch: `milestone/0.18.0`. Task26: explicit loaded-area coverage and
-  stationary chunky-turtle provider claims; queue/movement enforcement follows.
+- Current branch: `milestone/0.18.0`. Task27: queue/movement coverage enforcement;
+  final suite and native chunky-turtle acceptance follow.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -293,3 +293,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Task26: six coverage geometry/provider/checkpoint regressions failed then passed;
   full514 Lua tests passed. Strict policy, actual chunky detection, bounded chunk
   envelopes and durable provider claims are ready for dispatch integration.
+
+- Task27: dispatch, movement, telemetry and immutable grants pass12 focused runtime
+  regressions. Full525 Lua tests passed before the final opt-out regression/fix;
+ 18 Python tests passed. The final full suite includes that additional case.
+  Existing hardware simulations explicitly declare their loaded terrain. Failed
+  queue checkpoints roll back ownership and geometry; physical recovery keeps its
+  owner and requires assured coverage before a missing historical grant can move.

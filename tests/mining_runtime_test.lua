@@ -22,7 +22,7 @@ local function fixture()
     getType=function(name) if name=='right' then return 'modem' elseif equipped then return 'geoScanner' end end,
     call=function(name,method,arg) if name=='right' then return true end; return w.peripheral.call(name,method,arg) end}
   we.gps={locate=function() return w.pose.x,w.pose.y,w.pose.z end}
-  local C=require('autobuilder.config')
+  local C=require('tests.loaded_config')
   local cc=C.load({role='controller',storageInventories={'chest_0'}})
   local wc=C.load({role='worker',controllerId=7,initialPosition=U.copy(w.pose),depot={x=0,y=0,z=0},minimumFuelReserve=5,
     mining={enabled=true,entry={x=1,y=0,z=0},bounds={min={x=1,y=-1,z=-2},max={x=8,y=1,z=2}},fuelTarget=100}})

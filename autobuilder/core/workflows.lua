@@ -13,6 +13,7 @@ end
 local storageWorkers={HARVEST=true,FARM=true,TRANSPORT=true,REFUEL=true}
 local function factory(job) return job.type=='SMELT' or job.type=='CRAFT' end
 function M.workerBusy(state,owner,exceptId)
+  if require('autobuilder.core.chunks').holdsAnchor(state,owner) then return true end
   for _,job in pairs(state.jobs or {}) do
     if job.id~=exceptId and job.workerId==owner and job.status~='completed' and not job.physicalComplete then return true end
   end
@@ -72,7 +73,7 @@ function M.factoryCanRun(state,job,preparing)
   end
   return true
 end
-function M.new(state,save,clock,id)
+function M.new(state,save,clock,id,chunks)
   state.automation=state.automation or {jobs={},sequence=0,requests={},projects={},cells={}}
   local s=state.automation; s.cells=s.cells or {}; local self={state=s}
   local function persist() local ok,err=save(); assert(ok,err) end
@@ -117,7 +118,15 @@ function M.new(state,save,clock,id)
               and not M.workerBusy(state,w.id,j.id) then ids[#ids+1]=tonumber(wid) end
           end
           table.sort(ids)
-          if ids[1] then j.workerId=ids[1]; j.status='assigned'; persist(); return j end
+          for _,wid in ipairs(ids) do
+            local lease,why
+            if chunks then lease,why=chunks:reserve(j,workers[tostring(wid)],true) else lease={status='disabled'} end
+            j.coverageError=why
+            if lease then
+              if lease.status=='disabled' then j.workerId=wid;j.status='assigned';persist() end
+              return j
+            end
+          end
         end
       end
     end
@@ -127,7 +136,11 @@ function M.new(state,save,clock,id)
     for _,j in ipairs(ordered) do
       local w=j.workerId and workers[tostring(j.workerId)]; local t=w and w.telemetry
       if j.status=='assigned' and not j.paused and w and w.online and t and (not t.task or t.task==j.id)
-        and not M.workerBusy(state,j.workerId,j.id) then pending[#pending+1]=j end
+        and not M.workerBusy(state,j.workerId,j.id) then
+          local lease,why=true
+          if chunks then lease,why=chunks:reserve(j,w) end
+          j.coverageError=why;if lease then pending[#pending+1]=j end
+        end
     end
     if #pending>0 then resendCursor=resendCursor%#pending+1; return pending[resendCursor] end
   end
@@ -147,6 +160,7 @@ function M.new(state,save,clock,id)
   function self:reserve(owner,jobId,from,target,workers)
     local j=s.jobs[jobId] or (state.jobs or {})[jobId]
     if not j or j.workerId~=owner or j.status=='completed' then return false,'reservation requires active task ownership' end
+    if chunks then local ok,why=chunks:allows(j,from,target);if not ok then return false,why end end
     if U.distance(from,target)>1 then return false,'reservation requires adjacent position' end
     local occupied=s.cells[key(target)]
     if occupied and occupied.owner~=owner then return false,'position reserved by worker '..occupied.owner end

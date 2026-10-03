@@ -276,6 +276,7 @@ function M.new(app,config,e,queue,production)
     for id,j in pairs(s.jobs) do
       if not remove[id] then for _,dep in ipairs(j.dependencies or {}) do if remove[dep] then return false,'Another job still depends on this batch' end end end
     end
+    if app.chunks then app.chunks:reconcile() end
     for id in pairs(remove) do s.jobs[id]=nil end
     for id in pairs(requests) do s.requests[id]=nil end
     s.projects[name]=nil; cache[name]=nil

@@ -83,7 +83,7 @@ local function fixture(furnaceCount)
   end
   function h:count(item) local n=0; for _,stack in pairs(self.inventories.store) do if stack.name==item then n=n+stack.count end end; return n end
   local ce,we=environment(7),environment(12); ce.peripheral=peripheral; we.peripheral=peripheral; we.turtle=turtle
-  local C=require('autobuilder.config')
+  local C=require('tests.loaded_config')
   local settings={storageInventories={'store'},furnaces=U.copy(h.furnaces),turtleFuelReserveItems={[mc('coal')]=2},
     craftingStation={input='input',output='output',inputSide='up',outputSide='down'},
     heartbeatInterval=1,registrationInterval=3,workerTimeout=8}
@@ -331,7 +331,7 @@ test('native runtime protocol refuels an empty turtle through a claimed station 
     item.count=item.count-used; if item.count==0 then h.slots[h.selected]=nil end
     return true
   end
-  local C=require('autobuilder.config')
+  local C=require('tests.loaded_config')
   f.cc.fuel={enabled=true,low=80,target=160,stations={{id='home',workerId=12,inventory='fuel',position={x=0,y=64,z=0},targetItems=2}}}
   f.wc.fuel={enabled=true,low=80,target=160}; f.wc.depot={x=0,y=64,z=0}
   f.cc=C.load(f.cc); f.wc=C.load(f.wc)
@@ -366,7 +366,7 @@ local function stationRefuelRegression(target,stock)
     item.count=item.count-used; if item.count==0 then h.slots[h.selected]=nil end
     return true
   end
-  local C=require('autobuilder.config')
+  local C=require('tests.loaded_config')
   f.cc.fuel={enabled=true,low=80,target=target,stations={{id='home',workerId=12,inventory='fuel',position={x=0,y=64,z=0},targetItems=stock}}}
   f.wc.fuel={enabled=true,low=80,target=target}; f.wc.depot={x=0,y=64,z=0}
   f.cc=C.load(f.cc); f.wc=C.load(f.wc)
@@ -460,7 +460,7 @@ test('fleet runtime rescues a stranded worker and resumes its original task acro
   local call=f.we.peripheral.call; local getType=f.we.peripheral.getType
   f.we.peripheral.getType=function(name) return name=='bottom' and 'turtle' or getType(name) end
   f.we.peripheral.call=function(name,method,...) if name=='bottom' and method=='getID' then return 13 end; return call(name,method,...) end
-  local C=require('autobuilder.config')
+  local C=require('tests.loaded_config')
   f.cc.fuel={enabled=true,low=80,target=160,stations={{id='courier',workerId=12,inventory='fuel',position={x=0,y=64,z=0},targetItems=2}}}
   f.wc.fuel={enabled=true,low=80,target=160}; f.wc.depot={x=0,y=64,z=0}; f.wc.automation.courier=true
   local vc=C.load({role='worker',controllerId=7,initialPosition={x=5,y=64,z=0,heading='north'},depot={x=5,y=64,z=3},
@@ -502,7 +502,7 @@ end)
 
 test('private Crafty worker only consumes and produces in its configured buffer across reboot',function()
   local f=fixture(); local h=f.h; h.inventories.buffer={[1]={name=mc('stone'),count=4}}
-  f.wc.craftingStation.buffer='buffer'; f.wc.turtleFuelReserveItems[mc('stone')]=4; f.wc=require('autobuilder.config').load(f.wc)
+  f.wc.craftingStation.buffer='buffer'; f.wc.turtleFuelReserveItems[mc('stone')]=4; f.wc=require('tests.loaded_config').load(f.wc)
   f.w=Runtime.new(f.wc,f.we)
   local job={id='task:7:999',type='CRAFT',item=mc('stone_bricks'),quantity=4,batches=1,workerId=12,preferredWorker=12,
     privateStation={id='west',workerId=12,buffer='buffer',input='input',output='output'}}
@@ -547,7 +547,7 @@ local function parallelFixture()
   f.wc.craftingStation.buffer='buffer'; f.wc.turtleFuelReserveItems={}
   second.wc.craftingStation={buffer='buffer2',input='input2',output='output2',inputSide='up',outputSide='down'}
   second.wc.turtleFuelReserveItems={}
-  local C=require('autobuilder.config'); f.cc=C.load(f.cc); f.wc=C.load(f.wc); second.wc=C.load(second.wc)
+  local C=require('tests.loaded_config'); f.cc=C.load(f.cc); f.wc=C.load(f.wc); second.wc=C.load(second.wc)
   f.c=Runtime.new(f.cc,f.ce); f.w=Runtime.new(f.wc,f.we); second.w=Runtime.new(second.wc,second.we)
   f.maxConcurrent=0; f.droppedAcks=0
   function f:pumpAll(env)
@@ -714,7 +714,7 @@ test('reboot refuses to reclassify an owned private station as shared inventory'
     elseif field=='supply' then changed.supply.inventory='buffer'
     elseif field=='legacy' then changed.craftingStation.input='buffer'
     else changed.craftingStations[1].buffer='buffer' end
-    local ok,why=pcall(Runtime.new,require('autobuilder.config').load(changed),f.ce)
+    local ok,why=pcall(Runtime.new,require('tests.loaded_config').load(changed),f.ce)
     assert(not ok and tostring(why):find('owned private',1,true),'accepted conflicting '..field..': '..tostring(why))
     eq(f.h.transfers,before); eq(f.h.inventories.buffer[1].count,8)
   end

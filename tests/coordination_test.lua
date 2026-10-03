@@ -75,7 +75,7 @@ end
 local function runtime()
   local h={inventories={store={[1]={name=mc('stone'),count=4},[2]={name=mc('cobblestone'),count=8},[3]={name=mc('coal'),count=4}},stage={},furnace={}},transfers=0}
   local ce=environment(7,h); local we=environment(12,h)
-  local C=require('autobuilder.config'); local R=require('autobuilder.core.runtime')
+  local C=require('tests.loaded_config'); local R=require('autobuilder.core.runtime')
   local cc=C.load({role='controller',storageInventories={'store'},furnaces={'furnace'},turtleFuelReserveItems={},
     supply={inventory='stage'},heartbeatInterval=1,registrationInterval=3,workerTimeout=8})
   local wc=C.load({role='worker',controllerId=7,initialPosition={x=0,y=64,z=0,heading='north'},depot={x=0,y=64,z=0},

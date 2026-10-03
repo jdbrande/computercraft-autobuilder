@@ -6,6 +6,10 @@ function M.validArea(a)
   return type(a)=='table' and coordinate(a.minX) and coordinate(a.maxX) and coordinate(a.minZ) and coordinate(a.maxZ)
     and a.minX<=a.maxX and a.minZ<=a.maxZ
 end
+function M.validGrant(a)
+  return M.validArea(a) and (a.maxX-a.minX+1)*(a.maxZ-a.minZ+1)<=M.MAX_CHUNKS
+end
+function M.cleanArea(a) return a and {minX=a.minX,maxX=a.maxX,minZ=a.minZ,maxZ=a.maxZ} end
 function M.contains(a,p)
   if not M.validArea(a) or not U.position(p) then return false end
   local x,z=math.floor(p.x/16),math.floor(p.z/16)
@@ -63,6 +67,44 @@ function M.holdsAnchor(state,id)
   end
   return false
 end
+local function assured(config,area)
+  for x=area.minX,area.maxX do for z=area.minZ,area.maxZ do
+    local found=false
+    for _,a in ipairs(config.chunkLoading.areas) do if x>=a.minX and x<=a.maxX and z>=a.minZ and z<=a.maxZ then found=true;break end end
+    if not found then return false end
+  end end
+  return true
+end
+function M.workerAccept(config,state,job)
+  local c=config.chunkLoading
+  local old=state.currentTask
+  if old and not Equal(old.loadedArea,job.loadedArea) then return false,'changed loaded mission grant' end
+  if (not c or not c.enabled) and not job.loadedArea then return true end
+  if c and c.anchor then return false,'MISSION_BLOCKED_UNLOADED_AREA: stationary chunk anchor' end
+  if old then return old.id==job.id,'worker already has a task' end
+  local geometry=job
+  if job.type=='MINE' and not job.exploration and not job.miningArea then geometry=U.copy(job);geometry.miningArea=config.mining.bounds end
+  local a,why=M.area(geometry,{position=state.position,depot=config.depot});if not a then return false,why end
+  -- Legacy saved assignments can continue only with explicit local assurances.
+  if not job.loadedArea and assured(config,a) then return true end
+  if not M.validGrant(job.loadedArea) then return false,'MISSION_BLOCKED_UNLOADED_AREA: assignment needs loaded envelope' end
+  local g=job.loadedArea
+  if a.minX<g.minX or a.maxX>g.maxX or a.minZ<g.minZ or a.maxZ>g.maxZ then return false,'MISSION_BLOCKED_UNLOADED_AREA: assignment omits route or depot' end
+  return true
+end
+function M.guard(config,state,from,target)
+  local c=config.chunkLoading
+  local job=state.currentTask
+  if (not c or not c.enabled) and not (job and job.loadedArea) then return true end
+  if c and c.anchor then return false,'MISSION_BLOCKED_UNLOADED_AREA: stationary chunk anchor' end
+  local function covered(p)
+    if job and job.loadedArea then return M.validGrant(job.loadedArea) and M.contains(job.loadedArea,p) end
+    for _,a in ipairs(c.areas) do if M.contains(a,p) then return true end end
+    return false
+  end
+  if covered(from) and covered(target) then return true end
+  return false,'MISSION_BLOCKED_UNLOADED_AREA: chunk '..math.floor(target.x/16)..','..math.floor(target.z/16)
+end
 function M.new(state,config,save)
   state.chunkLedger=state.chunkLedger or {leases={}};local s=state.chunkLedger
   local self={state=s}
@@ -84,7 +126,7 @@ function M.new(state,config,save)
     end
     if id then return {kind='anchor',workerId=id} end
   end
-  function self:reserve(job,worker)
+  function self:reserve(job,worker,assign)
     if not config.chunkLoading.enabled then return {status='disabled'} end
     assert(U.shortString(job.id,160),'invalid loaded mission ID')
     local old=s.leases[job.id];local t=worker.telemetry
@@ -104,9 +146,32 @@ function M.new(state,config,save)
     end end
     assert(not job.loadedArea or Equal(job.loadedArea,area),'changed loaded mission envelope')
     local lease={status='held',workerId=worker.id,area=area,providers=providers,origin={position=U.copy(t.position),depot=U.copy(t.depot)}}
-    local before=job.loadedArea
-    persist(function() s.leases[job.id]=lease;job.loadedArea=U.copy(area) end,function() s.leases[job.id]=nil;job.loadedArea=before end)
+    local before,owner,status=job.loadedArea,job.workerId,job.status
+    persist(function()
+      s.leases[job.id]=lease;job.loadedArea=U.copy(area)
+      if assign then job.workerId=worker.id;job.status='assigned' end
+    end,function() s.leases[job.id]=nil;job.loadedArea=before;job.workerId=owner;job.status=status end)
     return U.copy(lease)
+  end
+  function self:allows(job,from,target)
+    if not config.chunkLoading.enabled then return true end
+    local lease=s.leases[job.id]
+    if not lease then
+      -- Upgraded/backup jobs keep physical ownership. Only explicit assurances
+      -- can establish a missing historical coverage contract, never a heartbeat.
+      local w=(state.workers or {})[tostring(job.workerId)]
+      local a=w and M.area(job,w.telemetry)
+      if a and assured(config,a) then lease=self:reserve(job,w) end
+    end
+    if lease and lease.status=='held' and lease.workerId==job.workerId and Equal(lease.area,job.loadedArea)
+      and M.contains(lease.area,from) and M.contains(lease.area,target) then return true end
+    return false,'MISSION_BLOCKED_UNLOADED_AREA: movement outside held coverage'
+  end
+  function self:reconcile()
+    for id,lease in pairs(s.leases) do
+      local j=(state.jobs or {})[id] or ((state.automation or {}).jobs or {})[id]
+      if lease.status=='held' and j and (j.physicalComplete or j.status=='completed') then self:release(id) end
+    end
   end
   function self:release(id)
     local old=s.leases[id];if not old or old.status=='released' then return true end

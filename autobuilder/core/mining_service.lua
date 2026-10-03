@@ -19,7 +19,7 @@ function M.new(app,config,e,network,clock)
   end
   if s.role=='controller' then
     self.storage=require('autobuilder.storage.storage').new(e.peripheral,config.storageInventories)
-    self.jobs=require('autobuilder.core.jobs').new(s,save,clock,s.id,config)
+    self.jobs=require('autobuilder.core.jobs').new(s,save,clock,s.id,config,app.chunks)
     if (config.exploration or {}).enabled then
       local gridChanged=s.exploration.gridBase and not same(s.exploration.gridBase,config.exploration.base)
       local settingsChanged=s.exploration.settingsRevision~=nil and s.exploration.settingsRevision~=(config.exploration.revision or 0)
@@ -136,6 +136,7 @@ function M.new(app,config,e,network,clock)
         end
       end
       if count>0 or #stamped>0 then
+        if app.chunks then app.chunks:reconcile() end
         for id in pairs(removed) do s.jobs[id]=nil end
         local ok,err=save()
         if not ok then
@@ -168,7 +169,7 @@ function M.new(app,config,e,network,clock)
       local job=self.jobs:assign(s.workers,self.storage.counts)
       if job then
         lastSend=clock()
-        send(job.workerId,'mine_assign',{jobId=job.id,item=job.item,quantity=job.quantity,miningArea=job.miningArea,miningResources=job.miningResources,exploration=job.exploration,returnRequested=job.exploration and (s.exploration.paused or s.exploration.groups[job.exploration.groupId].paused or not (config.exploration or {}).enabled) or nil})
+        send(job.workerId,'mine_assign',{jobId=job.id,item=job.item,quantity=job.quantity,loadedArea=job.loadedArea,miningArea=job.miningArea,miningResources=job.miningResources,exploration=job.exploration,returnRequested=job.exploration and (s.exploration.paused or s.exploration.groups[job.exploration.groupId].paused or not (config.exploration or {}).enabled) or nil})
       end
       return true
     end
@@ -227,11 +228,13 @@ function M.new(app,config,e,network,clock)
           return send(sender,'mine_progress',{jobId=p.jobId,phase='completed',delivered=type(r)=='table' and r.delivered or r,held=0,exploration=type(r)=='table' and r.exploration or nil})
         end
         if require('autobuilder.core.receipts').archived(s,'completedMining',p.jobId) then return false,'Old acknowledged mine was archived; restore the matching controller checkpoint' end
+        local covered,why=require('autobuilder.core.chunks').workerAccept(config,s,{id=p.jobId,type='MINE',miningArea=p.miningArea,exploration=p.exploration,loadedArea=p.loadedArea})
+        if not covered then return false,why end
         if s.currentTask then
           if s.currentTask.id==p.jobId and s.currentTask.item==p.item and s.currentTask.quantity==p.quantity and same(s.currentTask.exploration,p.exploration) then return true end
           return false,'worker already owns a different task'
         end
-        s.currentTask={id=p.jobId,type='MINE',item=p.item,quantity=p.quantity,returnRequested=p.returnRequested,exploration=p.exploration and E.cleanGeometry(p.exploration),phase='setup',delivered=0,miningArea=U.copy(p.miningArea),miningResources=U.copy(p.miningResources or config.mining.resources or {})}
+        s.currentTask={loadedArea=U.copy(p.loadedArea),id=p.jobId,type='MINE',item=p.item,quantity=p.quantity,returnRequested=p.returnRequested,exploration=p.exploration and E.cleanGeometry(p.exploration),phase='setup',delivered=0,miningArea=U.copy(p.miningArea),miningResources=U.copy(p.miningResources or config.mining.resources or {})}
         s.status='setup'; local ok,err=save()
         if not ok then s.currentTask=nil; s.status='idle'; return false,err end
         return true

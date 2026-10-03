@@ -1,5 +1,5 @@
 local U=require('autobuilder.core.util')
-local C=require('autobuilder.config')
+local C=require('tests.loaded_config')
 local FuelService=require('autobuilder.core.fuel_service')
 local function mc(s) return 'minecraft:'..s end
 local function fixture(stock)

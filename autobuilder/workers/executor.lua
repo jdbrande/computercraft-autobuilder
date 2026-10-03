@@ -110,6 +110,7 @@ function M.new(app,config,e,network,clock)
       local j=p.job; local done=s.completedTasks[j.id]
       if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report}) end
       if require('autobuilder.core.receipts').archived(s,'completedTasks',j.id) then return false,'Old acknowledged task was archived; restore the matching controller checkpoint' end
+      local covered,why=require('autobuilder.core.chunks').workerAccept(config,s,j);if not covered then return false,why end
       if t then return t.id==j.id,'worker already has a task' end
       local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end

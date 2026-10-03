@@ -1,6 +1,6 @@
 local U=require('autobuilder.core.util')
 local M={}
-function M.new(state,config,network,turtle,save)
+function M.new(state,config,network,turtle,save,chunkProbe)
   local self={connected=false}; local lastRegister,lastHeartbeat,lastAck=-math.huge,-math.huge,-math.huge
   local pending={}
   state.status=state.status or 'idle'; state.position=state.position or {known=false}
@@ -10,15 +10,16 @@ function M.new(state,config,network,turtle,save)
     local p=state.position
     local capabilities=U.copy(config.capabilities or {telemetry=true})
     capabilities.fuelV1=config.fuel and config.fuel.enabled or false
+    capabilities.chunkCoverageV1=config.chunkLoading and config.chunkLoading.enabled==true or false
     local task=state.currentTask
     local need=config.fuel and config.fuel.enabled and task and not task.paused
       and require('autobuilder.workers.fuel_recovery').needsFuel(task)
       and math.max(config.fuel.target,config.mining.fuelTarget,task.requiredFuel or 0) or nil
     local limit=turtle.getFuelLimit and turtle.getFuelLimit() or nil
     if limit=='unlimited' then limit=nil end
-    return {fuelRequired=need,fuelLimit=limit,label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,
+    return {chunkAnchor=chunkProbe and chunkProbe() or nil,fuelRequired=need,fuelLimit=limit,label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,
       position={known=p.known==true,x=p.x,y=p.y,z=p.z,heading=p.heading,source=p.source or 'unknown'},
-      fuel=turtle.getFuelLevel(),depot=config.fuel and config.fuel.enabled and U.copy(config.depot) or nil,inventory={used=used,slots=16},
+      fuel=turtle.getFuelLevel(),depot=U.copy(config.depot),inventory={used=used,slots=16},
       miningResources=config.mining and config.mining.enabled and U.copy(config.mining.resources or {}) or nil,
       miningArea=config.mining and config.mining.enabled and U.copy(config.mining.bounds) or nil,
       explorationHome=config.capabilities and config.capabilities.explorationV1 and {depot=U.copy(config.depot),exitRoute=U.copy(config.mining.exitRoute),protectedAreas=U.copy(config.restrictedAreas)} or nil,

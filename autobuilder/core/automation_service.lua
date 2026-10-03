@@ -3,7 +3,7 @@ local Coordination=require('autobuilder.core.workflows')
 local M={}
 function M.new(app,config,e,network,clock)
   if config.role=='worker' then return require('autobuilder.workers.executor').new(app,config,e,network,clock) end
-  local queue=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,app.state.id)
+  local queue=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,app.state.id,app.chunks)
   local production=require('autobuilder.core.production_service').new(app,config,e,queue)
   local fuel=require('autobuilder.core.fuel_service').new(app,config,e,queue,production,clock)
   local rescue=require('autobuilder.core.fuel_rescue_service').new(app,config,e,queue,production,network,clock)

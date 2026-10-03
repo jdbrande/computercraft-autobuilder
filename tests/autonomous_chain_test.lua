@@ -3,7 +3,7 @@
 local U=require('autobuilder.core.util')
 local S=require('tests.support')
 local Runtime=require('autobuilder.core.runtime')
-local Config=require('autobuilder.config')
+local Config=require('tests.loaded_config')
 local function mc(name) return 'minecraft:'..name end
 local function fixture(options)
   options=options or {}

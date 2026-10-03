@@ -28,6 +28,7 @@ function M.validate(kind,p)
   if kind=='task_assign' then
     local j=p.job
     if type(j)~='table' or not U.shortString(j.id,100) or not M.types[j.type] then return false,'invalid task assignment' end
+    if j.loadedArea~=nil and not require('autobuilder.core.chunks').validGrant(j.loadedArea) then return false,'invalid loaded mission envelope' end
     if j.privateStation and (j.type~='CRAFT' or not require('autobuilder.factory.stations').valid(j.privateStation)
       or j.workerId~=j.privateStation.workerId or j.preferredWorker~=j.workerId) then return false,'invalid private crafting station' end
     if j.type=='RESCUE' and (not U.position(j.source) or not U.position(j.destination) or not U.position(j.home)

@@ -13,7 +13,7 @@ local function fixture(options)
     return e
   end
   local ce,we=env(7),env(12); we.turtle=w.turtle
-  local C=require('autobuilder.config'); local cc=C.load({storageInventories={'stock'},turtleFuelReserveItems={},clearSite=options.clearSite or false,build={enabled=true,origin={x=2,y=0,z=0},rotation=options.rotation or 0,mirrorX=options.mirrorX or false},autoDepotExpansion={enabled=options.expansion~=nil,freeSlots=0},depotExpansion=options.expansion or {}})
+  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},turtleFuelReserveItems={},clearSite=options.clearSite or false,build={enabled=true,origin={x=2,y=0,z=0},rotation=options.rotation or 0,mirrorX=options.mirrorX or false},autoDepotExpansion={enabled=options.expansion~=nil,freeSlots=0},depotExpansion=options.expansion or {}})
   local wc=C.load({role='worker',controllerId=7,automation={building=true},clearSite=options.clearSite or false,minimumFuelReserve=0,initialPosition=U.copy(w.pose)})
   local R=require('autobuilder.core.runtime'); local c,b=R.new(cc,ce),R.new(wc,we)
   local blueprint={schema=1,size={x=2,y=1,z=1},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=2}},metadata={},requirements={['minecraft:stone']=2}}

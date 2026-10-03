@@ -28,6 +28,7 @@ function M.new(turtle,pose,config,save)
     elseif action=='down' then target.y=target.y-1
     else local d=vectors[pose.heading]; local sign=action=='back' and -1 or 1; target.x=target.x+d[1]*sign; target.z=target.z+d[2]*sign end
     if not turn then
+      if self.coverageGuard then local ok,why=self.coverageGuard(pose,target); if not ok then return false,why end end
       local permitted,why=allowed(target); if not permitted then return false,why end
       local ok,fuel=pcall(turtle.getFuelLevel); if not ok then return false,'fuel query failed: '..tostring(fuel) end
       local home=config.depot; local distance=home and U.distance(target,home) or 0

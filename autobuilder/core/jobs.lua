@@ -3,7 +3,7 @@ local Materials=require('autobuilder.resources.materials')
 local Coordination=require('autobuilder.core.workflows')
 local E=require('autobuilder.resources.exploration')
 local M={}
-function M.new(state,save,clock,controllerId,config)
+function M.new(state,save,clock,controllerId,config,chunks)
   state.jobs=state.jobs or {}; state.jobSequence=state.jobSequence or 0
   local self={state=state}
   local function persist() local ok,err=save(); assert(ok,err) end
@@ -101,13 +101,27 @@ function M.new(state,save,clock,controllerId,config)
                 attempts=attempts+1; local sector=choices[ci]
                 local geometry,why=E.plan(sector,{config=config,depot=home.depot,exitRoute=home.exitRoute,protectedAreas=areas,activeJobs=state.jobs,availableFuel=t.fuel})
                 if geometry then
-                  planning[g.id]=nil
                   local j=create(g.item,math.min(64,math.ceil(remaining/math.max(1,eligible))),0); geometry.groupId=g.id
-                  j.exploration=geometry; j.workerId=wid; j.miningArea=U.copy(geometry.bounds); j.miningResources=U.copy(t.miningResources or {}); j.status='assigned'
-                  g.tripIds[#g.tripIds+1]=j.id; g.status='running'; g.error=nil
-                  local ok,err=save()
-                  if not ok then state.jobs[j.id]=nil; table.remove(g.tripIds); error(err) end
-                  return j
+                  j.exploration=geometry; j.miningArea=U.copy(geometry.bounds); j.miningResources=U.copy(t.miningResources or {})
+                  g.tripIds[#g.tripIds+1]=j.id
+                  local oldStatus,oldError=g.status,g.error;g.status='running';g.error=nil
+                  local ok,lease,err=pcall(function()
+                    if chunks then return chunks:reserve(j,w,true) end
+                    return {status='disabled'}
+                  end)
+                  if not ok or not lease then
+                    state.jobs[j.id]=nil;table.remove(g.tripIds);g.status=oldStatus;g.error=oldError
+                    if not ok then error(lease) end
+                    why=err
+                  else
+                    planning[g.id]=nil;g.status='running';g.error=nil
+                    if lease.status=='disabled' then
+                      j.workerId=wid;j.status='assigned'
+                      local saved,why=pcall(persist)
+                      if not saved then state.jobs[j.id]=nil;table.remove(g.tripIds);g.status=oldStatus;g.error=oldError;error(why) end
+                    end
+                    return j
+                  end
                 end
                 reason=why; if why and why:find('owned') then waiting=true end
               end
@@ -173,21 +187,28 @@ function M.new(state,save,clock,controllerId,config)
     end
     table.sort(queued,order)
     for _,job in ipairs(queued) do
-      local owner,area,resources
-      for _,w in ipairs(candidates) do
-        local bounds=miningArea(w.telemetry)
-        if not w.telemetry.capabilities.explorationV1 and Materials.accepts(w.telemetry.miningResources,job.item) and not conflict(w.id,bounds) then
-          owner=w.id; area=bounds; resources=w.telemetry.miningResources; break
-        end
-      end
-      if owner then
-        if counts then job.quantity=math.max(0,job.target-(counts[job.item] or 0)) end
-        if job.quantity==0 then finish(job); persist()
-        else
-          job.workerId=owner; job.miningArea=U.copy(area); job.miningResources=U.copy(resources); job.status='assigned'
-          -- Historic miningWorkerId pins are intentionally not used: each durable
-          -- active job now owns its area. Unknown legacy areas remain exclusive.
-          persist(); return job
+      if counts then job.quantity=math.max(0,job.target-(counts[job.item] or 0)) end
+      if job.quantity==0 then finish(job);persist()
+      else
+        for _,w in ipairs(candidates) do
+          local bounds=miningArea(w.telemetry)
+          if not w.telemetry.capabilities.explorationV1 and Materials.accepts(w.telemetry.miningResources,job.item) and not conflict(w.id,bounds) then
+            local oldArea,oldResources=job.miningArea,job.miningResources
+            job.miningArea=U.copy(bounds);job.miningResources=U.copy(w.telemetry.miningResources)
+            local ok,lease,why=pcall(function()
+              if chunks then return chunks:reserve(job,w,true) end
+              return {status='disabled'}
+            end)
+            if not ok or not lease then
+              job.miningArea=oldArea;job.miningResources=oldResources
+              if not ok then error(lease) end
+              job.coverageError=why
+            else
+              job.coverageError=nil
+              if lease.status=='disabled' then job.workerId=w.id;job.status='assigned';persist() end
+              return job
+            end
+          end
         end
       end
     end
@@ -199,7 +220,11 @@ function M.new(state,save,clock,controllerId,config)
       local t=w and w.telemetry
       if job.status=='assigned' and not job.physicalComplete and w and w.online and t
         and t.capabilities and t.capabilities.mining and (not t.task or t.task==job.id)
-        and not Coordination.workerBusy(state,job.workerId,job.id) then pending[#pending+1]=job end
+        and not Coordination.workerBusy(state,job.workerId,job.id) then
+          local lease,why=true
+          if chunks then lease,why=chunks:reserve(job,w) end
+          job.coverageError=why;if lease then pending[#pending+1]=job end
+        end
     end
     table.sort(pending,order)
     if #pending>0 then resendCursor=resendCursor%#pending+1; return pending[resendCursor] end

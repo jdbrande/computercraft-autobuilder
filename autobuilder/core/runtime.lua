@@ -53,6 +53,7 @@ function M.new(config,e)
     if level=='ERROR' or level=='WARN' then state.lastError=message end
     local ok,err=log:write(level,message); assert(ok,err)
   end
+  self.chunks=require('autobuilder.core.chunks').new(state,config,function() return self:save() end)
   if config.role=='controller' then
     if source:find('backup') then state.assignmentRecovery=true end
     self.registry=require('autobuilder.workers.workers').new(state,config,function() return self:save() end)
@@ -67,8 +68,9 @@ function M.new(config,e)
     if state.position.source=='gps' then state.position.source='local' end
     state.gpsError='awaiting GPS'
     self.navigation=require('autobuilder.core.navigation').new(e.turtle,state.position,config,function() return self:save() end)
+    self.navigation.coverageGuard=function(from,target) return require('autobuilder.core.chunks').guard(config,state,from,target) end
     self.fuelRecovery=require('autobuilder.workers.fuel_recovery').new(self,config,e)
-    self.agent=require('autobuilder.workers.agent').new(state,config,network,e.turtle,function() return self:save() end)
+    self.agent=require('autobuilder.workers.agent').new(state,config,network,e.turtle,function() return self:save() end,function() return require('autobuilder.core.chunks').probe(e,state,config) end)
   end
   self:save() -- Persist boot generation before producing any message IDs.
   self:report('INFO','Started '..config.role..' '..id..' boot '..state.boot..' from '..source)
@@ -112,6 +114,7 @@ function M.new(config,e)
     local ready,err=network:open()
     if not ready and state.lastError~=err then self:report('WARN',err) end
     if self.registry then
+      self.chunks:reconcile()
       local ok,why=self.registry:expire(clock()); if not ok then return false,why end
     else
       local ok,why=self.agent:tick(clock())
@@ -136,6 +139,7 @@ function M.new(config,e)
     if m.type:sub(1,5)=='mine_' then return self.mining:handle(sender,m) end
     if m.type:sub(1,5)=='task_' then return self.automation:handle(sender,m) end
     if self.registry then
+      self.chunks:reconcile()
       local ok,why=self.registry:handle(m,clock())
       if not ok then
         if why=='registration required' then
