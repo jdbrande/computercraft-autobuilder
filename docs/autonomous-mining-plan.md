@@ -922,18 +922,17 @@ requirements until all acceptance below passes.
 
 ### Task44: Excavation, foundation fill and debris/supply
 
-- [ ] Implement top-down conflict excavation preserving matching blocks, required-air
+- [x] Implement top-down conflict excavation preserving matching blocks, required-air
   clearance, suitable fill selection and automatic production/acquisition shortages.
-- [ ] Reuse/extend physical journals for drops, no-drop vegetation, falling blocks and
+- [x] Reuse/extend physical journals for drops, no-drop vegetation, falling blocks and
   fluids. Drain finite debris batches through home collection without losing region
   progress. Test hills, holes/caves, water/lava, occupied volumes and interruptions.
 
 Implemented and accepted subsets: journaled excavation/fill, mined fill acquisition,
 debris return, three bounded preparation retries, and finite one-region water/lava
 sealing/clearance. Native basins recover all temporary fill. Fresh optional scanner
-proof and cross-region finite-fluid stabilization passed native validation. Finish
-automatic access to missing sealed support and external-flow containment before marking the
-general preparation scope complete. Keep scan absence/name-only exact-state limits.
+proof and cross-region finite-fluid stabilization passed native validation. Automatic missing sealed-support access and external-flow containment also passed
+native acceptance, including independent world/stock checks and restart recovery. Keep scan absence/name-only exact-state limits.
 
 ### Task45: Verified regions, normal pipeline and native acceptance
 
@@ -944,7 +943,7 @@ general preparation scope complete. Keep scan absence/name-only exact-state limi
   depots can supply independent construction workers without shared idle stands.
 - [x] Run actual multiworker runtime and native uneven-terrain survey→level→fill→clear→
   verify→build acceptance. Record counts, retained infrastructure, restarts and limits.
-- [ ] Complete Lua/Python/release gates and one final whole-branch review/fix pass;
+- [x] Complete Lua/Python/release gates and one final whole-branch review/fix pass;
   document/integrate/push, then continue dynamic role scaling and all remaining scope.
 
 Foundation access implementation findings: use the existing preparation child-job

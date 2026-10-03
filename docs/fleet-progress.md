@@ -28,15 +28,11 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   two native pane trials and final review fixes.
 - Worker home/unloading and project settlement integrated/pushed at `bb9c41e`:
   623 Lua/18 Python, two native trials, final review fixes and release checks.
-- Current branch `milestone/0.23.0`: general automatic site preparation. Immutable
-  geometry, project surveys, protected excavation/fill batches, debris collection
-  and normal per-region construction gates are implemented, with missing-evidence
-  recovery and bounded preparation retries. Shared mutation protection, native
-  multiworker uneven-terrain construction and finite water/lava drainage have
-  acceptance evidence. Sealed-support scanning and cross-region fluid drainage passed native validation;
-  automatic missing sealed-support access passed its first native trial. The
-  single final review found three bugs; its consolidated regression-backed fix
-  pass and the remaining native/final test gates are in progress.
+- Automatic site preparation0.23 completed:748 Lua/18 Python tests, one final
+  review/fix pass and native multiworker terrain, finite water/lava, scanner support,
+  within/cross-region hidden access and external-inflow containment acceptance.
+  Integrated and pushed at`71b21ed`. Dynamic scaling0.24 continues in the isolated
+  `.worktrees/fleet-scaling` checkout, including final0.23 documentation.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -82,7 +78,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 38–39: completion and failures | Verified projects and final inventory/logistics/worker settlement accepted0.22 | Broader bounded automatic retries and actionable project errors |
 | 41–42: dependency-ordered milestones | Exploration, dependency/provider graph and count ownership integrated | Implement remaining milestones using existing controller/executor boundaries |
 | 44: dynamic fleet scaling | Shared-material explorers and capability-based queues provide partial foundations | Demand/yield/travel/rate allocation, role minimum/maximum counts, bottleneck response, safe idle reassignment and scale-down; simulation and live miners/clearers/builders ramp-up |
-| 45: automatic site preparation and leveling | Shared mutation protection, uneven-terrain multiworker and finite fluid native trials, scanner proof and automatic hidden-foundation access; bounded external-inflow containment in simulation | Native cross-region access and external-inflow containment, consolidated review corrections and final release gates |
+| 45: automatic site preparation and leveling | Accepted0.23:748 Lua/18 Python tests, native terrain/fluids/support/access/containment; see validation-0.23.0.md | Preserve during scaling and later integrated acceptance |
 
 ## Evidence and discovered bugs
 
@@ -934,6 +930,35 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   yielding chunk check. Full final validation remains pending. Controller-only
   preparation/admission fixes were deployed to208/210 and both restarted while
   their independent native trials continued.
+- Native208/209 cross-region foundation access passed:all nine preparation regions
+  completed,38 sampled child jobs crossed region boundaries,9 retained floor blocks
+  verified,100 independent world checks passed, and net fill consumption was one
+  cobblestone. All120 jobs completed; no access/supply lease remained. The worker
+  returned home idle with12,470 finite fuel and empty cargo/private inventories.
+  Both computers are off and their four test chunks released. The permanent
+  [foundation report](validation-foundation-access.md#cross-region-access) includes
+  deployment/restart evidence and limits. External-inflow acceptance remains active.
+- The pre-review containment snapshot completed744 Lua tests successfully. The
+  final committed review-fix tree has18 Python tests and release checks passing;
+  its complete Lua run is still in progress. Do not confuse the earlier snapshot
+  result with the pending final gate.
+- Final0.23 code gate at`01d65e2` completed748 Lua tests and18 Python tests; release
+  artifact and whitespace checks passed. Only later acceptance documentation changed
+  in the main checkout. Native external inflow exhausted its initial and secondary
+  retry budgets and began the retaining wall. The first eight-cell wall batch
+  completed; a controller restart was queued during the next batch to test durable
+  containment progress. Wall verification and final independent observations remain
+  pending. The passive monitor was restarted after its one-hour sampling limit;
+  explicit barrier-start and restart snapshots supplement the sampling gap.
+
+- Native210/211 external-inflow acceptance passed:32 exact cobblestone wall blocks,
+  one glass and17 air workspace cells,63 unchanged floor blocks and a retained outside
+  source passed114 independent checks. All164 jobs completed; the worker was home,
+  idle and empty with9,482 finite fuel. Central stock retained32 cobblestone and both
+  private inventories were empty. Controller restart during wall placement preserved
+  progress. The test computers are shut down and four test chunks released. Permanent
+  [inflow](validation-external-inflow.md) and [0.23](validation-0.23.0.md) reports record
+  fixture assumptions, sampling limits, full final gates and the single review pass.
 
 - Isolated next branch`milestone/0.24.0` at`.worktrees/fleet-scaling` starts
   requirement44 while0.23 final gates run in the main checkout. Its demand model
