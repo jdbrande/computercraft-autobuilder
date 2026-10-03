@@ -698,10 +698,10 @@ rectangle; `chunks.new(state,config,save)` provides `reserve(job,worker)` and
 `release(jobId)`; `chunks.probe(environment,state,config)` reports actual stationary
 chunky hardware. Shared pure validators serve telemetry/assignment integration.
 
-- [ ] Write/run failing boundary, missing/dead/moving-provider, explicit-area,
+- [x] Write/run failing boundary, missing/dead/moving-provider, explicit-area,
   configured-anchor-without-hardware, exact duplicate, save rollback/reboot and
   release tests. Expected: missing module or coverage refusal, no physical work.
-- [ ] Implement default enforced policy, bounded mission geometry and immutable
+- [x] Implement default enforced policy, bounded mission geometry and immutable
   durable claims using configured areas or current-chunk anchors. Run focused/full
   Lua tests; expected all pass. Commit reusable coverage contract.
 

@@ -289,3 +289,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   slices. Stored→compressed backreferences remain correct. Full508 Lua/18 Python
   and release checks passed. Native8MiB inflation took2.242s with383 yields and
   correctly refused a1MiB bound. Integration follows; no requirement is dropped.
+
+- Task26: six coverage geometry/provider/checkpoint regressions failed then passed;
+  full514 Lua tests passed. Strict policy, actual chunky detection, bounded chunk
+  envelopes and durable provider claims are ready for dispatch integration.
