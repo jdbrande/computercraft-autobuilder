@@ -846,3 +846,45 @@ test('failed adaptive grant restores quantity and both ledgers before any transf
   f.ce.packets={};f.c=Runtime.new(f.cc,f.ce);f:finish(650)
   eq(f.h:count(mc('glass_pane')),32);eq(f.h:count(mc('glass')),12)
 end)
+
+test('adaptive craft rechecks worker ownership after yielding capacity observations',function()
+  local f=parallelFixture();f:request(8);assert(f.c:tick());local q=f.c.automation.queue
+  local craft;for _,j in pairs(q.state.jobs) do if j.privateStation then craft=j;break end end;assert(craft)
+  local home=q:submit('RETURN_HOME',{preferredWorker=craft.preferredWorker},{})
+  local call=f.ce.peripheral.call;local assigned=false
+  f.ce.peripheral.call=function(name,method,...)
+    if method=='getItemLimit' and not assigned then assigned=true;eq(q:assign(f.c.state.workers).id,home.id) end
+    return call(name,method,...)
+  end
+  f.c.automation.production:step();assert(assigned)
+  eq(home.workerId,craft.preferredWorker);eq(craft.factoryFlow,nil)
+  eq(f.c.state.capacityLedger.leases[craft.id],nil);eq(f.c.state.inventoryLedger.leases[craft.id],nil);eq(f.h.transfers,0)
+end)
+
+test('offline legacy preference releases unstarted input claim for healthy private station',function()
+  local f=panesFixture();f:requestPanes(32);assert(f.c:tick())
+  local old;for _,j in pairs(f.c.state.automation.jobs) do if j.privateStation then old=j;break end end;assert(old)
+  eq(old.preferredWorker,12)
+  assert(f.c.automation.production.ledger:reserve(old.id,old.stockInputs,old.stockOutputs,{[mc('glass')]=24}))
+  old.factoryFlow={stage={},collect={}};f.c.state.workers['12'].online=false
+  f.w.tick=function() return true end;f.w.workStep=function() return true end;assert(f.c:save())
+  f:finish(650)
+  eq(old.cancelled,true);eq(f.c.state.inventoryLedger.leases[old.id].status,'cancelled')
+  eq(f.h.crafts,0);eq(f.other.h.crafts,2);eq(f.h:count(mc('glass_pane')),32)
+end)
+
+test('unclaimed private production obeys a lowered batch maximum after reboot',function()
+  local f=parallelFixture();f:request(16);assert(f.c:tick());f.cc.craftingBatchSize=1
+  f.ce.packets={};f.c=Runtime.new(f.cc,f.ce);f:finish()
+  for _,j in pairs(f.c.state.automation.jobs) do if j.privateStation and not j.cancelled then eq(j.batches,1) end end
+  eq(f.h:count(mc('stone_bricks')),16)
+end)
+
+test('pause arriving during adaptive observation prevents claims and physical staging',function()
+  local f=parallelFixture();f:request(8);assert(f.c:tick())
+  local j;for _,v in pairs(f.c.state.automation.jobs) do if v.privateStation then j=v;break end end;assert(j)
+  local call=f.ce.peripheral.call
+  f.ce.peripheral.call=function(name,method,...) if method=='getItemLimit' then j.paused=true end;return call(name,method,...) end
+  f.c.automation.production:step()
+  eq(j.factoryFlow,nil);eq(f.c.state.capacityLedger.leases[j.id],nil);eq(f.c.state.inventoryLedger.leases[j.id],nil);eq(f.h.transfers,0)
+end)

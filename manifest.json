@@ -687,7 +687,7 @@
       "version": "0.21.0"
     },
     {
-      "bytes": 16966,
+      "bytes": 17356,
       "path": "autobuilder/factory/parallel.lua",
       "roles": [
         "controller",
@@ -697,7 +697,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "39706abb1c1b43c54b062fd0af9376203d0fdf596a29c84efc77429eebc2261d",
+      "sha256": "3d6215f254244c45be5407fc067e5e8b0631847dbf4b722c70cc60df472c025e",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/factory/parallel.lua",
       "version": "0.21.0"
     },

@@ -414,5 +414,17 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Native0.21 accepted:24 glass→64 panes without an output sample, then24 more glass
   →128 total panes with concurrent Crafty121/122 and controller/worker reboot.
   Independent world reads confirm exact counts, empty private/turtle inventories,
- 2000 fuel each and released claims. Rig shut down and loading tickets removed.
+  2000 fuel each and released claims. Rig shut down and loading tickets removed.
   Permanent report: [validation-0.21.0.md](validation-0.21.0.md). Final branch review next.
+
+- 0.21 final review found two Important and one Minor issue: yielding-observation
+  worker race, offline legacy claim starvation and lowered maximum ignored on reboot.
+  All reproduced RED→GREEN; a fourth regression covers pause during observation.
+  Final eligibility checks precede atomic grant; legacy retirement precedes station
+  availability; only unclaimed work adopts a lowered maximum. Full gates running.
+- Next dependency is safe worker home/cargo return and project settlement, needed
+  before debris-producing large site preparation and safe fleet scale-down.
+
+- Final0.21 gate:599 Lua/18 Python tests passed, release/check and whitespace clean.
+  All final review findings fixed; native evidence recorded. Integrating then
+  continuing home unloading and project settlement without a handoff pause.

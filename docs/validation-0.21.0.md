@@ -6,8 +6,9 @@ production, dynamic scaling and site preparation remain required subsequent work
 
 ## Automated evidence
 
-Pre-review gate:595 Lua tests and18 Python tests passed. Release0.21 generation/check
-and whitespace validation passed. One final whole-branch review/fix pass is pending.
+Final gate:599 Lua tests and18 Python tests passed. Release0.21 generation/check
+and whitespace validation passed. One final whole-branch review found two Important
+and one Minor issue; all were corrected in the consolidated fix pass below.
 
 The high-yield pane regression reproduced the original capacity stall, then produced
 64 panes from24 glass using the actual controller and two worker runtimes. Coverage
@@ -59,6 +60,22 @@ Workers used normal turtle, peripheral and rednet APIs. The harness only observe
 state and submitted operator commands through the runtime event boundary. No physical
 output or worker receipts were emulated. Existing native chunk-loading acceptance is
 in0.18; this trial used explicitly assured loading.
+
+## Final review fixes
+
+Four additional regressions failed before their fixes, then passed:
+
+- Assigning RETURN_HOME during a yielding capacity observation could leave the same
+  worker claimed by two jobs. Worker ownership and factory eligibility are rechecked
+  after observations immediately before the atomic grant.
+- A pause arriving during that same interval now prevents all claims and staging.
+- A never-started legacy ingredient claim can retire while its preferred worker or
+  station is offline, allowing a healthy station to complete the operation.
+- Lowering the configured maximum after reboot now bounds unclaimed production work.
+  Granted and explicit standalone contracts retain their original quantities.
+
+These admission/migration fixes follow the native trials and are runtime regression
+covered. No second review was performed. Final gates include all four regressions.
 
 ## Limits
 

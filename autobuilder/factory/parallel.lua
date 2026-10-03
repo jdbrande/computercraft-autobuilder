@@ -82,24 +82,6 @@ function M.new(app,config,e,queue,production)
   local function empty(name) assert(not next(F.list(e,name)),'private crafting inventory must be empty: '..name) end
   local function reserve(job)
     local old=capacity.state.leases[job.id];if old then assert(old.status=='held','craft capacity already released');return old end
-    local worker=app.state.workers[tostring(job.preferredWorker)];local t=worker and worker.telemetry
-    assert(worker and worker.online and t and t.status=='idle' and not t.task
-      and t.capabilities and t.capabilities.isolatedCraftingV1
-      and not Q.workerBusy(app.state,job.preferredWorker,job.id),'waiting for available preferred Crafty worker')
-    local observed=require('autobuilder.storage.capacity').observe(e)
-    local station=job.privateStation
-    for _,field in ipairs({'buffer','input','output'}) do
-      assert(not next(F.list(observed,station[field])),'private crafting inventory must be empty: '..station[field])
-    end
-    local limits={}
-    for item in pairs(job.stockInputs) do
-      local sources=F.sources(observed,config,item);local source=assert(sources[1],'reserved craft ingredient missing: '..item)
-      local detail=observed.peripheral.call(source.name,'getItemDetail',source.slot)
-      assert(detail and U.integer(detail.maxCount) and detail.maxCount>0,'ingredient stack limit unavailable')
-      limits[item]=detail.maxCount
-    end
-    local sources=F.sources(observed,config,job.item);local outputLimit
-    if sources[1] then local detail=observed.peripheral.call(sources[1].name,'getItemDetail',sources[1].slot);outputLimit=detail and detail.maxCount end
     local stock=production.ledger.state.leases[job.id]
     -- Retire only never-started legacy production claims. Their closed IDs and
     -- immutable quantities remain auditable; the scheduler fills the interval.
@@ -117,9 +99,33 @@ function M.new(app,config,e,queue,production)
       end
       return nil,'retired'
     end
+    local function eligible()
+      assert(not job.paused and job.status~='completed','craft preference paused or retired during observation')
+      local worker=app.state.workers[tostring(job.preferredWorker)];local t=worker and worker.telemetry
+      assert(worker and worker.online and t and t.status=='idle' and not t.task
+        and t.capabilities and t.capabilities.isolatedCraftingV1
+        and not Q.workerBusy(app.state,job.preferredWorker,job.id),'waiting for available preferred Crafty worker')
+      local allowed,why=Q.factoryCanRun(app.state,job,true);assert(allowed,why)
+    end
+    eligible()
+    local observed=require('autobuilder.storage.capacity').observe(e)
+    local station=job.privateStation
+    for _,field in ipairs({'buffer','input','output'}) do
+      assert(not next(F.list(observed,station[field])),'private crafting inventory must be empty: '..station[field])
+    end
+    local limits={}
+    for item in pairs(job.stockInputs) do
+      local sources=F.sources(observed,config,item);local source=assert(sources[1],'reserved craft ingredient missing: '..item)
+      local detail=observed.peripheral.call(source.name,'getItemDetail',source.slot)
+      assert(detail and U.integer(detail.maxCount) and detail.maxCount>0,'ingredient stack limit unavailable')
+      limits[item]=detail.maxCount
+    end
+    local sources=F.sources(observed,config,job.item);local outputLimit
+    if sources[1] then local detail=observed.peripheral.call(sources[1].name,'getItemDetail',sources[1].slot);outputLimit=detail and detail.maxCount end
     assert(app.mining:refresh())
     local max=job.batches;local offset=job.productionBatch
     if job.productionRequest and not stock then
+      max=math.min(max,config.craftingBatchSize)
       local r=assert(queue.state.requests[job.productionRequest],'craft request missing')
       local op=assert(r.plan.operations[job.productionOperation],'craft operation missing')
       local limit;offset,limit=coverage(r,op);max=math.min(max,limit-offset)
@@ -155,6 +161,7 @@ function M.new(app,config,e,queue,production)
       while not lease and n>1 do n=n-1;lease,inputs,outputs,quantity=trial(n) end
     else assert(n==job.batches,'insufficient unreserved craft ingredients') end
     assert(lease,inputs)
+    eligible() -- Peripheral observations yield; ownership and pause may have changed.
     local before=U.copy(job)
     local ok,why=pcall(function()
       capacity.state.leases[job.id]=lease

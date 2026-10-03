@@ -845,7 +845,7 @@ worker ownership, unavailable candidate and native unknown output stack sizes.
 
 ### Task37: Native pane acceptance and integration
 
-- [ ] Run real two-Crafty high-yield production without an output sample. Verify exact
+- [x] Run real two-Crafty high-yield production without an output sample. Verify exact
   source/output/private inventories and final claims; record bugs/limits/regressions.
-- [ ] Update documentation, run final checks and one whole-branch review/fix pass,
+- [x] Update documentation, run final checks and one whole-branch review/fix pass,
   integrate/push and continue every remaining fleet requirement.
