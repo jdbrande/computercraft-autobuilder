@@ -10,7 +10,7 @@ The intended player workflow should eventually be close to:
 build castle.schem
 ```
 
-The player should select or confirm the build location, then the fleet handles the remaining work.
+The player should select or confirm the build location, then the fleet handles the remaining work, including automatic fleet scaling, terrain leveling and site preparation (sections 44–45).
 
 The system should support large numbers of turtles working together without requiring the player to manually assign every turtle, identify every ore deposit, distribute every stack of materials, refuel each turtle, or restart individual jobs.
 
@@ -72,7 +72,7 @@ MINING          HARVESTING      CRAFTING
 
 The entire system should work as a continuous pipeline instead of a strict sequence.
 
-Mining, harvesting, processing, crafting, logistics, and building should occur concurrently whenever dependencies allow.
+Mining, harvesting, processing, crafting, logistics, site preparation, and building should occur concurrently whenever dependencies allow. Every build follows the survey, foundation, preparation, construction, verification and repair pipeline in section 45.3. Structural placement is gated by verified preparation of its required region; unaffected independent regions may proceed.
 
 ---
 
@@ -1221,6 +1221,9 @@ Do not steal resources already physically committed if doing so breaks recovery 
 
 # 31. Fleet scheduling
 
+Dynamic role scaling in section 44 is required, including configurable role limits,
+measured bottlenecks, automatic scale-up and scale-down, and live acceptance.
+
 The scheduler should assign idle workers based on:
 
 - worker capabilities
@@ -1658,12 +1661,16 @@ Add:
 
 ## Milestone 7: Builder fleet
 
-Add:
+Sections 44–45 make multi-worker site preparation, terrain leveling and automatic
+worker participation prerequisites for this milestone’s acceptance. Add:
 
 - multiple builders
 - owned build regions
 - project supply
 - parallel placement
+- survey-derived foundations and per-region preparation verification
+- multi-turtle excavation, fill and clearing with protected workspace
+- uneven-terrain native acceptance without manual preparation
 
 ## Milestone 8: Placement dependency engine
 
@@ -1686,7 +1693,8 @@ Add:
 
 Add:
 
-- dynamic worker roles
+- dynamic worker roles and workload-driven scaling for all five required roles
+- one-to-many ramp-up and scale-down simulation/live acceptance
 - optimized scheduling
 - rescue missions
 - improved routing
@@ -1805,3 +1813,91 @@ PROJECT COMPLETE
 ```
 
 That is the target architecture.
+
+---
+
+# 44. Dynamic fleet scaling
+
+The controller must automatically increase or decrease the number of active turtles assigned to mining, hauling, crafting, clearing, and building based on current workload.
+
+Requirements:
+
+1. Mining demand should scale with outstanding material shortages, estimated yield, travel distance, and delivery rate.
+2. Building demand should scale with remaining blocks, independent build regions, dependency constraints, and available materials.
+3. Clearing demand should scale with the size and complexity of the obstructed construction volume.
+4. Crafting and hauling should scale when they become bottlenecks.
+5. Use additional idle workers when they would safely improve throughput.
+6. Continuously reevaluate workload and reassign idle turtles as demand changes.
+7. Return excess workers to the idle pool when they are no longer useful.
+8. Prevent duplicate work through durable leases, ownership, reservations, or equivalent coordination.
+9. Multiple builders should divide large builds into safe independent regions.
+10. Multiple miners should divide acquisition work while allowing several miners to contribute to the same material demand.
+11. Multiple clearing turtles should divide site-preparation work into safe regions.
+12. Respect route conflicts, turtle collisions, protected areas, fuel, tools, inventory capacity, dependencies, and storage throughput.
+13. Use configurable minimum and maximum worker counts for each role.
+14. If automatic turtle deployment exists, provision additional workers when sustained workload exceeds current capacity. Otherwise, use all suitable registered idle turtles before declaring the fleet saturated.
+15. Track active workers, idle workers, queue depth, estimated remaining work, throughput, bottlenecks, and scaling decisions.
+16. Add simulation tests proving the controller ramps from one worker to multiple workers under heavy load and scales back down after the work drains.
+17. Add live Minecraft acceptance proving miners, clearing turtles, and builders join a sufficiently large job automatically without manual worker assignment.
+
+# 45. Automatic build-site preparation
+
+Before construction begins, compare the target schematic or build plan with the existing world and prepare the required construction volume automatically.
+
+The system must determine the intended ground or foundation elevation for the build and flatten the required construction footprint before normal building begins.
+
+## 45.1 Site leveling requirements
+
+1. Survey the entire building footprint and surrounding working area.
+2. Determine the required base elevation from the schematic or build plan.
+3. Remove terrain above the required elevation.
+4. Fill depressions below the required elevation when the build requires a continuous level surface.
+5. Use suitable available fill material automatically.
+6. Request or mine additional fill material when available stock is insufficient.
+7. Compact the preparation logically by verifying every required foundation coordinate is at the correct elevation before construction proceeds.
+8. Support builds on slopes, hills, uneven terrain, shallow holes, caves, water, and partially obstructed areas.
+9. If the schematic intentionally uses multiple terrain elevations, preserve those planned elevations instead of flattening everything to one Y level.
+10. Allow large leveling jobs to be divided between multiple clearing turtles.
+11. Prevent one turtle from digging beneath or filling over another active worker.
+12. Recheck the site after leveling because falling blocks, fluids, or excavation may alter nearby positions.
+13. Do not begin dependent structural placement until its required foundation region has passed preparation verification.
+
+## 45.2 General preparation requirements
+
+1. Inspect every relevant target position before placement.
+2. Remove blocks that conflict with the required final structure.
+3. Preserve blocks that already match the required final block and state.
+4. Treat required air as part of the schematic. Clear any block occupying a position that should be air.
+5. Clear vegetation, terrain, structures, fluids, and other obstructions when required by the build.
+6. Excavate underground portions automatically.
+7. Prepare foundations when the planned structure extends below the existing surface.
+8. Clear enough surrounding workspace for turtle movement when construction requires access around, above, or below the structure.
+9. Handle sand, gravel, water, lava, and other changing terrain without invalidating already prepared areas.
+10. Protect depots, exits, storage, turtles, computers, peripherals, infrastructure, and protected project regions unless the build explicitly authorizes replacement.
+11. Divide large clearing operations among multiple turtles when safe.
+12. Coordinate clearing and building so builders do not place blocks in regions still awaiting excavation or leveling.
+13. Use durable ownership or leases so workers do not clear, fill, or build the same position simultaneously.
+14. Verify prepared regions before allowing dependent construction to start.
+15. If an obstruction cannot be removed, record its exact coordinates, block type, reason, and affected work, then continue with unaffected regions when possible.
+16. Support partially completed structures by retaining already correct blocks and repairing only incorrect or missing portions.
+17. Add simulation tests for hills, uneven ground, holes, caves, water, occupied build volumes, terrain excavation, required air, fluids, falling blocks, protected blocks, partially completed builds, and multi-turtle clearing.
+18. Add live Minecraft acceptance where a requested structure starts on uneven terrain. Verify that the fleet surveys the area, levels the required footprint, fills low sections where needed, clears obstructions, verifies the prepared site, and constructs the structure without manual site preparation.
+
+## 45.3 Required build pipeline
+
+```text
+survey target area
+determine foundation elevation
+plan site preparation
+reserve work regions
+excavate high terrain
+fill low terrain
+verify level foundation
+clear remaining construction volume
+verify prepared regions
+build
+verify final structure
+repair defects
+```
+
+Treat dynamic fleet scaling, terrain leveling, and automatic site preparation as core fleet requirements, not optional future enhancements.

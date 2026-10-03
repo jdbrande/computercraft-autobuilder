@@ -1,7 +1,7 @@
 # Fleet requirements progress
 
 Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
-[autonomous mining plan](autonomous-mining-plan.md). Updated 2026-10-02.
+[autonomous mining plan](autonomous-mining-plan.md). Updated 2026-10-03.
 
 ## Current work
 
@@ -9,8 +9,11 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
 - Inventory ownership integrated and pushed at `e66daa5`.
 - Current branch: `milestone/0.15.0`, fuel policy, distribution and rescue.
-- Next: implement durable inventory ownership, then fuel
-  delivery/rescue in dependency order. Continue through all rows below.
+- Current task: durable fuel station distribution and automatic refueling. The
+  inventory ledger prerequisite is integrated; rescue follows station acceptance.
+- Added required scope: dynamic fleet scaling and automatic site preparation,
+  including terrain leveling, fill acquisition and verified foundation gates.
+  Continue through all rows below in dependency order.
 - No external blocker is currently established. Missing implementation is remaining
   work, not an external blocker.
 
@@ -33,7 +36,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 10: mining intelligence | Surveys, observed resources, protection, routes and exhaustion | Persist hazard/inaccessibility/density evidence and apply ranking |
 | 11: fuel management | Finite mission/return budgets, reserved fuel and some builder refueling | Configurable fuel providers, fleet forecasting, stations/distribution/rescue |
 | 12: logistics network | Journaled point-to-point courier and supply batch executors | Pickup/destination capacity reservations, automatic station routing and dispatch |
-| 13: storage abstraction | Aggregated wired physical stock, one factory barrier | Available/reserved/transit/expected/project views; concurrent ownership |
+| 13: storage abstraction | Durable count claims and physical/available/reserved/transit/expected/project views accepted in 0.14.0 | Destination capacity and concurrent physical ownership |
 | 14: continuous forecasting | Acquisition targets and shortages | Proactive per-project coverage of all physical/expected states |
 | 15: parallel crafting | One exclusive Crafty station | Multiple stations and finite tasks backed by ingredient/output leases |
 | 16: processing network | Furnace lanes and fuel partitioning | Generic machine providers, timing/capacity forecasts and supported processors |
@@ -51,7 +54,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 32–34: monitor, commands, logs | Terminal screens and role/project commands, rotating logs | Monitor fleet dashboard, consistent fleet/project/resource/recovery commands, structured significant events |
 | 35–37: messages, duplicates, checkpoints | Existing validation, exact receipts and physical-action journals | Apply and regression-test every new message and side effect |
 | 38–39: completion and failures | Verified small projects and visible blocked states | Final inventory/logistics/worker settlement gate, bounded automatic retries and actionable project errors |
-| 41–42: dependency-ordered milestones | Milestone 1 accepted | Implement remaining milestones using existing controller/executor boundaries |
+| 41–42: dependency-ordered milestones | Exploration, dependency/provider graph and count ownership integrated | Implement remaining milestones using existing controller/executor boundaries |
+| 44: dynamic fleet scaling | Shared-material explorers and capability-based queues provide partial foundations | Demand/yield/travel/rate allocation, role minimum/maximum counts, bottleneck response, safe idle reassignment and scale-down; simulation and live miners/clearers/builders ramp-up |
+| 45: automatic site preparation and leveling | Existing site-preparation executor and placement inspection provide partial foundations | Full footprint/workspace survey, intended multi-elevation foundations, excavation/fill acquisition, fluid/falling-block rechecks, durable independent regions, verified preparation gates, partial-structure preservation and uneven-terrain live acceptance |
 
 ## Evidence and discovered bugs
 
@@ -154,3 +159,13 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Native rescue feasibility: turtle107 verified adjacent miner101 through
   peripheral.getID and physically delivered one coal with dropDown; probe cleanup
   submitted. This is hardware feasibility, not completed rescue automation.
+
+- Task16 in progress: eight focused fuel-service tests pass, covering grants,
+  partial/restarted transfers, failed checkpoints, offline ownership, missing stock,
+  ambiguous observations, shared inventory locks and capacity. A real-module runtime
+  simulation refueled an empty turtle to160 through the network and released its
+  owner. This is simulated hardware evidence; native fuel acceptance remains open.
+- Required scope expanded on 2026-10-03: sections44–45 retain all user requirements
+  for dynamic fleet scaling, terrain leveling and automatic site preparation.
+  These are mandatory completion gates, not optional enhancements. Existing bounded
+  preparation and shared-demand mining do not establish this broader acceptance.

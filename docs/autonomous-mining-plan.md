@@ -541,3 +541,49 @@ executor; add rescue service tests and full-chain recovery scenario.
   worker acceptance. Review branch, fix demonstrated bugs with regressions,
   integrate and continue to remaining parallel factory/schematic/chunk/recovery
   requirements without a routine approval pause.
+
+
+## Required continuation: dynamic scaling and automatic site preparation
+
+Added 2026-10-03 under [requirements44–45](fleet-requirements.md#44-dynamic-fleet-scaling).
+These extend the full-fleet completion criteria. Keep Tasks16–18 moving; they
+provide fuel and recovery prerequisites. Then extend the existing queues and
+leases in this dependency order, alongside the remaining original requirements:
+
+- [ ] Complete pickup/destination capacity, independent factory staging and
+  parallel crafting/hauling. Expose measured delivery/production rates and
+  bottlenecks; forecasts must remain distinct from physical stock.
+- [ ] Extend schematic analysis with explicit required air, intended foundation
+  coordinates/elevations and access workspace. Preserve intentional multiple
+  elevations; do not infer a single flat plane over a terraced design.
+- [ ] Survey the full footprint and working area. Plan high-terrain excavation,
+  low-terrain fill and remaining-volume clearance from measured world state.
+  Select suitable available fill, and route shortages through normal acquisition.
+- [ ] Partition preparation and construction into safe owned regions with
+  dependencies, worker/route exclusion and infrastructure protection. Use the
+  existing durable job/region ownership; never expire an offline physical owner.
+- [ ] Implement measured excavation/fill/clearance with changing-terrain rechecks,
+  exact obstruction diagnostics, preservation of correct partial structures and
+  verified foundation/preparation gates before dependent structural placement.
+- [ ] Add bounded workload allocation for mining, hauling, crafting, clearing and
+  building: configurable role minima/maxima, outstanding work, measured yield and
+  rates, travel cost, supply coverage and independent ready regions. Use suitable
+  registered idle workers before saturation; release excess workers at safe task
+  boundaries. Provision workers only if automatic deployment is implemented.
+- [ ] Expose active/idle counts, queue depth, work remaining, throughput,
+  bottlenecks and scaling decisions. Exercise sustained workload and drainage,
+  avoiding repeated role switching and duplicate physical work.
+- [ ] Test one-to-many ramp-up and scale-down, shared-material mining, parallel
+  clearing/building, slopes/hills/holes/caves/water, required air, falling blocks,
+  protected terrain and partial builds. Include checkpoint and message failures.
+- [ ] Run native acceptance on a sufficiently large uneven site: idle miners,
+  clearing turtles and builders join automatically, survey and level/fill the
+  footprint, clear obstructions, verify regions, construct, verify and repair.
+  No manual preparation or worker assignment. Document measured results and
+  remaining limits, integrate and continue all other unfinished requirements.
+
+Required region pipeline: survey → determine foundation elevation → plan site
+preparation → reserve regions → excavate high terrain → fill low terrain → verify
+level foundation → clear remaining volume → verify prepared regions → build →
+verify final structure → repair defects. Independent regions may overlap in time
+when their dependencies and physical access permit it.
