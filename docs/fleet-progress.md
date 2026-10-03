@@ -8,9 +8,11 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
 - Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
 - Inventory ownership integrated and pushed at `e66daa5`.
-- Current branch: `milestone/0.15.0`, fuel policy, distribution and rescue.
-- Current task: final review of fuel distribution/rescue, after native acceptance.
-  Next dependencies: capacity reservations and independent parallel factory staging.
+- Fuel distribution/rescue integrated and pushed at `c0d1aa5`:470 Lua/16 Python
+  tests and native acceptance including final review regressions.
+- Current branch: `milestone/0.16.0`, capacity and parallel factory.
+- Current task: durable measured destination capacity (Task19), followed by private
+  Crafty station contracts, staging/collection and concurrent batch scheduling.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.

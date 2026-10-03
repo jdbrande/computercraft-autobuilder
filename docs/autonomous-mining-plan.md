@@ -588,3 +588,48 @@ preparation → reserve regions → excavate high terrain → fill low terrain �
 level foundation → clear remaining volume → verify prepared regions → build →
 verify final structure → repair defects. Independent regions may overlap in time
 when their dependencies and physical access permit it.
+
+## Milestone0.16: capacity and independent parallel factory
+
+Spec: [parallel factory design](parallel-factory-design.md). Continue inline under
+standing authorization; no milestone handoff pause.
+
+### Task 19: Durable physical capacity reservations
+
+**Files:** `autobuilder/storage/capacity.lua`, `tests/capacity_test.lua`, suite list.
+
+- [ ] Add failing tests for concrete-slot reservations, shared and exclusive claims,
+  measured stack/slot bounds, unknown item limits, immutable duplicates, reboot,
+  failed save rollback, full/missing destinations and explicit release.
+- [ ] Implement native measured-capacity planning and durable ownership. Run focused
+  tests and full suite; commit. Expected: no owner can reserve the same capacity.
+
+### Task 20: Private Crafty station contracts and execution
+
+**Files:** config, worker capability/task validation, Crafty executor, workflows,
+production receipts, focused runtime tests.
+
+- [ ] Add failing incompatible-station, private-buffer-only, completed/collecting
+  and duplicate-progress cases. Validate unique inventories and worker ownership.
+- [ ] Implement capability-gated private station execution and durable worker-finish
+  acknowledgement without central output credit. Legacy execution stays exclusive.
+  Run tests and commit. Expected: workers cannot mutate shared stock in this mode.
+
+### Task 21: Controller staging and parallel batch scheduling
+
+**Files:** parallel factory service, production planner/service, workflow integration,
+full runtime fixture with two independent Crafty turtles.
+
+- [ ] Add failing parallel/splitting, short stock, partial stage/collection, missing
+  capacity, controller/worker restart, lost ack and independent blocked-station cases.
+- [ ] Reserve inputs/private stations/output slots; journal staged inputs and final
+  collection; split exact finite operations across idle eligible stations. Release
+  only reconciled complete jobs. Run full tests and commit. Expected: two workers
+  craft concurrently with conserved quantities and no duplicate production.
+
+### Task 22: Parallel factory native acceptance and integration
+
+- [ ] Document configuration, ownership, bottlenecks, measured rates and limitations.
+  Run native two-Crafty acceptance with finite batches and restart. Correct defects
+  with failing regressions. Run all Lua/Python/release checks, one whole-branch
+  review and required fix pass, integrate/push, then continue remaining requirements.
