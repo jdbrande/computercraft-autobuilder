@@ -9,8 +9,8 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
 - Inventory ownership integrated and pushed at `e66daa5`.
 - Current branch: `milestone/0.15.0`, fuel policy, distribution and rescue.
-- Current task: durable fuel station distribution and automatic refueling. The
-  inventory ledger prerequisite is integrated; rescue follows station acceptance.
+- Current task: final review of fuel distribution/rescue, after native acceptance.
+  Next dependencies: capacity reservations and independent parallel factory staging.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -34,7 +34,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 8: provider registry | Deterministic candidates, availability/preferences, durable acquisition selection | Accepted 0.13.0; preserve during later integration |
 | 9: autonomous mining | Accepted 0.12.0 with four live explorers | Preserve during later pipeline integration |
 | 10: mining intelligence | Surveys, observed resources, protection, routes and exhaustion | Persist hazard/inaccessibility/density evidence and apply ranking |
-| 11: fuel management | Finite mission/return budgets, reserved fuel and some builder refueling | Configurable fuel providers, fleet forecasting, stations/distribution/rescue |
+| 11: fuel management | Configurable fuels, durable stations, automatic refuel and native rescue accepted; budgets deny unsafe trips | Per-mission budget presentation for every role and fleet-wide predictive fuel forecasting |
 | 12: logistics network | Journaled point-to-point courier and supply batch executors | Pickup/destination capacity reservations, automatic station routing and dispatch |
 | 13: storage abstraction | Durable count claims and physical/available/reserved/transit/expected/project views accepted in 0.14.0 | Destination capacity and concurrent physical ownership |
 | 14: continuous forecasting | Acquisition targets and shortages | Proactive per-project coverage of all physical/expected states |
@@ -46,7 +46,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 21: builder supply | Bounded journaled supply batches | Early replenishment and automatic project logistics/direct delivery |
 | 22–23: verification/repair | Physical comparison and explicit repair jobs | Automatic bounded defect scheduling and independent repair-worker acceptance |
 | 24: worker states | Heartbeats, task/fuel/pose/errors | Equipment/software health and full recovery-state presentation |
-| 25: rescue | Safe blocked return and journal preservation | Fuel delivery, reachable inventory recovery and automatic recovery missions |
+| 25: rescue | Native identity-checked fuel delivery, original-task recovery, offline ownership and journal preservation | Reachable inventory recovery and broader blocked-route recovery missions |
 | 26: offline owners | Ownership survives timeout/restart | Extend to new leases and configurable recovery commands |
 | 27: chunk loading | Explicit operator-loaded envelope assumption | Installed-mod integration, loaded mission checks and unsupported-area blocking |
 | 28–29: protection/traffic | Protected projects/depots/routes, cell reservations | Global station/farm registration, larger fleet deadlock/routing checks |
@@ -194,3 +194,16 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Task18 current: operational fuel status/setup documentation, fresh native
   acceptance, complete release checks and whole-branch review. Dynamic scaling
   and terrain preparation remain required later work under sections44–45.
+
+- Task18 pre-review gate:466 Lua/all16 Python tests, regenerated0.15.0 release and
+  release/whitespace checks passed. `fuel` exposes station/worker/recovery status;
+  `setup fuel` copies validated controller policy without moving or burning fuel.
+  Frozen recipients and unsettled rescues block setup. Unknown cyclic profile
+  fields are ignored after a reproducing regression.
+- Fresh native acceptance114/115 passed without rescue assignment, fuel transfer
+  or task resume by the operator. Original return completed; courier returned;
+  all13 jobs completed, both rescues released, seven station claims released.
+  Independent world reads matched152/420/160 fuel and conserved the original20
+  coal (8 consumed,12 remaining). Live `fuel` status showed all stations2/2.
+  Computers110–115 were shut down and27 force-load tickets removed. Evidence and
+  scope: [0.15.0 acceptance](validation-0.15.0.md). Whole-branch review next.

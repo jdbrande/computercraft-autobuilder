@@ -536,7 +536,7 @@ executor; add rescue service tests and full-chain recovery scenario.
 
 ### Task 18: Fuel visibility and native acceptance
 
-- [ ] Expose fleet fuel budgets, station stock, waiting deliveries and recovery
+- [x] Expose fleet fuel budgets, station stock, waiting deliveries and recovery
   status with actionable errors; document exact setup and configurable providers.
 - [ ] Run full Lua/Python/release checks and native zero-fuel depot plus stranded
   worker acceptance. Review branch, fix demonstrated bugs with regressions,

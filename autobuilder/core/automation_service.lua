@@ -14,7 +14,8 @@ function M.new(app,config,e,network,clock)
   local function send(owner,kind,payload) return network:send(owner,kind,payload) end
   function self:command(line)
     local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
-    if args[1]=='production' or args[1]=='8' then app.state.view='production'; return true,'Material team: different workers gather each missing resource'
+    if args[1]=='fuel' then app.state.view='fuel'; return true,fuel:describe()
+    elseif args[1]=='production' or args[1]=='8' then app.state.view='production'; return true,'Material team: different workers gather each missing resource'
     elseif args[1]=='resource' then
       assert(#args==2,'Usage: resource <namespaced-item>')
       return true,production:describe(args[2])
@@ -96,6 +97,7 @@ function M.new(app,config,e,network,clock)
       if not ready then app.state.lastError='Backup recovery: waiting for every known worker to register and reconcile task ownership'; return true end
       app.state.assignmentRecovery=nil; app:save()
     end
+    if app.state.view=='fuel' then fuel:describe() end
     production:tick(); projects:tick(); infrastructure:tick(); cathedral:tick()
     production:syncClaims()
     if clock()-last<config.heartbeatInterval then return true end

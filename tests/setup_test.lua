@@ -315,3 +315,32 @@ test('cancelled exploration wizard leaves existing settings unchanged',function(
   local e=env('controller',{'cancel'}); local original=e.fs.files['/autobuilder/settings.lua']
   eq(require('autobuilder.setup_wizard').run({'exploration'},e),false); eq(e.fs.files['/autobuilder/settings.lua'],original)
 end)
+
+test('fuel setup shares controller policy without supply staging and does not move or burn fuel',function()
+  local Share=require('autobuilder.setup_share')
+  local ce=env('controller',{}); local c=C.load({fuel={enabled=true,low=80,target=160}})
+  assert(Share.reply(ce,c,{['8']={}},8,{version=1,type='setup_request',requestId='8:1000'}))
+  eq(ce.packet.message.fuel.target,160)
+  local we=env('worker',{'yes'})
+  we.fs.files['/autobuilder/settings.lua']='return {role="worker",controllerId=1,depot={x=12,y=64,z=-9},label="Keep me"}'
+  we.rednet.receive=function() return 1,ce.packet.message end
+  local fuel=we.turtle.fuel
+  assert(require('autobuilder.setup_wizard').run({'fuel'},we))
+  eq(settings(we).fuel.target,160); eq(settings(we).fuel.enabled,true); eq(settings(we).label,'Keep me')
+  eq(we.turtle.fuel,fuel); eq(we.turtle.calls,0)
+end)
+
+test('setup refuses a frozen fuel recipient even when its original task is idle',function()
+  local e=env('worker',{})
+  assert(CP.new(e.fs,e.textutils,'/autobuilder/data/worker.state'):save({schema=1,id=8,role='worker',boot=1,phase='telemetry',
+    position={known=true,x=12,y=64,z=-9,heading='north'},fuelRecovery={phase='frozen'}}))
+  local ok,why=pcall(require('autobuilder.setup_wizard').run,{'fuel'},e)
+  assert(not ok and tostring(why):find('fuel recovery',1,true))
+end)
+
+test('fuel setup copies only validated profile fields and ignores cyclic unknown data',function()
+  local e=env('worker',{}); local fuel=C.load({fuel={enabled=true}}).fuel; fuel.extra=fuel
+  e.rednet.receive=function() return 1,{version=1,type='setup_profile',requestId=e.packet.message.requestId,fuel=fuel} end
+  local profile=require('autobuilder.setup_share').fetch(e,C.load({role='worker',controllerId=1}))
+  eq(profile.fuel.enabled,true); eq(profile.fuel.extra,nil)
+end)

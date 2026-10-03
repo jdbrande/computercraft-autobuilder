@@ -125,3 +125,10 @@ test('remote refuel dispatch budgets overhead travel and the navigation return r
   for _,j in pairs(f.q.state.jobs) do assert(j.type~='REFUEL','unsafe station trip was queued') end
   assert(f.app.state.fuel.stations.home.error:find('rescue'))
 end)
+
+test('fuel status reports physical station stock owners and actionable shortages without moving items',function()
+  local f=fixture(); f:tick(); local before=f.h.transfers
+  local description=f.fuel:describe()
+  assert(description:find('home',1,true)); assert(description:find('stock=0',1,true)); assert(description:find('fill=task:',1,true))
+  eq(f.h.transfers,before)
+end)

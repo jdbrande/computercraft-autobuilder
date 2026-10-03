@@ -41,6 +41,7 @@ function M.new(app,config,e,queue,production,clock)
     local item=station.item or config.fuel.item
     local _,count=inspect(station,item)
     local target=station.targetItems or 16
+    row.stock=count; row.item=item; row.target=target; row.observedAt=clock()
     if count<target then
       local n=target-count
       local job=queue:submit('FUEL_STATION',{station=U.copy(station),item=item,quantity=n,
@@ -90,6 +91,33 @@ function M.new(app,config,e,queue,production,clock)
     F.commit(job,save,function() job.status='running' end)
     return F.transfer(p,e,save,source.name,source.slot,job.station.inventory,slot,job.item,
       math.min(source.count,room,job.quantity-(p.delivered or 0)),job.station.inventory,1,'delivered',nil,true)
+  end
+  function self:describe()
+    local lines={'FUEL '..(config.fuel.enabled and 'automatic' or 'disabled')..' low='..config.fuel.low..' target='..config.fuel.target}
+    for _,station in ipairs(config.fuel.stations) do
+      local row=stations[station.id] or {}
+      lines[#lines+1]=station.id..' worker='..station.workerId..' stock='..tostring(row.stock or 'unknown')..'/'..(station.targetItems or 16)
+        ..' fill='..tostring(row.fill or '-')..' refuel='..tostring(row.refuel or '-')
+      local fill=row.fill and queue.state.jobs[row.fill]
+      local why=row.error or fill and (fill.error or fill.stockError)
+      if why then lines[#lines+1]=station.id..': '..why end
+    end
+    local ids={}; for id in pairs(app.state.workers) do ids[#ids+1]=id end; table.sort(ids)
+    for _,id in ipairs(ids) do
+      local w=app.state.workers[id]; local t=w.telemetry or {}
+      lines[#lines+1]='Worker '..id..' fuel='..tostring(t.fuel or 'unknown')..' required='..tostring(t.fuelRequired or config.fuel.low)
+        ..' '..(w.online and 'online' or 'offline')
+      local why=(app.state.fuel.errors or {})[id]; if why then lines[#lines+1]=why end
+    end
+    local jobs={}; for _,j in pairs(queue.state.jobs) do if j.type=='RESCUE' and not j.rescueSettled then jobs[#jobs+1]=j end end
+    table.sort(jobs,function(a,b) return a.id<b.id end)
+    for _,j in ipairs(jobs) do
+      lines[#lines+1]=j.id..' courier='..tostring(j.workerId or j.preferredWorker)..' recipient='..j.targetWorker
+        ..' delivered='..(j.fuelDelivered or 0)..'/'..j.quantity..' budget='..j.fuelBudget..' '..j.status
+      lines[#lines+1]='Recipient '..tostring(j.receiverPhase or 'waiting for freeze')..' '..tostring(j.rescueError or j.error or '')
+    end
+    app.state.fuelLines=lines
+    return table.concat(lines,'; ')
   end
   function self:step()
     if not config.fuel.enabled or app.state.assignmentRecovery then return false end

@@ -25,6 +25,15 @@ function M.draw(term,state,agent,page,input)
     local perPage=math.max(1,height-10); local pages=math.max(1,math.ceil(#details/perPage)); page=(page or 0)%pages
     for i=page*perPage+1,math.min(#details,(page+1)*perPage) do line(details[i]) end
     if pages>1 then line('Help '..(page+1)..'/'..pages..' - Shift N: next page') end
+  elseif state.role=='controller' and state.view=='fuel' then
+    local details={}
+    for _,text in ipairs(state.fuelLines or {'Type fuel to refresh fuel status.'}) do
+      while #text>width do details[#details+1]=text:sub(1,width); text=text:sub(width+1) end
+      details[#details+1]=text
+    end
+    local perPage=math.max(1,height-6); local pages=math.max(1,math.ceil(#details/perPage)); page=(page or 0)%pages
+    line('Fuel '..(page+1)..'/'..pages..' | Shift N/P')
+    for i=page*perPage+1,math.min(#details,(page+1)*perPage) do line(details[i]) end
   elseif state.role=='controller' and state.view=='exploration' then
     local x=state.exploration or {}; line('EXPLORATION '..(x.paused and '[PAUSED]' or ''))
     local details={}

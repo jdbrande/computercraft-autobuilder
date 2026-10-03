@@ -59,6 +59,7 @@ local function idle(e,config,preparation)
   if state then
     assert(state.schema==1 and state.id==e.os.getComputerID() and state.role==config.role
       and U.integer(state.boot) and type(state.phase)=='string','Invalid or foreign checkpoint')
+    assert(not state.fuelRecovery and not state.fuelResume,'Finish fuel recovery before setup')
     assert(not state.assignmentRecovery and not state.currentTask and not state.motionReservation
       and not next(state.pendingSupplyAcks or {}),'Finish current jobs and acknowledgements before setup')
     assert(not (state.firstBuild and state.firstBuild.autoStart),'Finish the requested first test before changing setup; pausing keeps its saved settings in use')
@@ -69,7 +70,10 @@ local function idle(e,config,preparation)
     local a=state.automation or {}
     assert(not a.supply,'Finish the outstanding supply batch before setup')
     for _,jobs in ipairs({state.jobs or {},a.jobs or {},preparation and {} or a.requests or {}}) do
-      for _,job in pairs(jobs) do assert(job.status=='completed','Finish queued or paused work before setup') end
+      for _,job in pairs(jobs) do
+        assert(job.type~='RESCUE' or job.rescueSettled,'Finish fuel recovery before setup')
+        assert(job.status=='completed','Finish queued or paused work before setup')
+      end
     end
     for _,project in pairs(a.projects or {}) do
       assert(not ({building=true,verifying=true,repairing=true,clearing=true,preparing=not preparation})[project.phase],
@@ -381,8 +385,8 @@ local function loadFuel(e)
   end
 end
 function M.run(args,e,opts)
-  assert(#args==0 or (#args==1 and (args[1]=='builder' or args[1]=='controller' or args[1]=='miner' or args[1]=='factory' or args[1]=='crafter' or args[1]=='exploration'))
-    or (#args==2 and args[1]=='miner'),'Usage: setup [builder|controller|miner [resource]|factory|crafter]')
+  assert(#args==0 or (#args==1 and (args[1]=='fuel' or args[1]=='builder' or args[1]=='controller' or args[1]=='miner' or args[1]=='factory' or args[1]=='crafter' or args[1]=='exploration'))
+    or (#args==2 and args[1]=='miner'),'Usage: setup [builder|controller|miner [resource]|factory|crafter|fuel]')
   if args[1]=='miner' and args[2] and args[2]~='explore' then assert(miningResources(args[2])) end
   assert(not e.fs.exists('/.autobuilder-install/transaction'),'Run /installer.lua --recover before setup')
   local original=IO.read(e.fs,settingsPath)
@@ -401,7 +405,14 @@ function M.run(args,e,opts)
     if not retry(e,tostring(why)..'. Attach a wireless modem to this computer/turtle.') then return cancel(e) end
   end
   local pose
-  if factory then
+  if args[1]=='fuel' then
+    assert(config.depot,'Set up this worker depot before enabling automatic fuel')
+    local profile=require('autobuilder.setup_share').fetch(e,config)
+    assert(profile.fuel and profile.fuel.enabled,'Configure and enable fuel on the controller first')
+    overrides.fuel=U.copy(profile.fuel)
+    e.print('Automatic fuel: '..profile.fuel.item..', low '..profile.fuel.low..', target '..profile.fuel.target)
+    e.print('Depot remains '..describe(config.depot)..'. Saving does not move or refuel this turtle.')
+  elseif factory then
     if not require('autobuilder.factory_setup').configure(e,overrides,config,ask) then return cancel(e) end
   elseif args[1]=='exploration' then
     if not explorationController(e,overrides,config) then return cancel(e) end
