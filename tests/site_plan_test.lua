@@ -76,3 +76,55 @@ test('site plan emits valid bounded survey contracts and keeps workspace scans a
   eq(job.siteSurvey.columns[1].minY,64);eq(job.siteSurvey.columns[1].foundationY,nil)
   eq(job.siteSurvey.identity,p.identity)
 end)
+
+local function workPlan(source,options)
+  local plan=require('autobuilder.build.site_plan').new(source,{origin={x=10,y=0,z=10}},string.rep('a',64),options or {margin=0,minY=-4,maxY=15})
+  local payload=plan:survey(1,1,64)
+  local record={identity=plan.identity,region=1,clearanceY=payload.clearanceY,report={identity=plan.identity,region=1,observations={}}}
+  for _,c in ipairs(payload.siteSurvey.columns) do record.report.observations[#record.report.observations+1]={x=c.x,y=-3,z=c.z,status='surface',name='minecraft:stone'} end
+  return plan,record
+end
+
+test('survey-derived work clears hills while preserving planned states and fills actual depressions',function()
+  local source={schema=1,size={x=2,y=2,z=1},palette={{name='minecraft:air',state={}},{name='minecraft:oak_log',state={axis='x'}}},
+    runs={{id=2,count=1},{id=1,count=3}},metadata={},requirements={}}
+  local plan,record=workPlan(source);record.report.observations[2].y=2
+  local j,nextCursor=plan:work(1,record,'clear',1,64)
+  eq(nextCursor,nil);eq(#j.blocks,6);eq(j.blocks[1].y,2)
+  local keep=0;for _,b in ipairs(j.blocks) do if b.retain then keep=keep+1;eq(b.retain.name,'minecraft:oak_log');eq(b.retain.state.axis,'x') end end;eq(keep,1)
+  j,nextCursor=plan:work(1,record,'fill',1,64,'minecraft:cobblestone')
+  eq(nextCursor,nil);eq(#j.blocks,3)
+  eq(j.blocks[1].x,10);eq(j.blocks[1].y,-2);eq(j.blocks[2].y,-1);eq(j.blocks[3].x,11);eq(j.blocks[3].y,-1)
+  for _,b in ipairs(j.blocks) do assert(b.support);eq(b.name,'minecraft:cobblestone') end
+  assert(require('autobuilder.build.site_work').validContract(j))
+end)
+
+test('stepped preparation never fills explicit air below the planned elevated foundation',function()
+  local source={schema=1,size={x=1,y=3,z=1},palette={{name='minecraft:air',state={}},{name='minecraft:stone',state={}}},
+    runs={{id=1,count=2},{id=2,count=1}},metadata={site={foundation={columns={{x=0,z=0,y=2}}}}},requirements={}}
+  local plan,record=workPlan(source)
+  local j=plan:work(1,record,'fill',1,64,'minecraft:cobblestone')
+  eq(#j.blocks,3);eq(j.blocks[1].y,-2);eq(j.blocks[2].y,-1);eq(j.blocks[3].y,2);eq(j.blocks[3].name,'minecraft:stone');assert(not j.blocks[3].support)
+  local seen={};j=plan:work(1,record,'clear',1,64)
+  for _,b in ipairs(j.blocks) do seen[b.y]=b end
+  assert(seen[0] and seen[1] and not seen[0].retain and not seen[1].retain);eq(seen[2].retain.name,'minecraft:stone')
+end)
+
+test('work batches are bounded resumable and refuse blocked mismatched or unstable fill evidence',function()
+  local source={schema=1,size={x=8,y=8,z=8},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=512}},metadata={},requirements={}}
+  local plan,record=workPlan(source,{margin=0,minY=-64,maxY=319})
+  local cursor,total,seen=1,0,{}
+  repeat
+    local j,nextCursor=plan:work(1,record,'verify_clear',cursor,7)
+    eq(j.siteWork.stage,'verify');assert(#j.blocks<=7)
+    for _,b in ipairs(j.blocks) do local key=b.x..','..b.y..','..b.z;assert(not seen[key]);seen[key]=true;total=total+1 end
+    cursor=nextCursor
+  until not cursor
+  eq(total,64*9)
+  local bad=U.copy(record);bad.report.observations[1].status='blocked';bad.report.observations[1].reason='inaccessible';bad.report.observations[1].name=nil
+  assert(not pcall(plan.work,plan,1,bad,'clear',1,8))
+  bad=U.copy(record);bad.identity=string.rep('b',64);assert(not pcall(plan.work,plan,1,bad,'clear',1,8))
+  assert(not pcall(plan.work,plan,1,record,'fill',1,8,'minecraft:sand'))
+  assert(not pcall(plan.work,plan,1,record,'clear',0,8))
+  assert(not pcall(plan.work,plan,1,record,'clear',1,513))
+end)

@@ -20,8 +20,22 @@ Configure `build.site.minY`, `build.site.maxY` and `build.site.margin` before im
 (defaults-64,319 and1). These settings and `build.regionSize` are captured with the
 project. At most four survey payloads are pending at once. Bounded region evidence
 is checkpointed under `<dataDir>/sites/<project>/<geometry identity>/<generation>/`;
-missing or corrupt evidence cannot certify preparation. Automatic excavation/fill
-and the normal construction gate are still being implemented.
+missing or corrupt evidence cannot certify preparation.
+
+`build level house` runs survey followed by bounded excavation, foundation fill,
+and preparation verification. It preserves matching schematic cells and required
+air, including intentional stepped foundations. Debris returns use the worker's
+registered private home buffer and central storage before the region continues.
+Fill prefers available common stable terrain materials, accounting for reservations;
+missing stock follows the ordinary production/supply path. Existing suitable ground
+is retained. Each region must pass foundation and clearance verification before it
+is reported prepared; failures retain coordinates, observed blocks and reasons.
+Independent regions continue when another has a defect.
+
+This command is an intermediate0.23 development feature. Automatic construction
+gating, recovery of lost region evidence, flowing-fluid clearance and native
+uneven-terrain acceptance are still being implemented. A `site_ready` result does
+not place the structural schematic. Final `build auto` integration follows.
 
 Import reads one binary snapshot, validates the whole structure, and saves an
 immutable JSON copy. Corrupt data creates no project; unsupported entities or

@@ -101,3 +101,19 @@ test('preparation can inspect and fill beneath a retained partial floor from a s
   run(new(),150);eq(j.phase,'completed');eq(j.report.counts.correct,1);eq(w.places,1);eq(w.digs,0)
   eq(w.blocks['1,1,0'].name,'minecraft:stone');eq(w.blocks['1,0,0'].name,'minecraft:cobblestone')
 end)
+
+test('stable foundation fill displaces water or lava with a measured restart-safe placement',function()
+  for _,fluid in ipairs({'minecraft:water','minecraft:lava'}) do
+    local w,c,j,nav,new=fixture({{x=1,y=0,z=0,name='minecraft:cobblestone',state={},support=true}},'fill')
+    w.blocks['1,0,0']={name=fluid,state={level=0}};w.items[1]={name='minecraft:cobblestone',count=2}
+    local place=w.turtle.placeDown
+    w.turtle.placeDown=function()
+      -- A solid block replaces a fluid cell; the fixture's ordinary placement
+      -- helper otherwise treats all inspected cells as solid obstacles.
+      if w.blocks['1,0,0'] and w.blocks['1,0,0'].name==fluid then w.blocks['1,0,0']=nil end
+      return place()
+    end
+    w.crashPlace=true;local ex=new();run(ex);assert(j.intent);assert(ex:resume());run(new())
+    eq(j.phase,'completed');eq(w.digs,0);eq(w.places,1);eq(w.blocks['1,0,0'].name,'minecraft:cobblestone');eq(w.items[1].count,1)
+  end
+end)

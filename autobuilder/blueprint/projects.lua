@@ -6,7 +6,7 @@ local E=require('autobuilder.resources.exploration')
 local M={}
 function M.new(app,config,e,queue,production)
   local s=queue.state; local cache,sites={},{}; local self={}
-  local siteService=require('autobuilder.build.site_service').new(app,config,e,queue)
+  local siteService=require('autobuilder.build.site_service').new(app,config,e,queue,production)
   local function save() return app:save() end
   local function project(name)
     local p=s.projects[name or s.currentProject]; assert(p,'Unknown project; use build import <file.schem|file.json> [name]'); return p
@@ -253,7 +253,7 @@ function M.new(app,config,e,queue,production)
       s.projects[title]=p; s.currentProject=title; save(); return true,'Imported '..title
     end
     local p=project(name); s.currentProject=p.name
-    if action=='status' then return true,p.name..': '..p.phase..' '..(p.completed or 0)..'/'..(p.total or 0)..' blocks' end
+    if action=='status' then return true,p.name..': '..p.phase..' '..(p.completed or 0)..'/'..(p.total or 0)..' positions'..(p.error and '; '..p.error or '') end
     if action=='pause' then
       p.paused=true
       pauseProduction(p,true)
@@ -265,12 +265,17 @@ function M.new(app,config,e,queue,production)
       for _,id in ipairs(p.jobs) do local j=s.jobs[id]; if j then j.paused=false; j.resumeRequested=true end end
       save(); return true,'Resuming '..p.name
     end
-    if action=='survey' then
+    if action=='survey' or action=='level' then
       assert(config.build.enabled,'Set build.enabled=true and configure the build origin first')
       assert(p.phase~='settling','Project still owns worker or inventory settlement')
       for _,id in ipairs(p.jobs) do assert(s.jobs[id].status=='completed','Project still owns unfinished tasks; pause/resume instead') end
       if not p.run or p.phase=='built' or p.phase=='verified' then startRun(p,false) end
-      siteService:start(p,sitePlan(p,true));return true,'Surveying '..p.name
+      if action=='level' and (p.phase=='surveyed' or p.phase=='survey_blocked') then
+        siteService:startWork(p,sitePlan(p,true));return true,'Preparing site '..p.name
+      end
+      siteService:start(p,sitePlan(p,true))
+      if action=='level' then p.levelAfterSurvey=true;assert(save()) end
+      return true,'Surveying '..p.name
     end
     local a=analysis(p,true); p.total=p.mode=='VERIFY' and a.volume or p.mode=='CLEAR' and a.airCount or #a.blocks; p.volume=a.volume; p.airCells=a.airCount; p.issues=a.issues; p.requirements=U.copy(a.requirements)
     if action=='analyze' or action=='materials' or action=='simulate' then
@@ -284,7 +289,7 @@ function M.new(app,config,e,queue,production)
     end
     assert(#a.issues==0,'Unsupported palette or entity data; inspect build analyze before unattended work')
     if action=='prepare' or action=='auto' then
-      assert(not ({building=true,clearing=true,verifying=true,repairing=true,settling=true,surveying=true})[p.phase],'Project is already active; use pause/resume')
+      assert(not ({building=true,clearing=true,verifying=true,repairing=true,settling=true,surveying=true,preparing_site=true})[p.phase],'Project is already active; use pause/resume')
       if not p.run or p.phase=='built' or p.phase=='verified' then startRun(p,true) end
       if action=='auto' then p.autoStart=true end
       if not next(a.requirements) then
@@ -308,7 +313,7 @@ function M.new(app,config,e,queue,production)
       p.autoStart=nil
       save(); return true,p.phase..' '..p.name
     end
-    return false,'build import|analyze|materials|survey|auto|prepare|start|status|pause|resume|verify|repair|clear [name]'
+    return false,'build import|analyze|materials|survey|level|auto|prepare|start|status|pause|resume|verify|repair|clear [name]'
   end
   function self:tick()
     if s.retiredBlueprints and #s.retiredBlueprints>0 then
@@ -321,6 +326,10 @@ function M.new(app,config,e,queue,production)
     for _,p in pairs(s.projects) do
       local work,requests=linked(p);actors(p,work)
       if p.phase=='surveying' then siteService:tick(p,sitePlan(p)) end
+      if p.levelAfterSurvey and not p.paused and (p.phase=='surveyed' or p.phase=='survey_blocked') then
+        siteService:startWork(p,sitePlan(p));p.levelAfterSurvey=nil;assert(save())
+      end
+      if p.phase=='preparing_site' then siteService:workTick(p,sitePlan(p)) end
       if p.phase=='settling' and not p.paused then settle(p,work,requests) end
       if p.phase=='preparing' and s.requests[p.requestId].status=='completed' then p.phase='ready'; save() end
       if p.phase=='ready' and p.autoStart and not p.paused then

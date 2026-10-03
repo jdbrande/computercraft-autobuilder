@@ -95,6 +95,57 @@ function M.new(source,transform,sourceHash,options)
     return {type='SURVEY_SITE',clearanceY=bounds.max.y,bounds=self:region(regionIndex).bounds,
       siteSurvey={identity=planId,region=regionIndex,columns=columns}},nextCursor
   end
+  function self:work(regionIndex,evidence,stage,cursor,limit,fill)
+    local verify=stage=='verify_clear' or stage=='verify_fill'
+    local clearing=stage=='clear' or stage=='verify_clear'
+    assert(clearing or stage=='fill' or stage=='verify_fill','invalid preparation stage')
+    integer(cursor,1,262145,'invalid preparation cursor');integer(limit,1,512,'preparation batch must be 1..512')
+    assert(type(evidence)=='table' and evidence.identity==planId and evidence.region==regionIndex
+      and U.integer(evidence.clearanceY) and evidence.clearanceY>=bounds.max.y and evidence.clearanceY<=maxY,'site evidence differs from geometry')
+    local survey=self:survey(regionIndex,1,64);survey.clearanceY=evidence.clearanceY;survey.bounds.max.y=evidence.clearanceY
+    for _,c in ipairs(survey.siteSurvey.columns) do c.clearanceY=evidence.clearanceY end
+    assert(require('autobuilder.build.site_survey').validReport(survey,evidence.report,true),'invalid preparation survey evidence')
+    if not clearing then assert(C.family(fill)=='cube' and C.classify(fill,{})=='SUPPORTED','fill must be a supported stable cube') end
+    local ranges={};local total=0
+    for i,c in ipairs(survey.siteSurvey.columns) do
+      local observed=evidence.report.observations[i]
+      assert(observed.status~='blocked','site column remains inaccessible: '..c.x..','..observed.y..','..c.z)
+      local low,high
+      if clearing then low=math.min(origin.y,c.foundationY and c.foundationY+1 or origin.y);high=evidence.clearanceY-1
+      elseif c.foundationY then
+        high=c.foundationY
+        local solid=observed.status=='surface' and require('autobuilder.build.site_work').support(observed.name)
+        low=math.min(high,observed.y+(solid and 1 or 0))
+      end
+      if low and low<=high then
+        ranges[#ranges+1]={column=c,first=total+1,last=total+high-low+1,low=low,high=high}
+        total=total+high-low+1
+      end
+    end
+    assert(cursor<=total+1,'preparation cursor exceeds work')
+    local blocks={};local position=cursor
+    for _,r in ipairs(ranges) do if position<=r.last then
+      position=math.max(position,r.first)
+      while position<=r.last and #blocks<limit do
+        local y=clearing and r.high-(position-r.first) or r.low+(position-r.first)
+        local p={x=r.column.x,y=y,z=r.column.z};local wanted=self:wanted(p)
+        if clearing then
+          p.name='minecraft:air';p.state={}
+          if wanted and not C.isAir(wanted.name) then p.retain={name=wanted.name,state=wanted.state} end
+          blocks[#blocks+1]=p
+        elseif not wanted or y==r.column.foundationY then
+          p.name=wanted and wanted.name or fill;p.state=wanted and wanted.state or {};p.support=not wanted or nil
+          blocks[#blocks+1]=p
+        end
+        position=position+1;Cooperate.every(position)
+      end
+      if #blocks==limit then break end
+    end end
+    if #blocks==0 then return nil,nil,total end
+    local payload={type='PREPARE_REGION',blocks=blocks,bounds=survey.bounds,clearanceY=evidence.clearanceY,
+      siteWork={identity=planId,region=regionIndex,stage=verify and 'verify' or clearing and 'clear' or 'fill'}}
+    return payload,position<=total and position or nil,total
+  end
   return self
 end
 return M

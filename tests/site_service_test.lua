@@ -69,3 +69,75 @@ test('site evidence survives root checkpoint failure without double counting or 
   service=new();service:tick(p,plan);eq(p.site.completed,1);assert(not j.siteReport)
   service:tick(p,plan);eq(p.site.completed,1)
 end)
+
+local function surveyedFixture()
+  local e,c,app,q,p,plan,new,finish=fixture();local service=new();service:start(p,plan)
+  for _=1,100 do
+    for _,j in pairs(q.state.jobs) do if j.status~='completed' then finish(j) end end
+    service:tick(p,plan);if p.phase=='surveyed' then break end
+  end
+  eq(p.phase,'surveyed')
+  app.mining={storage={counts={['minecraft:dirt']=30,['minecraft:cobblestone']=10}}}
+  app.state.workers['12']={id=12,online=true,lastSeen=101,telemetry={status='idle',cargo={items={},limits={}}}}
+  local production={ledger=require('autobuilder.storage.ledger').new(app.state,function() return true end),returns={}}
+  function production.returns:request(owner,key)
+    for _,r in pairs(q.state.returns or {}) do if r.key==key then return r end end
+    q.state.returns=q.state.returns or {};local r={id='return:'..owner,owner=owner,key=key,status='queued'};q.state.returns[r.id]=r;return r
+  end
+  service=require('autobuilder.build.site_service').new(app,c,e,q,production)
+  return e,c,app,q,p,plan,service,production
+end
+
+test('preparation service executes bounded batches and verifies every region before certifying it',function()
+  local e,c,app,q,p,plan,service,production=surveyedFixture();service:startWork(p,plan)
+  for _=1,800 do
+    service:workTick(p,plan)
+    for _,j in pairs(q.state.jobs) do if j.type=='PREPARE_REGION' and j.status~='completed' then
+      assert(#j.blocks<=8);j.workerId=12;j.status='completed';j.completedAt=100;j.progress=#j.blocks;j.report={counts={correct=#j.blocks},entries={}}
+    end end
+    if p.phase=='site_ready' then break end
+  end
+  eq(p.phase,'site_ready');eq(p.site.work.completed,plan.regionCount);eq(p.site.work.blocked,0)
+  for region=1,plan.regionCount do assert(service:prepared(p,plan,region));eq(service:evidence(p,plan,region).preparation.fill,'minecraft:dirt') end
+  local count=0;for _,j in pairs(q.state.jobs) do if j.type=='PREPARE_REGION' then count=count+1;assert(not j.report and not j.blocks,'completed work payload retained') end end
+  assert(count>plan.regionCount*2,'verification or fill phase skipped')
+end)
+
+test('preparation waits for exact debris settlement and retains bounded defects without stalling other regions',function()
+  local e,c,app,q,p,plan,service=surveyedFixture();service:startWork(p,plan);for _=1,8 do service:workTick(p,plan) end
+  local first
+  for _,j in pairs(q.state.jobs) do if j.type=='PREPARE_REGION' then first=j end end
+  assert(first);first.workerId=12;first.status='completed';first.completedAt=100;first.progress=#first.blocks;first.report={counts={correct=#first.blocks},entries={}}
+  app.state.workers['12'].telemetry.cargo={items={['minecraft:dirt']=2},limits={['minecraft:dirt']=64}}
+  for _=1,8 do service:workTick(p,plan) end
+  local r=assert(q.state.returns and next(q.state.returns) and select(2,next(q.state.returns)));eq(r.status,'queued')
+  local record=service:evidence(p,plan,first.siteWork.region);eq(record.preparation.jobId,first.id)
+  r.status='completed';r.settledAt=102;app.state.workers['12'].telemetry.cargo={items={},limits={}}
+  for _=1,1000 do
+    service:workTick(p,plan)
+    for _,j in pairs(q.state.jobs) do if j.type=='PREPARE_REGION' and j.status~='completed' then
+      j.workerId=12;j.status='completed';j.completedAt=100
+      local blocked=j.siteWork.region==1 and j.siteWork.stage=='verify'
+      j.progress=#j.blocks-(blocked and 1 or 0);j.report={counts={correct=j.progress},entries={}}
+      if blocked then j.report.counts.wrong=1;j.report.entries={{x=j.blocks[1].x,y=j.blocks[1].y,z=j.blocks[1].z,status='wrong',actual={name='minecraft:bedrock'},reason='protected'}} end
+    end end
+    if p.phase=='site_blocked' then break end
+  end
+  eq(p.phase,'site_blocked');eq(p.site.work.blocked,1)
+  assert(not service:prepared(p,plan,1));assert(service:prepared(p,plan,2))
+  local blocked=service:evidence(p,plan,1).preparation;assert(blocked.defects[1].reason);assert(blocked.defects[1].actual.name)
+end)
+
+test('preparation retains root receipts until both evidence checkpoints contain their consumption',function()
+  local e,c,app,q,p,plan,service=surveyedFixture();service:startWork(p,plan)
+  for _=1,8 do service:workTick(p,plan) end
+  local first;for _,j in pairs(q.state.jobs) do if j.type=='PREPARE_REGION' then first=j;break end end
+  assert(first);local region=first.siteWork.region
+  p.site.work.active={[tostring(region)]={region=region}};p.site.work.cursor=plan.regionCount+1
+  first.workerId=12;first.status='completed';first.completedAt=100;first.progress=#first.blocks;first.report={counts={correct=#first.blocks},entries={}}
+  service:workTick(p,plan)
+  local record,path=service:evidence(p,plan,region);eq(record.preparation.lastJob,first.id);assert(first.report)
+  e.fs.fault.open=path..'.tmp';assert(not pcall(service.workTick,service,p,plan));assert(first.report,'worker receipt pruned before backup advanced')
+  e.fs.fault.open=nil;service:workTick(p,plan);assert(not first.report)
+  e.fs.files[path]='corrupt';local backup=assert(service:evidence(p,plan,region));eq(backup.preparation.lastJob,first.id);assert(not backup.preparation.jobId)
+end)

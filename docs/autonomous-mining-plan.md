@@ -914,7 +914,7 @@ requirements until all acceptance below passes.
 
 ### Task43: Survey, protection and preparation ownership
 
-- [ ] Add native inspection survey reports and validated bounded contracts; distinguish
+- [x] Add native inspection survey reports and validated bounded contracts; distinguish
   observed terrain from hidden/blocked cells. Persist progress and retry safely.
 - [ ] Share infrastructure/worker/route protection before every mutation and admission;
   reserve independent preparation regions and access envelopes durably. Test paused,

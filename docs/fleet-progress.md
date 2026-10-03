@@ -29,8 +29,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Worker home/unloading and project settlement integrated/pushed at `bb9c41e`:
   623 Lua/18 Python, two native trials, final review fixes and release checks.
 - Current branch `milestone/0.23.0`: general automatic site preparation. Immutable
-  geometry, project surface surveys and shared protection/admission are implemented;
-  excavation/fill, debris collection and verified construction gates remain.
+  geometry, project surveys, protected excavation/fill batches, debris collection
+  and `build level` verification are implemented. Normal construction gates, fluid
+  clearance, evidence recovery and native uneven-terrain acceptance remain.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -73,10 +74,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 30–31: priorities/scheduling | Capabilities, dependencies and exclusive jobs | Priority/cost/fuel/chunk scheduling, dynamic roles and simultaneous projects |
 | 32–34: monitor, commands, logs | Terminal screens and role/project commands, rotating logs | Monitor fleet dashboard, consistent fleet/project/resource/recovery commands, structured significant events |
 | 35–37: messages, duplicates, checkpoints | Existing validation, exact receipts and physical-action journals | Apply and regression-test every new message and side effect |
-| 38–39: completion and failures | Verified small projects and visible blocked states | Final inventory/logistics/worker settlement gate, bounded automatic retries and actionable project errors |
+| 38–39: completion and failures | Verified projects and final inventory/logistics/worker settlement accepted0.22 | Broader bounded automatic retries and actionable project errors |
 | 41–42: dependency-ordered milestones | Exploration, dependency/provider graph and count ownership integrated | Implement remaining milestones using existing controller/executor boundaries |
 | 44: dynamic fleet scaling | Shared-material explorers and capability-based queues provide partial foundations | Demand/yield/travel/rate allocation, role minimum/maximum counts, bottleneck response, safe idle reassignment and scale-down; simulation and live miners/clearers/builders ramp-up |
-| 45: automatic site preparation and leveling | Existing site-preparation executor and placement inspection provide partial foundations | Full footprint/workspace survey, intended multi-elevation foundations, excavation/fill acquisition, fluid/falling-block rechecks, durable independent regions, verified preparation gates, partial-structure preservation and uneven-terrain live acceptance |
+| 45: automatic site preparation and leveling | Immutable geometry, bounded survey/work contracts, protected native action journals, `build level` runtime with partial-floor retention, debris return and verified fill | Normal per-region construction gates, evidence recovery, flowing-fluid clearance and larger uneven-terrain live acceptance |
 
 ## Evidence and discovered bugs
 
@@ -526,3 +527,19 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Physical batch foundation gate:660 Lua/18 Python tests passed; release0.23
   generation/check and whitespace checks passed. Continuing bounded survey-derived
   work planning and full project integration on the same milestone branch.
+
+- Survey-derived batches now preserve planned states and explicit air through stepped
+  foundations, fill observed low terrain and verify foundation/clearance separately.
+  Stable foundation placement displaces water/lava with exact restart receipts;
+  draining/containing flowing fluids for clearance remains unfinished.
+- `build level` runs survey→excavation→debris return→fill→verification through real
+  controller/worker modules. Its runtime regression preserves a partial floor, clears
+  a mound, fills low supports and survives controller restart without operator work.
+  Scheduler regressions bound active work, select unreserved fill, require durable
+  debris settlement and allow independent regions to finish around a blocked region.
+- Region report pruning now advances the evidence backup before deleting root task
+  receipts. A failing evidence write retains the worker report; primary corruption
+  subsequently recovers consumed progress from the backup. Full gates are running.
+- Survey-derived leveling service gate:668 Lua/18 Python tests passed; release0.23
+  generation/check and whitespace checks passed. Committing this intermediate
+  service and continuing evidence recovery and normal per-region build gates.

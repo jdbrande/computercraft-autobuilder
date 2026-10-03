@@ -445,3 +445,23 @@ test('project survey retries real overhead obstructions with higher immutable ac
   assert(count>1 and height>3,'obstructed route never caused a higher attempt')
   eq(w.blocks['2,2,0'].name,'minecraft:stone');eq(p.protectedBounds.max.y,height)
 end)
+
+test('build level surveys excavates returns debris fills holes and verifies a retained partial structure',function()
+  local w,ce,we,c,b,step,reboot=fixture({site={minY=-2,maxY=15}})
+  w.blocks['2,1,0']={name='minecraft:dirt',state={}};w.blocks['2,0,0']={name='minecraft:stone',state={}};w.blocks['3,-2,0']={name='minecraft:stone',state={}}
+  assert(c:command('build import /example.json terrain'));assert(c:command('build level terrain'))
+  local restarted=false
+  for _=1,3000 do
+    step();local p=c.state.automation.projects.terrain
+    if not restarted and w.digs>0 and p.phase=='preparing_site' then c,b=reboot();restarted=true end
+    if (p.phase=='site_ready' or p.phase=='site_blocked') and not b.state.currentTask then break end
+  end
+  local p=c.state.automation.projects.terrain
+  if p.phase~='site_ready' then
+    local errors={};for id,j in pairs(c.state.automation.jobs) do if j.status~='completed' then errors[#errors+1]=id..':'..j.status..':'..tostring(j.error) end end
+    error(p.phase..':'..tostring(p.error)..':'..table.concat(errors,';'))
+  end
+  assert(restarted);eq(w.digs,1);eq(w.blocks['2,0,0'].name,'minecraft:stone');assert(not w.blocks['2,1,0']);assert(not w.blocks['3,0,0'])
+  assert(w.blocks['2,-1,0'] and w.blocks['3,-1,0'],'foundation not filled');eq(p.site.work.blocked,0)
+  local returns=0;for _,r in pairs(c.state.automation.returns) do eq(r.status,'completed');returns=returns+1 end;assert(returns>0,'debris was not collected')
+end)

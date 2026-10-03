@@ -17,6 +17,7 @@ end
 function M.support(name)
   return C.family(name)=='cube' or C.family(name)=='log' or name=='minecraft:grass_block'
 end
+function M.fluid(name) return name=='minecraft:water' or name=='minecraft:lava' end
 function M.drops(block,config)
   if (config.protectedBlocks or {})[block.name] then return nil end
   local name=block.name;local family=C.family(name)
