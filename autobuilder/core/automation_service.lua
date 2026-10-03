@@ -110,6 +110,9 @@ function M.new(app,config,e,network,clock)
     return false,'unexpected worker task packet'
   end
   function self:preflight()
+    for _,jobs in ipairs({app.state.jobs or {},queue.state.jobs}) do
+      for _,j in pairs(jobs) do require('autobuilder.core.scaling').record(app.state,j,function() return app:save() end,clock()) end
+    end
     if config.automation.enabled then fuel:tick(); rescue:tick() end
   end
   function self:tick()

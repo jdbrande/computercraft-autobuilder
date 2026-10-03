@@ -124,6 +124,11 @@ function M.new(state,save,clock,id,chunks,config)
   end
   local resendCursor=0
   function self:assign(workers)
+    local Scaling=require('autobuilder.core.scaling')
+    local function admit(j,w)
+      if config and config.scaling then return Scaling.canAssign(state,config,j,w,nil,clock(),workers) end
+      return not M.workerBusy(state,w.id,j.id),'worker already owns work'
+    end
     local ordered={}; for _,j in pairs(s.jobs) do ordered[#ordered+1]=j end
     table.sort(ordered,function(a,b) return a.created<b.created or (a.created==b.created and a.id<b.id) end)
     local factoryPending=M.factoryPending(state)
@@ -153,12 +158,16 @@ function M.new(state,save,clock,id,chunks,config)
               and (not j.preferredWorker or j.preferredWorker==w.id)
               and not M.workerBusy(state,w.id,j.id) then ids[#ids+1]=tonumber(wid) end
           end
-          table.sort(ids)
+          table.sort(ids,function(a,b)
+            local pa,pb=Scaling.preference(state,config,j,workers[tostring(a)]),Scaling.preference(state,config,j,workers[tostring(b)])
+            return pa<pb or pa==pb and a<b
+          end)
           for _,wid in ipairs(ids) do
             local lease,why
             local admission,reason=require('autobuilder.core.protection').canOwn(state,j,wid)
+            if admission then admission,reason=admit(j,workers[tostring(wid)]) end
             if not admission then why=reason
-            elseif chunks then lease,why=chunks:reserve(j,workers[tostring(wid)],true,self.preparationReady) else lease={status='disabled'} end
+            elseif chunks then lease,why=chunks:reserve(j,workers[tostring(wid)],true,self.preparationReady,admit,clock()) else lease={status='disabled'} end
             j.coverageError=why
             if lease then
               if lease.status~='disabled' then return j end
@@ -167,7 +176,14 @@ function M.new(state,save,clock,id,chunks,config)
                 admission,reason=false,'preparation verifier is unavailable'
                 if self.preparationReady then admission,reason=self.preparationReady(j) end
               end
-              if admission then j.workerId=wid;j.status='assigned';persist();return j end
+              if admission then admission,reason=admit(j,workers[tostring(wid)]) end
+              if admission then
+                local before={workerId=j.workerId,status=j.status,assignedAt=j.assignedAt}
+                j.workerId=wid;j.status='assigned';j.assignedAt=clock()
+                local ok,err=pcall(persist)
+                if not ok then j.workerId=before.workerId;j.status=before.status;j.assignedAt=before.assignedAt;error(err,0) end
+                return j
+              end
               j.coverageError=reason
             end
           end

@@ -541,6 +541,7 @@ local function parallelFixture()
   end})
   second.we.os.getComputerID=function() return 13 end; second.we.fs=S.fs()
   f.cc.turtleFuelReserveItems={}; f.cc.craftingBatchSize=2
+  f.cc.scaling.roles.crafting.min=2 -- These recovery fixtures require both private stations to participate.
   f.cc.craftingStation.input=''; f.cc.craftingStation.output=''
   f.cc.craftingStations={{id='west',workerId=12,buffer='buffer',input='input',output='output'},
     {id='east',workerId=13,buffer='buffer2',input='input2',output='output2'}}
@@ -887,4 +888,23 @@ test('pause arriving during adaptive observation prevents claims and physical st
   f.ce.peripheral.call=function(name,method,...) if method=='getItemLimit' then j.paused=true end;return call(name,method,...) end
   f.c.automation.production:step()
   eq(j.factoryFlow,nil);eq(f.c.state.capacityLedger.leases[j.id],nil);eq(f.c.state.inventoryLedger.leases[j.id],nil);eq(f.h.transfers,0)
+end)
+
+test('crafting role limits gate new private stock while scale down drains owned batches',function()
+  local f=parallelFixture();f.cc.scaling.roles.crafting={min=0,max=0};f:request(16)
+  for _=1,30 do f:step() end
+  eq(f.h.crafts+f.other.h.crafts,0)
+  for _,j in pairs(f.c.state.automation.jobs) do if j.privateStation then assert(not j.factoryFlow,'zero craft cap staged stock') end end
+  f.cc.scaling.roles.crafting.max=1
+  local staged
+  for _=1,100 do
+    f:step()
+    for _,j in pairs(f.c.state.automation.jobs) do if j.factoryFlow then staged=j;break end end
+    if staged then break end
+  end
+  assert(staged);f.cc.scaling.roles.crafting.max=0
+  for _=1,150 do f:step() end
+  eq(staged.status,'completed');eq(f.h:count(mc('stone_bricks')),8)
+  for _,j in pairs(f.c.state.automation.jobs) do if j.privateStation and j.id~=staged.id then assert(not j.factoryFlow) end end
+  f.cc.scaling.roles.crafting={min=2,max=2};f:finish();eq(f.h:count(mc('stone_bricks')),16)
 end)

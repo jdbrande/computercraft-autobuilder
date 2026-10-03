@@ -943,3 +943,19 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   regressions and existing mining/coordination checks pass. Dispatch integration,
   diagnostics, actual-runtime/native acceptance and final review are still pending;
   no claim that scaling is active yet.
+
+- Dynamic allocation now gates mining and workflow dispatch, splits exploration
+  quotas among admitted workers, prefers specialized candidates and rechecks limits
+  after yielding chunk calls. Ownership timestamps share the assignment checkpoint;
+  failed writes restore the job and loaded-area lease. Existing owners remain valid
+  after a reduced cap. Private crafting and hauling check limits before staging
+  stock and drain existing claims even when the corresponding maximum becomes zero.
+  Producer windows expand above their four-region lookahead floor for larger fleets.
+- Focused0.24 ownership coverage passed110 checks; producer/service coverage passed60,
+  and quota/crafting/hauling runtime coverage passed79. Regressions cover zero-cap
+  staging, cap reduction during collection, stationary unfueled crafters, haul travel
+  estimates and counting physical collection in delivery rates. Historical parallel
+  recovery fixtures explicitly request two crafting workers (and the small shared
+  mining accounting case two miners) to retain their original fault/concurrency
+  coverage under the new automatic small-work policy. General bottleneck allocation,
+  status/limit commands and native ramp/drain acceptance remain unfinished.

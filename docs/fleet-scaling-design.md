@@ -85,3 +85,11 @@ workers and configured0..128 role limits. They are estimates; final dispatch ret
 all existing material, station, tool, fuel, region and route checks. Home, fuel and
 rescue operations and temporary-access restoration bypass ordinary scale-down so
 changing a role maximum cannot strand an existing physical obligation.
+
+Producer windows retain a four-region lookahead floor and expand to at most64 with
+eligible registered capacity. The floor lets surveys find independent usable work
+while an early region is blocked; it does not authorize more physical owners than
+the role limit. Hauling bootstrap estimates include the round trip between private
+endpoints. Stationary crafting does not require movement fuel. Final grants recheck
+idle state, capabilities and role capacity after yielding observations. Stock staging
+uses the same limits, and existing staged batches retain their owners through drain.

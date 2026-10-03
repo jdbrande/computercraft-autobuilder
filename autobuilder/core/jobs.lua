@@ -63,6 +63,14 @@ function M.new(state,save,clock,controllerId,config,chunks)
     elseif g.status=='completed' then g.status='running'; g.error=nil end
     return g
   end
+  local function admission(job,w,workers,counts)
+    local t=w.telemetry
+    if not w.online or not t or not (t.capabilities or {}).mining or job.item and not Materials.accepts(t.miningResources,job.item) then
+      return false,'mining worker capability or resources changed'
+    end
+    if config and config.scaling then return require('autobuilder.core.scaling').canAssign(state,config,job,w,counts,clock(),workers) end
+    return not Coordination.workerBusy(state,w.id,job.id),'worker already owns work'
+  end
   local planning={}
   local function assignExploration(workers,counts)
     if not config or not (config.exploration or {}).enabled or exploration.paused or Coordination.factoryPending(state) or not counts then return end
@@ -81,6 +89,11 @@ function M.new(state,save,clock,controllerId,config,chunks)
           if w.online and t and t.capabilities and t.capabilities.explorationV1 and E.home(t.explorationHome)
             and Materials.accepts(t.miningResources,g.item) and t.status=='idle' and not t.task and not Coordination.workerBusy(state,w.id) then eligible=eligible+1 end
         end
+        if config.scaling then
+          local allocation=require('autobuilder.core.scaling').snapshot(state,config,counts,clock(),workers).mining
+          eligible=math.min(eligible,math.max(0,allocation.desired-allocation.active))
+          if eligible==0 then g.error='mining allocation '..allocation.active..'/'..allocation.desired;return end
+        end
         local cursor=planning[g.id] or {worker=1,sector=1}
         local reason=cursor.reason or 'No online exploration-capable worker'; local waiting=cursor.waiting or false
         for wi=cursor.worker,#ids do
@@ -89,7 +102,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
           if w.online and t and t.capabilities and t.capabilities.explorationV1 and E.home(home) and Materials.accepts(t.miningResources,g.item) then
             if t.fuel~='unlimited' and t.fuel<2*#home.exitRoute+config.minimumFuelReserve+config.mining.returnMargin+2 then
               reason='insufficient round-trip fuel for worker '..wid
-            elseif t.status=='idle' and not t.task and not Coordination.workerBusy(state,wid) then
+            elseif t.status=='idle' and not t.task and not Coordination.workerBusy(state,wid) and admission({type='MINE'},w,workers,counts) then
               local choices=E.candidates(exploration.sectors,config.exploration,g.item,home.exitRoute[#home.exitRoute] or home.depot)
               reason='Search envelope exhausted for '..g.item
               local areas={}
@@ -112,9 +125,12 @@ function M.new(state,save,clock,controllerId,config,chunks)
                   g.tripIds[#g.tripIds+1]=j.id
                   local oldStatus,oldError=g.status,g.error;g.status='running';g.error=nil
                   local ok,lease,err=pcall(function()
-                    if chunks then return chunks:reserve(j,w,true) end
+                    if chunks then return chunks:reserve(j,w,true,nil,function(job,worker) return admission(job,worker,workers,counts) end,clock()) end
                     return {status='disabled'}
                   end)
+                  if ok and lease and lease.status=='disabled' then
+                    local allowed,why=admission(j,w,workers,counts);if not allowed then lease=nil;err=why end
+                  end
                   if not ok or not lease then
                     state.jobs[j.id]=nil;table.remove(g.tripIds);g.status=oldStatus;g.error=oldError
                     if not ok then error(lease) end
@@ -122,7 +138,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
                   else
                     planning[g.id]=nil;g.status='running';g.error=nil
                     if lease.status=='disabled' then
-                      j.workerId=wid;j.status='assigned'
+                      j.workerId=wid;j.status='assigned';j.assignedAt=clock()
                       local saved,why=pcall(persist)
                       if not saved then state.jobs[j.id]=nil;table.remove(g.tripIds);g.status=oldStatus;g.error=oldError;error(why) end
                     end
@@ -182,7 +198,10 @@ function M.new(state,save,clock,controllerId,config,chunks)
       if w.online and t and t.capabilities and t.capabilities.mining and not t.task and t.status=='idle'
         and U.integer(w.id) and miningArea(t)~=false then candidates[#candidates+1]=w end
     end
-    table.sort(candidates,function(a,b) return a.id<b.id end)
+    table.sort(candidates,function(a,b)
+      local Scaling=require('autobuilder.core.scaling');local pa,pb=Scaling.preference(state,config,{type='MINE'},a),Scaling.preference(state,config,{type='MINE'},b)
+      return pa<pb or pa==pb and a.id<b.id
+    end)
     local queued={}
     for _,job in pairs(state.jobs) do
       if job.status=='queued' and not job.paused and not job.workerId and not Coordination.factoryPending(state) then
@@ -198,20 +217,30 @@ function M.new(state,save,clock,controllerId,config,chunks)
       else
         for _,w in ipairs(candidates) do
           local bounds=miningArea(w.telemetry)
-          if not w.telemetry.capabilities.explorationV1 and Materials.accepts(w.telemetry.miningResources,job.item) and not conflict(w.id,bounds) then
+          if not w.telemetry.capabilities.explorationV1 and Materials.accepts(w.telemetry.miningResources,job.item) and not conflict(w.id,bounds) and admission(job,w,workers,counts) then
             local oldArea,oldResources=job.miningArea,job.miningResources
             job.miningArea=U.copy(bounds);job.miningResources=U.copy(w.telemetry.miningResources)
             local ok,lease,why=pcall(function()
-              if chunks then return chunks:reserve(job,w,true) end
+              if chunks then return chunks:reserve(job,w,true,nil,function(j,worker) return admission(j,worker,workers,counts) end,clock()) end
               return {status='disabled'}
             end)
+            if ok and lease and lease.status=='disabled' then
+              local allowed,reason=admission(job,w,workers,counts);if not allowed then lease=nil;why=reason end
+            end
             if not ok or not lease then
               job.miningArea=oldArea;job.miningResources=oldResources
               if not ok then error(lease) end
               job.coverageError=why
             else
               job.coverageError=nil
-              if lease.status=='disabled' then job.workerId=w.id;job.status='assigned';persist() end
+              if lease.status=='disabled' then
+                local oldStatus,oldTime=job.status,job.assignedAt
+                job.workerId=w.id;job.status='assigned';job.assignedAt=clock()
+                local saved,err=pcall(persist)
+                if not saved then
+                  job.workerId=nil;job.status=oldStatus;job.assignedAt=oldTime;job.miningArea=oldArea;job.miningResources=oldResources;error(err,0)
+                end
+              end
               return job
             end
           end
@@ -260,6 +289,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
       elseif p.phase=='blocked' then j.status='blocked'; j.error=p.error
       else j.status='running' end
       j.progress={delivered=p.delivered,held=p.held,phase=p.phase,exploration=E.cleanReport(p.exploration)}
+      if j.physicalComplete then j.physicalCompletedAt=j.physicalCompletedAt or clock() end
       self:refreshAcquisition(j.exploration.groupId,stock or 0); persist(); return true
     end
     j.progress={delivered=p.delivered,held=p.held,phase=p.phase}
@@ -277,6 +307,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
       else j.status='blocked'; j.error='waiting for live storage to confirm requested stock' end
     elseif p.phase=='blocked' then j.status='blocked'; j.error=p.error or 'worker blocked'
     else j.status='running'; j.error=nil end
+    if j.physicalComplete then j.physicalCompletedAt=j.physicalCompletedAt or clock() end
     persist(); return true
   end
   function self:replan(id,stock)

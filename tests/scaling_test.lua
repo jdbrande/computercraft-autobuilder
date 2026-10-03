@@ -1,7 +1,7 @@
 local U=require('autobuilder.core.util')
 local function fixture(n)
   local c=require('autobuilder.config').load({minimumFuelReserve=5})
-  local s={workers={},jobs={},automation={jobs={},projects={}},exploration={groups={}}}
+  local s={workers={},jobs={},automation={jobs={},projects={},sequence=0,cells={}},exploration={groups={}}}
   for id=1,n or 4 do s.workers[tostring(id)]={id=id,online=true,telemetry={status='idle',fuel=1000,
     capabilities={mining=true,explorationV1=true,building=true,siteWorkV1=true,siteSurveyV1=true,crafting=true,courier=true},
     position={x=0,y=1,z=0,known=true},depot={x=0,y=1,z=0}}} end
@@ -106,4 +106,56 @@ test('measured delivery rate changes useful allocation without crediting held or
   eq(s.fleet.metrics.mining.units,60)
   local fast=S.snapshot(s,c,{},100).mining;assert(fast.desired<slow);eq(fast.remaining,60);eq(fast.rate,1)
   c.scaling.roles.mining.min=3;eq(S.snapshot(s,c,{},100).mining.desired,3)
+end)
+
+test('workflow dispatch obeys role caps selects specialized idle workers and rechecks after a yielding claim',function()
+  local s,c=fixture(3);local S=require('autobuilder.core.scaling')
+  c.scaling.roles.building.max=1;s.workers['3'].telemetry.capabilities={building=true}
+  local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+  local a=Q:submit('BUILD',{blocks={{x=100,y=1,z=0,name='minecraft:stone',state={}}}})
+  local b=Q:submit('BUILD',{blocks={{x=200,y=1,z=0,name='minecraft:stone',state={}}}})
+  eq(Q:assign(s.workers).id,a.id);eq(a.workerId,3);eq(a.assignedAt,100)
+  a.status='running';s.workers['3'].telemetry.task=a.id
+  eq(Q:assign(s.workers),nil);assert(not b.workerId)
+  a.status='completed';s.workers['3'].telemetry.task=nil
+  local chunks={reserve=function() c.scaling.roles.building.max=0;return {status='disabled'} end}
+  Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 101 end,7,chunks,c)
+  eq(Q:assign(s.workers),nil);assert(not b.workerId,'stale role target assigned after yielding coverage')
+end)
+
+test('failed workflow ownership checkpoint leaves an idle worker and unchanged job for retry',function()
+  local s,c=fixture(1);local fail=false
+  local Q=require('autobuilder.core.workflows').new(s,function() return not fail,'disk full' end,function() return 100 end,7,nil,c)
+  local j=Q:submit('BUILD',{blocks={{x=100,y=1,z=0,name='minecraft:stone',state={}}}});fail=true
+  assert(not pcall(Q.assign,Q,s.workers));assert(not j.workerId);eq(j.status,'queued');eq(j.assignedAt,nil)
+  fail=false;eq(Q:assign(s.workers).id,j.id)
+end)
+
+test('loaded ownership applies the final scaling check and checkpoints its assignment time atomically',function()
+  local s,c=fixture(1);c.chunkLoading.areas={{minX=-1,maxX=10,minZ=-1,maxZ=1}}
+  s.workers['1'].telemetry.capabilities.chunkCoverageV1=true
+  local fail=false;local save=function() return not fail,'disk full' end
+  local chunks=require('autobuilder.core.chunks').new(s,c,save)
+  local Q=require('autobuilder.core.workflows').new(s,save,function() return 100 end,7,chunks,c)
+  local j=Q:submit('BUILD',{requiresSite=true,blocks={{x=100,y=1,z=0,name='minecraft:stone',state={}}}})
+  local calls=0;Q.preparationReady=function() calls=calls+1;if calls==2 then c.scaling.roles.building.max=0 end;return true end
+  eq(Q:assign(s.workers),nil);assert(not j.workerId);eq(s.chunkLedger.leases[j.id],nil)
+  c.scaling.roles.building.max=1;Q.preparationReady=function() return true end;fail=true
+  assert(not pcall(Q.assign,Q,s.workers));assert(not j.workerId);eq(j.assignedAt,nil);eq(s.chunkLedger.leases[j.id],nil)
+  fail=false;eq(Q:assign(s.workers).id,j.id);eq(j.assignedAt,100);eq(s.chunkLedger.leases[j.id].workerId,1)
+end)
+
+test('stationary crafting remains useful without movement fuel and larger fleets widen bounded region windows',function()
+  local s,c=fixture(12);local S=require('autobuilder.core.scaling')
+  for _,w in pairs(s.workers) do w.telemetry.fuel=0 end
+  job(s,'craft','CRAFT',100);eq(S.snapshot(s,c,{},100).crafting.idle,12)
+  eq(S.snapshot(s,c,{},100).building.idle,0)
+  eq(S.window(s,c,'clearing'),12);c.scaling.roles.clearing.max=6;eq(S.window(s,c,'clearing'),6)
+end)
+
+test('delivery rates include collection after worker completion and exclude unfinished private stock',function()
+  local s,c=fixture();local S=require('autobuilder.core.scaling')
+  local j=job(s,'collect','TRANSPORT',8);j.logistics={};j.workerId=1;j.assignedAt=10;j.completedAt=20
+  j.status='collecting';j.delivered=8;assert(not S.record(s,j,function() return true end,30))
+  j.status='completed';assert(S.record(s,j,function() return true end,40));eq(s.fleet.metrics.hauling.seconds,30)
 end)

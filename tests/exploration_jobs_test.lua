@@ -78,7 +78,7 @@ test('production requests use exploration groups and wait for physical returns',
   ps:tick(); assert(r.acquired)
 end)
 test('small exploration demands share finite quotas across eligible idle workers',function()
-  local j,s,w=fixture(); j:requestAcquisition('minecraft:cobblestone',4,0,'small')
+  local j,s,w,c=fixture();c.scaling.roles.mining.min=2; j:requestAcquisition('minecraft:cobblestone',4,0,'small')
   local a=assert(j:assign(w,{})); eq(a.quantity,2)
   local b=assert(j:assign(w,{})); eq(b.quantity,2); assert(a.workerId~=b.workerId)
 end)
@@ -104,4 +104,24 @@ test('distant infrastructure cannot exhaust exploration protection payload limit
   assert(j,'irrelevant distant protected areas prevented a local mission')
   assert(#j.exploration.protectedAreas<=128)
   for _,box in ipairs(j.exploration.protectedAreas) do assert(require('autobuilder.resources.exploration').overlaps(box,c.exploration.bounds)) end
+end)
+
+test('exploration scaling caps shared demand and splits quotas among admitted workers',function()
+  local jobs,s,workers,c=fixture();c.scaling.roles.mining={min=2,max=2}
+  local g=jobs:requestAcquisition('minecraft:coal',64,0,'scaled')
+  local first=assert(jobs:assign(workers,{}));eq(first.quantity,32);eq(first.assignedAt,1)
+  first.status='running';workers[tostring(first.workerId)].telemetry.task=first.id
+  local second=assert(jobs:assign(workers,{}));eq(second.quantity,32);assert(second.workerId~=first.workerId)
+  second.status='running';workers[tostring(second.workerId)].telemetry.task=second.id
+  c.scaling.roles.mining.max=0;c.scaling.roles.mining.min=0
+  local before=#g.tripIds;eq(jobs:assign(workers,{}),nil);eq(#g.tripIds,before)
+  eq(first.workerId,1);eq(second.workerId,2)
+end)
+
+test('exploration scaling rechecks changed capacity after loaded-area calls before claiming a trip',function()
+  local jobs,s,workers,c=fixture();c.scaling.roles.mining.max=1
+  local chunks={reserve=function() c.scaling.roles.mining.max=0;return {status='disabled'} end}
+  jobs=require('autobuilder.core.jobs').new(s,function() return true end,function() return 100 end,7,c,chunks)
+  local g=jobs:requestAcquisition('minecraft:coal',64,0,'yielding-scale')
+  eq(jobs:assign(workers,{}),nil);eq(#g.tripIds,0);eq(next(s.jobs),nil)
 end)

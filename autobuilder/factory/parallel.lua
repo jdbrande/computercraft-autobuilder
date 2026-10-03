@@ -106,6 +106,7 @@ function M.new(app,config,e,queue,production)
         and t.capabilities and t.capabilities.isolatedCraftingV1
         and not Q.workerBusy(app.state,job.preferredWorker,job.id),'waiting for available preferred Crafty worker')
       local allowed,why=Q.factoryCanRun(app.state,job,true);assert(allowed,why)
+      allowed,why=require('autobuilder.core.scaling').canAssign(app.state,config,job,worker,app.mining.storage.counts,now());assert(allowed,why)
     end
     eligible()
     local observed=require('autobuilder.storage.capacity').observe(e)
