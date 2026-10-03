@@ -20,6 +20,14 @@ function M.new(app,config,e,network,clock)
   if s.role=='controller' then
     self.storage=require('autobuilder.storage.storage').new(e.peripheral,config.storageInventories)
     self.jobs=require('autobuilder.core.jobs').new(s,save,clock,s.id,config)
+    if (config.exploration or {}).enabled then
+      if s.exploration.gridBase and not same(s.exploration.gridBase,config.exploration.base) then
+        for _,j in pairs(s.jobs) do assert(j.physicalComplete or j.status=='completed','Finish exploration work before changing its base grid') end
+        s.exploration.sectors={}; s.exploration.bounds=nil
+      end
+      s.exploration.gridBase=U.copy(config.exploration.base)
+      if s.exploration.bounds then config.exploration.bounds=U.copy(s.exploration.bounds); assert(E.validate(config.exploration)) end
+    end
     function self:refresh()
       local ok,err=self.storage:refresh(); s.storageError=err
       if ok then s.resourceCounts=U.copy(self.storage.counts) else s.resourceCounts={} end
@@ -27,7 +35,26 @@ function M.new(app,config,e,network,clock)
     end
     function self:command(line)
       local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
-      if args[1]=='mine' then
+      if args[1]=='exploration' then
+        assert((config.exploration or {}).enabled,'Run setup exploration on the controller first')
+        if args[2]=='status' or args[2]==nil then s.view='exploration'; return true,'Exploration '..(s.exploration.paused and 'paused' or 'enabled') end
+        if args[2]=='pause' or args[2]=='resume' then
+          local previous=s.exploration.paused; s.exploration.paused=args[2]=='pause'
+          local ok,err=save(); if not ok then s.exploration.paused=previous; return false,err end
+          return true,'Exploration '..args[2]
+        end
+        if args[2]=='expand' then
+          local radius=tonumber(args[3]); assert(#args==3 and U.integer(radius) and radius>0,'Usage: exploration expand <positive radius>')
+          local chosen=U.copy(config.exploration); local b=chosen.base
+          local old=chosen.bounds; chosen.bounds={min={x=b.x-radius,y=old.min.y,z=b.z-radius},max={x=b.x+radius,y=old.max.y,z=b.z+radius}}
+          for _,a in ipairs({'x','z'}) do assert(chosen.bounds.min[a]<=old.min[a] and chosen.bounds.max[a]>=old.max[a],'Expansion cannot shrink existing territory') end
+          local valid,why=E.validate(chosen); assert(valid,why)
+          local previous=s.exploration.bounds; s.exploration.bounds=U.copy(chosen.bounds)
+          local ok,err=save(); if not ok then s.exploration.bounds=previous; return false,err end
+          config.exploration.bounds=chosen.bounds; s.view='exploration'; return true,'Expanded search boundary; keep the entire area loaded and within modem range'
+        end
+        return false,'exploration status|expand <radius>|pause|resume'
+      elseif args[1]=='mine' then
         if #args~=3 then return false,'Usage: mine minecraft:raw_iron 100' end
         local ok,err=self:refresh(); if not ok then return false,err end
         local job,why=self.jobs:submit(args[2],tonumber(args[3]),self.storage:getCount(args[2]))
@@ -135,7 +162,7 @@ function M.new(app,config,e,network,clock)
       local job=self.jobs:assign(s.workers,self.storage.counts)
       if job then
         lastSend=clock()
-        send(job.workerId,'mine_assign',{jobId=job.id,item=job.item,quantity=job.quantity,miningArea=job.miningArea,miningResources=job.miningResources,exploration=job.exploration})
+        send(job.workerId,'mine_assign',{jobId=job.id,item=job.item,quantity=job.quantity,miningArea=job.miningArea,miningResources=job.miningResources,exploration=job.exploration,returnRequested=job.exploration and (s.exploration.paused or s.exploration.groups[job.exploration.groupId].paused or not (config.exploration or {}).enabled) or nil})
       end
       return true
     end
@@ -198,7 +225,7 @@ function M.new(app,config,e,network,clock)
           if s.currentTask.id==p.jobId and s.currentTask.item==p.item and s.currentTask.quantity==p.quantity and same(s.currentTask.exploration,p.exploration) then return true end
           return false,'worker already owns a different task'
         end
-        s.currentTask={id=p.jobId,type='MINE',item=p.item,quantity=p.quantity,exploration=p.exploration and E.cleanGeometry(p.exploration),phase='setup',delivered=0,miningArea=U.copy(p.miningArea),miningResources=U.copy(p.miningResources or config.mining.resources or {})}
+        s.currentTask={id=p.jobId,type='MINE',item=p.item,quantity=p.quantity,returnRequested=p.returnRequested,exploration=p.exploration and E.cleanGeometry(p.exploration),phase='setup',delivered=0,miningArea=U.copy(p.miningArea),miningResources=U.copy(p.miningResources or config.mining.resources or {})}
         s.status='setup'; local ok,err=save()
         if not ok then s.currentTask=nil; s.status='idle'; return false,err end
         return true

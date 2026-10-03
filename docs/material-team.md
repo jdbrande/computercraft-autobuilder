@@ -1,5 +1,8 @@
 # Let the turtles gather the building materials
 
+For miners that find deposits automatically, use the [exploration guide](autonomous-mining.md).
+The resource-specific fixed-area setup below remains supported.
+
 The controller can now run different miners at the same time, make missing blocks,
 and start building when the materials arrive. Type **8**, then Enter, on the
 controller to see each resource and its assigned turtle.

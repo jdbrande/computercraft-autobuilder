@@ -236,6 +236,30 @@ local function miningResources(line)
   if #resources>0 then return resources end
   return nil,'Enter one or more resources, or all for an unrestricted miner.'
 end
+local function explorationController(e,overrides,config)
+  local E=require('autobuilder.resources.exploration')
+  local function input(label,validate,default)
+    return ask(e,label..' (cancel to stop)',function(v) if v=='cancel' then return false end; return validate(v) end,default)
+  end
+  local function integer(v) local n=tonumber(v); if U.integer(n) then return n end end
+  e.print('Automatic exploration: one operating boundary, no deposit coordinates.')
+  local base=input('Base position x y z',coordinate); if not base then return false end
+  local radius=input('Horizontal radius',function(v) local n=integer(v); if n and n>=1 and n<=256 then return n end end,'64'); if not radius then return false end
+  local minDimension=input('Dimension minimum Y',integer,tostring(config.exploration.dimensionMinY)); if minDimension==false then return false end
+  local maxDimension=input('Dimension maximum Y',integer,tostring(config.exploration.dimensionMaxY)); if maxDimension==false then return false end
+  local minY=input('Search minimum Y',integer,tostring(math.max(minDimension,base.y-16))); if minY==false then return false end
+  local maxY=input('Search maximum Y',integer,tostring(math.min(maxDimension,base.y+16))); if maxY==false then return false end
+  e.print('Protect all base storage, cables, farms and machines. Additional restrictedAreas remain in effect.')
+  local low=input('Protected base minimum x y z',coordinate); if not low then return false end
+  local high=input('Protected base maximum x y z',coordinate); if not high then return false end
+  local chosen={enabled=true,base=base,bounds={min={x=base.x-radius,y=minY,z=base.z-radius},max={x=base.x+radius,y=maxY,z=base.z+radius}},baseProtection={min=low,max=high},dimensionMinY=minDimension,dimensionMaxY=maxDimension}
+  local ok,why=E.validate(chosen); assert(ok,why)
+  e.print('Search bounds: '..describe(chosen.bounds.min)..' through '..describe(chosen.bounds.max))
+  e.print('Protected base: '..describe(low)..' through '..describe(high))
+  e.print('Software does not load chunks. Keep every search cell and depot loaded and within modem coverage.')
+  if not yes(e,'Is this operating boundary loaded, reachable and protected as shown? yes/no') then return false end
+  overrides.exploration=chosen; return true
+end
 local function miner(e,overrides,config,resource)
   assert(e.turtle,'Miner setup requires a turtle')
   assert(config.controllerId~=e.os.getComputerID(),'A worker cannot be its own controller')
@@ -248,7 +272,7 @@ local function miner(e,overrides,config,resource)
   end
   e.print('Miner '..e.os.getComputerID()..' - park directly ABOVE its dedicated deposit chest/barrel.')
   e.print('Connect that chest by wired modem and cable to controller '..config.controllerId..'. Add its peripheral name to controller STOCK during controller setup.')
-  e.print('Keep SUPPLY separate. Every miner needs a different mine site with the requested resources actually present; setup does not create deposits.')
+  e.print(resource=='explore' and 'Explorers receive their search areas from the controller. Keep SUPPLY separate from deposit chests.' or 'Keep SUPPLY separate. Every miner needs a different mine site with the requested resources actually present; setup does not create deposits.')
   e.print('Keep a pickaxe and wireless modem equipped. Reserve slot 16 for the scanner; without a scanner the miner uses a limited strip survey.')
   while true do
     local ok,found,block=pcall(e.turtle.inspectDown)
@@ -266,6 +290,20 @@ local function miner(e,overrides,config,resource)
   local aliases={n='north',e='east',s='south',w='west',north='north',east='east',south='south',west='west'}
   position.heading=input('Turtle faces north/east/south/west',function(v) return aliases[v:lower()] end)
   if not position.heading then return nil end
+  if resource=='explore' then
+    e.print('Declare a CLEAR exit beyond the protected base. Route order: vertical, then X, then Z. No digging is allowed along this exit.')
+    local delta={north={0,-1},east={1,0},south={0,1},west={-1,0}}; local d=delta[position.heading]
+    local target=input('Clear exit endpoint x y z',coordinate,describe({x=position.x+d[1],y=position.y,z=position.z+d[2]})); if not target then return nil end
+    assert(U.distance(position,target)<=math.min(config.maxTravelDistance,1024),'Exit exceeds travel limit')
+    local route={}; local p={x=position.x,y=position.y,z=position.z}
+    for _,axis in ipairs({'y','x','z'}) do while p[axis]~=target[axis] do p[axis]=p[axis]+(target[axis]>p[axis] and 1 or -1); route[#route+1]=U.copy(p) end end
+    e.print('Depot '..describe(position)..'; clear exit '..describe(target)..'; '..#route..' moves.')
+    if not yes(e,'Is this route clear and the deposit chest connected to controller STOCK? yes/no') then return nil end
+    overrides.depot=U.copy(position); overrides.initialPosition=U.copy(position)
+    overrides.mining=U.copy(overrides.mining or {}); overrides.mining.enabled=true; overrides.mining.mode='explore'; overrides.mining.resources={}; overrides.mining.exitRoute=route
+    e.print('Provide startup fuel before assigning missions. Setup does not move or consume fuel.')
+    return position
+  end
   local resources
   if resource then resources=assert(miningResources(resource))
   else resources=input('Resources (space/comma separated; all means unrestricted)',miningResources) end
@@ -322,7 +360,7 @@ local function miner(e,overrides,config,resource)
   assert(found and block and containers[block.name],'Deposit chest changed. Leave the turtle parked, then rerun setup.')
   overrides.depot=U.copy(position); overrides.initialPosition=U.copy(position)
   overrides.mining=U.copy(overrides.mining or {}); overrides.mining.enabled=true; overrides.mining.resources=resources
-  overrides.mining.entry=entry; overrides.mining.bounds=bounds
+  overrides.mining.mode='fixed'; overrides.mining.entry=entry; overrides.mining.bounds=bounds
   overrides.automation=U.copy(overrides.automation or {}); overrides.automation.enabled=true; overrides.automation.building=false
   e.print('Slot 15 = bottom row, third box: put 16 coal/charcoal or 2 coal blocks there. Keep slot 16 reserved.')
   e.print('Saving loads slot 15 fuel toward 1000 after settings are saved. Setup does not move or dig. Replenish fuel between trips; the deposit chest is below, not a fuel supply.')
@@ -342,15 +380,15 @@ local function loadFuel(e)
   end
 end
 function M.run(args,e,opts)
-  assert(#args==0 or (#args==1 and (args[1]=='builder' or args[1]=='controller' or args[1]=='miner' or args[1]=='factory' or args[1]=='crafter'))
+  assert(#args==0 or (#args==1 and (args[1]=='builder' or args[1]=='controller' or args[1]=='miner' or args[1]=='factory' or args[1]=='crafter' or args[1]=='exploration'))
     or (#args==2 and args[1]=='miner'),'Usage: setup [builder|controller|miner [resource]|factory|crafter]')
-  if args[1]=='miner' and args[2] then assert(miningResources(args[2])) end
+  if args[1]=='miner' and args[2] and args[2]~='explore' then assert(miningResources(args[2])) end
   assert(not e.fs.exists('/.autobuilder-install/transaction'),'Run /installer.lua --recover before setup')
   local original=IO.read(e.fs,settingsPath)
   local fn,err=load(original,'@settings.lua','t',{}); assert(fn,err)
   local overrides=fn(); assert(type(overrides)=='table','Settings must return a plain table')
   local config=Config.load(overrides)
-  if args[1] then assert((args[1]=='controller' or args[1]=='factory')==(config.role=='controller'),'Setup role does not match this installation') end
+  if args[1] then assert((args[1]=='controller' or args[1]=='factory' or args[1]=='exploration')==(config.role=='controller'),'Setup role does not match this installation') end
   local factory=args[1]=='factory' or args[1]=='crafter'
   local preparation=args[1]=='factory'
   idle(e,config,preparation)
@@ -364,15 +402,18 @@ function M.run(args,e,opts)
   local pose
   if factory then
     if not require('autobuilder.factory_setup').configure(e,overrides,config,ask) then return cancel(e) end
+  elseif args[1]=='exploration' then
+    if not explorationController(e,overrides,config) then return cancel(e) end
   elseif config.role=='controller' then
     if not controller(e,overrides,config) then return cancel(e) end
   else
     if args[1]=='miner' then pose=miner(e,overrides,config,args[2]) else pose=worker(e,overrides,config) end
     if not pose then return cancel(e) end
   end
-  if not yes(e,pose and 'Save settings and load slot 15 coal/charcoal or coal blocks if needed? yes/no' or 'Save these settings? yes/no') then return cancel(e) end
+  local exploring=args[1]=='miner' and args[2]=='explore'
+  if not yes(e,pose and not exploring and 'Save settings and load slot 15 coal/charcoal or coal blocks if needed? yes/no' or 'Save these settings? yes/no') then return cancel(e) end
   persist(e,config,overrides,pose,original,preparation)
-  if pose then loadFuel(e) end
+  if pose and not exploring then loadFuel(e) end
   if opts and opts.returnToApp then e.print('Setup saved. Returning to Autobuilder...')
   else e.print('Setup saved. Run reboot to reconnect.') end
   if config.role=='controller' then e.print(factory and 'Factory saved. Use 8 on the controller to see the material team.' or 'Then run setup on one builder. Use setup miner on gathering turtles.') end

@@ -254,3 +254,13 @@ test('explorer rejects a duplicate assignment whose saved geometry changed',func
   p.exploration.bounds.max.x=3
   assert(not worker.mining:handle(7,{type='mine_assign',payload=p}))
 end)
+test('exploration expansion survives restart and refuses shrinking or oversized territory',function()
+  local _,ce,_,_,_,cc=fixture()
+  cc.exploration={enabled=true,base={x=0,y=0,z=0},bounds={min={x=-8,y=0,z=-8},max={x=8,y=2,z=8}},baseProtection={min={x=0,y=-1,z=0},max={x=0,y=-1,z=0}},dimensionMinY=-64,dimensionMaxY=319}
+  local R=require('autobuilder.core.runtime'); local c=R.new(cc,ce)
+  assert(c:command('exploration expand 16')); eq(c.state.exploration.bounds.max.x,16)
+  assert(not c:command('exploration expand 4')); assert(not c:command('exploration expand 10000'))
+  assert(c:command('exploration pause')); assert(c.state.exploration.paused)
+  c=R.new(cc,ce); assert(c.state.exploration.paused); eq(c.state.exploration.bounds.min.x,-16)
+  assert(c:command('exploration resume')); assert(not c.state.exploration.paused)
+end)

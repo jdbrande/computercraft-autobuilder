@@ -25,6 +25,26 @@ function M.draw(term,state,agent,page,input)
     local perPage=math.max(1,height-10); local pages=math.max(1,math.ceil(#details/perPage)); page=(page or 0)%pages
     for i=page*perPage+1,math.min(#details,(page+1)*perPage) do line(details[i]) end
     if pages>1 then line('Help '..(page+1)..'/'..pages..' - Shift N: next page') end
+  elseif state.role=='controller' and state.view=='exploration' then
+    local x=state.exploration or {}; line('EXPLORATION '..(x.paused and '[PAUSED]' or ''))
+    local details={}
+    local ids={}; for id in pairs(x.groups or {}) do ids[#ids+1]=id end; table.sort(ids)
+    for _,id in ipairs(ids) do
+      local g=x.groups[id]
+      details[#details+1]=g.item..' '..((state.resourceCounts or {})[g.item] or 0)..'/'..g.target..' '..g.status
+      if g.error then details[#details+1]=g.error end
+      for _,jid in ipairs(g.tripIds) do
+        local j=state.jobs[jid]
+        if j and not j.physicalComplete then
+          local w=state.workers[tostring(j.workerId)]; local t=w and w.telemetry
+          details[#details+1]='Turtle '..j.workerId..' sector '..j.exploration.sectorId..' '..j.status
+          details[#details+1]='Delivered '..j.progress.delivered..'/'..j.quantity..' fuel '..tostring(t and t.fuel or '?')..' cursor '..tostring(j.progress.exploration and j.progress.exploration.cursor or j.exploration.cursor)
+        end
+      end
+    end
+    local perPage=math.max(1,height-6); local pages=math.max(1,math.ceil(#details/perPage)); page=(page or 0)%pages
+    line('Details '..(page+1)..'/'..pages..' | Shift N/P')
+    for i=page*perPage+1,math.min(#details,(page+1)*perPage) do line(details[i]) end
   elseif state.role=='controller' and (state.view=='production' or state.view=='cathedral') then
     local a=state.automation or {}; local c=a.cathedral; local details={}
     local function add(text)
@@ -49,6 +69,7 @@ function M.draw(term,state,agent,page,input)
       for _,name in ipairs(names) do
         local m=r.materials[name]
         add(item(name)..' '..m.count..'/'..m.target..' '..(m.workerId and 'turtle '..m.workerId or m.status))
+        if m.workers and #m.workers>0 then local ids={}; for _,id in ipairs(m.workers) do ids[#ids+1]=tostring(id) end; add('Turtles '..table.concat(ids,', ')) end
         if m.error then add(m.error) end
       end
       if r.error then add(r.error) end
