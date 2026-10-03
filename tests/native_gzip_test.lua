@@ -42,3 +42,19 @@ test('native gzip refuses truncated and oversized source before returning bytes'
   for _,n in ipairs({0,1,3,9,11,14,23,31,#data-9,#data-1}) do rejects(data:sub(1,n),nil,'gzip') end
   rejects(fixture('stored.gz'),100,'byte limit')
 end)
+
+
+test('consecutive stored blocks retain constant working history and preserve compressed backreferences',function()
+  local data=fixture('consecutive-stored.gz'); local peak=0
+  -- Inspect the working table at the existing progress boundary, without adding
+  -- a production telemetry API solely for this resource-regression test.
+  local function progress()
+    local _,state=debug.getlocal(2,1); local _,buffered=debug.getlocal(2,2)
+    assert(type(state)=='table' and state.buffer and type(buffered)=='number','missing inflation progress boundary')
+    peak=math.max(peak,buffered)
+  end
+  local raw,remaining=require('autobuilder.vendor.libdeflate'):DecompressDeflateBounded(data:sub(11),2*1024*1024,progress)
+  eq(raw,fixture('payload.bin'):rep(8)); eq(remaining,8)
+  assert(peak<=131070,'stored blocks grew the working buffer to '..peak)
+  eq(require('autobuilder.blueprint.gzip').decode(fixture('stored-transition.gz'),1024*1024),fixture('stored-transition.bin'))
+end)

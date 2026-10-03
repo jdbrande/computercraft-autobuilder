@@ -2490,9 +2490,10 @@ local function DecompressStoreBlock(state)
     return 2 -- available inflate data did not terminate
   end
 
-  -- memory clean up when there are enough bytes in the buffer.
-  if buffer_size >= 65536 then
-      CheckDecompressBounds(state, buffer_size)
+  -- AutoBuilder: a stored block can append 65535 bytes. Drain every full
+  -- output slice so consecutive blocks cannot grow/copy an unbounded history.
+  while buffer_size >= 65536 do
+    CheckDecompressBounds(state, buffer_size)
     result_buffer[#result_buffer + 1] = table_concat(buffer, "", 1, 32768)
     for i = 32769, buffer_size do buffer[i - 32768] = buffer[i] end
     buffer_size = buffer_size - 32768

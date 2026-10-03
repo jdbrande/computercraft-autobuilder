@@ -10,7 +10,9 @@ remaining fleet, placement-adapter, chunk-loading or terrain-preparation scope.
 - Typed NBT/Sponge: seven RED→GREEN tests plus independent Python converter
   comparisons; full Lua503 and18 Python tests passed.
 - Import/runtime: four RED→GREEN regressions; full Lua507 and18 Python tests passed.
-  Release generation/check and whitespace checks passed. Whole-branch review next.
+  Release generation/check and whitespace checks passed before review.
+- Final review gate:508 Lua/18 Python tests passed; regenerated release/check and
+  whitespace checks passed after the regression-backed fix below.
 
 Coverage includes stored/fixed/dynamic compression, optional gzip headers, CRC32,
 ISIZE, truncation/trailing data, expansion and cooperative-yield bounds; NBT field
@@ -28,6 +30,23 @@ is idempotent across reboot and rejects changed source bytes without new work.
 The bundled LibDeflate source is pinned, licensed and SHA-verified. Its marked local
 extension bounds output before retained-buffer flush/final concatenation and invokes
 cooperative progress. The strict wrapper validates the gzip member and trailers.
+
+## Review correction
+
+One Important resource issue was confirmed: consecutive stored DEFLATE blocks
+appended up to65535 bytes but flushed only one32768-byte slice per block. The output
+limit held, while retained history grew and caused quadratic copying. A regression
+failed at622546 buffered bytes before the fix. Stored blocks now drain all full
+slices with bounds/progress checks, preserving backreferences into earlier blocks.
+Tests cover consecutive stored blocks and a stored-to-compressed transition.
+
+Post-fix desktop measurements of1/4/8MiB inputs all peaked at131070 working bytes;
+inflation took approximately0.066/0.257/0.512 seconds. A separate native CraftOS check
+on controller130 generated128 consecutive stored blocks in memory:8,388,480 bytes
+inflated in2.242 seconds with383 cooperative yields, and a1MiB bound rejected the
+same stream. This isolates decoder memory/timing without exceeding the instance's
+1,000,000-byte computer disk quota. No blocks were changed by this check. Its harness
+was removed, controller130 shut down and test force-loading removed again.
 
 ## Native Minecraft acceptance — 2026-10-03
 

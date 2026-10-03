@@ -23,6 +23,20 @@ def main():
         (ROOT/(name+'.gz')).write_bytes(gzip_bytes(payload,level,strategy))
     (ROOT/'optional.gz').write_bytes(gzip_bytes(payload,optional=True))
     (ROOT/'empty.gz').write_bytes(gzip_bytes(b''))
+    large = payload * 8
+    (ROOT/'consecutive-stored.gz').write_bytes(gzip_bytes(large,level=0))
+    # Stored blocks followed by compressed backreferences into their history.
+    history = bytes((i*17+i//256)%256 for i in range(65535*4))
+    body = b''.join(b'\0'+struct.pack('<HH',len(part),len(part)^65535)+part
+                    for part in (history[i:i+65535] for i in range(0,len(history),65535)))
+    suffix = history[-32768:] * 2
+    compressor = zlib.compressobj(6,zlib.DEFLATED,-15,zdict=history[-32768:])
+    body += compressor.compress(suffix) + compressor.flush()
+    combined = history + suffix
+    assert zlib.decompress(body,-15) == combined
+    (ROOT/'stored-transition.gz').write_bytes(b'\x1f\x8b\x08'+b'\0'*7+body+struct.pack('<II',zlib.crc32(combined),len(combined)))
+    (ROOT/'stored-transition.bin').write_bytes(combined)
+
     import sys
     sys.path.insert(0, str(ROOT.parents[1]))
     from test_schem_converter import fixture

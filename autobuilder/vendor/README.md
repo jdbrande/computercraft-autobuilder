@@ -6,7 +6,9 @@ commit `afc3b78d12fb3bcfa6b21e5332031ad3d7572e19`, zlib license
 
 AutoBuilder changes are marked in the source: `DecompressDeflateBounded` adds a
 maximum expanded size and progress callback, checked at both32KiB output flushes
-and after every block before final concatenation. Existing methods are unchanged.
+and after every block before final concatenation. Stored blocks also drain every full32KiB output slice, correcting upstream
+working-buffer growth across consecutive stored blocks. Existing API results are
+unchanged; working history stays below64KiB between blocks.
 The decoder may transiently assemble at most one DEFLATE stored block or its
 64KiB working buffer beyond the requested bound; it rejects before retaining or
 returning that excess. Our gzip wrapper supplies the bound and cooperative yield.

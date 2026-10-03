@@ -678,7 +678,7 @@ operator documentation, `docs/validation-0.17.0.md`, progress ledger, release.
   ensuring invalid files or unsupported analysis cannot start physical work.
 - [x] Implement binary read/immutable JSON normalization and `.schem` shorthand;
   retain existing JSON behavior. Run focused/full Lua and Python tests.
-- [ ] Run native gzip-schematic construction/verification and independent world
+- [x] Run native gzip-schematic construction/verification and independent world
   inspection. Fix discovered bugs with regressions. Document exact evidence and
   limits, generate/check release, conduct one final whole-branch review/fix pass,
   integrate/push and continue chunk loading and every remaining requirement.

@@ -13,8 +13,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Capacity and parallel factory completed:492 Lua/16 Python tests, native
   two-Crafty acceptance and regression-backed final review fixes.
 - Capacity/parallel factory integrated and pushed at `345b833`.
-- Current branch: `milestone/0.17.0`. Task25 native acceptance passed; final
-  whole-branch review remains before integration. Chunk-loading support is next.
+- Native schematic milestone completed:508 Lua/18 Python tests, both native
+  construction trials and review correction passed. Integrating0.17; chunk-loading
+  compatibility is next.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -281,3 +282,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   with1791 fuel and one recovered dirt. Final home return/unload remains required.
   Test computers shut down; observer/rig force loading removed. See
   [0.17 acceptance](validation-0.17.0.md). Whole-branch review next.
+
+- Final schematic review: one Important stored-DEFLATE buffer-growth issue. A
+  regression failed at622546 working bytes, then passed after draining all full
+  slices. Stored→compressed backreferences remain correct. Full508 Lua/18 Python
+  and release checks passed. Native8MiB inflation took2.242s with383 yields and
+  correctly refused a1MiB bound. Integration follows; no requirement is dropped.

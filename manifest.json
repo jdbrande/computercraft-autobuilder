@@ -1106,7 +1106,7 @@
       "version": "0.17.0"
     },
     {
-      "bytes": 131033,
+      "bytes": 131121,
       "path": "autobuilder/vendor/libdeflate.lua",
       "roles": [
         "controller",
@@ -1116,7 +1116,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "d8ebb60b0f07ad480f53e726a3ad5a716447bb3584673bfacd051e672e8a928f",
+      "sha256": "7c2a0c241b7a2ed528828ef2b0425983e7798fa802640689d27cf0743c03b92d",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/vendor/libdeflate.lua",
       "version": "0.17.0"
     },
