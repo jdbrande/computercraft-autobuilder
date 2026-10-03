@@ -821,3 +821,31 @@ worker probes once with persistent intent and derives heading from actual GPS de
   Run full Lua/Python/release checks, one whole-branch review/fix pass, integrate/push.
 - [x] Continue final settlement, continuous supply, scaling/site preparation and all
   other unfinished fleet requirements without a milestone handoff.
+
+## Milestone0.21: capacity-aware crafting batches
+
+Spec: [adaptive crafting design](adaptive-crafting-design.md). Standing authorization
+continues native inline execution. Keep finite owned contracts immutable; size only
+unclaimed work. Review boundaries: cancelled offset coverage, failed atomic grant,
+worker ownership, unavailable candidate and native unknown output stack sizes.
+
+### Task35: Read-only capacity sizing
+
+- [ ] Add failing preview/no-mutation, cached observation, native limits and held-slot
+  tests. Extract the existing allocator so reservation and preview use one algorithm.
+- [ ] Implement bounded cached observations and largest-fit batch evaluation; preserve
+  strict quantities, unknown limits and concrete allocations. Run focused tests.
+
+### Task36: Atomic adaptive grants and operation coverage
+
+- [ ] Reproduce pane output stall, worker pinning and legacy unstarted claims. Implement
+  atomic count/capacity/quantity grants, first-gap scheduling and safe legacy retirement.
+- [ ] Exercise simultaneous stations, small inputs, changed availability, failed saves,
+  partial transfers and runtime restarts. Run full Lua/Python/release gates and commit.
+
+### Task37: Native pane acceptance and integration
+
+- [ ] Run real two-Crafty high-yield production without an output sample. Verify exact
+  source/output/private inventories and final claims; record bugs/limits/regressions.
+- [ ] Update documentation, run final checks and one whole-branch review/fix pass,
+  integrate/push and continue every remaining fleet requirement.

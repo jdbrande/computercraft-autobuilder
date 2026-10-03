@@ -22,8 +22,10 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   restocking, one final review/fix pass and release checks passed.
 - Managed logistics integrated/pushed at `d877f95`.
 - Interrupted movement/heading recovery accepted:589 Lua/18 Python tests, two
-  native interrupted-action/fallback trials and final review fixes. Integrating0.20.
-- Next: capacity-aware crafting batches, followed by every remaining row.
+  native interrupted-action/fallback trials and final review fixes. Integrated/pushed
+  at `c895b77`.
+- Current branch `milestone/0.21.0`: capacity-aware crafting batches, followed by
+  every remaining row.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
