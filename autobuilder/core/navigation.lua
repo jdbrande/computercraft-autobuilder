@@ -14,7 +14,7 @@ function M.new(turtle,pose,config,save)
   local function allowed(p)
     for _,area in ipairs(config.restrictedAreas or {}) do
       if p.x>=area.min.x and p.x<=area.max.x and p.y>=area.min.y and p.y<=area.max.y and p.z>=area.min.z and p.z<=area.max.z then
-        return false,'destination is protected'
+        if not self.clearExit or not self.clearExit(p) then return false,'destination is protected' end
       end
     end
     return true

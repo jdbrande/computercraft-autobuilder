@@ -125,3 +125,51 @@ test('fallback survey covers northward rows and westward rows from either entry 
     assert(run(m,w,700)); eq(w.stock['minecraft:raw_iron'],1)
   end
 end)
+local function explorer(w,task,save,pose)
+  task=task or {id='mine:explore',item='minecraft:raw_iron',quantity=2,exploration={version=1,groupId='acquire:1',sectorId='0,0,0',
+    depot={x=0,y=0,z=0},bounds={min={x=2,y=0,z=0},max={x=3,y=1,z=1}},envelope={min={x=0,y=0,z=0},max={x=8,y=3,z=3}},
+    entry={x=2,y=0,z=0},exitRoute={},route={{x=1,y=0,z=0},{x=2,y=0,z=0}},cursor=1,protectedAreas={}}}
+  local _,p,c=setup(w,task,pose); c.mining.mode='explore'
+  c.mining.bounds={min={x=99,y=0,z=0},max={x=100,y=0,z=0}}
+  local n=require('autobuilder.core.navigation').new(w.turtle,p,c,save or function() return true end)
+  local inv=require('autobuilder.storage.inventory').new(w.turtle,{reservedSlots={15,16}})
+  local scan=require('autobuilder.resources.scanner').new({peripheral=w.peripheral},{radius=8,side='left',cooldown=0,ttl=10,maxCost=0},function() return w.time end)
+  return require('autobuilder.resources.miner').new(task,{turtle=w.turtle},c,n,inv,scan,save or function() return true end,function() return w.time end),p,c
+end
+test('explorer digs assigned route and returns a measured partial survey result',function()
+  local w=W.new(); w.blocks['1,0,0']='minecraft:stone'; w.blocks['3,1,1']='minecraft:iron_ore'
+  local m=explorer(w); assert(run(m,w,2000)); eq(m.task.delivered,1); eq(w.pose.x,0)
+  eq(m.task.explorationProgress.result,'survey_exhausted'); eq(w.stock['minecraft:raw_iron'],1)
+end)
+test('explorer inspection fallback surveys all layers and respects safe return request',function()
+  local w=W.new(); w.peripheral.getType=function() return nil end; w.blocks['3,1,1']='minecraft:iron_ore'
+  local m=explorer(w); assert(run(m,w,2000)); eq(m.task.delivered,1)
+  w=W.new(); m=explorer(w); for _=1,4 do assert(m:step()) end
+  assert(m:requestReturn()); assert(run(m,w)); eq(m.task.explorationProgress.result,'paused'); eq(w.pose.x,0)
+end)
+test('exploration dig intent reconciles a crash after dig without another dig',function()
+  local w=W.new(); w.blocks['1,0,0']='minecraft:stone'; local saved,pp
+  local task={id='mine:crash',item='minecraft:raw_iron',quantity=1,exploration={version=1,groupId='acquire:1',sectorId='0,0,0',depot={x=0,y=0,z=0},
+    bounds={min={x=2,y=0,z=0},max={x=2,y=0,z=0}},envelope={min={x=0,y=0,z=0},max={x=2,y=0,z=0}},entry={x=2,y=0,z=0},route={{x=1,y=0,z=0},{x=2,y=0,z=0}},exitRoute={},protectedAreas={},cursor=1}}
+  local m,p=explorer(w,task,function() saved=U.copy(task); if pp then saved.pose=U.copy(pp) end; return true end); pp=p
+  local dig=w.turtle.dig; w.turtle.dig=function() dig(); error('power cut') end
+  for _=1,10 do local ok=pcall(m.step,m); if not ok or task.phase=='blocked' then break end end
+  assert(saved.digIntent,'dig intent must precede hardware')
+  w.turtle.dig=dig; local restored=explorer(w,saved,nil,saved.pose or p)
+  if restored.task.phase=='blocked' then assert(restored:resume()) end
+  assert(run(restored,w)); eq(#w.dug,1); eq(w.stock['minecraft:cobblestone'],1)
+end)
+test('explorer traverses declared protected exits but never excavates them',function()
+  for _,blocked in ipairs({false,true}) do
+    local w=W.new(); local m,p,c=explorer(w)
+    local g=m.task.exploration; g.exitRoute={{x=1,y=0,z=0}}; g.route={{x=2,y=0,z=0}}
+    c.restrictedAreas={{min={x=1,y=0,z=0},max={x=1,y=0,z=0}}}; g.protectedAreas=U.copy(c.restrictedAreas)
+    local nav=require('autobuilder.core.navigation').new(w.turtle,p,c,function() return true end)
+    local inv=require('autobuilder.storage.inventory').new(w.turtle,{reservedSlots={15,16}})
+    local scan={scan=function() return nil,'no scanner' end,invalidate=function() end}
+    m=require('autobuilder.resources.miner').new(m.task,{turtle=w.turtle},c,nav,inv,scan,function() return true end,function() return 0 end)
+    if blocked then w.blocks['1,0,0']='minecraft:stone' end
+    assert(run(m,w,2000)); eq(w.pose.x,0); eq(#w.dug,0)
+    eq(m.task.explorationProgress.result,blocked and 'route_blocked' or 'survey_exhausted')
+  end
+end)
