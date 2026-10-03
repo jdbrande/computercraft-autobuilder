@@ -849,3 +849,50 @@ worker ownership, unavailable candidate and native unknown output stack sizes.
   source/output/private inventories and final claims; record bugs/limits/regressions.
 - [x] Update documentation, run final checks and one whole-branch review/fix pass,
   integrate/push and continue every remaining fleet requirement.
+
+## Milestone0.22: worker home unloading and project settlement
+
+Spec: [worker settlement design](worker-settlement-design.md). Native inline execution
+continues. Reuse registered private node buffers, count/capacity ledgers, R.delta and
+F.transfer. Review boundaries: output credited before collection, reserved slots,
+worker eligibility after yielding reads, acknowledgement-before-settlement and lost
+ownership across project phase changes.
+
+### Task38: Bounded cargo contracts and worker unload journal
+
+**Files:** `storage/returns.lua`, `workers/home.lua`, worker agent/executor,
+network/task messages, `tests/home_return_test.lua`, suite registration.
+
+- [ ] Add failing bounded/cleaned cargo telemetry, contract and actual mixed-cargo
+  unloading tests. Protect fuel/tool slots and retain ambiguous intents.
+- [ ] Implement shared cargo observation/validation and journaled RETURN_HOME cargo
+  execution using existing travel and delta helpers. Test post-drop reboot, partial
+  native effects, changed inventory, missing/full container and paused tasks.
+
+### Task39: Controller return ownership and collection
+
+**Files:** `core/return_service.lua`, production/automation/workflows, nodes/chunks,
+config capability negotiation and actual runtime tests.
+
+- [ ] Add failing explicit return scheduling, native capacity, atomic failure,
+  unavailable worker, endpoint change and exact central-receipt tests.
+- [ ] Implement durable return requests, exclusive buffer/output capacity and count
+  claims, monotone deposit receipts and controller collection before final task ack.
+  Run actual runtime restarts/lost messages and ownership contention regressions.
+
+### Task40: Project final settlement gate
+
+**Files:** projects, controller return service, project and full-chain tests.
+
+- [ ] Reproduce premature built with pending worker acknowledgement/cargo/supply.
+  Track participation across phases; share retirement linkage checks where useful.
+- [ ] Add settling phase and automatic home/unload requests. Require reconciled
+  inventories, claims and worker release/home evidence before built/verified; preserve
+  compatible reassignment and stream retirement. Test restart and independent actors.
+
+### Task41: Native home/cargo acceptance and integration
+
+- [ ] Exercise remote finite-cargo return, post-effect restart and independent world
+  inspection. Record setup, counts, fuel, claims, cleanup and limits.
+- [ ] Run full Lua/Python/release gates, one final whole-branch review/fix pass, update
+  running progress and docs, integrate/push and continue all fleet requirements.

@@ -24,8 +24,10 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Interrupted movement/heading recovery accepted:589 Lua/18 Python tests, two
   native interrupted-action/fallback trials and final review fixes. Integrated/pushed
   at `c895b77`.
-- Current branch `milestone/0.21.0`: capacity-aware crafting batches, followed by
-  every remaining row.
+- Capacity-aware crafting integrated/pushed at `7029c12`:599 Lua/18 Python tests,
+  two native pane trials and final review fixes.
+- Current branch `milestone/0.22.0`: safe worker home/unloading and project settlement,
+  prerequisites for full site preparation and safe scale-down.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -53,7 +55,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 12: logistics network | Registered nodes, reserved parallel couriers, automatic targets/production and native restocking accepted0.19 | Continuous builder/fuel supply integration and broader physical network routing |
 | 13: storage abstraction | Durable count claims and physical/available/reserved/transit/expected/project views accepted in 0.14.0 | Native slot capacity and private station ownership accepted in0.16; managed courier integration accepted0.19 |
 | 14: continuous forecasting | Acquisition targets and shortages | Proactive per-project coverage of all physical/expected states |
-| 15: parallel crafting | Two native private Crafty stations with input/output leases, finite batches and restart acceptance | Automatic capacity-based batch sizing, cross-role pipeline integration |
+| 15: parallel crafting | Two native private Crafty stations with input/output leases, finite batches and restart acceptance | Capacity-based batch sizing accepted0.21; cross-role pipeline integration remains |
 | 16: processing network | Furnace lanes and fuel partitioning | Generic machine providers, timing/capacity forecasts and supported processors |
 | 17: renewables | Managed trees, crops, column farms with replant/return journals | Provider coverage/reserve policies for registered additional farms |
 | 18: builder fleet | Owned regions and movement reservations | Concurrent multi-builder acceptance with independent supply and dependencies |
