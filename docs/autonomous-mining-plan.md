@@ -863,9 +863,9 @@ ownership across project phase changes.
 **Files:** `storage/returns.lua`, `workers/home.lua`, worker agent/executor,
 network/task messages, `tests/home_return_test.lua`, suite registration.
 
-- [ ] Add failing bounded/cleaned cargo telemetry, contract and actual mixed-cargo
+- [x] Add failing bounded/cleaned cargo telemetry, contract and actual mixed-cargo
   unloading tests. Protect fuel/tool slots and retain ambiguous intents.
-- [ ] Implement shared cargo observation/validation and journaled RETURN_HOME cargo
+- [x] Implement shared cargo observation/validation and journaled RETURN_HOME cargo
   execution using existing travel and delta helpers. Test post-drop reboot, partial
   native effects, changed inventory, missing/full container and paused tasks.
 

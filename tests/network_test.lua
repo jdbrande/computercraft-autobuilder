@@ -94,3 +94,11 @@ test('network validates and preserves resource restrictions on telemetry and min
     m.payload.miningResources=nil; assert(N.validate(12,m))
   end
 end)
+
+test('network validates cargo manifests and strips unknown cyclic cargo fields',function()
+  local n=net(7,1);local m=packet('heartbeat',1)
+  m.payload.cargo={items={['minecraft:stone']=5},limits={['minecraft:stone']=64}};m.payload.cargo.extra=m.payload.cargo
+  local clean=assert(n:accept(12,m,'test',1));eq(clean.payload.cargo.items['minecraft:stone'],5);eq(clean.payload.cargo.extra,nil)
+  m=packet('heartbeat',2);m.payload.cargo={items={['minecraft:stone']=-1},limits={['minecraft:stone']=64}}
+  assert(not n:accept(12,m,'test',2))
+end)

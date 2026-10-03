@@ -5,7 +5,7 @@ local function transportReceipt(t)
   if t.logistics then return {sequence=t.transportSequence or 0,pickedUp=t.pickedUp or 0,delivered=t.delivered or 0} end
 end
 local construction={BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true}
-local modules={RESCUE='autobuilder.workers.fuel_courier',BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',
+local modules={RETURN_HOME='autobuilder.workers.home',RESCUE='autobuilder.workers.fuel_courier',BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',
   CRAFT='autobuilder.factory.crafting',TRANSPORT='autobuilder.workers.courier',HARVEST='autobuilder.resources.logger',FARM='autobuilder.resources.farmer'}
 function M.new(app,config,e,network,clock)
   local s=app.state; s.completedTasks=s.completedTasks or {}; s.pendingSupplyAcks=s.pendingSupplyAcks or {}; local self={}; local lastSend=-math.huge
@@ -180,7 +180,8 @@ function M.new(app,config,e,network,clock)
     if t.type=='CRAFT' and t.production and t.production.stockSequence then
       stockReceipt={sequence=t.production.stockSequence,withdrawn=U.copy(t.production.withdrawn or {}),delivered={[t.item]=t.production.delivered or 0}}
     end
-    send('task_progress',{transportReceipt=transportReceipt(t),fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
+    local homeReceipt=t.returning and {sequence=t.homeCargo and t.homeCargo.sequence or 0,deposited=U.copy(t.homeCargo and t.homeCargo.deposited or {})} or nil
+    send('task_progress',{homeReceipt=homeReceipt,transportReceipt=transportReceipt(t),fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
       missingItem=t.supplyRequest and t.supplyRequest.item or t.missingItem,
       missingCount=t.supplyRequest and t.supplyRequest.count or t.missingCount,supplyId=t.supplyRequest and t.supplyRequest.id,report=Reports.compact(t.report)})
     return true
@@ -261,11 +262,14 @@ function M.new(app,config,e,network,clock)
       return true
     end
     if t.phase=='blocked' then
+      if t.returning and t.homeCargo and t.homeCargo.intent then
+        engine():step();s.status=t.phase;save();return true
+      end
       if t.type=='RESCUE' and t.cargo and t.cargo.intent then
         engine():step(); s.status=t.phase; save(); return true
       end
       if t.error and tostring(t.error):find('movement reservation pending',1,true) and s.motionReservation and s.motionReservation.granted then resumeTask()
-      elseif t.logisticsRetryable and clock()-(t.lastLogisticsRetry or 0)>=config.heartbeatInterval then
+      elseif (t.logisticsRetryable or t.homeRetryable) and clock()-(t.lastLogisticsRetry or 0)>=config.heartbeatInterval then
         t.lastLogisticsRetry=clock();resumeTask();save()
       elseif t.blockedCategory=='immature' and clock()-(t.lastFarmRetry or 0)>=config.farmRetrySeconds then
         t.lastFarmRetry=clock(); engine():resume(); save()
@@ -283,7 +287,7 @@ function M.new(app,config,e,network,clock)
         t.supplyRequest={id=t.id..':supply:'..t.supplySequence,item=t.missingItem,count=math.min(config.supply.batch,needed),granted=false}; t.lastSupply=nil; save(); return true
       else return true end
     end
-    if t.type=='REFUEL' or t.type=='RETURN_HOME' then
+    if t.type=='REFUEL' or t.type=='RETURN_HOME' and not t.returning then
       if t.managedFuel then
         assert(config.fuel.enabled and t.station and U.distance(t.station.position,config.depot)==0,'managed fuel station does not match depot')
       end

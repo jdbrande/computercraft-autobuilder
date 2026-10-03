@@ -430,3 +430,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Final0.21 gate:599 Lua/18 Python tests passed, release/check and whitespace clean.
   All final review findings fixed; native evidence recorded. Integrating then
   continuing home unloading and project settlement without a handoff pause.
+
+-0.22 Task38 foundation: bounded nonreserved cargo manifests and strict protocol
+  cleaning; journaled home travel/drop executor uses existing R.delta and preserves
+  fuel/tools. Seven home tests and network tests pass, including partial drops,
+  post-effect restart, ambiguous reserved-slot mutation and failed receipt saves.
+  Existing runtime/logistics focused suites pass. Controller return collection and
+  project completion gate are in progress; no native acceptance claimed yet.

@@ -9,6 +9,8 @@ function M.new(state,config,network,turtle,save,chunkProbe)
     for slot=1,16 do if turtle.getItemCount(slot)>0 then used=used+1 end end
     local p=state.position
     local capabilities=U.copy(config.capabilities or {telemetry=true})
+    capabilities.returnCargoV1=config.automation and config.automation.enabled==true and type(turtle.getItemDetail)=='function' or false
+    local cargo=capabilities.returnCargoV1 and require('autobuilder.storage.returns').observe(turtle,config) or nil
     capabilities.fuelV1=config.fuel and config.fuel.enabled or false
     capabilities.chunkCoverageV1=config.chunkLoading and config.chunkLoading.enabled==true or false
     local task=state.currentTask
@@ -17,7 +19,7 @@ function M.new(state,config,network,turtle,save,chunkProbe)
       and math.max(config.fuel.target,config.mining.fuelTarget,task.requiredFuel or 0) or nil
     local limit=turtle.getFuelLimit and turtle.getFuelLimit() or nil
     if limit=='unlimited' then limit=nil end
-    return {controllerBoot=state.controllerBoot,poseRecovery=require('autobuilder.core.task_messages').poseReport(state.poseRecovery or state.poseReceipt),
+    return {cargo=cargo,controllerBoot=state.controllerBoot,poseRecovery=require('autobuilder.core.task_messages').poseReport(state.poseRecovery or state.poseReceipt),
       chunkAnchor=chunkProbe and chunkProbe() or nil,fuelRequired=need,fuelLimit=limit,label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,
       position={known=p.known==true,x=p.x,y=p.y,z=p.z,heading=p.heading,source=p.source or 'unknown'},
       fuel=turtle.getFuelLevel(),depot=U.copy(config.depot),inventory={used=used,slots=16},
