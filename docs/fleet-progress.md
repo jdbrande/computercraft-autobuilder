@@ -220,3 +220,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   verified. Native default16/small2 station retest completed automatically: both
   workers160→1040 fuel, one/six batches, empty turtle inventories, all jobs complete.
   Final review defects are regression-covered; integration into main is next.
+
+- Task19: six capacity regressions failed before implementation and now pass.
+  Claims allocate concrete slot quantities using native limits; exclusive station
+  ownership survives reboot, and failed multi-inventory saves roll back atomically.

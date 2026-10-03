@@ -598,10 +598,10 @@ standing authorization; no milestone handoff pause.
 
 **Files:** `autobuilder/storage/capacity.lua`, `tests/capacity_test.lua`, suite list.
 
-- [ ] Add failing tests for concrete-slot reservations, shared and exclusive claims,
+- [x] Add failing tests for concrete-slot reservations, shared and exclusive claims,
   measured stack/slot bounds, unknown item limits, immutable duplicates, reboot,
   failed save rollback, full/missing destinations and explicit release.
-- [ ] Implement native measured-capacity planning and durable ownership. Run focused
+- [x] Implement native measured-capacity planning and durable ownership. Run focused
   tests and full suite; commit. Expected: no owner can reserve the same capacity.
 
 ### Task 20: Private Crafty station contracts and execution
