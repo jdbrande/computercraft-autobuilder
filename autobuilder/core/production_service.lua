@@ -79,7 +79,7 @@ function M.new(app,config,e,queue)
     if allowGrant==false then return end
     for _,j in ipairs(jobs) do if j.status~='completed' and not self.ledger.state.leases[j.id] then
       local lease,why=self.ledger:reserve(j.id,j.stockInputs,j.stockOutputs,
-        app.mining.storage.valid and app.mining.storage.counts or nil,{protected=config.turtleFuelReserveItems})
+        app.mining.storage.valid and app.mining.storage.counts or nil,{protected=j.type=='FUEL_STATION' and {} or config.turtleFuelReserveItems})
       if j.stockError~=why then j.stockError=why; save() end
     end end
   end
@@ -415,14 +415,15 @@ function M.new(app,config,e,queue)
     end
     return execute(job)
   end
-  function self:step()
-    if self.reading or self.working then return true end
+  function self:inventoryAction(action)
+    if self.reading or self.working then return false end
     self.working=true
-    local ok,result=pcall(step)
+    local ok,result=pcall(action)
     self.working=false
     if not ok then error(result,0) end
     return result
   end
+  function self:step() return self:inventoryAction(step) end
   return self
 end
 return M

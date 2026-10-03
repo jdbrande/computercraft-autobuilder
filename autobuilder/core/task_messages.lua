@@ -1,6 +1,6 @@
 local U=require('autobuilder.core.util')
 local M={}
-M.types={CRAFT=true,SMELT=true,BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true,PREPARE_SITE=true,TRANSPORT=true,HARVEST=true,FARM=true,REFUEL=true,RETURN_HOME=true}
+M.types={FUEL_STATION=true,CRAFT=true,SMELT=true,BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true,PREPARE_SITE=true,TRANSPORT=true,HARVEST=true,FARM=true,REFUEL=true,RETURN_HOME=true}
 local phases={setup=true,work=true,running=true,waiting=true,blocked=true,completed=true,paused=true,supply=true}
 local function bounded(value,depth,seen,budget)
   budget.n=budget.n+1; if budget.n>20000 or depth>12 then return false end
@@ -28,6 +28,9 @@ function M.validate(kind,p)
   if kind=='task_assign' then
     local j=p.job
     if type(j)~='table' or not U.shortString(j.id,100) or not M.types[j.type] then return false,'invalid task assignment' end
+    if j.managedFuel and (j.type~='REFUEL' or type(j.station)~='table' or not U.position(j.station.position)
+      or not U.integer(j.fuelTarget) or j.fuelTarget<1 or j.fuelTarget>100000000) then return false,'invalid managed fuel assignment' end
+    if j.type=='FUEL_STATION' then return false,'controller-only task' end
     if j.type=='PREPARE_SITE' then
       local plan=j.sitePlan
       if type(plan)~='table' or not U.position(plan.start) or not U.heading(plan.start.heading)

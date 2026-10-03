@@ -224,9 +224,12 @@ function M.new(app,config,e,network,clock)
       else return true end
     end
     if t.type=='REFUEL' or t.type=='RETURN_HOME' then
+      if t.managedFuel then
+        assert(config.fuel.enabled and t.station and U.distance(t.station.position,config.depot)==0,'managed fuel station does not match depot')
+      end
       t.homeRoute=t.homeRoute or {}
       local ok,err=require('autobuilder.workers.resupply').travel(t.homeRoute,t,app.navigation,config.depot,save,e.turtle,config)
-      if ok and t.type=='REFUEL' then ok,err=require('autobuilder.storage.inventory').new(e.turtle,config):refuel(config.mining.fuelTarget,true) end
+      if ok and t.type=='REFUEL' then ok,err=require('autobuilder.storage.inventory').new(e.turtle,config):refuel(t.fuelTarget or config.mining.fuelTarget,true) end
       t.phase=ok and 'completed' or 'blocked'; t.error=err; t.progress=ok and 1 or 0; save(); return true
     end
     local result,err=engine():step()

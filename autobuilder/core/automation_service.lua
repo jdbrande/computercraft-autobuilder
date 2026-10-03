@@ -5,10 +5,11 @@ function M.new(app,config,e,network,clock)
   if config.role=='worker' then return require('autobuilder.workers.executor').new(app,config,e,network,clock) end
   local queue=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,app.state.id)
   local production=require('autobuilder.core.production_service').new(app,config,e,queue)
+  local fuel=require('autobuilder.core.fuel_service').new(app,config,e,queue,production,clock)
   local projects=require('autobuilder.blueprint.projects').new(app,config,e,queue,production)
   local cathedral=require('autobuilder.blueprint.cathedral').new(app,config,e,projects)
   local infrastructure=require('autobuilder.core.infrastructure').new(app,config,e,queue)
-  local self={queue=queue,production=production,projects=projects,infrastructure=infrastructure,cathedral=cathedral}; local last=-math.huge
+  local self={queue=queue,production=production,fuel=fuel,projects=projects,infrastructure=infrastructure,cathedral=cathedral}; local last=-math.huge
   local function send(owner,kind,payload) return network:send(owner,kind,payload) end
   function self:command(line)
     local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
@@ -128,7 +129,10 @@ function M.new(app,config,e,network,clock)
     if j then send(j.workerId,'task_assign',{job=U.copy(j)}) end
     return true
   end
-  function self:step() if config.automation.enabled then return production:step() end; return true end
+  function self:step() if config.automation.enabled then
+    if fuel:step() then return true end
+    return production:step()
+  end; return true end
   return self
 end
 return M

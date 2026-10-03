@@ -17,7 +17,7 @@ function M.workerBusy(state,owner,exceptId)
     if job.id~=exceptId and job.workerId==owner and job.status~='completed' and not job.physicalComplete then return true end
   end
   for _,job in pairs((state.automation or {}).jobs or {}) do
-    if job.id~=exceptId and job.workerId==owner and job.status~='completed' then return true end
+    if job.id~=exceptId and (job.workerId==owner or job.managedFuel and job.preferredWorker==owner) and job.status~='completed' then return true end
   end
   return false
 end
@@ -47,7 +47,7 @@ function M.storageBusy(state)
   end
   local automation=state.automation or {}
   for _,job in pairs(automation.jobs or {}) do
-    if storageWorkers[job.type] and job.workerId and job.status~='completed' then return true,'waiting for active storage job '..job.id end
+    if (storageWorkers[job.type] and job.workerId or job.type=='FUEL_STATION' and job.production) and job.status~='completed' then return true,'waiting for active storage job '..job.id end
   end
   if automation.supply then return true,'waiting for outstanding supply batch '..tostring(automation.supply.jobId) end
   return false
@@ -98,6 +98,7 @@ function M.new(state,save,clock,id)
     local factoryPending=M.factoryPending(state)
     for _,j in ipairs(ordered) do
       local allowed=not (storageWorkers[j.type] and factoryPending)
+      if j.managedFuel then allowed=j.fuelReady==true and not M.factoryActive(state) end
       if j.type=='CRAFT' then allowed=M.factoryCanRun(state,j) end
       if allowed and j.status=='queued' and not j.workerId and j.requiredCapability and self:ready(j) and not j.paused then
         local conflict=false

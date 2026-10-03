@@ -77,3 +77,26 @@ supports identity-checked native delivery; no temporary-chest or new upgrade API
 is needed. The probe coal/block were cleaned up. Production rescue still requires
 the frozen-target handshake, capacity and delivery/consumption receipts. Evidence:
 ignored `dist/live-fuel/adjacent-transfer-probe.json`.
+
+## Rescue protocol implementation contract
+
+Use a controller-owned `RESCUE` task and existing task networking. The recipient
+keeps its original task; a separate saved fuel-recovery record freezes physical
+work only at a confirmed, non-busy pose. The freeze reply records actual receiving
+capacity and a bounded inventory snapshot. Repeated requests preserve the same
+contract. A courier may depart only after this acknowledgement, a dedicated station
+pickup is ready, and its finite budget covers pickup, delivery, home and reserve.
+
+The courier uses its assigned station above its depot for pickup, reserves normal
+route cells, stands above the recipient and verifies the adjacent turtle's computer
+ID before every drop. Both sides retain inventory observations. The recipient must
+confirm the measured delivery before consuming just that added quantity; each
+native refuel call has a saved intent and reconciles inventory and actual fuel.
+The courier returns before the controller releases the station and recipient.
+Offline parties retain ownership. Lost packets resend the existing contract.
+
+Keep safe stops for unknown pose, unrelated inventory changes, a full receiver,
+blocked/protected routes and missing bootstrap fuel. Only a task previously blocked
+on fuel may resume automatically after enough measured fuel is present. Other
+errors and ambiguous physical journals remain intact. These guarantees also apply
+to the workload-driven scaling required in section44: rescue owners are not idle.

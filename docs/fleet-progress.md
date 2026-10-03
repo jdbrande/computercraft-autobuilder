@@ -169,3 +169,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   for dynamic fleet scaling, terrain leveling and automatic site preparation.
   These are mandatory completion gates, not optional enhancements. Existing bounded
   preparation and shared-demand mining do not establish this broader acceptance.
+
+- Task16 complete: 445 Lua tests passed after the remote-trip budget regression
+  failed and was fixed. Station deliveries use durable count claims, measured
+  capacity, the shared inventory lock and restartable transfer intents. Pending
+  refuel work holds workers before mining dispatch; offline consumers retain their
+  station. Native station/rescue acceptance remains Task18.
+- Task17 started: receiver recovery contract and four failing tests define frozen
+  task preservation, measured delivery, consumption after a reboot, changed-message
+  rejection, failed-save safety and refusal of uncertain or active movement.

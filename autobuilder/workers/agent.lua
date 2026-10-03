@@ -8,13 +8,15 @@ function M.new(state,config,network,turtle,save)
     local used=0
     for slot=1,16 do if turtle.getItemCount(slot)>0 then used=used+1 end end
     local p=state.position
+    local capabilities=U.copy(config.capabilities or {telemetry=true})
+    capabilities.fuelV1=config.fuel and config.fuel.enabled or false
     return {label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,
       position={known=p.known==true,x=p.x,y=p.y,z=p.z,heading=p.heading,source=p.source or 'unknown'},
-      fuel=turtle.getFuelLevel(),inventory={used=used,slots=16},
+      fuel=turtle.getFuelLevel(),depot=config.fuel and config.fuel.enabled and U.copy(config.depot) or nil,inventory={used=used,slots=16},
       miningResources=config.mining and config.mining.enabled and U.copy(config.mining.resources or {}) or nil,
       miningArea=config.mining and config.mining.enabled and U.copy(config.mining.bounds) or nil,
       explorationHome=config.capabilities and config.capabilities.explorationV1 and {depot=U.copy(config.depot),exitRoute=U.copy(config.mining.exitRoute),protectedAreas=U.copy(config.restrictedAreas)} or nil,
-      capabilities=U.copy(config.capabilities or {telemetry=true}),task=state.currentTask and tostring(state.currentTask.id)}
+      capabilities=capabilities,task=state.currentTask and tostring(state.currentTask.id)}
   end
   function self:tick(now)
     self.connected=now-lastAck<config.workerTimeout

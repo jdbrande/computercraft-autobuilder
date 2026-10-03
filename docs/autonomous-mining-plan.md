@@ -511,12 +511,13 @@ modify config, storage inventory, mining service, worker executor and suite list
 ### Task 16: Dedicated station ownership and automatic replenishment
 
 **Files:** add controller fuel service and its tests; extend automation/runtime,
-workflows, config/setup sharing and inventory coordination.
+workflows, telemetry and inventory coordination. Setup sharing is handled with
+operator configuration and visibility in Task18.
 
-- [ ] Add failing runtime cases for empty stations, stock claims/capacity, failed
+- [x] Add failing runtime cases for empty stations, stock claims/capacity, failed
   saves and ambiguous transfers, offline worker, duplicate/partial delivery and
   low-fuel idle worker automatically obtaining fuel before mining assignment.
-- [ ] Persist station ownership and use the shared controller inventory lock.
+- [x] Persist station ownership and use the shared controller inventory lock.
   Grant preferred-worker REFUEL only after reconciled filling; hold mining while
   refuel is pending. Replenish stock through ordinary resource requests and show
   explicit bootstrap shortages. Run suites and commit.

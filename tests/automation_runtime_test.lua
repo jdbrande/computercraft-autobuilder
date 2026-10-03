@@ -40,6 +40,9 @@ local function fixture(furnaceCount)
       if h.offline==name then error('inventory detached') end
       local inv=assert(h.inventories[name],'unknown inventory '..tostring(name))
       if method=='list' then return U.copy(inv) end
+      if method=='size' then return 27 end
+      if method=='getItemLimit' then return 64 end
+      if method=='getItemDetail' then local slot=...; local item=U.copy(inv[slot]); if item then item.maxCount=64 end; return item end
       assert(method=='pushItems','unexpected inventory method '..method)
       local target,slot,n,toSlot=...; local moved=move(inv,slot,assert(h.inventories[target]),toSlot,n)
       h.transfers=h.transfers+1
@@ -306,4 +309,40 @@ test('stock receipt protocol rejects malformed counters before accepting progres
     {sequence=1,withdrawn={},delivered={[mc('stone')]=math.huge}}}) do
     assert(not P.validate('task_progress',{jobId='task:7:1',phase='work',stockReceipt=receipt}))
   end
+end)
+
+
+test('native runtime protocol refuels an empty turtle through a claimed station and releases its owner',function()
+  local f=fixture(); local h=f.h; local turtle=f.we.turtle
+  h.inventories.fuel={}; turtle.fuel=0
+  turtle.inspectUp=function() return true,{name=mc('chest')} end
+  turtle.suckUp=function(n)
+    for slot,stack in pairs(h.inventories.fuel) do
+      local moved=math.min(n,stack.count)
+      h.slots[h.selected]={name=stack.name,count=moved}; stack.count=stack.count-moved
+      if stack.count==0 then h.inventories.fuel[slot]=nil end
+      return moved>0
+    end
+    return false
+  end
+  turtle.refuel=function(n)
+    local item=h.slots[h.selected]; if not item or item.name~=mc('coal') then return false end
+    local used=math.min(n,item.count); turtle.fuel=turtle.fuel+used*80
+    item.count=item.count-used; if item.count==0 then h.slots[h.selected]=nil end
+    return true
+  end
+  local C=require('autobuilder.config')
+  f.cc.fuel={enabled=true,low=80,target=160,stations={{id='home',workerId=12,inventory='fuel',position={x=0,y=64,z=0},targetItems=2}}}
+  f.wc.fuel={enabled=true,low=80,target=160}; f.wc.depot={x=0,y=64,z=0}
+  f.cc=C.load(f.cc); f.wc=C.load(f.wc)
+  f.c=Runtime.new(f.cc,f.ce); f.w=Runtime.new(f.wc,f.we)
+  for _=1,25 do f:step() end
+  eq(turtle.fuel,160); eq(f.w.state.currentTask,nil)
+  local refuels=0
+  for _,job in pairs(f.c.state.automation.jobs) do
+    if job.type=='REFUEL' then refuels=refuels+1; eq(job.status,'completed') end
+    if job.type=='FUEL_STATION' and job.status=='completed' then eq(f.c.state.inventoryLedger.leases[job.id].status,'released') end
+  end
+  eq(refuels,1); assert(not require('autobuilder.core.workflows').workerBusy(f.c.state,12))
+  assert(not f.rejections,table.concat(f.rejections or {},'; '))
 end)

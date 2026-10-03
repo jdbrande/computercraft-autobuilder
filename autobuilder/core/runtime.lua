@@ -115,6 +115,7 @@ function M.new(config,e)
       local ok,why=self.agent:tick(clock())
       if not ok then self:report('WARN',why) end
     end
+    if self.automation.fuel and config.automation.enabled then self.automation.fuel:tick() end
     self.mining:tick()
     self.automation:tick()
     if self.firstBuild then self.firstBuild:tick() end

@@ -6,6 +6,7 @@ local short=U.shortString
 local E=require('autobuilder.resources.exploration')
 local function telemetry(p)
   if not short(p.label) or not short(p.status) then return false end
+  if p.depot~=nil and not U.position(p.depot) then return false end
   if p.explorationHome~=nil and not E.home(p.explorationHome) then return false end
   local pos=p.position
   if type(pos)~='table' or type(pos.known)~='boolean' then return false end
@@ -88,6 +89,7 @@ function M.new(hw,config,id,boot)
         inventory={used=p.inventory.used,slots=16},capabilities=U.copy(p.capabilities),
         position={known=p.position.known,heading=p.position.heading,source=p.position.source}}
       if p.position.known then clean.position.x,clean.position.y,clean.position.z=p.position.x,p.position.y,p.position.z end
+      if p.depot then clean.depot={x=p.depot.x,y=p.depot.y,z=p.depot.z} end
       clean.miningResources=U.copy(p.miningResources)
       if p.explorationHome then clean.explorationHome=E.cleanHome(p.explorationHome) end
       if p.miningArea then clean.miningArea={min={x=p.miningArea.min.x,y=p.miningArea.min.y,z=p.miningArea.min.z},max={x=p.miningArea.max.x,y=p.miningArea.max.y,z=p.miningArea.max.z}} end
