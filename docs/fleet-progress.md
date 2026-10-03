@@ -7,7 +7,8 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
 - Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
-- Inventory ownership prerequisite accepted; next: fuel management/distribution/rescue.
+- Inventory ownership integrated and pushed at `e66daa5`.
+- Current branch: `milestone/0.15.0`, fuel policy, distribution and rescue.
 - Next: implement durable inventory ownership, then fuel
   delivery/rescue in dependency order. Continue through all rows below.
 - No external blocker is currently established. Missing implementation is remaining
@@ -140,3 +141,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   found no additional issues. Fixed live run reached fourteen physical bricks,
   four claims released overall, and test computers/tickets were cleaned up.
   [0.14.0 acceptance](validation-0.14.0.md) records scope and evidence.
+
+- Fuel design/Tasks15–18 selected. Use native reserved-slot refueling, dedicated
+  station ownership and measured delivery; retain original stranded-worker task.
+  Installed CC1.120 lacks the newer1.121 turtle_storage upgrade, so it is not a
+  dependency. Native receiver identification will be verified before rescue code
+  selects direct transfer versus temporary-station fallback.

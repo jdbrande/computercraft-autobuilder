@@ -488,3 +488,56 @@ regenerate release artifacts.
 - [x] Run full Lua/Python/release checks and live furnace/Crafty acceptance. Review
   whole branch, fix reproduced important findings with regressions, integrate and
   continue directly to station staging, fuel distribution and rescue.
+
+## Continued execution: fuel management and rescue
+
+**Spec:** [fuel management design](fuel-management-design.md), requirements 11–12,
+24–25. Inventory count claims exist; retain isolation and add station ownership
+before new fuel consumers. Native execution remains authorized.
+
+### Task 15: Configurable fuel policy and finite budget primitives
+
+**Files:** create `autobuilder/resources/fuel.lua`, `tests/fuel_test.lua`;
+modify config, storage inventory, mining service, worker executor and suite list.
+
+- [ ] Add failing validation/budget cases for known/custom fuels, malformed maps,
+  thresholds, station identity/geometry, unlimited fuel and insufficient missions.
+  Add hardware cases for configured fuel restrictions and lava bucket retention/
+  safe depot return; preserve slots 15/16 and existing refuel tests.
+- [ ] Implement validated fuel policy, estimates and measured native refueling;
+  pass config into existing inventory users. No automatic dispatch in this step.
+  Run focused/full suites and commit.
+
+### Task 16: Dedicated station ownership and automatic replenishment
+
+**Files:** add controller fuel service and its tests; extend automation/runtime,
+workflows, config/setup sharing and inventory coordination.
+
+- [ ] Add failing runtime cases for empty stations, stock claims/capacity, failed
+  saves and ambiguous transfers, offline worker, duplicate/partial delivery and
+  low-fuel idle worker automatically obtaining fuel before mining assignment.
+- [ ] Persist station ownership and use the shared controller inventory lock.
+  Grant preferred-worker REFUEL only after reconciled filling; hold mining while
+  refuel is pending. Replenish stock through ordinary resource requests and show
+  explicit bootstrap shortages. Run suites and commit.
+
+### Task 17: Fuel delivery and stranded-worker recovery
+
+**Files:** extend task/message/telemetry validation, worker recovery and courier
+executor; add rescue service tests and full-chain recovery scenario.
+
+- [ ] Add failing frozen-target/finite-courier cases with partial pickup/delivery,
+  full receiver, lost acknowledgements, controller/worker reboot and blocked route.
+- [ ] Implement bounded identity-checked rescue handshake and measured fuel
+  delivery without replacing the original worker task. Reserve pickup/capacity,
+  deny unsafe courier missions, resume only known fuel-blocked work and return the
+  courier before releasing ownership. Run suites and commit.
+
+### Task 18: Fuel visibility and native acceptance
+
+- [ ] Expose fleet fuel budgets, station stock, waiting deliveries and recovery
+  status with actionable errors; document exact setup and configurable providers.
+- [ ] Run full Lua/Python/release checks and native zero-fuel depot plus stranded
+  worker acceptance. Review branch, fix demonstrated bugs with regressions,
+  integrate and continue to remaining parallel factory/schematic/chunk/recovery
+  requirements without a routine approval pause.
