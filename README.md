@@ -1,9 +1,15 @@
-# Autobuilder 0.22.0
+# Autobuilder 0.23.0
 
 Development direction: [full fleet requirements](docs/fleet-requirements.md) and
 [milestone 1 autonomous exploration design](docs/autonomous-mining-design.md).
 The full fleet roadmap remains in progress. The current release behavior is documented below.
 See the [0.12.0 acceptance report](docs/validation-0.12.0.md) for automated and live Minecraft results.
+
+**Automatic site preparation:** `build auto NAME` surveys, levels and clears the
+required workspace, acquires missing foundation fill, and verifies each region
+before construction. Retained structures can use restored temporary access to hidden
+support; bounded fluid retries can schedule verified containment. See the
+[0.23.0 acceptance report](docs/validation-0.23.0.md) for evidence and limits.
 
 **Worker settlement:** projects finish only after linked work, cargo and worker
 acknowledgements settle. Configure [home return buffers](docs/logistics.md#home-return-and-project-completion);
