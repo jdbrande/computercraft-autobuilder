@@ -108,3 +108,25 @@ test('mining telemetry keeps the remaining outbound leg while a route is in prog
   local t=telemetry();t.position={known=true,x=1,y=0,z=0}
   local b=budget(j,t);eq(b.outward,2);assert(b.returning>=3)
 end)
+
+test('forecast skips a tank too small for the mission and refuels a capable alternative',function()
+  local B=require('autobuilder.resources.fuel_budget');local config=C.load({fuel={enabled=true},minimumFuelReserve=100})
+  local state={workers={},automation={jobs={one={id='one',created=1,type='BUILD',status='queued',requiredCapability='building',blocks={{x=50,y=0,z=0,name='minecraft:stone'}}}}}}
+  for i,limit in ipairs({160,20000}) do local t=telemetry(100);t.fuelLimit=limit;t.status='idle';t.capabilities={building=true};state.workers[tostring(i)]={id=i,online=true,telemetry=t} end
+  local f=B.forecast(state,config);eq(f.workers['1'],nil);eq(f.workers['2'].taskId,'one');eq(f.workers['2'].budget.required,214)
+end)
+
+test('blocked crafting cannot hide ready moving work from an above low worker forecast',function()
+  local B=require('autobuilder.resources.fuel_budget');local config=C.load({fuel={enabled=true},minimumFuelReserve=100})
+  local t=telemetry(100);t.status='idle';t.capabilities={crafting=true,building=true}
+  local state={workers={['1']={id=1,online=true,telemetry=t}},automation={jobs={
+    craft={id='craft',created=1,type='CRAFT',status='queued',requiredCapability='crafting',stockInputs={['minecraft:stone']=4}},
+    verify={id='verify',created=2,type='VERIFY',status='queued',requiredCapability='building',blocks={{x=50,y=0,z=0,name='minecraft:stone'}}}}}}
+  local f=B.forecast(state,config);eq(f.workers['1'].taskId,'verify');eq(f.shortfall,114)
+end)
+
+test('fixed miner budget uses its advertised entry rather than controller mining settings',function()
+  local B=require('autobuilder.resources.fuel_budget');local config=C.load({fuel={enabled=true},minimumFuelReserve=20})
+  local t=telemetry(1000);t.miningRoute={entry={x=20,y=0,z=0}}
+  local b=assert(B.mission(config,{id='fixed',item='minecraft:coal',quantity=4},t));eq(b.outward,20);eq(b.returning,20);eq(b.required,70)
+end)

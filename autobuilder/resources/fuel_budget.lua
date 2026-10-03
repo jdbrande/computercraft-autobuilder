@@ -47,7 +47,7 @@ function M.mission(config,task,telemetry)
     local localConfig=setmetatable({depot=home},{__index=config})
     return M.construction(localConfig,task,pose,current)
   elseif task.type=='MINE' or not task.type and task.item then
-    local g=task.exploration;local entry=g and g.entry or (config.mining or {}).entry
+    local g=task.exploration;local entry=g and g.entry or telemetry.miningRoute and telemetry.miningRoute.entry or (config.mining or {}).entry
     if not U.position(entry) then return nil,'Mining route geometry unavailable' end
     local outward=g and (#(g.exitRoute or {})+#(g.route or {})) or U.distance(home,entry)
     local trail=#(task.trail or {});local returning=math.max(trail,U.distance(pose,home))
@@ -108,9 +108,9 @@ end
 function M.forecast(state,config)
   local Q=require('autobuilder.core.workflows')
   local result={workers={},required=0,shortfall=0,current=0,unlimited=0,unknown=0,items={}}
-  local jobs,byId,ids={},{},{}
+  local jobs,ids={},{}
   for _,queue in ipairs({state.jobs or {},(state.automation or {}).jobs or {}}) do
-    for _,j in pairs(queue) do if not j.physicalComplete and j.status~='completed' then jobs[#jobs+1]=j;byId[j.id]=j end end
+    for _,j in pairs(queue) do if not j.physicalComplete and j.status~='completed' then jobs[#jobs+1]=j end end
   end
   for id in pairs(state.workers or {}) do ids[#ids+1]=id end
   table.sort(ids,function(a,b) return tonumber(a)<tonumber(b) end)
@@ -140,22 +140,29 @@ function M.forecast(state,config)
   end
   for _,j in ipairs(jobs) do
     if not owned(j) and not j.paused and j.status=='queued' then
-      local ready=true
+      local ready=Q.canDispatch(state,j) and not j.preparationError
       for _,dep in ipairs(j.dependencies or {}) do
         local d=((state.automation or {}).jobs or {})[dep] or (state.jobs or {})[dep]
         if not d or d.status~='completed' then ready=false end
       end
       local cap=j.requiredCapability or (j.type=='MINE' or not j.type and j.item) and 'mining'
+      if cap=='mining' and Q.factoryPending(state) then ready=false end
       local selected,best,reason
       if ready and cap then for _,id in ipairs(ids) do
         local w=state.workers[id];local t=w.telemetry
         if not result.workers[id] and w.online and t and t.status=='idle' and not t.task
           and (t.capabilities or {})[cap] and (not j.preferredWorker or j.preferredWorker==w.id)
+          and (not j.privateStation or t.capabilities.isolatedCraftingV1)
+          and (not j.logistics or t.capabilities.logisticsV1)
+          and (not j.returnManaged or t.capabilities.returnCargoV1)
           and not Q.workerBusy(state,w.id) then
           local compatible=cap~='mining' or require('autobuilder.resources.materials').accepts(t.miningResources,j.item)
           if compatible then
             local b,why=M.mission(config,j,t)
-            if not selected or b and (not best or b.allowed and not best.allowed or b.allowed==best.allowed and b.required<best.required) then
+            local fit=b and (not t.fuelLimit or b.required<=t.fuelLimit)
+            local bestLimit=selected and state.workers[selected].telemetry.fuelLimit
+            local bestFit=best and (not bestLimit or best.required<=bestLimit)
+            if not selected or b and (not best or fit and not bestFit or fit==bestFit and (b.allowed and not best.allowed or b.allowed==best.allowed and b.required<best.required)) then
               selected,best,reason=id,b,why
             end
           end
@@ -163,6 +170,31 @@ function M.forecast(state,config)
       end end
       if selected then record(selected,j,best,reason) end
     end
+  end
+  -- Reuse bounded exploration planning refusals; forecasting never searches for
+  -- routes or creates a trip lease. A later detour may increase this lower bound.
+  local groups={}
+  if (config.exploration or {}).enabled and not (state.exploration or {}).paused then
+    for _,g in pairs((state.exploration or {}).groups or {}) do
+      if not g.paused and g.status~='completed' then groups[#groups+1]=g end
+    end
+  end
+  table.sort(groups,function(a,b) return a.id<b.id end)
+  for _,g in ipairs(groups) do
+    local chosen,best
+    for _,id in ipairs(ids) do
+      local w=state.workers[id];local t=w.telemetry;local need=(g.fuelNeeds or {})[id]
+      if need and not result.workers[id] and w.online and t and t.status=='idle' and not t.task
+        and (t.capabilities or {}).explorationV1 and not Q.workerBusy(state,w.id)
+        and require('autobuilder.resources.materials').accepts(t.miningResources,g.item)
+        and require('autobuilder.factory.factory').equal(need.home,t.explorationHome)
+        and require('autobuilder.factory.factory').equal(need.bounds,config.exploration.bounds) then
+        local b=Fuel.budget(t.fuel,need.outward,2,need.outward,need.reserve)
+        b.taskId=g.id..':fuel';b.scope='excursion'
+        if not chosen or (not t.fuelLimit or b.required<=t.fuelLimit) and (state.workers[chosen].telemetry.fuelLimit and best.required>state.workers[chosen].telemetry.fuelLimit or b.required<best.required) then chosen,best=id,b end
+      end
+    end
+    if chosen then record(chosen,{id=best.taskId,type='MINE'},best) end
   end
   return result
 end

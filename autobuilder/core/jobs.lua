@@ -59,7 +59,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
   function self:refreshAcquisition(id,stock)
     local g=assert(exploration.groups[id]); local active=false
     for _,jid in ipairs(g.tripIds) do local j=state.jobs[jid]; if j and not j.physicalComplete then active=true end end
-    if stock>=g.target and not active then g.status='completed'; g.error=nil
+    if stock>=g.target and not active then g.status='completed'; g.error=nil;g.fuelNeeds=nil
     elseif g.status=='completed' then g.status='running'; g.error=nil end
     return g
   end
@@ -74,6 +74,15 @@ function M.new(state,save,clock,controllerId,config,chunks)
     return not Coordination.workerBusy(state,w.id,job.id),'worker already owns work'
   end
   local planning={}
+  local function fuelNeed(group,worker,required)
+    if not config.fuel.enabled then return end
+    local reserve=config.minimumFuelReserve+config.mining.returnMargin
+    local need={outward=(required-reserve-2)/2,reserve=reserve,home=U.copy(worker.telemetry.explorationHome),bounds=U.copy(config.exploration.bounds)}
+    local previous=group.fuelNeeds;local needs=U.copy(previous or {});local id=tostring(worker.id)
+    if needs[id] and needs[id].outward<=need.outward then return end
+    needs[id]=need;group.fuelNeeds=needs
+    local ok,why=pcall(persist);if not ok then group.fuelNeeds=previous;error(why,0) end
+  end
   function self:retrySector(id)
     local r=exploration.sectors[id];if not r then return false,'unknown exploration sector' end
     local bounds;for _,sector in ipairs(E.sectors(config.exploration)) do if sector.id==id then bounds=sector.bounds;break end end
@@ -107,6 +116,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
       local outstanding=0
       for _,id in ipairs(g.tripIds) do local j=state.jobs[id]; if j and not j.physicalComplete then outstanding=outstanding+math.max(0,j.quantity-j.progress.delivered) end end
       local remaining=g.target-(counts[g.item] or 0)-outstanding
+      if g.fuelNeeds and not planning[g.id] then g.fuelNeeds=nil end
       if remaining>0 then
         local eligible=0
         for _,w in pairs(workers) do local t=w.telemetry
@@ -128,6 +138,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
             if not allocated then reason=allocationError;waiting=true
             elseif t.fuel~='unlimited' and t.fuel<2*#home.exitRoute+config.minimumFuelReserve+config.mining.returnMargin+2 then
               reason='insufficient round-trip fuel for worker '..wid
+              fuelNeed(g,w,2*#home.exitRoute+config.minimumFuelReserve+config.mining.returnMargin+2)
             elseif t.status=='idle' and not t.task and not Coordination.workerBusy(state,wid) then
               local choices=E.candidates(exploration.sectors,config.exploration,g.item,home.exitRoute[#home.exitRoute] or home.depot)
               reason='Search envelope exhausted for '..g.item
@@ -144,7 +155,8 @@ function M.new(state,save,clock,controllerId,config,chunks)
                   g.status='running'; g.error='Planning reachable search sectors'; return
                 end
                 attempts=attempts+1; local sector=choices[ci]
-                local geometry,why=E.plan(sector,{config=config,depot=home.depot,exitRoute=home.exitRoute,protectedAreas=areas,activeJobs=state.jobs,availableFuel=t.fuel,records=exploration.sectors})
+                local geometry,why,required=E.plan(sector,{config=config,depot=home.depot,exitRoute=home.exitRoute,protectedAreas=areas,activeJobs=state.jobs,availableFuel=t.fuel,records=exploration.sectors})
+                if required then fuelNeed(g,w,required) end
                 if geometry then
                   local j=create(g.item,math.min(64,math.ceil(remaining/math.max(1,eligible))),0); geometry.groupId=g.id
                   j.exploration=geometry; j.miningArea=U.copy(geometry.bounds); j.miningResources=U.copy(t.miningResources or {})

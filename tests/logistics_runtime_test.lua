@@ -585,4 +585,7 @@ test('queued distant work triggers above low station refuel before assignment ac
   assert(w.fuel>=20+U.distance(w.pose,f.worker.config.depot),'verification lost its return reserve')
   local total=0;for _,inv in ipairs({f.inventories.stock,f.inventories.fuel}) do for _,item in pairs(inv) do if item.name=='minecraft:coal' then total=total+item.count end end end
   eq(total+w.refuels,4);eq(next(w.items),nil)
+  local home=f.controller.automation.queue:submit('RETURN_HOME',{}, {})
+  for _=1,500 do f:step();if home.status=='completed' and not f.worker.state.currentTask then break end end
+  eq(home.status,'completed');eq(U.distance(w.pose,f.worker.config.depot),0);eq(w.refuels,1)
 end)

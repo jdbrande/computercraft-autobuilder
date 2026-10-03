@@ -1152,3 +1152,19 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   coverage checks pass. An actual-runtime distant verification refueled first,
   survived controller reboot, completed correctly and conserved all four initial
   coal items with one consumed. Broader fuel runtime checks are running.
+
+- The single final0.26 review found four Important forecast stalls: fixed miners lacked
+  advertised entry geometry, undersized native tanks masked capable alternatives,
+  non-dispatchable factory jobs masked ready movement, and exploration demand was
+  invisible before a funded trip could exist. Each reproduces red and now passes
+  with validated worker entry, tank-aware matching, existing readiness checks and
+  bounded planner fuel-refusal estimates. No second review will run.
+- Native0.26 confirmed100 fuel above low80 proactively increased to180 for a174-fuel
+  verification, with one correct block. Final home return then hit the station chest.
+  The actual-runtime extension failed the same way. Shared depot travel now reuses
+  the station side approach; empty and mixed-cargo reboot regressions pass without
+  digging or losing cargo. Final native recovery and complete gates remain pending.
+- Final review rulings: whole-project unknown-terrain optimization remains outside
+  the explicit bounded-excursion forecast; navigation still enforces actual reserves.
+  Full suites and native acceptance remain mandatory parent gates. Neither declined
+  item is treated as finished, and no external blocker exists.

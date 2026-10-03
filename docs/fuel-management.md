@@ -117,3 +117,15 @@ retain their existing recovery rules. Dynamic obstructions can increase actual
 travel and still invoke the navigation reserve stop. Forecast fuel-item quantities
 are estimates; only observed station stock and transfer receipts are physical fuel.
 Optional task-bound budget telemetry remains compatible with older worker reports.
+
+
+Fixed miners advertise their configured entry in optional validated telemetry;
+update workers with the controller to obtain those per-worker route forecasts.
+Exploration's bounded planner exposes prospective fuel needs even before a trip
+can be created. The initial exit/route lower bound may rise when a detour is found;
+no additional route search or speculative ownership is created by the fuel view.
+Paused/completed groups and changed worker homes/envelopes invalidate those hints.
+Queued jobs that cannot currently dispatch do not hide ready work, and a turtle
+whose native tank cannot hold the requirement does not mask a capable alternative.
+Home travel with automatic fuel enabled uses the station side approach, including
+mixed cargo returns. Keep that approach clear as described in the station setup.

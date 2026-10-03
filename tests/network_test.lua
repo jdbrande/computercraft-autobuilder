@@ -125,3 +125,11 @@ test('worker publishes current mission fuel and explicit unavailable geometry wi
   state.position.known=false;p=a:telemetry();eq(p.fuelBudget,nil);assert(p.fuelBudgetError:find('position'))
   state.currentTask=nil;p=a:telemetry();eq(p.fuelBudget,nil);eq(p.fuelBudgetError,nil)
 end)
+
+test('fixed mining route telemetry copies validated worker entry and accepts legacy omission',function()
+  local N=require('autobuilder.core.network');local m=packet('heartbeat',1)
+  m.payload.miningRoute={entry={x=40,y=-20,z=7}};m.payload.miningRoute.extra=m.payload.miningRoute
+  local got=assert(net(7,1):accept(12,m,'test',1));eq(got.payload.miningRoute.entry.x,40);eq(got.payload.miningRoute.extra,nil)
+  for _,bad in ipairs({false,{}, {entry={x=0/0,y=1,z=2}},{entry={x=1,y=1.5,z=2}}}) do m.payload.miningRoute=bad;assert(not N.validate(12,m)) end
+  m.payload.miningRoute=nil;assert(N.validate(12,m))
+end)
