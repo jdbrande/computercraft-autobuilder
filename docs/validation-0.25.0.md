@@ -1,6 +1,6 @@
 # 0.25.0 mining intelligence validation
 
-Status: native acceptance and complete automated gates passed; integration awaits accepted 0.24.
+Status: native acceptance passed; final gate rerun follows the shared navigation correction.
 Implementation candidate: `b369e3e`, based on the ongoing 0.24 scaling branch.
 
 ## Automated evidence
@@ -11,7 +11,8 @@ confirmed travel and exact physical delivery totals across controller/worker
 restarts. The single final review and consolidated fix pass are complete.
 The final Python suite passed all 18 tests; release and whitespace checks passed.
 The complete Lua suite passed all **802 tests** on `b369e3e`
-(`/tmp/fleet-025-final-full.log`).
+(`/tmp/fleet-025-final-full.log`). The later0.24 physical-detour correction
+is now merged; its complete gate is restarting before integration.
 
 Review regressions reproduce and correct three errors: transient turtles recorded
 as permanent hazards, long clear returns evicting unresolved hazards, and cargo

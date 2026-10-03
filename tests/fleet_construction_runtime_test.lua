@@ -243,3 +243,23 @@ test('opposing construction workers pass one another without synchronized detour
   for _,j in ipairs(jobs) do eq(j.status,'completed');eq(j.report.counts.correct,1) end
   for x=0,20 do eq(f.blocks[x..',0,2'].name,'minecraft:stone') end
 end)
+
+test('opposing construction detours recover physical station obstructions without digging',function()
+  local f=fixture({width=20,scaling=true});assert(f.apps[7]:command('fleet limit building 2 4'))
+  for id,x in pairs({[12]=10,[13]=11}) do
+    for axis,value in pairs({x=x,y=2,z=0}) do f.worlds[id].pose[axis]=value;f.apps[id].state.position[axis]=value end
+  end
+  for x=0,20 do f.blocks[x..',0,2']={name='minecraft:stone',state={}} end
+  f.blocks['10,2,1']={name='minecraft:chest',state={}};f.blocks['11,2,-1']={name='minecraft:chest',state={}}
+  local q=f.apps[7].automation.queue;local jobs={}
+  for id,x in pairs({[12]=20,[13]=0}) do jobs[#jobs+1]=q:submit('VERIFY',{preferredWorker=id,clearanceY=2,
+    blocks={{x=x,y=0,z=2,name='minecraft:stone',state={}}}},{}) end
+  f.heldBuilder=12
+  for _=1,30 do f:cycle();if jobs[1].workerId and jobs[2].workerId then break end end
+  f.heldBuilder=nil
+  for _=1,800 do f:cycle();if jobs[1].status=='completed' and jobs[2].status=='completed' then break end end
+  assert((f.active.VERIFY or 0)>=2,'fixture did not run opposing workers concurrently')
+  for _,j in ipairs(jobs) do eq(j.status,'completed');eq(j.report.counts.correct,1) end
+  for x=0,20 do eq(f.blocks[x..',0,2'].name,'minecraft:stone') end
+  eq(f.blocks['10,2,1'].name,'minecraft:chest');eq(f.blocks['11,2,-1'].name,'minecraft:chest')
+end)

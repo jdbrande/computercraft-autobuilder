@@ -1134,3 +1134,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Final0.25 clean-source gate completed:802 Lua tests,18 Python tests, release
   verification and whitespace checks pass. Native acceptance is complete.
   Integration remains ordered behind the still-running0.24 native scaling trial.
+- Final0.24 full gate failed1/786 tests: the48-block ramp/drain fixture stalled at
+ 46 blocks. Retained state identified builder14 blocked by a chest encountered
+  inside a traffic detour. The earlier focused pass did not exercise that ordering.
+  A deterministic regression reproduced a terminal physical-obstruction error.
+  Navigation now persists the inspected cell as bounded detour evidence and retries
+  without digging. The regression passes across reboot; an actual two-worker
+  runtime with opposing routes and station chests also passes. This is a release
+  blocker corrected before restarting the full gate, not a waived flaky test.
+
+- Propagated0.24 physical-detour correction after the earlier802-test pass. The
+  complete0.25 gate is restarting on the merged source before integration.
