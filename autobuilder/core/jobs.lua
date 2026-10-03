@@ -62,7 +62,7 @@ function M.new(state,save,clock,controllerId,config)
     return g
   end
   local function assignExploration(workers,counts)
-    if not config or not config.exploration.enabled or exploration.paused or Coordination.factoryPending(state) or not counts then return end
+    if not config or not (config.exploration or {}).enabled or exploration.paused or Coordination.factoryPending(state) or not counts then return end
     local groups={}; for _,g in pairs(exploration.groups) do if not g.paused and g.status~='completed' then groups[#groups+1]=g end end
     table.sort(groups,function(a,b) return a.id<b.id end)
     local ids={}; for _,w in pairs(workers) do ids[#ids+1]=w.id end; table.sort(ids)

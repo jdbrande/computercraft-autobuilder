@@ -125,12 +125,12 @@ function M.new(app,config,e,network,clock)
       if not self.storage.valid then return true end
       if s.assignmentRecovery then return true end
       if clock()-lastSend<config.heartbeatInterval then return true end
-      if config.exploration.enabled then
+      if (config.exploration or {}).enabled then
         local ready=self:refresh(); if not ready then return true end
       end
       for _,j in pairs(s.jobs) do
         local g=j.exploration and s.exploration.groups[j.exploration.groupId]
-        if g and not j.physicalComplete and (g.paused or s.exploration.paused or not config.exploration.enabled) then send(j.workerId,'mine_return',{jobId=j.id}) end
+        if g and not j.physicalComplete and (g.paused or s.exploration.paused or not (config.exploration or {}).enabled) then send(j.workerId,'mine_return',{jobId=j.id}) end
       end
       local job=self.jobs:assign(s.workers,self.storage.counts)
       if job then
