@@ -649,9 +649,9 @@ mutation during import, repeated shorthand after restart, unsupported metadata.
 **Interface:** `gzip.decode(bytes,maxBytes)` returns decompressed bytes or throws
 before any physical effect; raw NBT detection belongs to Task24.
 
-- [ ] Write/run failing stored/fixed/dynamic gzip, optional-header, CRC/ISIZE,
+- [x] Write/run failing stored/fixed/dynamic gzip, optional-header, CRC/ISIZE,
   trailing/truncated stream and bounded-expansion tests. Expected: missing module.
-- [ ] Vendor pinned LibDeflate with license and a marked bounded/progress hook;
+- [x] Vendor pinned LibDeflate with license and a marked bounded/progress hook;
   implement strict gzip wrapper and cooperative loops. Run focused/full Lua tests;
   expected all pass. Commit independently usable bounded decoder.
 

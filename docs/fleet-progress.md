@@ -262,3 +262,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 
 - Task22 final gate:492 Lua/16 Python tests, release generation/check and whitespace
   checks passed. Reviewed fixes are complete; integrating0.16 and continuing0.17.
+
+- Task23: bounded native gzip decoder passes four new RED→GREEN cases and the
+  full496-test Lua suite. Pinned LibDeflate source SHA verified; license retained.
+  CRC/header/size/trailing-data checks and cooperative expansion bounds are covered.
