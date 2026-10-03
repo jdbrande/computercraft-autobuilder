@@ -41,9 +41,12 @@ its nearest free destination buffer. Overlapping narrow corridors still use cell
 reservations; automatic resolution of every fleet deadlock remains later traffic work.
 
 Automatic targets subtract inbound committed cargo and preserve each source's own
-target stock. Sources rank by distance, then node ID. A missing item creates a normal
-production request. Existing hauls settle before another shortage forecast for that
-item, and produced stock waits for the production request's durable completion.
+target stock, other reservations and protected turtle fuel. Sources rank by distance,
+then node ID. Disconnected unused buffers do not prevent selection of healthy ones.
+A missing item creates a normal production request once existing stock owners settle.
+Every possible factory output in storageInventories must have a registered logistics
+node before automatic production; status names any missing registration. Produced
+stock waits for the production request's durable completion.
 Manual hauls keep their selected source and report its shortage rather than silently
 changing nodes. Batches shrink to measured stack and concrete destination capacity.
 

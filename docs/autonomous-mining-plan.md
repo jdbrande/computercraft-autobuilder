@@ -772,11 +772,11 @@ production invokes step under its inventory lock and synchronizes central receip
 
 ### Task 31: Automatic restocking, commands and native acceptance
 
-- [ ] Add/run failing desired-stock routing, inbound subtraction, source ranking,
+- [x] Add/run failing desired-stock routing, inbound subtraction, source ranking,
   capacity-sized batches and production-shortage/restart cases. Implement using
   Task30 API and existing resource graph; expose `haul` and `logistics` status.
-- [ ] Run native two-courier finite-stock acceptance with both restarts and a
+- [x] Run native two-courier finite-stock acceptance with both restarts and a
   temporarily unavailable endpoint. Inspect actual inventories and durable claims;
   correct bugs with regression tests and document results/limits.
-- [ ] Run all Lua/Python/release checks, one whole-branch review/fix pass. Update
+- [x] Run all Lua/Python/release checks, one whole-branch review/fix pass. Update
   running progress, integrate/push and continue all unfinished requirements.

@@ -18,8 +18,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Loaded mission compatibility completed:533 Lua/18 Python tests, native chunky
   cross-chunk acceptance, final review fixes and release checks passed.
 - Loaded mission compatibility integrated/pushed at `105f2f3`.
-- Current branch: `milestone/0.19.0`; Task29 registered infrastructure nodes, then
-  reserved physical logistics and automatic restocking.
+- Managed logistics completed:563 Lua/18 Python tests, native two-courier
+  restocking, one final review/fix pass and release checks passed.
+- Next: interrupted movement and heading recovery, followed by every remaining row.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -44,8 +45,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 9: autonomous mining | Accepted 0.12.0 with four live explorers | Preserve during later pipeline integration |
 | 10: mining intelligence | Surveys, observed resources, protection, routes and exhaustion | Persist hazard/inaccessibility/density evidence and apply ranking |
 | 11: fuel management | Configurable fuels, durable stations, automatic refuel and native rescue accepted; budgets deny unsafe trips | Per-mission budget presentation for every role and fleet-wide predictive fuel forecasting |
-| 12: logistics network | Journaled point-to-point courier and supply batch executors | Pickup/destination capacity reservations, automatic station routing and dispatch |
-| 13: storage abstraction | Durable count claims and physical/available/reserved/transit/expected/project views accepted in 0.14.0 | Native slot capacity and private station ownership accepted in0.16; general courier integration remains |
+| 12: logistics network | Registered nodes, reserved parallel couriers, automatic targets/production and native restocking accepted0.19 | Continuous builder/fuel supply integration and broader physical network routing |
+| 13: storage abstraction | Durable count claims and physical/available/reserved/transit/expected/project views accepted in 0.14.0 | Native slot capacity and private station ownership accepted in0.16; managed courier integration accepted0.19 |
 | 14: continuous forecasting | Acquisition targets and shortages | Proactive per-project coverage of all physical/expected states |
 | 15: parallel crafting | Two native private Crafty stations with input/output leases, finite batches and restart acceptance | Automatic capacity-based batch sizing, cross-role pipeline integration |
 | 16: processing network | Furnace lanes and fuel partitioning | Generic machine providers, timing/capacity forecasts and supported processors |
@@ -347,3 +348,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Native fixture setup corrections and interrupted-move limitation are recorded in
   [0.19 acceptance](validation-0.19.0.md). Pre-review gate557 Lua/18 Python and
   release/diff checks passed; final whole-branch review follows.
+
+- Task31 final review: four Important findings fixed with six RED→GREEN cases.
+  Unclaimed worker preferences no longer block older factory owners; grants recheck
+  worker availability. Forecasting respects protected fuel and held stock, disconnected
+  unused buffers are skipped, and unregistered factory output routes block production
+  with actionable status. Final563 Lua/18 Python, release generation/check and diff
+  checks passed. Native trial predates these admission fixes. Integrating0.19 and
+  continuing movement recovery without a milestone handoff.

@@ -20,7 +20,7 @@ function M.workerBusy(state,owner,exceptId)
   for _,job in pairs((state.automation or {}).jobs or {}) do
     if job.id~=exceptId and job.type=='RESCUE' and not job.rescueSettled
       and (job.preferredWorker==owner and job.status~='completed' or job.targetWorker==owner) then return true end
-    if job.id~=exceptId and (job.workerId==owner or (job.managedFuel or job.privateStation or job.logistics) and job.preferredWorker==owner) and job.status~='completed' then return true end
+    if job.id~=exceptId and (job.workerId==owner or (job.managedFuel or job.privateStation or job.logistics and job.logisticsFlow) and job.preferredWorker==owner) and job.status~='completed' then return true end
   end
   return false
 end

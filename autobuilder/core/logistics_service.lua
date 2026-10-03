@@ -47,13 +47,19 @@ function M.new(app,config,e,queue,production)
       local da,db=U.distance(a.position,position),U.distance(b.position,position)
       return da<db or da==db and a.inventory<b.inventory
     end)
+    local unavailable
     for _,b in ipairs(ordered) do
       local busy=false
       for _,j in pairs(s.jobs) do if j.logistics and j.status~='completed' then
         if j.logistics.pickup.inventory==b.inventory or j.logistics.drop.inventory==b.inventory then busy=true end
       end end
-      if not busy and not next(F.list(e,b.inventory)) then return b end
+      if not busy then
+        local ok,inventory=pcall(F.list,e,b.inventory)
+        if ok and not next(inventory) then return b end
+        if not ok then unavailable=b.inventory..': '..tostring(inventory) end
+      end
     end
+    return nil,unavailable
   end
   local function idleWorker()
     local ids={}
@@ -83,9 +89,10 @@ function M.new(app,config,e,queue,production)
     local allowed,why=canRun();if not allowed then r.error=why;assert(save());return false end
     local owner=idleWorker();if not owner then r.error='waiting for an idle logisticsV1 courier';assert(save());return false end
     local from,to=Nodes.get(config,r.source),Nodes.get(config,r.destination)
-    local pickup=availableBuffer(from,app.state.workers[tostring(owner)].telemetry.position)
-    local drop=pickup and availableBuffer(to,pickup.position)
-    if not pickup or not drop then r.error='waiting for empty private logistics buffers';assert(save());return false end
+    local pickup,pickupError=availableBuffer(from,app.state.workers[tostring(owner)].telemetry.position)
+    local drop,dropError
+    if pickup then drop,dropError=availableBuffer(to,pickup.position) end
+    if not pickup or not drop then r.error=pickupError or dropError or 'waiting for empty private logistics buffers';assert(save());return false end
     local n=math.min(config.logistics.batchSize,r.quantity-allocated,sourceCount(from,r.item))
     if n==0 then r.error='source stock missing: '..r.source..' '..r.item;assert(save());return false end
     queue:submit('TRANSPORT',{item=r.item,quantity=n,preferredWorker=owner,haulRequest=r.id,logisticsReady=false,
@@ -97,6 +104,10 @@ function M.new(app,config,e,queue,production)
   -- observations occur under production's inventory lock, before any transfer.
   local function reserve(job)
     local old=capacity.state.leases[job.id];if old then assert(old.status=='held','logistics capacity released');return old end
+    local worker=app.state.workers[tostring(job.preferredWorker)]
+    local telemetry=worker and worker.telemetry
+    assert(worker and worker.online and telemetry and telemetry.status=='idle' and not telemetry.task
+      and not Q.workerBusy(app.state,job.preferredWorker,job.id),'waiting for available preferred courier')
     local c=job.logistics
     assert(not next(F.list(e,c.pickup.inventory)) and not next(F.list(e,c.drop.inventory)),'logistics buffers must be empty')
     local sources=F.sources(e,{storageInventories={c.source.inventory}},job.item)
@@ -212,10 +223,13 @@ function M.new(app,config,e,queue,production)
           if request and request.status~='completed' then
             s.logisticsStatus[key]='waiting for production '..request.id..': '..(request.error or request.status)
           else
+            assert(app.mining:refresh())
+            local stockView=production.ledger:view(item,app.mining.storage.counts)
+            local available=math.max(0,stockView.available-(config.turtleFuelReserveItems[item] or 0))
             local candidates={}
             for _,source in ipairs(nodes) do if source.id~=node.id then
               local _,stock=F.sources(e,{storageInventories={source.inventory}},item)
-              local free=stock-((source.targets or {})[item] or 0)-outstanding(source,item,false)
+              local free=math.min(available,stock-((source.targets or {})[item] or 0)-outstanding(source,item,false))
               if free>0 then candidates[#candidates+1]={node=source,count=free,distance=U.distance(source.position,node.position)} end
             end end
             table.sort(candidates,function(a,b) return a.distance<b.distance or a.distance==b.distance and a.node.id<b.node.id end)
@@ -224,16 +238,21 @@ function M.new(app,config,e,queue,production)
               self:request(item,math.min(need,source.count),source.node.id,node.id,'restock:'..key..':'..(s.haulSequence+1))
               return true
             end
-            local transit=false
+            local transit=stockView.reserved>0 or stockView.transit>0 or stockView.expected>0
             for _,r in pairs(s.hauls) do if r.item==item and r.status~='completed' then transit=true end end
             if transit then s.logisticsStatus[key]='waiting for owned cargo to settle before forecasting shortage'
             else
-              assert(app.mining:refresh())
-              local target=(app.mining.storage.counts[item] or 0)+need
-              assert(target<=1000000,'logistics production target exceeds finite request limit')
-              local r=production:request({[item]=target},'logistics-stock:'..item)
-              s.logisticsProduction[item]=r.id;s.logisticsStatus[key]='acquiring '..need..' '..item..' through '..r.id
-              assert(save());return true
+              local registered={};for _,source in ipairs(nodes) do registered[source.inventory]=true end
+              local missing
+              for _,inventory in ipairs(config.storageInventories) do if not registered[inventory] then missing=inventory;break end end
+              if missing then s.logisticsStatus[key]='register logistics node for factory output inventory '..missing
+              else
+                local target=(app.mining.storage.counts[item] or 0)+need
+                assert(target<=1000000,'logistics production target exceeds finite request limit')
+                local r=production:request({[item]=target},'logistics-stock:'..item)
+                s.logisticsProduction[item]=r.id;s.logisticsStatus[key]='acquiring '..need..' '..item..' through '..r.id
+                assert(save());return true
+              end
             end
           end
         end

@@ -6,7 +6,7 @@ This is the logistics foundation for continuous supply and dynamic fleet scaling
 
 ## Automated evidence
 
-Pre-review gate:557 Lua tests and18 Python tests passed. Release0.19.0 generation
+Final reviewed gate:563 Lua tests and18 Python tests passed. Release0.19.0 generation
 and `python3 tools/release.py --check` passed; `git diff --check` passed.
 
 New tests first failed, then passed for node configuration/aliases, held endpoint
@@ -21,6 +21,20 @@ recovery. Additional regressions cover remote stock loading geometry, source/fin
 capacity limits, older factory drainage, shared legacy/fuel consumer isolation,
 target/inbound accounting, nearest-source routing, source stock targets, one
 production request across reboot and waiting for its completion before hauling.
+
+## Final review fixes
+
+Four Important findings were reproduced by six failing regressions, then fixed in
+one pass. Unclaimed haul preferences no longer pin a dual-role worker needed by an
+older factory; grant time rechecks actual worker ownership. Automatic routing honors
+protected fuel and held stock claims, waiting for existing owners before forecasting.
+Disconnected unused buffers are skipped in favor of healthy alternatives. Automatic
+production requires registered routes from every possible shared output inventory,
+preventing repeated manufacture into unreachable storage. Status names the inventory
+that needs registration. Existing owned endpoint reconciliation remains strict.
+
+The native trial below predates these admission fixes; focused controller and actual
+courier-runtime regressions validate the corrected scheduling behavior.
 
 ## Native Minecraft — 2026-10-03
 

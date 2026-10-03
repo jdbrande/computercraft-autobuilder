@@ -195,3 +195,52 @@ test('courier registration order chooses its nearest private pickup instead of a
   f.app.state.workers['12'].online=true;f.app.state.workers['12'].telemetry.position={x=2,y=1,z=0,known=true}
   f:step(12);local second=f:jobs()[2];eq(second.logistics.pickup.inventory,'a');eq(second.logistics.drop.inventory,'c')
 end)
+
+test('unclaimed haul leaves the dual role worker available for an older factory stock owner',function()
+  local f=fixture();f.app.state.workers['13'].online=false;f.app.state.workers['12'].telemetry.capabilities.crafting=true
+  local craft=f.queue:submit('CRAFT',{item='minecraft:stone_bricks',quantity=24,batches=6,stockInputs={[item]=24},stockOutputs={['minecraft:stone_bricks']=24}},{})
+  f.production:syncClaims();f.service:request(item,8,'base','site','craft-first');f:step(10)
+  local assigned=f.queue:assign(f.app.state.workers);assert(assigned and assigned.id==craft.id,'unclaimed haul pinned factory worker')
+end)
+
+test('haul grant rechecks worker ownership after the scheduling to reservation interval',function()
+  local f=fixture();f.app.state.workers['13'].online=false;f.app.state.workers['12'].telemetry.capabilities.building=true
+  f.service:request(item,8,'base','site','grant-race');f:step() -- logical haul exists but owns no inventory
+  local haul=assert(f:jobs()[1]);assert(not haul.logisticsFlow)
+  local build=f.queue:submit('VERIFY',{blocks={{x=50,y=0,z=0,name=item,state={}}},preferredWorker=12},{})
+  local assigned=f.queue:assign(f.app.state.workers);assert(assigned and assigned.id==build.id,'logical preference blocked other work')
+  f:step(5);assert(not haul.logisticsFlow,'haul acquired ownership of an already busy worker');eq(f.transfers,0)
+  build.status='completed';f:step(20);assert(haul.logisticsReady)
+end)
+
+test('automatic restock preserves protected fuel and acquires only its real shortage',function()
+  local f=fixture();local coal='minecraft:coal';f.inventories.base={[1]={name=coal,count=64}}
+  f.config.turtleFuelReserveItems={[coal]=64};f.config.logistics.nodes[2].targets={[coal]=8};f:step(10)
+  eq(#f:jobs(),0);eq(next(f.queue.state.hauls),nil);eq(F.count(f.inventories.base,coal),64)
+  local _,r=next(f.queue.state.requests);assert(r,'protected fuel hid the production shortage');eq(r.requirements[coal],72)
+end)
+
+test('automatic forecasting waits for existing stock reservations instead of inventing inbound cargo',function()
+  local f=fixture();f.config.logistics.nodes[2].targets={[item]=8}
+  assert(f.production.ledger:reserve('existing',{[item]=24},{['minecraft:stone_bricks']=24},{[item]=24}))
+  f:step(8);eq(next(f.queue.state.hauls),nil);eq(next(f.queue.state.requests),nil)
+  f.production.ledger:cancel('existing');f:step(20);eq(#f:jobs(),1);assert(f:jobs()[1].logisticsReady)
+end)
+
+test('a disconnected unowned buffer does not disable another available pickup or drop',function()
+  for _,name in ipairs({'a','c'}) do
+    local f=fixture();f.offline=name;f.service:request(item,8,'base','site','alternate');f:step(20)
+    local j=assert(f:jobs()[1],'healthy alternative lane was ignored');assert(j.logisticsReady)
+    assert(j.logistics.pickup.inventory~=name and j.logistics.drop.inventory~=name)
+  end
+end)
+
+test('unregistered possible factory outputs block logistics production without manufacturing unreachable surplus',function()
+  local f=fixture();table.insert(f.config.storageInventories,1,'factory_stock');f.inventories.factory_stock={};f.inventories.base={}
+  f.config.logistics.nodes[2].targets={[item]=8};f:step(5)
+  eq(next(f.queue.state.requests),nil,'unroutable production was requested')
+  assert((f.queue.state.logisticsStatus['site:'..item] or ''):find('factory_stock',1,true),'missing actionable registration error')
+  f.inventories.factory_stock[1]={name=item,count=8};f:step(10);eq(next(f.queue.state.requests),nil);eq(#f:jobs(),0)
+  f.config.logistics.nodes[3]={id='factory',inventory='factory_stock',position={x=40,y=0,z=0},buffers={{inventory='factory_buffer',position={x=42,y=1,z=0}}}}
+  f.inventories.factory_buffer={};f:step(20);local j=assert(f:jobs()[1]);eq(j.logistics.source.id,'factory');assert(j.logisticsReady)
+end)
