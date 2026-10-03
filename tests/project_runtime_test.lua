@@ -43,7 +43,7 @@ local function fixture(options)
     return e
   end
   local ce,we=env(7),env(12); we.turtle=w.turtle
-  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},turtleFuelReserveItems={},supply={inventory='stage',side='front'},logistics={nodes={{id='home',inventory='stock',position={x=-3,y=1,z=0},buffers={{inventory='home',position={x=0,y=2,z=0}}}}}},clearSite=options.clearSite or false,build={enabled=true,origin={x=2,y=0,z=0},rotation=options.rotation or 0,mirrorX=options.mirrorX or false,site=options.site or {}},autoDepotExpansion={enabled=options.expansion~=nil,freeSlots=0},depotExpansion=options.expansion or {}})
+  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},turtleFuelReserveItems={},supply={inventory='stage',side='front'},logistics={nodes={{id='home',inventory='stock',position={x=-3,y=1,z=0},buffers={{inventory='home',position={x=0,y=2,z=0}}}}}},clearSite=options.clearSite or false,build={enabled=true,origin={x=2,y=0,z=0},regionSize=options.regionSize or 8,rotation=options.rotation or 0,mirrorX=options.mirrorX or false,site=options.site or {}},autoDepotExpansion={enabled=options.expansion~=nil,freeSlots=0},depotExpansion=options.expansion or {}})
   local wc=C.load({role='worker',controllerId=7,automation={building=true},clearSite=options.clearSite or false,minimumFuelReserve=0,depot=U.copy(w.pose),supply={inventory='stage',side='front'},initialPosition=U.copy(w.pose)})
   local R=require('autobuilder.core.runtime'); local c,b=R.new(cc,ce),R.new(wc,we)
   local blueprint={schema=1,size={x=2,y=1,z=1},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=2}},metadata={},requirements={['minecraft:stone']=2}}
@@ -658,4 +658,53 @@ test('cross-region preparation reopens exhausted fluid work after a delayed sour
   assert(p.phase=='built',p.phase..': '..tostring(p.error));eq(p.report.counts.correct,9)
   for x=2,10 do eq(w.blocks[x..',0,0'].name,'minecraft:glass') end
   eq(c.state.automation.supply,nil);assert(not b.state.currentTask)
+end)
+
+test('automatic preparation tunnels beneath retained floor fills hidden foundation and restores excavated ground',function()
+  local blueprint={schema=1,size={x=3,y=1,z=3},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=9}},metadata={},requirements={['minecraft:stone']=9}}
+  local w,ce,we,c,b,step,reboot=fixture({site={minY=-2,maxY=10},blueprint=blueprint,stock={[1]={name='minecraft:stone',count=32}}})
+  for x=1,5 do for z=-1,3 do for y=-2,-1 do w.blocks[x..','..y..','..z]={name='minecraft:stone',state={}} end end end
+  for x=2,4 do for z=0,2 do w.blocks[x..',0,'..z]={name='minecraft:stone',state={}} end end
+  w.blocks['3,-1,1']=nil
+  assert(c:command('build import /example.json hidden'));assert(c:command('build auto hidden'))
+  local restarted=false;local accessJobs=0
+  for _=1,12000 do
+    step()
+    local t=b.state.currentTask
+    if not restarted and t and t.siteAccess and w.places>0 then c,b=reboot();restarted=true end
+    if c.state.automation.projects.hidden.phase=='built' and not b.state.currentTask then break end
+  end
+  local p=c.state.automation.projects.hidden
+  assert(p.phase=='built',ce.textutils.serialize({phase=p.phase,error=p.error,worker=b.state.currentTask,site=p.site}))
+  assert(restarted);eq(p.report.counts.correct,9)
+  for _,j in pairs(c.state.automation.jobs) do if j.key and j.key:find(':access:',1,true) then accessJobs=accessJobs+1;assert(j.status=='completed');assert(not j.siteAccess and not j.report) end end
+  assert(accessJobs>=5);assert(w.digs>=2)
+  for x=1,5 do for z=-1,3 do for y=-2,-1 do assert(w.blocks[x..','..y..','..z],'ground left excavated') end end end
+  for x=2,4 do for z=0,2 do eq(w.blocks[x..',0,'..z].name,'minecraft:stone') end end
+  eq(w.places,w.digs+1)
+end)
+
+test('cross-region preparation reaches a sealed interior region through the project margin',function()
+  local blueprint={schema=1,size={x=3,y=1,z=3},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=9}},metadata={},requirements={['minecraft:stone']=9}}
+  local w,ce,we,c,b,step,reboot=fixture({regionSize=2,site={minY=-2,maxY=10},blueprint=blueprint,stock={[1]={name='minecraft:stone',count=32}}})
+  for x=1,5 do for z=-1,3 do for y=-2,-1 do w.blocks[x..','..y..','..z]={name='minecraft:stone',state={}} end end end
+  for x=2,4 do for z=0,2 do w.blocks[x..',0,'..z]={name='minecraft:stone',state={}} end end
+  w.blocks['3,-1,1']=nil
+  assert(c:command('build import /example.json hidden'));assert(c:command('build auto hidden'))
+  local restarted=false;local accessJobs=0;local crossed=false
+  for _=1,18000 do
+    step()
+    local t=b.state.currentTask
+    if t and t.siteAccess and t.siteAccess.bounds then crossed=true end
+    if not restarted and t and t.siteAccess and w.places>0 then c,b=reboot();restarted=true end
+    if c.state.automation.projects.hidden.phase=='built' and not b.state.currentTask then break end
+  end
+  local p=c.state.automation.projects.hidden
+  assert(p.phase=='built',ce.textutils.serialize({phase=p.phase,error=p.error,worker=b.state.currentTask,site=p.site}))
+  assert(restarted and crossed);eq(p.report.counts.correct,9)
+  for _,j in pairs(c.state.automation.jobs) do if j.key and j.key:find(':access:',1,true) then accessJobs=accessJobs+1;assert(j.status=='completed');assert(not j.siteAccess and not j.report) end end
+  assert(accessJobs>=5);assert(w.digs>=2)
+  for x=1,5 do for z=-1,3 do for y=-2,-1 do assert(w.blocks[x..','..y..','..z],'ground left excavated') end end end
+  for x=2,4 do for z=0,2 do eq(w.blocks[x..',0,'..z].name,'minecraft:stone') end end
+  eq(w.places,w.digs+1)
 end)

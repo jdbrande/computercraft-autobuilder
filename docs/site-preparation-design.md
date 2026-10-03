@@ -244,3 +244,56 @@ ordinary debris collection. Fresh verification and the bounded re-survey policy
 handle later changes; persistent external inflow stays a precise blocker. Coordinated
 containment across fluid regions and externally fed boundaries remains required
 before general fluid preparation can be accepted.
+
+### Access controller implementation
+
+The region checkpoint now drives opening, target fill/inspection, and restoration.
+Only solids actually recorded with excavation intent are candidates for restoration;
+intersect those receipts with the immutable below-clearance geometry so old air and
+required working air remain open. Restore from the deepest cell toward the shaft,
+verifying each cell before closing the next. Generic target proof becomes usable
+only after all restoration verifies, and lasts only for that preparation epoch.
+
+Keep access receipts in the controller root until both region checkpoint copies
+contain completion. If both region files disappear, retain active physical owners,
+settle their cargo, perform a fresh survey and reconstruct outstanding restoration
+from the root receipts before ordinary preparation resumes. Do not reuse the old
+hidden-target proof. Three failed restoration attempts leave the region owned with
+an explicit recovery error; neighboring regions can still progress.
+
+The automatic access controller and its recovery tests are implemented. The complete
+controller/worker retained-floor case is undergoing validation. Native automatic
+access, cross-region shafts where a region has no internal opening, and external
+fluid containment remain unfinished.
+
+Cross-region access now falls back to a bounded shaft at the project margin. Its
+contract declares the entire tunnel envelope, avoiding all explicit schematic
+blocks and remaining within the project. A durable project access lease spans
+child jobs, stock/debris trips and restoration; existing overlapping jobs drain
+before excavation, and affected region certificates cannot admit new builders.
+Only one such access operation runs per project. The actual multi-region runtime
+passes; native cross-region acceptance remains pending.
+
+Mutation reservations now include the cells immediately above and below every
+physical target. This prevents digging beneath or filling above another worker,
+including the race where its movement request arrives after the action grant.
+The same checkpointed cell ownership applies to mining, farming and construction.
+
+### External inflow containment follow-up
+
+After local draining and the cross-region reconsideration still observe inflow,
+construct and verify a bounded retaining barrier immediately outside the required
+working margin. Those cells are outside the authoritative schematic and required-air
+volume; never plug requested air permanently. The barrier is ordinary stable fill,
+so existing terrain can satisfy it and shortages use normal production. Preserve
+all infrastructure/protection checks and record exact inaccessible barrier cells.
+Keep the resulting barrier as protected project infrastructure while water or lava
+outside the site remains present.
+
+Use one durable controller preparation phase for this project-wide operation. Drain
+existing overlapping physical owners before wall work, withhold affected construction
+admission throughout, and reuse PREPARE_REGION fill/verify batches, cargo settlement
+and supply. Verify the barrier before a fresh bounded survey/preparation pass; do
+not let retry recovery forget that containment was already attempted. Continuously
+changing or inaccessible surroundings retain explicit bounded blockers. This is the
+next implementation task after the foundation-access acceptance boundary.

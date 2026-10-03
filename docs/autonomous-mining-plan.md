@@ -931,8 +931,8 @@ requirements until all acceptance below passes.
 Implemented and accepted subsets: journaled excavation/fill, mined fill acquisition,
 debris return, three bounded preparation retries, and finite one-region water/lava
 sealing/clearance. Native basins recover all temporary fill. Fresh optional scanner
-proof for sealed generic support is undergoing native validation. Finish cross-region
-fluid stabilization and safe access to missing sealed support before marking the
+proof and cross-region finite-fluid stabilization passed native validation. Finish
+automatic access to missing sealed support and external-flow containment before marking the
 general preparation scope complete. Keep scan absence/name-only exact-state limits.
 
 ### Task45: Verified regions, normal pipeline and native acceptance
@@ -946,3 +946,11 @@ general preparation scope complete. Keep scan absence/name-only exact-state limi
   verify→build acceptance. Record counts, retained infrastructure, restarts and limits.
 - [ ] Complete Lua/Python/release gates and one final whole-branch review/fix pass;
   document/integrate/push, then continue dynamic role scaling and all remaining scope.
+
+Foundation access implementation findings: use the existing preparation child-job
+sequence for bounded shaft opening, target fill/verification and reverse restoration.
+Restore only journaled solid changes below required clearance; verify each restored
+cell before closing the next. Keep root access receipts until both evidence copies
+advance, so lost sidecars can reconstruct outstanding restoration. Do not certify
+a region while access remains open or restoration is blocked. Fresh survey epochs
+never inherit old hidden-target proof.

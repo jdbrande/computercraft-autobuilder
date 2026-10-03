@@ -33,8 +33,8 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   and normal per-region construction gates are implemented, with missing-evidence
   recovery and bounded preparation retries. Shared mutation protection, native
   multiworker uneven-terrain construction and finite water/lava drainage have
-  acceptance evidence. Sealed-support scanning is under native validation;
-  cross-region fluid stabilization, missing sealed-support access and final
+  acceptance evidence. Sealed-support scanning and cross-region fluid drainage passed native validation;
+  automatic missing sealed-support access and final
   milestone verification/review remain in progress.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
@@ -851,3 +851,32 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   access tasks, and duplicate assignments cannot change/remove the owned route.
   Controller access orchestration and final proof/restoration accounting remain to
   implement; no normal build currently creates these access tasks automatically.
+
+- The stabilization snapshot passed all725 Lua tests (before the latest access
+  receipt/controller edits);18 Python tests passed. Current-tree validation remains
+  pending. Controller access now passes service checks for opening, filling, hidden
+  support verification and reverse ground restoration across controller recreation.
+  Only observed solid ground below planned clearance is restored. Original access
+  receipts remain in the root until restoration commits to both region checkpoints;
+  loss of both region files reconstructs restoration before fresh preparation.
+  Three failed restoration attempts retain the region and an actionable error.
+  A full controller/worker retained-floor runtime is running; no native automatic
+  missing-support acceptance is claimed yet.
+
+- The actual retained3×3-floor runtime found an exit-target bug: the target was
+  recomputed from each intermediate tunnel position while a reserved route remained
+  pending. The fixed shaft entrance is now used for the whole exit. Its focused
+  reservation-yield regression and actual controller/worker reboot case pass, with
+  every original floor/ground cell retained or restored and exactly one net fill.
+- Interior regions now obtain bounded access through the project margin when no
+  internal shaft exists. A durable project access lease spans child jobs and debris
+  settlement, drains pre-existing owners, and withholds affected neighboring region
+  certificates until restoration completes. Geometry/service checks and an actual
+  nine-region retained-floor runtime pass. One access operation per project is the
+  deliberate concurrency limit; unrelated regions remain usable.
+- A new protection regression reproduced permission to mutate directly above/below
+  another worker. Mutation grants now reserve the two vertical neighboring cells
+  atomically and reject occupied/offline worker positions there. Both grant orders
+  pass, along with the focused preparation/construction/protection tests. Fresh full
+  current-tree validation is running. Native206/207 automatic access is running on
+  the preceding within-region snapshot; it is not evidence for the later lease/guard.

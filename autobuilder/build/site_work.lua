@@ -117,8 +117,18 @@ function M.new(task,e,config,nav,save)
 end
 function M.validProgress(j,p)
   local counts=p.report and p.report.counts
-  if not counts then return p.phase~='completed' and (p.progress or 0)==0 and not j.report end
+  if not counts then return p.phase~='completed' and (p.progress or 0)==0 and not j.report and not (p.report and p.report.accessChanges~=nil) end
   if type(counts)~='table' then return false end
+  local changes=p.report.accessChanges
+  if changes~=nil and (not j.siteAccess or j.siteWork.stage~='clear' or type(changes)~='table') then return false end
+  for index,change in pairs(changes or {}) do
+    local b=U.integer(index) and j.blocks[index]
+    if not b or not U.position(change) or U.distance(b,change)~=0 or not U.shortString(change.name,128)
+      or not (M.support(change.name) or C.family(change.name)=='gravity') then return false end
+  end
+  for index,change in pairs(j.report and j.report.accessChanges or {}) do
+    if not F.equal(change,(changes or {})[index]) then return false end
+  end
   local total=0
   for status,n in pairs(counts) do
     if not ({correct=true,wrong=true,missing=true,inaccessible=true,unsupported=true,inventory_full=true,attempt_limit=true})[status]

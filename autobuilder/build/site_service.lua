@@ -3,6 +3,7 @@ local F=require('autobuilder.factory.factory')
 local Survey=require('autobuilder.build.site_survey')
 local Checkpoint=require('autobuilder.core.checkpoint')
 local E=require('autobuilder.resources.exploration')
+local Access=require('autobuilder.build.site_access')
 local M={}
 function M.new(app,config,e,queue,production)
   local self={};local s=queue.state
@@ -44,6 +45,8 @@ function M.new(app,config,e,queue,production)
         or w.nextCursor~=nil and (not U.integer(w.nextCursor) or w.nextCursor<1 or w.nextCursor>262145)
         or w.status=='prepared' and (w.stage~='verified' or w.failed~=0 or w.verifiedFill~=true or w.verifiedClear~=true)
         or w.status=='working' and w.stage=='verified' then return nil,'invalid preparation evidence' end
+      if not Access.valid(w,plan,region,record.clearanceY) then return nil,'invalid foundation access evidence' end
+      if w.status=='prepared' and (w.access or w.accessPending and #w.accessPending>0) then return nil,'unfinished foundation access' end
     end
     return record,path
   end
@@ -127,6 +130,7 @@ function M.new(app,config,e,queue,production)
     end)
   end
   function self:prepared(p,plan,region)
+    if p.site and p.site.accessLease and E.overlaps(p.site.accessLease.bounds,plan:region(region).bounds) then return false,'foundation access restoration remains owned' end
     local record,why=self:evidence(p,plan,region)
     if not record then return false,why end
     local work=record.preparation
@@ -135,6 +139,8 @@ function M.new(app,config,e,queue,production)
   function self:readyFor(p,plan,blocks)
     if not p.site or p.site.identity~=plan.identity or not p.site.work then return false,'site preparation has not started' end
     for _,region in ipairs(plan:requiredRegions(blocks)) do
+      local lease=p.site.accessLease
+      if lease and E.overlaps(lease.bounds,plan:region(region).bounds) then return false,'foundation access restoration owns preparation region '..region end
       local record,why=self:evidence(p,plan,region)
       if not record then
         local w=p.site.work
@@ -215,10 +221,15 @@ function M.new(app,config,e,queue,production)
     record.preparationRetries=math.max(a.preparationRetries or 0,prior and prior.preparationRetries or 0)
     record.retryHistory=U.copy(prior and prior.retryHistory or {})
     record.fluidRechecked=a.fluidRechecked or prior and prior.fluidRechecked or nil
+    local orphanJobs={}
+    for _,old in pairs(s.jobs) do if old.key and old.key:sub(1,#prefix)==prefix and old.siteAccess then orphanJobs[#orphanJobs+1]=old end end
+    if #orphanJobs>0 then
+      record.preparation=Access.recover(plan,a.region,j.clearanceY,orphanJobs,fillMaterial(1),a.recoveries)
+    end
     local cp=store(p,plan,a.region);assert(cp:save(record));assert(cp:save(record))
     F.commit(p,save,function() a.recovery=nil;a.fluidRetry=nil;a.error=nil end)
     j.siteReport=nil;j.siteSurvey.columns=nil
-    for _,old in pairs(s.jobs) do if old.key and old.key:sub(1,#prefix)==prefix then old.blocks=nil;old.report=nil end end
+    for _,old in pairs(s.jobs) do if old.key and old.key:sub(1,#prefix)==prefix and not old.siteAccess then old.blocks=nil;old.report=nil end end
     assert(save());return true
   end
   local function workRegion(p,plan,a)
@@ -266,10 +277,25 @@ function M.new(app,config,e,queue,production)
         retired.workerId=receipt.owner;retired.status='completed';retired.phase='completed';retired.progress=receipt.progress;retired.completedAt=receipt.at
       end)
     end
-    if retired and (retired.blocks or retired.report) then
+    if retired and not retired.siteAccess and (retired.blocks or retired.report) then
       -- A failed prior promotion may leave only the primary advanced. Make the
       -- backup contain consumed evidence before deleting the worker's report.
-      assert(cp:save(record));retired.blocks=nil;retired.report=nil;assert(save())
+      assert(cp:save(record));retired.blocks=nil;retired.report=nil;retired.siteAccess=nil;assert(save())
+    end
+    if work.accessRetired then
+      assert(cp:save(record))
+      for _,id in ipairs(work.accessRetired) do
+        local old=s.jobs[id];if old then old.blocks=nil;old.report=nil;old.siteAccess=nil end
+      end
+      assert(save());work.accessRetired=nil;assert(cp:save(record))
+      if p.site.accessLease and p.site.accessLease.region==a.region then F.commit(p,save,function() p.site.accessLease=nil end) end
+      return true
+    end
+    if p.site.accessLease and p.site.accessLease.region==a.region and not work.access and not (work.accessPending and #work.accessPending>0) then
+      F.commit(p,save,function() p.site.accessLease=nil end);return true
+    end
+    if work.status=='blocked' and work.access then
+      a.error='Foundation access restoration requires recovery; region remains owned';return false
     end
     if work.status~='working' then
       F.commit(p,save,function()
@@ -300,11 +326,37 @@ function M.new(app,config,e,queue,production)
         end
       end
       if failed>0 then collectDefects(work,j.report);work.failed=work.failed+failed end
+      if j.siteAccess then Access.consume(work,j.report,failed)
+      elseif work.stage=='fill' then Access.discover(work,plan,a.region,record.clearanceY,j.report) end
       local retry=j.report.counts.inventory_full and j.report.counts.inventory_full>0
       work.lastJob=j.id;work.lastReceipt={owner=j.workerId,at=j.completedAt or 0,progress=j.progress};work.jobId=nil;work.sequence=work.sequence+1
-      if not retry then work.cursor=work.nextCursor or 0 end
+      if not retry and not j.siteAccess then work.cursor=work.nextCursor or 0 end
       work.nextCursor=nil
       -- The next tick rolls this evidence into the backup before root pruning.
+      assert(cp:save(record));return true
+    end
+    local lease=p.site.accessLease
+    if lease and lease.region~=a.region and E.overlaps(lease.bounds,plan:region(a.region).bounds) then
+      a.error='Waiting for foundation access restoration in region '..lease.region;return false
+    end
+    if work.access or work.accessPending and #work.accessPending>0 then
+      -- ponytail: one project access lease; independent access leases can replace
+      -- this when measured preparation throughput warrants the extra ownership.
+      if lease and lease.region~=a.region then a.error='Waiting for another foundation access owner';return false end
+      if not lease then
+        local route=work.access and work.access.route or assert(plan:access(a.region,work.accessPending[1],record.clearanceY))
+        F.commit(p,save,function() p.site.accessLease={region=a.region,target=U.copy(route.target),bounds=U.copy(route.bounds or plan:region(a.region).bounds)} end)
+        return true
+      end
+      for _,other in pairs(s.jobs) do if other.status~='completed' and other.bounds and E.overlaps(lease.bounds,other.bounds) then
+        a.error='Waiting for existing task '..other.id..' to leave the foundation access envelope';return false
+      end end
+      local payload=Access.payload(work,plan,a.region,record.clearanceY)
+      if payload then
+        payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
+        local j=queue:submit('PREPARE_REGION',payload,{},p.name..':site:'..p.site.generation..':'..a.region..':work:'..(work.epoch or 0)..':'..work.sequence..':access:'..work.access.phase..':'..work.access.cursor)
+        work.jobId=j.id;work.access.jobs[#work.access.jobs+1]=j.id
+      end
       assert(cp:save(record));return true
     end
     if work.cursor==0 then
@@ -331,6 +383,10 @@ function M.new(app,config,e,queue,production)
     end
     local payload,nextCursor=plan:work(a.region,record,work.stage,work.cursor,8,work.fill)
     if not payload then work.cursor=0;assert(cp:save(record));return true end
+    if work.stage=='fill' or work.stage=='verify_fill' then
+      for i=#payload.blocks,1,-1 do if Access.covered(work,payload.blocks[i]) then table.remove(payload.blocks,i) end end
+      if #payload.blocks==0 then work.cursor=nextCursor or 0;assert(cp:save(record));return true end
+    end
     payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
     local j=queue:submit('PREPARE_REGION',payload,{},p.name..':site:'..p.site.generation..':'..a.region..':work:'..(work.epoch or 0)..':'..work.sequence)
     work.jobId=j.id;work.nextCursor=nextCursor;assert(cp:save(record))
@@ -340,6 +396,15 @@ function M.new(app,config,e,queue,production)
     assert(p.site and p.site.identity==plan.identity and p.site.work,'preparation geometry missing or changed')
     if p.paused or p.site.work.status=='completed' then return end
     local work=p.site.work;local active=0;for _ in pairs(work.active) do active=active+1 end
+    if not p.site.accessLease then
+      for _,a in pairs(work.active) do
+        local record=self:evidence(p,plan,a.region);local access=record and record.preparation and record.preparation.access
+        if access then
+          F.commit(p,save,function() p.site.accessLease={region=a.region,target=U.copy(access.route.target),bounds=U.copy(access.route.bounds or plan:region(a.region).bounds)} end)
+          return
+        end
+      end
+    end
     if work.cursor<=plan.regionCount and (active<4 or work.active[tostring(work.cursor)]) then
       F.commit(p,save,function()
         local key=tostring(work.cursor);work.active[key]=work.active[key] or {region=work.cursor};work.active[key].countInAudit=true;work.cursor=work.cursor+1

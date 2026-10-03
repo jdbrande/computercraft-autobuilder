@@ -6,6 +6,7 @@ local function short(v,n) return v~=nil and tostring(v):gsub('[%c]',' '):sub(1,n
 function M.compact(report)
   if not report then return nil end
   local out={counts=U.copy(report.counts or {}),entries={},omittedEntries=report.omittedEntries or 0}
+  if report.accessChanges~=nil then out.accessChanges=U.copy(report.accessChanges) end
   for _,entry in ipairs(report.entries or {}) do
     if entry.status~='correct' then
       if #out.entries>=16 then out.omittedEntries=out.omittedEntries+1

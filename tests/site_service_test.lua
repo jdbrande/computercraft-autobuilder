@@ -363,3 +363,132 @@ test('cross-region fluid stabilization revisits an early failed region after lat
   local sequence=q.state.sequence;for _=1,20 do service:workTick(p,plan) end;eq(q.state.sequence,sequence)
  end
 end)
+
+test('controller restores opened foundation access before accepting its hidden support proof across restart',function()
+  local e,c,app,q,p,plan,service,production=surveyedFixture();service:startWork(p,plan)
+  local target={x=100,y=1,z=100};local phases={};local opened,verified,restored=false,false,false
+  for _=1,1500 do
+    service:workTick(p,plan)
+    service=require('autobuilder.build.site_service').new(app,c,e,q,production)
+    for _,j in pairs(q.state.jobs) do if j.status~='completed' then
+      assert(j.type=='PREPARE_REGION','access failure unnecessarily restarted the survey')
+      j.workerId=12;j.status='completed';j.completedAt=100;j.progress=#j.blocks;j.report={counts={correct=j.progress},entries={}}
+      if j.siteAccess then
+        assert(require('autobuilder.build.site_work').validContract(j));phases[#phases+1]=j.siteWork.stage
+        if j.siteWork.stage=='clear' then
+          opened=true;j.report.accessChanges={}
+          for i,b in ipairs(j.blocks) do if b.y==target.y then j.report.accessChanges[i]={x=b.x,y=b.y,z=b.z,name='minecraft:stone'} end end
+        elseif U.distance(j.blocks[1],target)==0 then
+          assert(opened and not restored)
+          if j.siteWork.stage=='verify' then verified=true end
+        else
+          assert(verified,'ground restored before hidden support was verified')
+          for _,b in ipairs(j.blocks) do eq(b.y,target.y) end
+          if j.siteWork.stage=='verify' then restored=true end
+        end
+      else
+        for _,b in ipairs(j.blocks) do if b.support and U.distance(b,target)==0 then
+          assert(not verified,'restored hidden support was sent through an inaccessible ordinary approach')
+          j.progress=j.progress-1;j.report.counts.correct=j.progress;j.report.counts.inaccessible=1
+          j.report.entries={{x=b.x,y=b.y,z=b.z,status='inaccessible',reason='retained floor blocks inspection'}}
+        end end
+      end
+    end end
+    if p.site.work.status=='completed' then break end
+  end
+  assert(opened and verified and restored,'controller never completed foundation access and restoration')
+  eq(p.phase,'site_ready');assert(service:prepared(p,plan,1));assert(#phases>=5)
+  local record,path=service:evidence(p,plan,1)
+  local checkpoint=require('autobuilder.core.checkpoint').new(e.fs,e.textutils,path)
+  local broken=U.copy(record);broken.preparation.accessProofs['100,1,100'].target.x=101
+  assert(checkpoint:save(broken));assert(not service:prepared(p,plan,1),'changed target retained hidden support proof')
+end)
+
+test('foundation access loss restores from retained receipts and failed restoration keeps region owned',function()
+ for _,lost in ipairs({true,false}) do
+  local e,c,app,q,p,plan,service,production=surveyedFixture();service:startWork(p,plan)
+  local target={x=100,y=1,z=100};local triggered,restoring,restored=false,false,false;local failures=0
+  for _=1,1600 do
+    service:workTick(p,plan)
+    for _,j in pairs(q.state.jobs) do if j.status~='completed' then
+      local access=j.siteAccess
+      if j.type=='SURVEY_SITE' then
+        assert(lost and triggered);completePreparation(q,plan)
+      else
+        j.workerId=12;j.status='completed';j.completedAt=100;j.progress=#j.blocks;j.report={counts={correct=j.progress},entries={}}
+        if access and j.siteWork.stage=='clear' then
+          j.report.accessChanges={}
+          for i,b in ipairs(j.blocks) do if b.y==target.y then j.report.accessChanges[i]={x=b.x,y=b.y,z=b.z,name='minecraft:stone'} end end
+        elseif access and U.distance(j.blocks[1],target)~=0 then
+          restoring=true
+          if not lost then
+            failures=failures+1;j.progress=0;j.report={counts={inaccessible=#j.blocks},entries={{x=j.blocks[1].x,y=j.blocks[1].y,z=j.blocks[1].z,status='inaccessible',reason='restoration obstructed'}}}
+          elseif j.siteWork.stage=='verify' then restored=true end
+        elseif not access and not triggered then
+          for _,b in ipairs(j.blocks) do if b.support and U.distance(b,target)==0 then
+            j.progress=j.progress-1;j.report.counts.correct=j.progress;j.report.counts.inaccessible=1
+            j.report.entries={{x=b.x,y=b.y,z=b.z,status='inaccessible',reason='retained floor'}}
+          end end
+        end
+      end
+    end end
+    local record,path=service:evidence(p,plan,1)
+    if not triggered and record and record.preparation and record.preparation.access and record.preparation.access.phase=='restore_fill' then
+      triggered=true
+      if lost then e.fs.files[path]=nil;e.fs.files[path..'.bak']=nil end
+      service=require('autobuilder.build.site_service').new(app,c,e,q,production)
+    end
+    if lost and p.phase=='site_ready' or not lost and failures==3 and p.error then break end
+  end
+  assert(triggered and restoring)
+  if lost then assert(restored);eq(p.phase,'site_ready')
+  else
+    eq(failures,3);assert(p.site.work.active['1'],'failed restoration released its region')
+    assert(not service:prepared(p,plan,1));assert(service:prepared(p,plan,2));assert(p.error:find('restoration'))
+  end
+ end
+end)
+
+test('cross-region access holds its envelope between jobs drains existing owners and releases after restoration',function()
+  local e,c,app,q,p,plan,service,production=surveyedFixture();service:startWork(p,plan)
+  local target={x=102,y=1,z=102};local held
+  for _=1,1200 do
+    service:workTick(p,plan)
+    for _,j in pairs(q.state.jobs) do if j.status~='completed' then
+      if j.siteWork and j.siteWork.region==5 and j.siteWork.stage=='fill' then held=j
+      else
+        j.workerId=12;j.status='completed';j.completedAt=100;j.progress=#j.blocks;j.report={counts={correct=j.progress},entries={}}
+      end
+    end end
+    if held and p.site.work.preparedCount==plan.regionCount-1 then break end
+  end
+  assert(held);eq(p.site.work.preparedCount,plan.regionCount-1)
+  held.workerId=12;held.status='completed';held.completedAt=100;held.progress=#held.blocks-1
+  held.report={counts={correct=held.progress,inaccessible=1},entries={{x=target.x,y=target.y,z=target.z,status='inaccessible',reason='sealed interior'}}}
+  for _=1,8 do service:workTick(p,plan);if p.site.accessLease then break end end
+  local lease=assert(p.site.accessLease);eq(lease.region,5)
+  local foreign
+  for r=1,plan.regionCount do if r~=5 and require('autobuilder.resources.exploration').overlaps(lease.bounds,plan:region(r).bounds) then foreign=r;break end end
+  assert(foreign);assert(service:evidence(p,plan,foreign).preparation.status=='prepared')
+  assert(not service:prepared(p,plan,foreign),'tunnel ownership left neighboring support certified')
+  q.state.jobs.foreign={id='foreign',status='running',workerId=13,bounds=U.copy(lease.bounds)}
+  service=require('autobuilder.build.site_service').new(app,c,e,q,production)
+  for _=1,8 do service:workTick(p,plan) end
+  for _,j in pairs(q.state.jobs) do assert(not j.siteAccess,'access began before the existing owner drained') end
+  q.state.jobs.foreign.status='completed'
+  local saw=false
+  for _=1,1200 do
+    service:workTick(p,plan)
+    for _,j in pairs(q.state.jobs) do if j.status~='completed' then
+      j.workerId=12;j.status='completed';j.completedAt=100;j.progress=#j.blocks;j.report={counts={correct=j.progress},entries={}}
+      if j.siteAccess then
+        saw=true;assert(p.site.accessLease);assert(require('autobuilder.build.site_work').validContract(j))
+        if j.siteWork.stage=='clear' then
+          j.report.accessChanges={};for i,b in ipairs(j.blocks) do if b.y==1 then j.report.accessChanges[i]={x=b.x,y=b.y,z=b.z,name='minecraft:stone'} end end
+        end
+      end
+    end end
+    if p.phase=='site_ready' then break end
+  end
+  assert(saw);eq(p.phase,'site_ready');assert(not p.site.accessLease);assert(service:prepared(p,plan,foreign))
+end)

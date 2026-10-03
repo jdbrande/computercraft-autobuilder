@@ -99,6 +99,7 @@ function M.new(source,transform,sourceHash,options)
     return {type='SURVEY_SITE',clearanceY=bounds.max.y,bounds=self:region(regionIndex).bounds,
       siteSurvey={identity=planId,region=regionIndex,columns=columns}},nextCursor
   end
+  local function clearFloor(column) return math.min(origin.y,column.foundationY and column.foundationY+1 or origin.y) end
   function self:access(regionIndex,target,clearanceY)
     local P=require('autobuilder.core.pathfinding');local r=self:region(regionIndex)
     if not U.position(target) or not P.inside(target,r.bounds) or self:wanted(target)
@@ -107,14 +108,25 @@ function M.new(source,transform,sourceHash,options)
     local columns=self:columns(regionIndex,1,64);local foundation=false
     for _,c in ipairs(columns) do if c.x==target.x and c.z==target.z and c.foundationY==target.y then foundation=true end end
     if not foundation then return nil,'access target is not a generic foundation' end
+    local routeBounds=r.bounds
     local function removable(p)
-      if p.y~=target.y or not P.inside(p,r.bounds) or U.distance(p,target)==0 then return false end
+      if p.y~=target.y or not P.inside(p,routeBounds) or U.distance(p,target)==0 then return false end
       local wanted=self:wanted(p);return not wanted or C.isAir(wanted.name)
     end
     table.sort(columns,function(a,b)
       local da,db=math.abs(a.x-target.x)+math.abs(a.z-target.z),math.abs(b.x-target.x)+math.abs(b.z-target.z)
       return da<db or da==db and (a.x<b.x or a.x==b.x and a.z<b.z)
     end)
+    for pass=1,2 do
+    if pass==2 then
+      routeBounds=bounds
+      columns={{x=bounds.min.x,z=target.z},{x=bounds.max.x,z=target.z},
+        {x=target.x,z=bounds.min.z},{x=target.x,z=bounds.max.z}}
+      table.sort(columns,function(a,b)
+        local da,db=math.abs(a.x-target.x)+math.abs(a.z-target.z),math.abs(b.x-target.x)+math.abs(b.z-target.z)
+        return da<db or da==db and (a.x<b.x or a.x==b.x and a.z<b.z)
+      end)
+    end
     for _,c in ipairs(columns) do
       local shaft={x=c.x,y=target.y,z=c.z};local clear=removable(shaft)
       if clear then for y=target.y+1,clearanceY-1 do
@@ -122,15 +134,25 @@ function M.new(source,transform,sourceHash,options)
         if wanted and not C.isAir(wanted.name) then clear=false;break end
       end end
       if clear then for _,stand in ipairs(P.neighbors(target)) do if removable(stand) then
-        local path=P.find(shaft,stand,removable,64)
+        local path=P.find(shaft,stand,removable,pass==1 and 64 or 256)
         if path and clearanceY-target.y+#path<=128 then
           local cells={};for y=clearanceY-1,target.y,-1 do cells[#cells+1]={x=c.x,y=y,z=c.z} end
           for _,cell in ipairs(path) do cells[#cells+1]=cell end
-          return {entry={x=c.x,y=clearanceY,z=c.z},cells=cells,stand=U.copy(stand),target=U.copy(target)}
+          local restore,envelope={},U.copy(r.bounds);envelope.max.y=clearanceY
+          for _,cell in ipairs(cells) do
+            local inside=cell.x>=origin.x and cell.x<origin.x+width and cell.z>=origin.z and cell.z<origin.z+depth
+            local foundation=inside and (overrides[cell.x..','..cell.z] or hasStructure and origin.y-1) or nil
+            if cell.y<clearFloor({foundationY=foundation}) then restore[P.key(cell)]=true end
+            for _,axis in ipairs({'x','z'}) do
+              envelope.min[axis]=math.min(envelope.min[axis],cell[axis]);envelope.max[axis]=math.max(envelope.max[axis],cell[axis])
+            end
+          end
+          return {entry={x=c.x,y=clearanceY,z=c.z},cells=cells,stand=U.copy(stand),target=U.copy(target),bounds=pass==2 and envelope or nil},restore
         end
       end end end
     end
-    return nil,'retained schematic leaves no access shaft within the owned region'
+    end
+    return nil,'retained schematic leaves no bounded access shaft within the project margin'
   end
   function self:requiredRegions(blocks)
     assert(type(blocks)=='table' and #blocks>0 and #blocks<=512,'bounded structural region required')
@@ -161,7 +183,7 @@ function M.new(source,transform,sourceHash,options)
       local observed=evidence.report.observations[i]
       assert(observed.status~='blocked','site column remains inaccessible: '..c.x..','..observed.y..','..c.z)
       local low,high
-      if clearing then low=math.min(origin.y,c.foundationY and c.foundationY+1 or origin.y);high=evidence.clearanceY-1
+      if clearing then low=clearFloor(c);high=evidence.clearanceY-1
       elseif c.foundationY then
         high=c.foundationY
         local solid=observed.status=='surface' and require('autobuilder.build.site_work').support(observed.name)

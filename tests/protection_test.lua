@@ -256,3 +256,22 @@ test('legacy preparation grants only canonical access above its own home while p
  s.workers['14']=nil;j.sitePlan.points[1].x=1
  assert(not Q:reserve(13,j.id,{x=0,y=2,z=0},{x=0,y=3,z=0},s.workers,true),'changed canonical access was accepted')
 end)
+
+test('mutation reservations protect above and below foreign workers in both grant orders',function()
+  for _,dy in ipairs({-1,1}) do
+    local c,s,j=fixture();j.type='REPAIR';j.blocks={{x=60,y=1,z=1,name='minecraft:air',state={}}}
+    local worker={x=60,y=1+dy,z=1,known=true}
+    s.workers['14']={id=14,online=false,telemetry={position=U.copy(worker)}}
+    local q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+    local from,target={x=61,y=1,z=1},j.blocks[1]
+    assert(not require('autobuilder.core.protection').canModify(s,c,j,target),'mutation directly above or beneath an offline worker was permitted')
+    assert(not q:reserve(13,j.id,from,target,s.workers,true))
+    s.workers['14'].telemetry.position={x=61,y=worker.y,z=1,known=true}
+    s.automation.jobs.courier={id='courier',type='TRANSPORT',workerId=14,status='running'}
+    assert(q:reserve(13,j.id,from,target,s.workers,true))
+    assert(not q:reserve(14,'courier',s.workers['14'].telemetry.position,worker,s.workers),'worker entered the vertical action envelope')
+    assert(q:reserve(13,j.id,from,{x=62,y=1,z=1},s.workers))
+    assert(q:reserve(14,'courier',s.workers['14'].telemetry.position,worker,s.workers))
+    assert(not q:reserve(13,j.id,from,target,s.workers,true),'mutation ignored the earlier vertical movement reservation')
+  end
+end)

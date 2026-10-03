@@ -122,7 +122,7 @@ function M.canModify(state,config,job,target)
   if E.protected(target,M.areas(state,config,job.project,job.type~='MINE',purpose)) then return false,'target is registered protected infrastructure or another project' end
   for _,w in pairs(state.workers or {}) do
     local at=w.telemetry and w.telemetry.position
-    if w.id~=job.workerId and at and at.known and U.position(at) and U.distance(at,target)==0 then return false,'target occupied by worker '..w.id end
+    if w.id~=job.workerId and at and at.known and U.position(at) and at.x==target.x and at.z==target.z and math.abs(at.y-target.y)<=1 then return false,'target is at, above or beneath worker '..w.id end
   end
   local cell=((state.automation or {}).cells or {})[P.key(target)]
   if cell and (cell.owner~=job.workerId or cell.jobId~=job.id) then return false,'target held by another movement or action reservation' end

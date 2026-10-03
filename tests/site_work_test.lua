@@ -134,7 +134,16 @@ test('preparation opens a tunnel fills and verifies hidden support then restores
     return j
   end
   local opening={};for _,p in ipairs(access.cells) do opening[#opening+1]={x=p.x,y=p.y,z=p.z,name='minecraft:air',state={}} end
-  execute('clear',opening,'dig')
+  local opened=execute('clear',opening,'dig')
+  local removed=0;for _,change in pairs(opened.report.accessChanges or {}) do removed=removed+1;eq(change.name,'minecraft:stone') end
+  eq(removed,2)
+  local report=require('autobuilder.core.reports').compact(opened.report)
+  local progress={phase='completed',progress=opened.progress,report=report}
+  assert(require('autobuilder.build.site_work').validProgress(opened,progress))
+  local index=next(report.accessChanges);report.accessChanges[index].x=4
+  assert(not require('autobuilder.build.site_work').validProgress(opened,progress),'restoration receipt moved to an unrelated cell')
+  progress.report=require('autobuilder.core.reports').compact(opened.report);progress.report.accessChanges[index]=nil
+  assert(not require('autobuilder.build.site_work').validProgress(opened,progress),'restoration receipt regressed after reboot')
   local support={x=2,y=-1,z=0,name='minecraft:stone',state={},support=true}
   execute('fill',{support},'place');local proof=execute('verify',{support});eq(proof.report.counts.correct,1)
   execute('fill',{{x=1,y=-1,z=0,name='minecraft:stone',state={},support=true},{x=0,y=-1,z=0,name='minecraft:stone',state={},support=true}})
@@ -291,4 +300,17 @@ test('fluid displacement preserves explicitly protected fluid blocks',function()
     w.items[1]={name='minecraft:cobblestone',count=1}
     run(new());eq(j.phase,'completed');eq(j.report.counts.unsupported,1);eq(w.places,0);eq(w.items[1].count,1)
   end
+end)
+
+test('completed access work resumes its fixed shaft exit after a horizontal reservation yield',function()
+  local w,c,j,nav,new=fixture({{x=3,y=0,z=0,name='minecraft:stone',state={},support=true}},'verify')
+  j.siteAccess={entry={x=0,y=5,z=0},cells={},stand={x=2,y=0,z=0},target={x=3,y=0,z=0}}
+  for y=4,0,-1 do j.siteAccess.cells[#j.siteAccess.cells+1]={x=0,y=y,z=0} end
+  for x=1,2 do j.siteAccess.cells[#j.siteAccess.cells+1]={x=x,y=0,z=0} end
+  for x=1,3 do w.blocks[x..',1,0']={name='minecraft:stone',state={}} end
+  w.pose.x=2;w.pose.y=0;w.pose.z=0;j.index=2;j.progress=1;j.report={counts={correct=1},entries={}}
+  nav.guard=function(_,p) if p.x==0 and p.y==0 then return false,'movement reservation pending' end;return true end
+  local ex=new();ex:step();eq(j.phase,'blocked');eq(w.pose.x,1)
+  nav.guard=function() return true end;ex=new();assert(ex:resume());run(ex)
+  eq(j.phase,'completed');eq(U.distance(w.pose,j.siteAccess.entry),0);assert(not j.moveRoute)
 end)

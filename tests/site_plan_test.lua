@@ -89,7 +89,7 @@ test('foundation access routes stay within owned terrain and preserve every sche
   local data={schema=1,size={x=3,y=1,z=3},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=9}},metadata={},requirements={}}
   local p=plan(data,{origin={x=10,y=0,z=10}},{margin=1,minY=-4,maxY=15})
   local target={x=11,y=-1,z=11}
-  local route=assert(p:access(1,target,2));eq(U.distance(route.stand,target),1)
+  local route,restore=p:access(1,target,2);assert(route);eq(U.distance(route.stand,target),1)
   eq(route.entry.y,2);assert(#route.cells>3 and #route.cells<=128)
   local previous=route.entry;local seen={}
   for _,cell in ipairs(route.cells) do
@@ -97,6 +97,7 @@ test('foundation access routes stay within owned terrain and preserve every sche
     assert(not p:wanted(cell),'access would remove a retained schematic cell')
     assert(U.distance(cell,target)>0,'access route destroys its own target')
     local key=cell.x..','..cell.y..','..cell.z;assert(not seen[key]);seen[key]=true;previous=cell
+    eq(restore[key]==true,cell.y<0) -- reopening the shaft must not refill required working air
   end
   eq(U.distance(previous,route.stand),0)
   assert(not p:access(1,{x=9,y=-1,z=9},2),'workspace is not a foundation target')
@@ -179,4 +180,22 @@ test('fluid sealing covers the bounded clearance volume with stable temporary bl
   assert(require('autobuilder.build.site_work').validContract(j))
   j,nextCursor=plan:work(1,record,'seal',nextCursor,4,'minecraft:cobblestone');eq(#j.blocks,2);eq(nextCursor,nil)
   assert(not pcall(plan.work,plan,1,record,'seal',1,4,'minecraft:sand'))
+end)
+
+test('interior foundation access declares its cross-region tunnel envelope inside the project margin',function()
+  local data={schema=1,size={x=6,y=1,z=6},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=36}},metadata={},requirements={}}
+  local p=plan(data,{origin={x=10,y=0,z=10}},{margin=1,regionSize=2,minY=-4,maxY=15})
+  local target={x=12,y=-1,z=12};local region
+  for r=1,p.regionCount do if require('autobuilder.core.pathfinding').inside(target,p:region(r).bounds) then region=r end end
+  local route,restore=p:access(region,target,2)
+  assert(route,'interior region could not reach the project margin');assert(route.bounds)
+  assert(require('autobuilder.resources.exploration').overlaps(route.bounds,p:region(region).bounds))
+  local crossed=false
+  for _,cell in ipairs(route.cells) do
+    assert(require('autobuilder.core.pathfinding').inside(cell,route.bounds))
+    assert(require('autobuilder.core.pathfinding').inside(cell,p.bounds))
+    assert(not p:wanted(cell));if not require('autobuilder.core.pathfinding').inside(cell,p:region(region).bounds) then crossed=true end
+    eq(restore[require('autobuilder.core.pathfinding').key(cell)]==true,cell.y<0)
+  end
+  assert(crossed)
 end)

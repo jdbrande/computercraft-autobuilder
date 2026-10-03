@@ -266,8 +266,17 @@ function M.new(state,save,clock,id,chunks,config)
     end
     if chunks then for _,p in ipairs(targets) do local ok,why=chunks:allows(j,from,p);if not ok then return false,why end end end
     if U.distance(from,target)>1 then return false,'reservation requires adjacent position' end
+    local reservations={}
     for _,destination in ipairs(targets) do
-      if work then local ok,why=require('autobuilder.core.protection').canModify(state,config,j,destination);if not ok then return false,why end end
+      if work then
+        local ok,why=require('autobuilder.core.protection').canModify(state,config,j,destination);if not ok then return false,why end
+        -- Keep neighboring turtles out for the entire physical action, including
+        -- a movement grant arriving after this mutation grant was checkpointed.
+        for _,dy in ipairs({-1,1}) do reservations[#reservations+1]={x=destination.x,y=destination.y+dy,z=destination.z} end
+      end
+      reservations[#reservations+1]=destination
+    end
+    for _,destination in ipairs(reservations) do
       local occupied=s.cells[key(destination)]
       if occupied and occupied.owner~=owner then return false,'position reserved by worker '..occupied.owner end
       for _,w in pairs(workers or {}) do
@@ -277,7 +286,7 @@ function M.new(state,save,clock,id,chunks,config)
     end
     local before=U.copy(s.cells)
     local keep={[key(from)]=true};s.cells[key(from)]={owner=owner,jobId=jobId}
-    for _,p in ipairs(targets) do keep[key(p)]=true;s.cells[key(p)]={owner=owner,jobId=jobId} end
+    for _,p in ipairs(reservations) do keep[key(p)]=true;s.cells[key(p)]={owner=owner,jobId=jobId} end
     -- A fresh adjacent request confirms the worker's current position, also
     -- reconciling a lost previous movement-confirmation packet.
     for k,cell in pairs(s.cells) do if cell.owner==owner and not keep[k] then s.cells[k]=nil end end

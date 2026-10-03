@@ -275,8 +275,9 @@ function M.new(task,e,config,nav,save,mode)
       for _,b in ipairs(task.blocks) do if not C.isAir(b.name) then return blocked('clear tasks must explicitly target air cells','unsupported') end end
     end
     if task.index>#task.blocks and not task.recheck then
-      if mode=='prepare' and pose.y<ceiling then
-        local ok,why=move({x=pose.x,y=ceiling,z=pose.z});if not ok then return blocked(why,'inaccessible') end;return true
+      if mode=='prepare' and (pose.y<ceiling or task.moveRoute) then
+        local target=task.siteAccess and task.siteAccess.entry or {x=pose.x,y=ceiling,z=pose.z}
+        local ok,why=move(target);if not ok then return blocked(why,'inaccessible') end;return true
       end
       task.phase='completed'; return persist()
     end
@@ -371,6 +372,10 @@ function M.new(task,e,config,nav,save,mode)
       end
       if not countAttempt('dig') then return issue(b,'attempt_limit','repair dig attempt limit reached',actual) end
       assert(t.select(empty),'cannot select free repair slot')
+      if task.siteAccess and task.siteWork.stage=='clear' and (Site.support(actual.name) or actualFamily=='gravity') then
+        task.report.accessChanges=task.report.accessChanges or {}
+        task.report.accessChanges[task.index]=task.report.accessChanges[task.index] or {x=b.x,y=b.y,z=b.z,name=actual.name}
+      end
       task.intent={kind='dig',index=task.index,block=U.copy(actual),inventory=inventory()}; persist()
       local callOk,result,detail=pcall(t['dig'..P.suffix(p.direction)])
       if not callOk then return blocked('dig hardware error: '..tostring(result),'ambiguous') end
