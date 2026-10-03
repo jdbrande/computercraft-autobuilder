@@ -18,7 +18,7 @@ Controller settings (merge into the existing configuration):
 
 ```lua
 storageInventories = {'minecraft:chest_0'},
-craftingBatchSize = 2, -- recipe executions per finite task
+craftingBatchSize = 2, -- maximum recipe executions per finite task
 craftingStations = {
   {id='west', workerId=12, buffer='minecraft:chest_1',
    input='minecraft:chest_2', output='minecraft:chest_3'},
@@ -62,9 +62,19 @@ Capacity uses native slot limits and observed item stack limits. An unknown outp
 is conservatively reserved at one item per slot until that item has been observed
 in storage. Two default stone-brick batches yield eight items and require eight
 initial output slots; subsequent measured stack limits permit denser reservations.
-Larger `craftingBatchSize` values (1–64) still require sufficient capacity. If a
-configured batch cannot fit, the error identifies the inventory; provide capacity
-or finish/reconcile existing work before changing the batch configuration.
+`craftingBatchSize` (1–64) is a maximum. Production automatically chooses a smaller
+batch when native capacity or unreserved ingredients require it. A first pane batch,
+for example, produces16 panes rather than trying to reserve32 unknown-stack outputs
+in a27-slot chest. Later physical samples can permit larger batches. If even one
+recipe cannot fit, the error identifies the inventory; other feasible stations can
+continue. Native observations are cached only for that grant and refreshed next time.
+
+An unclaimed station preference holds neither ingredients, worker nor production
+coverage. The actual interval, counts, output slots and journals are saved atomically
+before staging. Owned contracts never resize. Older production tasks with an input
+claim but no capacity, worker or physical journal are durably cancelled and replaced
+with fresh task IDs; completed or physically started tasks retain their exact work.
+Explicit standalone CRAFT contracts retain their requested quantity.
 
 ## Status and recovery
 

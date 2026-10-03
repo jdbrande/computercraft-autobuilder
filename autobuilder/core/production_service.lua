@@ -74,7 +74,7 @@ function M.new(app,config,e,queue)
     return {withdrawn=withdrawn,delivered={[job.item]=p.delivered or 0},sequence=p.stockSequence}
   end
   local function syncClaims(allowGrant)
-    local jobs={}; for _,j in pairs(s.jobs) do if j.stockInputs then jobs[#jobs+1]=j end end
+    local jobs={}; for _,j in pairs(s.jobs) do if j.stockInputs and not j.cancelled then jobs[#jobs+1]=j end end
     table.sort(jobs,function(a,b) return a.id<b.id end)
     for _,j in ipairs(jobs) do
       local lease=self.ledger.state.leases[j.id]
@@ -95,7 +95,7 @@ function M.new(app,config,e,queue)
       end
     end
     if allowGrant==false then return end
-    for _,j in ipairs(jobs) do if j.status~='completed' and not j.logistics and not self.ledger.state.leases[j.id] then
+    for _,j in ipairs(jobs) do if j.status~='completed' and not j.logistics and not j.privateStation and not self.ledger.state.leases[j.id] then
       local lease,why=self.ledger:reserve(j.id,j.stockInputs,j.stockOutputs,
         app.mining.storage.valid and app.mining.storage.counts or nil,{protected=j.type=='FUEL_STATION' and {} or config.turtleFuelReserveItems})
       if j.stockError~=why then j.stockError=why; save() end

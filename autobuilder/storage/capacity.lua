@@ -18,6 +18,18 @@ local function contract(requests)
   assert(n==#requests,'sparse capacity request array')
   return U.copy(requests)
 end
+-- A short-lived read-only observation for bounded sizing searches. The caller
+-- holds its inventory exclusion until the chosen claims are checkpointed.
+function M.observe(e)
+  local cached={}
+  return {peripheral={call=function(name,method,slot)
+    assert(method=='list' or method=='size' or method=='getItemLimit' or method=='getItemDetail','capacity observation is read-only')
+    cached[name]=cached[name] or {};local inventory=cached[name]
+    local key=method..':'..tostring(slot);local result=inventory[key]
+    if not result then result={pcall(e.peripheral.call,name,method,slot)};inventory[key]=result end
+    assert(result[1],result[2]);return U.copy(result[2])
+  end}}
+end
 function M.new(state,save)
   assert(type(state)=='table' and type(save)=='function','capacity state and persistence required')
   state.capacityLedger=state.capacityLedger or {leases={}}
@@ -30,7 +42,7 @@ function M.new(state,save)
   end
   -- Callers combining stock and capacity grants hold the shared inventory action
   -- lock across this observation and their physical transfer journal.
-  function self:reserve(id,requests,e)
+  local function allocate(id,requests,e,persist)
     assert(U.shortString(id,160),'invalid capacity claim ID')
     requests=contract(requests)
     local old=s.leases[id]
@@ -87,8 +99,10 @@ function M.new(state,save)
         if left>0 then return nil,'insufficient capacity in '..r.inventory..' for '..item end
       end
     end
-    commit(id,lease); return U.copy(lease)
+    if persist then commit(id,lease) end;return U.copy(lease)
   end
+  function self:preview(id,requests,e) return allocate(id,requests,e,false) end
+  function self:reserve(id,requests,e) return allocate(id,requests,e,true) end
   function self:release(id)
     local old=assert(s.leases[id],'unknown capacity claim')
     if old.status=='released' then return true end

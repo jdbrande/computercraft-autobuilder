@@ -20,7 +20,7 @@ function M.workerBusy(state,owner,exceptId)
   for _,job in pairs((state.automation or {}).jobs or {}) do
     if job.id~=exceptId and job.type=='RESCUE' and not job.rescueSettled
       and (job.preferredWorker==owner and job.status~='completed' or job.targetWorker==owner) then return true end
-    if job.id~=exceptId and (job.workerId==owner or (job.managedFuel or job.privateStation or job.logistics and job.logisticsFlow) and job.preferredWorker==owner) and job.status~='completed' then return true end
+    if job.id~=exceptId and (job.workerId==owner or (job.managedFuel or job.privateStation and job.factoryFlow or job.logistics and job.logisticsFlow) and job.preferredWorker==owner) and job.status~='completed' then return true end
   end
   return false
 end
@@ -64,7 +64,7 @@ function M.storageBusy(state)
 end
 function M.factoryCanRun(state,job,preparing)
   if job.privateStation and not job.privateReady and not preparing then return false,'waiting for staged private crafting inputs' end
-  if job.stockInputs then
+  if job.stockInputs and not (preparing and job.privateStation and not (state.capacityLedger and state.capacityLedger.leases[job.id])) then
     local lease=state.inventoryLedger and state.inventoryLedger.leases[job.id]
     if not lease or lease.status~='held' then return false,job.stockError or 'waiting for durable ingredient reservation' end
   end

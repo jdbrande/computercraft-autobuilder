@@ -20,7 +20,9 @@ reconciliation retain their existing behavior. A logical preferred worker can fi
 an older task before accepting this grant. A disconnected/full candidate reports its
 reason while another station can proceed. Never infer unobserved output stack limits.
 
-Production batch offsets identify nonoverlapping intervals in the operation. A
+Granted production batch offsets identify nonoverlapping intervals in the operation.
+Logical preferences reserve no operation coverage: at grant, choose the first remaining
+interval again so an unusable station cannot withhold work from another worker. A
 smaller granted batch leaves an uncovered interval; scheduling fills the first gap
 without changing any other batch's offset or repeating completed work. New queue
 identities remain unique. Older unstarted stock-only claims may be atomically

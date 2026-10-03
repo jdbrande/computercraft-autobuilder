@@ -83,3 +83,19 @@ test('capacity requests reject malformed shape sizes limits and item quantities'
   assert(not pcall(f.capacity.reserve,f.capacity,'bad-size',{request('a',{coal=1})},f.h))
   eq(next(f.state.capacityLedger.leases),nil)
 end)
+
+test('capacity preview shares allocation rules without claims or repeated peripheral observations',function()
+  local f=fixture();local calls=0;local call=f.h.peripheral.call
+  f.h.peripheral.call=function(...) calls=calls+1;return call(...) end
+  assert(f.capacity:reserve('held',{request('a',{coal=64},{coal=64})},f.h))
+  local observed=require('autobuilder.storage.capacity').observe(f.h)
+  calls=0
+  local no,why=f.capacity:preview('new',{request('a',{lava=3})},observed)
+  eq(no,nil);assert(why:find('capacity'));local first=calls
+  local fit=assert(f.capacity:preview('new',{request('a',{lava=2})},observed))
+  eq(calls,first);eq(fit.nodes.a.allocations[1].slot,2);eq(fit.nodes.a.allocations[2].slot,3)
+  eq(f.state.capacityLedger.leases.new,nil)
+  f.h.inventories.a[2]={name='coal',count=64}
+  eq(f.capacity:reserve('new',{request('a',{lava=2})},f.h),nil)
+  eq(f.state.capacityLedger.leases.new,nil)
+end)

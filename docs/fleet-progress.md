@@ -398,3 +398,21 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Final0.20 gate:589 Lua/18 Python tests; release generation/check and whitespace
   validation passed. Four Important review findings fixed with regressions; no
   re-review. Both native rigs were shut down and all test loading tickets removed.
+
+- 0.21 implementation: read-only capacity previews reuse the native allocator and
+  cache sizing observations. Atomic grants size ingredient/output contracts before
+  staging; only granted intervals count as production coverage. An unusable station
+  cannot withhold work from another. Old unstarted stock-only batches retire with
+  cancelled ledger IDs; owned journals remain unchanged.
+- Pane stall and unclaimed worker pinning regressions failed before fixes. New cases
+  cover heterogeneous capacity, old checkpoints and atomic-save rollback. Initial
+  full gate:595 Lua/18 Python passed; release0.21 generation/check passed. A further
+  failing status assertion restored actionable capacity errors for unclaimed work.
+- Native pane trial is running on reused isolated controller120/Crafty121–122 with
+  24 glass, no pane sample and2000 finite fuel each; no world backup.
+
+- Native0.21 accepted:24 glass→64 panes without an output sample, then24 more glass
+  →128 total panes with concurrent Crafty121/122 and controller/worker reboot.
+  Independent world reads confirm exact counts, empty private/turtle inventories,
+ 2000 fuel each and released claims. Rig shut down and loading tickets removed.
+  Permanent report: [validation-0.21.0.md](validation-0.21.0.md). Final branch review next.

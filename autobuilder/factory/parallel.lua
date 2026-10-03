@@ -10,26 +10,43 @@ function M.new(app,config,e,queue,production)
   local function jobsFor(r)
     local jobs={}
     for _,j in pairs(queue.state.jobs) do
-      if j.privateStation and j.productionRequest==r.id and j.productionOperation==r.operation and (j.productionGeneration or 0)==(r.replans or 0) then jobs[#jobs+1]=j end
+      if j.privateStation and not j.cancelled and j.productionRequest==r.id and j.productionOperation==r.operation and (j.productionGeneration or 0)==(r.replans or 0) then jobs[#jobs+1]=j end
     end
     table.sort(jobs,function(a,b) return a.productionBatch<b.productionBatch end); return jobs
+  end
+  local function claimed(j)
+    return j.workerId or j.privateReady or capacity.state.leases[j.id] or production.ledger.state.leases[j.id]
+      or j.factoryFlow and (j.factoryFlow.stage.intent or j.factoryFlow.collect.intent)
+  end
+  local function coverage(r,op)
+    local offset,limit=0,op.batches
+    for _,j in ipairs(jobsFor(r)) do if claimed(j) then
+      if j.productionBatch>offset then limit=j.productionBatch;break end
+      offset=j.productionBatch+j.batches
+    end end
+    return offset,limit
   end
   function self:owns(r) return #jobsFor(r)>0 end
   function self:schedule(r,op)
     if not r.privateCraft then F.commit(r,save,function() r.privateCraft=true end) end
     local jobs=jobsFor(r); local scheduled,complete,why=0,true,nil
+    local last=0
     for _,j in ipairs(jobs) do
-      assert(j.productionBatch==scheduled,'private craft batch coverage changed')
+      if j.status~='completed' then why=why or j.error or j.stockError end
+      if claimed(j) then
+      assert(j.productionBatch>=last,'private craft batches overlap')
+      last=j.productionBatch+j.batches;assert(last<=op.batches,'private craft batch exceeds operation')
       scheduled=scheduled+j.batches
       if j.status~='completed' then complete=false; why=why or j.error or j.stockError end
-    end
+    end end
     assert(scheduled<=op.batches,'private craft operation over-assigned')
     if scheduled==op.batches and complete then
+      for _,j in ipairs(jobs) do if not claimed(j) then F.commit(j,save,function() j.cancelled=true;j.status='completed';j.error=nil end) end end
       F.commit(r,save,function() r.operation=r.operation+1; r.privateCraft=nil; r.status='running'; r.error=nil end)
       return
     end
     for _,station in ipairs(config.craftingStations) do
-      if scheduled==op.batches then break end
+      if scheduled>=op.batches then break end
       local w=app.state.workers[tostring(station.workerId)]; local t=w and w.telemetry
       if w and w.online and t and t.status=='idle' and not t.task and t.capabilities and t.capabilities.isolatedCraftingV1
         and not Q.workerBusy(app.state,w.id) then
@@ -42,13 +59,14 @@ function M.new(app,config,e,queue,production)
           end
         end
         if not occupied then
-          local n=math.min(config.craftingBatchSize,op.batches-scheduled); local inputs={}
+          local offset,limit=coverage(r,op)
+          local n=math.min(config.craftingBatchSize,limit-offset); local inputs={}
           for item,count in pairs(op.inputs) do inputs[item]=count/op.batches*n end
           local j=queue:submit('CRAFT',{item=op.item,batches=n,quantity=op.quantity/op.batches*n,
             preferredWorker=w.id,privateStation=U.copy(station),privateReady=false,stockInputs=inputs,
             stockOutputs={[op.item]=op.quantity/op.batches*n},productionRequest=r.id,productionOperation=r.operation,
-            productionGeneration=r.replans or 0,productionBatch=scheduled},{},
-            r.id..':op:'..r.operation..':craft:'..scheduled..':generation:'..(r.replans or 0))
+            productionGeneration=r.replans or 0,productionBatch=offset},{},
+            r.id..':op:'..r.operation..':craft:'..offset..':attempt:'..(queue.state.sequence+1))
           scheduled=scheduled+j.batches; complete=false
         end
       end
@@ -63,41 +81,98 @@ function M.new(app,config,e,queue,production)
   end
   local function empty(name) assert(not next(F.list(e,name)),'private crafting inventory must be empty: '..name) end
   local function reserve(job)
-    local old=capacity.state.leases[job.id]; if old then assert(old.status=='held','craft capacity already released'); return old end
+    local old=capacity.state.leases[job.id];if old then assert(old.status=='held','craft capacity already released');return old end
+    local worker=app.state.workers[tostring(job.preferredWorker)];local t=worker and worker.telemetry
+    assert(worker and worker.online and t and t.status=='idle' and not t.task
+      and t.capabilities and t.capabilities.isolatedCraftingV1
+      and not Q.workerBusy(app.state,job.preferredWorker,job.id),'waiting for available preferred Crafty worker')
+    local observed=require('autobuilder.storage.capacity').observe(e)
     local station=job.privateStation
-    for _,field in ipairs({'buffer','input','output'}) do empty(station[field]) end
+    for _,field in ipairs({'buffer','input','output'}) do
+      assert(not next(F.list(observed,station[field])),'private crafting inventory must be empty: '..station[field])
+    end
     local limits={}
     for item in pairs(job.stockInputs) do
-      local sources=F.sources(e,config,item); local source=assert(sources[1],'reserved craft ingredient missing: '..item)
-      local detail=e.peripheral.call(source.name,'getItemDetail',source.slot)
+      local sources=F.sources(observed,config,item);local source=assert(sources[1],'reserved craft ingredient missing: '..item)
+      local detail=observed.peripheral.call(source.name,'getItemDetail',source.slot)
       assert(detail and U.integer(detail.maxCount) and detail.maxCount>0,'ingredient stack limit unavailable')
       limits[item]=detail.maxCount
     end
-    local sources=F.sources(e,config,job.item); local outputLimit
-    if sources[1] then
-      local detail=e.peripheral.call(sources[1].name,'getItemDetail',sources[1].slot)
-      outputLimit=detail and detail.maxCount
+    local sources=F.sources(observed,config,job.item);local outputLimit
+    if sources[1] then local detail=observed.peripheral.call(sources[1].name,'getItemDetail',sources[1].slot);outputLimit=detail and detail.maxCount end
+    local stock=production.ledger.state.leases[job.id]
+    -- Retire only never-started legacy production claims. Their closed IDs and
+    -- immutable quantities remain auditable; the scheduler fills the interval.
+    if stock and job.productionRequest and not job.workerId and not job.privateReady then
+      local f=job.factoryFlow
+      assert(not f or not (f.stage.intent or f.collect.intent or next(f.stage.withdrawn or {}) or f.stage.stockSequence or f.collect.stockSequence),'legacy craft journal still owned')
+      local before=U.copy(job)
+      local ok,why=pcall(function()
+        require('autobuilder.storage.ledger').new(app.state,function() return true end):cancel(job.id)
+        job.cancelled=true;job.status='completed';job.error='unstarted legacy batch replanned for capacity';assert(save())
+      end)
+      if not ok then
+        production.ledger.state.leases[job.id]=stock
+        for k in pairs(job) do job[k]=nil end;for k,v in pairs(before) do job[k]=v end;error(why,0)
+      end
+      return nil,'retired'
     end
-    local combined=U.copy(job.stockInputs); combined[job.item]=(combined[job.item] or 0)+job.quantity
-    local combinedLimits=U.copy(limits); combinedLimits[job.item]=outputLimit
-    local outputLimits=outputLimit and {[job.item]=outputLimit} or {}
-    local why='shared output storage is not configured'
-    for _,destination in ipairs(config.storageInventories) do
-      local lease
-      lease,why=capacity:reserve(job.id,{
-        {inventory=station.buffer,items=combined,limits=combinedLimits,exclusive=true},
-        {inventory=station.input,items=job.stockInputs,limits=limits,exclusive=true},
-        {inventory=station.output,items=job.stockOutputs,limits=outputLimits,exclusive=true},
-        {inventory=destination,items=job.stockOutputs,limits=outputLimits}},e)
-      if lease then return lease end
+    assert(app.mining:refresh())
+    local max=job.batches;local offset=job.productionBatch
+    if job.productionRequest and not stock then
+      local r=assert(queue.state.requests[job.productionRequest],'craft request missing')
+      local op=assert(r.plan.operations[job.productionOperation],'craft operation missing')
+      local limit;offset,limit=coverage(r,op);max=math.min(max,limit-offset)
+      if max==0 then F.commit(job,save,function() job.cancelled=true;job.status='completed';job.error=nil end);return nil,'retired' end
     end
-    error(why,0)
+    if not stock then for item,count in pairs(job.stockInputs) do
+      local available=production.ledger:view(item,app.mining.storage.counts).available-(config.turtleFuelReserveItems[item] or 0)
+      max=math.min(max,math.floor(math.max(0,available)/(count/job.batches)))
+    end end
+    assert(max>0,'insufficient unreserved craft ingredients')
+    local function trial(n)
+      local inputs={};for item,count in pairs(job.stockInputs) do inputs[item]=count/job.batches*n end
+      local quantity=job.quantity/job.batches*n;local outputs={[job.item]=quantity}
+      local combined=U.copy(inputs);combined[job.item]=(combined[job.item] or 0)+quantity
+      local combinedLimits=U.copy(limits);combinedLimits[job.item]=outputLimit
+      local outputLimits=outputLimit and {[job.item]=outputLimit} or {}
+      local why='shared output storage is not configured'
+      for _,destination in ipairs(config.storageInventories) do
+        local ok,lease,reason=pcall(capacity.preview,capacity,job.id,{
+          {inventory=station.buffer,items=combined,limits=combinedLimits,exclusive=true},
+          {inventory=station.input,items=inputs,limits=limits,exclusive=true},
+          {inventory=station.output,items=outputs,limits=outputLimits,exclusive=true},
+          {inventory=destination,items=outputs,limits=outputLimits}},observed)
+        if ok and lease then return lease,inputs,outputs,quantity end
+        why=ok and reason or lease
+      end
+      return nil,why
+    end
+    local n=max;local lease,inputs,outputs,quantity=trial(n)
+    if job.productionRequest and not stock then
+      -- At most64 recipe batches. Reuse native observations while shrinking;
+      -- counts and slots are still exclusively observed under inventoryAction.
+      while not lease and n>1 do n=n-1;lease,inputs,outputs,quantity=trial(n) end
+    else assert(n==job.batches,'insufficient unreserved craft ingredients') end
+    assert(lease,inputs)
+    local before=U.copy(job)
+    local ok,why=pcall(function()
+      capacity.state.leases[job.id]=lease
+      job.productionBatch=offset;job.batches=n;job.quantity=quantity;job.stockInputs=inputs;job.stockOutputs=outputs
+      assert(require('autobuilder.storage.ledger').new(app.state,function() return true end):reserve(
+        job.id,inputs,outputs,app.mining.storage.counts,{protected=config.turtleFuelReserveItems}))
+      job.factoryFlow={stage={},collect={}};assert(save())
+    end)
+    if not ok then
+      capacity.state.leases[job.id]=nil;production.ledger.state.leases[job.id]=stock
+      for k in pairs(job) do job[k]=nil end;for k,v in pairs(before) do job[k]=v end;error(why,0)
+    end
+    return lease
   end
   local function advance(job)
     local flow=job.factoryFlow
-    if not flow then F.commit(job,save,function() job.factoryFlow={stage={},collect={}} end); flow=job.factoryFlow end
-    if flow.stage.intent then return F.reconcileTransfer(flow.stage,e,save) end
-    if flow.collect.intent then return F.reconcileTransfer(flow.collect,e,save) end
+    if flow and flow.stage.intent then return F.reconcileTransfer(flow.stage,e,save) end
+    if flow and flow.collect.intent then return F.reconcileTransfer(flow.collect,e,save) end
     local allowed,why=Q.factoryCanRun(app.state,job,true); if not allowed then error(why,0) end
     local station=job.privateStation
     if job.workerFinished then
@@ -129,7 +204,7 @@ function M.new(app,config,e,queue,production)
       return F.transfer(flow.collect,e,save,station.buffer,source.slot,destination,allocation.slot,job.item,
         math.min(allocation.count-offset,source.count,room),station.buffer,-1,'delivered')
     end
-    local lease=reserve(job)
+    local lease=reserve(job);if not lease then return 'retired' end;flow=job.factoryFlow
     empty(station.input); empty(station.output)
     local inv=F.list(e,station.buffer)
     assert(F.equal(counts(inv),flow.stage.withdrawn or {}),'private crafting input changed during staging')

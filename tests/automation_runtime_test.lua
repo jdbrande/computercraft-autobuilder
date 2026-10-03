@@ -615,6 +615,7 @@ test('parallel production holds output capacity before touching ingredients',fun
   for i=2,27 do f.h.inventories.store[i]={name=mc('dirt'),count=64} end
   f:request(16); for _=1,30 do f:step() end
   eq(f.h:count(mc('stone')),40); eq(f.h.crafts+f.other.h.crafts,0)
+  assert((f.c.state.automation.requests[f.id].error or ''):find('capacity'),'full private factory needs actionable capacity status')
   eq(next(f.h.inventories.buffer),nil); eq(next(f.h.inventories.buffer2),nil)
   for i=10,27 do f.h.inventories.store[i]=nil end
   f:finish(); eq(f.h:count(mc('stone_bricks')),16)
@@ -757,4 +758,91 @@ test('restored legacy Crafty cannot stage or craft until its full stationary cov
   f.wc.chunkLoading.areas={{minX=-1,maxX=0,minZ=-1,maxZ=0}}
   for _=1,40 do f.w:workStep() end
   eq(f.w.state.currentTask.phase,'completed');eq(f.h.crafts,1);eq(f.h:count(mc('stone_bricks')),4)
+end)
+
+local function panesFixture()
+  local f=parallelFixture();f.h.inventories.store={[1]={name=mc('glass'),count=24}}
+  for _,w in ipairs({f,f.other}) do
+    w.we.turtle.craft=function(n)
+      eq(n,1);local recipe=require('autobuilder.factory.recipes').get(mc('glass_pane'))
+      for slot=1,16 do
+        local item=w.h.slots[slot]
+        if recipe.grid[slot] then assert(item and item.name==recipe.grid[slot] and item.count==1,'incorrect pane ingredient')
+        else assert(not item,'extra pane ingredient') end
+      end
+      w.h.slots={[13]={name=mc('glass_pane'),count=16}};w.h.crafts=w.h.crafts+1
+      if w.h.afterCraft then w.h.afterCraft() end;return true
+    end
+  end
+  function f:requestPanes(n)
+    for _,w in ipairs({self,self.other}) do assert(w.w:tick());self:pumpAll(w.we) end;self:pumpAll(self.ce)
+    local ok,id=self.c:command('request minecraft:glass_pane '..n);assert(ok,id);self.id=id
+  end
+  return f
+end
+
+test('unknown high yield output automatically uses smaller finite private batches',function()
+  local f=panesFixture();f:requestPanes(64);f:finish(650)
+  eq(f.h:count(mc('glass_pane')),64);eq(f.h:count(mc('glass')),0);eq(f.h.crafts+f.other.h.crafts,4)
+  local first;local covered={}
+  for _,j in pairs(f.c.state.automation.jobs) do if j.privateStation and not j.cancelled then
+    first=not first and j or j.productionBatch<first.productionBatch and j or first
+    for i=j.productionBatch,j.productionBatch+j.batches-1 do assert(not covered[i],'duplicate batch coverage');covered[i]=true end
+    eq(j.status,'completed');eq(f.c.state.inventoryLedger.leases[j.id].status,'released')
+    eq(f.c.state.capacityLedger.leases[j.id].status,'released')
+  end end
+  eq(first.batches,1);for i=0,3 do assert(covered[i]) end
+  for _,name in ipairs({'buffer','buffer2','input','input2','output','output2'}) do eq(next(f.h.inventories[name]),nil) end
+end)
+
+test('unclaimed private craft does not pin a worker that owns an older storage task',function()
+  local f=parallelFixture();local q=f.c.automation.queue
+  local waiting=q:submit('CRAFT',{item=mc('stone_bricks'),quantity=8,batches=2,preferredWorker=12,
+    privateStation=U.copy(f.cc.craftingStations[1]),stockInputs={[mc('stone')]=8},stockOutputs={[mc('stone_bricks')]=8}},{})
+  assert(not require('autobuilder.core.workflows').workerBusy(f.c.state,12),'logical craft preference pinned worker')
+  local older=q:submit('RETURN_HOME',{preferredWorker=12},{});older.workerId=12;older.status='assigned';assert(f.c:save())
+  f.c.automation.production:syncClaims();f.c.automation.production:step()
+  eq(f.c.state.inventoryLedger.leases[waiting.id],nil);eq(f.h.transfers,0)
+end)
+
+test('unusable private station cannot withhold production coverage from a feasible station',function()
+  local f=panesFixture();local call=f.ce.peripheral.call
+  f.ce.peripheral.call=function(name,method,...)
+    if name=='output' and method=='size' then return 8 end
+    if name=='output' and method=='getItemLimit' then return 1 end
+    return call(name,method,...)
+  end
+  f:requestPanes(64);f:finish(800)
+  eq(f.h.crafts,0);eq(f.other.h.crafts,4);eq(f.h:count(mc('glass_pane')),64)
+  for _,j in pairs(f.c.state.automation.jobs) do if j.privateStation.id=='west' then
+    eq(j.cancelled,true);eq(f.c.state.inventoryLedger.leases[j.id],nil);eq(f.c.state.capacityLedger.leases[j.id],nil)
+  end end
+end)
+
+test('unstarted legacy pane claims retire durably before capacity sized replacement after reboot',function()
+  local f=panesFixture();f:requestPanes(32);assert(f.c:tick())
+  local old
+  for _,j in pairs(f.c.state.automation.jobs) do if j.privateStation then old=j;break end end
+  assert(old);eq(old.batches,2)
+  assert(f.c.automation.production.ledger:reserve(old.id,old.stockInputs,old.stockOutputs,{[mc('glass')]=24}))
+  old.factoryFlow={stage={},collect={}};assert(f.c:save());local oldId=old.id
+  f.ce.packets={};f.c=Runtime.new(f.cc,f.ce);f:finish(650)
+  old=f.c.state.automation.jobs[oldId];eq(old.cancelled,true);eq(old.batches,2)
+  eq(f.c.state.inventoryLedger.leases[oldId].status,'cancelled');eq(f.c.state.capacityLedger.leases[oldId],nil)
+  eq(f.h:count(mc('glass_pane')),32);eq(f.h:count(mc('glass')),12)
+end)
+
+test('failed adaptive grant restores quantity and both ledgers before any transfer',function()
+  local f=panesFixture();f:requestPanes(32);assert(f.c:tick())
+  local j;for _,v in pairs(f.c.state.automation.jobs) do if v.privateStation then j=v;break end end;assert(j)
+  local original=U.copy(j);local save=f.c.save;local failed=false
+  f.c.save=function(app)
+    if not failed and app.state.capacityLedger.leases[j.id] and app.state.inventoryLedger.leases[j.id] then failed=true;return false,'disk full at adaptive grant' end
+    return save(app)
+  end
+  f.c.automation.production:step();assert(failed);eq(f.h.transfers,0)
+  eq(j.batches,original.batches);eq(j.quantity,original.quantity);eq(j.factoryFlow,nil)
+  eq(f.c.state.capacityLedger.leases[j.id],nil);eq(f.c.state.inventoryLedger.leases[j.id],nil)
+  f.ce.packets={};f.c=Runtime.new(f.cc,f.ce);f:finish(650)
+  eq(f.h:count(mc('glass_pane')),32);eq(f.h:count(mc('glass')),12)
 end)

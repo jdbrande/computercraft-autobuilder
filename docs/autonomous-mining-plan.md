@@ -831,16 +831,16 @@ worker ownership, unavailable candidate and native unknown output stack sizes.
 
 ### Task35: Read-only capacity sizing
 
-- [ ] Add failing preview/no-mutation, cached observation, native limits and held-slot
+- [x] Add failing preview/no-mutation, cached observation, native limits and held-slot
   tests. Extract the existing allocator so reservation and preview use one algorithm.
-- [ ] Implement bounded cached observations and largest-fit batch evaluation; preserve
+- [x] Implement bounded cached observations and largest-fit batch evaluation; preserve
   strict quantities, unknown limits and concrete allocations. Run focused tests.
 
 ### Task36: Atomic adaptive grants and operation coverage
 
-- [ ] Reproduce pane output stall, worker pinning and legacy unstarted claims. Implement
+- [x] Reproduce pane output stall, worker pinning and legacy unstarted claims. Implement
   atomic count/capacity/quantity grants, first-gap scheduling and safe legacy retirement.
-- [ ] Exercise simultaneous stations, small inputs, changed availability, failed saves,
+- [x] Exercise simultaneous stations, small inputs, changed availability, failed saves,
   partial transfers and runtime restarts. Run full Lua/Python/release gates and commit.
 
 ### Task37: Native pane acceptance and integration
