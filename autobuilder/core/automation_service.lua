@@ -95,8 +95,8 @@ function M.new(app,config,e,network,clock)
       if ok then return send(sender,'task_pose_ack',{jobId=j.id,sequence=p.sequence,origin=U.copy(p.origin)}) end
       return false,why
     elseif m.type=='task_reserve' then
-      local granted,err=queue:reserve(sender,j.id,p.from,p.target,app.state.workers)
-      send(sender,'task_grant',{jobId=j.id,target=p.target,granted=granted==true}); return granted,err
+      local granted,err=queue:reserve(sender,j.id,p.from,p.target,app.state.workers,p.work)
+      send(sender,'task_grant',{jobId=j.id,target=p.target,granted=granted==true,work=p.work,reason=err and tostring(err):sub(1,512)}); return granted,err
     elseif m.type=='task_position' then return queue:position(sender,j.id,p.from,p.target)
     elseif m.type=='task_supply_done' then
       self.supply=self.supply or require('autobuilder.storage.supply').new(queue.state,config,e,function() return app:save() end)

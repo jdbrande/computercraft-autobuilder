@@ -33,7 +33,7 @@ function M.new(source,transform,sourceHash,options)
   for i,entry in ipairs(source.palette) do palette[i]={name=entry.name,state=T.state(entry.state,rotation,mx,mz)};Cooperate.every(i) end
   local nx,nz=width+margin*2,depth+margin*2
   local rx,rz=math.ceil(nx/regionSize),math.ceil(nz/regionSize)
-  local self={version=M.VERSION,sourceHash=sourceHash,bounds=U.copy(bounds),regionCount=rx*rz,columnCount=nx*nz}
+  local self={version=M.VERSION,sourceHash=sourceHash,bounds=U.copy(bounds),maxY=maxY,regionCount=rx*rz,columnCount=nx*nz}
   function self:wanted(p)
     assert(U.position(p),'invalid site lookup coordinate')
     local x,y,z=p.x-origin.x,p.y-origin.y,p.z-origin.z

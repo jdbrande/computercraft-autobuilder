@@ -1,0 +1,109 @@
+local U=require('autobuilder.core.util')
+local function fixture()
+  local c=require('tests.loaded_config').load({depot={x=0,y=2,z=0},storageInventories={'stock'},
+    logistics={nodes={{id='base',inventory='stock',position={x=10,y=0,z=0},buffers={{inventory='buffer',position={x=12,y=1,z=0}}}}}},
+    fuel={stations={{id='fuel',inventory='fuel',workerId=12,position={x=20,y=1,z=0}}}},
+    farms={{kind='wheat',sites={{x=30,y=1,z=0}},maxHeight=8}},treeFarms={{kind='oak',sites={{x=40,y=1,z=0}},maxHeight=12}}})
+  local s={workers={['12']={id=12,online=false,telemetry={depot={x=50,y=1,z=0},position={x=51,y=1,z=0,known=true}}}},
+    jobs={},automation={jobs={},projects={own={name='own',protectedBounds={min={x=60,y=0,z=0},max={x=65,y=4,z=4}}},
+      other={name='other',protectedBounds={min={x=70,y=0,z=0},max={x=75,y=4,z=4}}}},cells={}}}
+  local j={id='prep',project='own',workerId=13,status='running',bounds={min={x=-5,y=-5,z=-5},max={x=100,y=30,z=10}}}
+  s.automation.jobs[j.id]=j
+  return c,s,j
+end
+
+test('site protection covers registered home logistics fuel farms and other project volumes',function()
+  local c,s,j=fixture();local P=require('autobuilder.core.protection')
+  for _,p in ipairs({{x=0,y=1,z=0},{x=1,y=2,z=0},{x=10,y=0,z=0},{x=12,y=0,z=0},{x=20,y=2,z=0},
+    {x=30,y=0,z=0},{x=40,y=12,z=0},{x=50,y=1,z=0},{x=70,y=1,z=0}}) do
+    local ok,why=P.canModify(s,c,j,p);assert(not ok and why,'missed protected '..p.x..','..p.y..','..p.z)
+  end
+  assert(P.canModify(s,c,j,{x=60,y=1,z=1}),'own project volume must remain executable')
+  assert(not P.canModify(s,c,j,{x=101,y=1,z=1}),'escaped owned bounds')
+end)
+
+test('mutation protection retains offline positions active work and pending routes until settlement',function()
+  local c,s,j=fixture();local P=require('autobuilder.core.protection')
+  assert(not P.canModify(s,c,j,{x=51,y=1,z=0}))
+  s.automation.cells['80,1,0']={owner=99,jobId='other'};assert(not P.canModify(s,c,j,{x=80,y=1,z=0}))
+  s.jobs.mine={id='mine',workerId=99,status='running',exploration={bounds={min={x=85,y=0,z=0},max={x=86,y=2,z=1}},route={{x=84,y=1,z=0}},exitRoute={{x=83,y=1,z=0}}}}
+  for _,x in ipairs({83,84,85}) do assert(not P.canModify(s,c,j,{x=x,y=1,z=0})) end
+  s.jobs.mine.physicalComplete=true;assert(P.canModify(s,c,j,{x=85,y=1,z=0}))
+  s.automation.jobs.other={id='other',workerId=99,status='running',bounds={min={x=90,y=0,z=0},max={x=92,y=3,z=1}}}
+  assert(not P.canModify(s,c,j,{x=91,y=1,z=0}))
+  s.automation.jobs.other.status='completed';assert(P.canModify(s,c,j,{x=91,y=1,z=0}))
+end)
+
+test('construction mutation grants share traffic cells and refuse protected or unplanned targets',function()
+  local c,s,j=fixture();j.type='REPAIR';j.blocks={{x=60,y=1,z=1,name='minecraft:air',state={}},{x=50,y=1,z=0,name='minecraft:air',state={}}}
+  local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+  assert(not Q:reserve(13,j.id,{x=61,y=2,z=1},{x=61,y=1,z=1},s.workers,true),'unplanned target accepted')
+  assert(not Q:reserve(13,j.id,{x=50,y=2,z=0},{x=50,y=1,z=0},s.workers,true),'depot mutation accepted')
+  assert(Q:reserve(13,j.id,{x=60,y=2,z=1},{x=60,y=1,z=1},s.workers,true))
+  eq(s.automation.cells['60,1,1'].owner,13)
+end)
+
+test('traffic cannot enter another active preparation region and failed grants restore ownership',function()
+  local c,s,j=fixture();j.type='SURVEY_SITE';j.siteSurvey={identity=string.rep('a',64)}
+  s.automation.jobs.courier={id='courier',type='TRANSPORT',workerId=14,status='running'}
+  local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+  assert(not Q:reserve(14,'courier',{x=60,y=1,z=0},{x=60,y=1,z=1},s.workers),'route entered owned survey region')
+  j.status='completed';assert(Q:reserve(14,'courier',{x=60,y=1,z=0},{x=60,y=1,z=1},s.workers))
+  local before=U.copy(s.automation.cells)
+  Q=require('autobuilder.core.workflows').new(s,function() return false,'disk full' end,function() return 100 end,7,nil,c)
+  assert(not pcall(Q.reserve,Q,14,'courier',{x=60,y=1,z=1},{x=60,y=1,z=2},s.workers))
+  assert(require('autobuilder.factory.factory').equal(before,s.automation.cells),'failed movement claim mutated durable ownership')
+end)
+
+test('worker mutation reservations cannot consume movement grants or bypass disabled ownership',function()
+  local C=require('tests.loaded_config');local w=require('tests.build_world').new()
+  local c=C.load({role='worker',controllerId=7,automation={building=true},depot=U.copy(w.pose)})
+  local app={navigation={pose=w.pose},state={id=12,position=w.pose,currentTask={id='task:7:1',type='REPAIR',phase='work'}}}
+  function app:save() return true end
+  local sent={};local net={send=function(_,_,kind,p) sent[#sent+1]={kind=kind,p=U.copy(p)};return true end}
+  local ex=require('autobuilder.workers.executor').new(app,c,{turtle=w.turtle},net,function() return 100 end)
+  local target={x=0,y=1,z=0};assert(not app.navigation.workGuard(target));assert(sent[#sent].p.work)
+  local seq=0;local function grant(work)
+    seq=seq+1;return ex:handle(7,{boot=1,sequence=seq,type='task_grant',payload={jobId='task:7:1',target=target,granted=true,work=work}})
+  end
+  assert(not grant(nil),'movement grant authorized mutation');assert(grant(true));assert(app.navigation.workGuard(target))
+  assert(not app.navigation.guard(w.pose,target),'mutation grant authorized movement');assert(not grant(true));assert(grant(nil))
+  c.automation.enabled=false;assert(not app.navigation.workGuard(target))
+  c.automation.enabled=true;app.state.currentTask=nil;assert(not app.navigation.workGuard(target))
+end)
+
+test('independent workers can use a clear overhead plane without entering preparation work cells',function()
+  local c,s,j=fixture();j.type='SURVEY_SITE';j.siteSurvey={};j.clearanceY=4;j.bounds={min={x=60,y=0,z=0},max={x=65,y=4,z=4}}
+  s.automation.jobs.courier={id='courier',type='TRANSPORT',workerId=14,status='running'}
+  local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+  assert(Q:reserve(14,'courier',{x=60,y=4,z=0},{x=60,y=4,z=1},s.workers),'clear survey overhead corridor was blocked')
+  assert(not Q:reserve(14,'courier',{x=60,y=4,z=1},{x=60,y=3,z=1},s.workers))
+end)
+
+test('preparation admission waits for prior occupied cells and mining routes but admits independent regions',function()
+  local c,s=fixture();s.automation.jobs={};s.automation.sequence=0;s.workers={
+    ['13']={id=13,online=true,telemetry={status='idle',capabilities={siteSurveyV1=true},position={x=59,y=4,z=0,known=true}}},
+    ['14']={id=14,online=false,telemetry={position={x=61,y=2,z=1,known=true}}}}
+  local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+  local payload={siteSurvey={},clearanceY=4,bounds={min={x=60,y=0,z=0},max={x=65,y=4,z=4}}}
+  local j=Q:submit('SURVEY_SITE',payload)
+  assert(not Q:assign(s.workers),'region captured an offline worker')
+  s.workers['14'].telemetry.position.y=4
+  s.automation.cells['62,2,1']={owner=14,jobId='older'}
+  assert(not Q:assign(s.workers),'region captured pending movement')
+  s.automation.cells={};s.jobs.mine={id='mine',workerId=14,status='running',exploration={bounds={min={x=80,y=0,z=0},max={x=82,y=2,z=2}},route={{x=63,y=1,z=1}},exitRoute={}}}
+  assert(not Q:assign(s.workers),'region captured an owned return route')
+  s.jobs.mine.physicalComplete=true
+  eq(Q:assign(s.workers).id,j.id);eq(j.workerId,13)
+end)
+
+test('preparation admission is rechecked after yielding chunk coverage observation',function()
+  local c,s=fixture();s.automation.jobs={};s.automation.sequence=0;s.workers={['13']={id=13,online=true,telemetry={status='idle',capabilities={siteSurveyV1=true}}}}
+  local chunks={reserve=function(_,j,w)
+    s.workers['14']={id=14,telemetry={position={x=61,y=2,z=1,known=true}}}
+    return {status='disabled'}
+  end}
+  local Q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,chunks,c)
+  local j=Q:submit('SURVEY_SITE',{siteSurvey={},clearanceY=4,bounds={min={x=60,y=0,z=0},max={x=65,y=4,z=4}}})
+  assert(not Q:assign(s.workers),'yielding coverage observation invalidated admission');assert(not j.workerId)
+end)

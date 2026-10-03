@@ -66,3 +66,13 @@ test('site survey retains an unreachable column and continues another accessible
   eq(j.siteReport.observations[1].x,2);assert(j.siteReport.observations[1].reason)
   eq(j.siteReport.observations[2].status,'empty');eq(w.digs,0)
 end)
+
+test('survey retains territory until the turtle leaves its interior after its final observation',function()
+  local w,c,j,nav,save=fixture();w.blocks['2,1,0']={name='minecraft:stone',state={}}
+  local engine=require('autobuilder.build.site_survey').new(j,{turtle=w.turtle},c,nav,save)
+  for _=1,80 do engine:step();if j.progress==2 then break end end
+  eq(j.progress,2);assert(j.phase~='completed','worker released interior before reaching clearance')
+  local saved=U.copy(j);local engine2=require('autobuilder.build.site_survey').new(saved,{turtle=w.turtle},c,nav,function() return true end)
+  for _=1,30 do engine2:step();if saved.phase=='completed' then break end end
+  eq(saved.phase,'completed');eq(w.pose.y,j.clearanceY);eq(#saved.siteReport.observations,2)
+end)

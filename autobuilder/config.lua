@@ -16,7 +16,8 @@ M.defaults={
   craftingStations={},craftingBatchSize=2,
   logistics={batchSize=64,nodes={}},
   automation={enabled=true,building=false,crafting=false,courier=false,logging=false,farming=false},
-  build={enabled=false,autoSite=false,origin={x=0,y=64,z=0},rotation=0,mirrorX=false,mirrorZ=false,regionSize=8},
+  build={enabled=false,autoSite=false,origin={x=0,y=64,z=0},rotation=0,mirrorX=false,mirrorZ=false,regionSize=8,
+    site={minY=-64,maxY=319,margin=1}},
   blueprintDir='/autobuilder/blueprints', clearSite=false,
   supply={inventory='',side='front',batch=64}, treeFarms={}, farms={}, depotExpansion={}, farmRetrySeconds=60,
   autoDepotExpansion={enabled=false,freeSlots=2},
@@ -111,6 +112,10 @@ function M.load(overrides)
   assert(U.position(c.build.origin) and ({[0]=true,[90]=true,[180]=true,[270]=true})[c.build.rotation],'invalid build transform')
   assert(type(c.build.enabled)=='boolean' and type(c.build.autoSite)=='boolean' and type(c.build.mirrorX)=='boolean' and type(c.build.mirrorZ)=='boolean','invalid build flags')
   assert(U.integer(c.build.regionSize) and c.build.regionSize>=1 and c.build.regionSize<=8,'regionSize must be 1..8')
+  local site=c.build.site
+  assert(U.integer(site.minY) and site.minY>=-30000000 and U.integer(site.maxY) and site.maxY<=30000000
+    and site.maxY>=site.minY and site.maxY-site.minY<=4095,'invalid site dimension bounds')
+  assert(U.integer(site.margin) and site.margin>=0 and site.margin<=8,'site margin must be 0..8')
   assert(type(c.clearSite)=='boolean' and type(c.blueprintDir)=='string' and c.blueprintDir:sub(1,1)=='/','invalid blueprint/clearing config')
   assert(({front=true,up=true,down=true})[c.supply.side] and U.integer(c.supply.batch) and c.supply.batch>=1 and c.supply.batch<=64,'invalid supply station')
   assert(type(c.supply.inventory)=='string','supply inventory must be a wired peripheral name')

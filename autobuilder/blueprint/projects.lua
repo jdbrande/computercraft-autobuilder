@@ -5,7 +5,8 @@ local Cooperate=require('autobuilder.core.cooperate')
 local E=require('autobuilder.resources.exploration')
 local M={}
 function M.new(app,config,e,queue,production)
-  local s=queue.state; local cache={}; local self={}
+  local s=queue.state; local cache,sites={},{}; local self={}
+  local siteService=require('autobuilder.build.site_service').new(app,config,e,queue)
   local function save() return app:save() end
   local function project(name)
     local p=s.projects[name or s.currentProject]; assert(p,'Unknown project; use build import <file.schem|file.json> [name]'); return p
@@ -13,6 +14,14 @@ function M.new(app,config,e,queue,production)
   local function data(p)
     local raw=IO.read(e.fs,p.path); assert(Hash.digest(raw)==p.hash,'Imported blueprint changed; import under a new name')
     local value,err=require('autobuilder.blueprint.schematic').load(e.fs,e.textutils,p.path); assert(value,err); return value
+  end
+  local function sitePlan(p,verifySource)
+    local source=verifySource and data(p) or nil
+    if not sites[p.name] then
+      local options=U.copy(p.transform.site or config.build.site);options.regionSize=p.transform.regionSize
+      sites[p.name]=require('autobuilder.build.site_plan').new(source or data(p),p.transform,p.hash,options)
+    end
+    return sites[p.name]
   end
   -- Verification and clearance cover cells with no placement dependency. Visit upper
   -- cells first so an unwanted column can be cleared without digging an access route.
@@ -256,6 +265,13 @@ function M.new(app,config,e,queue,production)
       for _,id in ipairs(p.jobs) do local j=s.jobs[id]; if j then j.paused=false; j.resumeRequested=true end end
       save(); return true,'Resuming '..p.name
     end
+    if action=='survey' then
+      assert(config.build.enabled,'Set build.enabled=true and configure the build origin first')
+      assert(p.phase~='settling','Project still owns worker or inventory settlement')
+      for _,id in ipairs(p.jobs) do assert(s.jobs[id].status=='completed','Project still owns unfinished tasks; pause/resume instead') end
+      if not p.run or p.phase=='built' or p.phase=='verified' then startRun(p,false) end
+      siteService:start(p,sitePlan(p,true));return true,'Surveying '..p.name
+    end
     local a=analysis(p,true); p.total=p.mode=='VERIFY' and a.volume or p.mode=='CLEAR' and a.airCount or #a.blocks; p.volume=a.volume; p.airCells=a.airCount; p.issues=a.issues; p.requirements=U.copy(a.requirements)
     if action=='analyze' or action=='materials' or action=='simulate' then
       local ok,err=production:refresh(); local stock=ok and app.mining.storage.counts or {}
@@ -268,7 +284,7 @@ function M.new(app,config,e,queue,production)
     end
     assert(#a.issues==0,'Unsupported palette or entity data; inspect build analyze before unattended work')
     if action=='prepare' or action=='auto' then
-      assert(not ({building=true,clearing=true,verifying=true,repairing=true,settling=true})[p.phase],'Project is already active; use pause/resume')
+      assert(not ({building=true,clearing=true,verifying=true,repairing=true,settling=true,surveying=true})[p.phase],'Project is already active; use pause/resume')
       if not p.run or p.phase=='built' or p.phase=='verified' then startRun(p,true) end
       if action=='auto' then p.autoStart=true end
       if not next(a.requirements) then
@@ -292,7 +308,7 @@ function M.new(app,config,e,queue,production)
       p.autoStart=nil
       save(); return true,p.phase..' '..p.name
     end
-    return false,'build import|analyze|materials|auto|prepare|start|status|pause|resume|verify|repair|clear [name]'
+    return false,'build import|analyze|materials|survey|auto|prepare|start|status|pause|resume|verify|repair|clear [name]'
   end
   function self:tick()
     if s.retiredBlueprints and #s.retiredBlueprints>0 then
@@ -304,6 +320,7 @@ function M.new(app,config,e,queue,production)
     end
     for _,p in pairs(s.projects) do
       local work,requests=linked(p);actors(p,work)
+      if p.phase=='surveying' then siteService:tick(p,sitePlan(p)) end
       if p.phase=='settling' and not p.paused then settle(p,work,requests) end
       if p.phase=='preparing' and s.requests[p.requestId].status=='completed' then p.phase='ready'; save() end
       if p.phase=='ready' and p.autoStart and not p.paused then
@@ -393,7 +410,7 @@ function M.new(app,config,e,queue,production)
     for id in pairs(remove) do s.jobs[id]=nil end
     for id in pairs(requests) do s.requests[id]=nil end
     for id in pairs(returns) do s.returns[id]=nil end
-    s.projects[name]=nil; cache[name]=nil
+    s.projects[name]=nil; cache[name]=nil;sites[name]=nil
     if s.currentProject==name then s.currentProject=nil end
     s.retiredBlueprints=s.retiredBlueprints or {}; s.retiredBlueprints[#s.retiredBlueprints+1]=p.path
     -- Commit the stream cursor and removal in the same checkpoint. Never leave

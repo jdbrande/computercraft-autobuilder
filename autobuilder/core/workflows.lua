@@ -147,11 +147,15 @@ function M.new(state,save,clock,id,chunks,config)
           table.sort(ids)
           for _,wid in ipairs(ids) do
             local lease,why
-            if chunks then lease,why=chunks:reserve(j,workers[tostring(wid)],true) else lease={status='disabled'} end
+            local admission,reason=require('autobuilder.core.protection').canOwn(state,j,wid)
+            if not admission then why=reason
+            elseif chunks then lease,why=chunks:reserve(j,workers[tostring(wid)],true) else lease={status='disabled'} end
             j.coverageError=why
             if lease then
-              if lease.status=='disabled' then j.workerId=wid;j.status='assigned';persist() end
-              return j
+              if lease.status~='disabled' then return j end
+              admission,reason=require('autobuilder.core.protection').canOwn(state,j,wid)
+              if admission then j.workerId=wid;j.status='assigned';persist();return j end
+              j.coverageError=reason
             end
           end
         end
@@ -223,11 +227,24 @@ function M.new(state,save,clock,id,chunks,config)
     if (j.privateStation or j.logistics or j.returning) and p.phase=='completed' then j.workerFinished=true; j.status='collecting' end
     persist(); return true
   end
-  function self:reserve(owner,jobId,from,target,workers)
+  function self:reserve(owner,jobId,from,target,workers,work)
     if state.assignmentRecovery then return false,'controller backup ownership reconciliation pending' end
     local j=s.jobs[jobId] or (state.jobs or {})[jobId]
     if not j or j.workerId~=owner or j.status=='completed' then return false,'reservation requires active task ownership' end
     if j.poseRecovery and j.poseRecovery.status=='held' then return false,'pose recovery owns movement cells' end
+    if work then
+      if not config or not ({BUILD=true,REPAIR=true,CLEAR=true})[j.type] then return false,'task cannot reserve physical changes' end
+      local planned=false;for _,b in ipairs(j.blocks or {}) do if U.distance(b,target)==0 then planned=true;break end end
+      if not planned then return false,'mutation target is not in the immutable task' end
+      local ok,why=require('autobuilder.core.protection').canModify(state,config,j,target);if not ok then return false,why end
+    else
+      for id,other in pairs(s.jobs) do
+        if id~=jobId and other.workerId~=owner and other.workerId and other.status~='completed'
+          and (other.siteSurvey or other.siteWork or other.type=='PREPARE_SITE') and other.bounds
+          and (not other.clearanceY or target.y<other.clearanceY)
+          and require('autobuilder.core.pathfinding').inside(target,other.bounds) then return false,'active preparation region owned by '..id end
+      end
+    end
     if chunks then local ok,why=chunks:allows(j,from,target);if not ok then return false,why end end
     if U.distance(from,target)>1 then return false,'reservation requires adjacent position' end
     local occupied=s.cells[key(target)]
@@ -236,11 +253,13 @@ function M.new(state,save,clock,id,chunks,config)
       local p=w.telemetry and w.telemetry.position
       if w.id~=owner and p and p.known and key(p)==key(target) then return false,'worker occupies destination' end
     end
+    local before=U.copy(s.cells)
     s.cells[key(from)]={owner=owner,jobId=jobId}; s.cells[key(target)]={owner=owner,jobId=jobId}
     -- A fresh adjacent request confirms the worker's current position, also
     -- reconciling a lost previous movement-confirmation packet.
     for k,cell in pairs(s.cells) do if cell.owner==owner and k~=key(from) and k~=key(target) then s.cells[k]=nil end end
-    persist(); return true
+    local ok,why=pcall(persist);if not ok then s.cells=before;error(why,0) end
+    return true
   end
   local function poseCommit(j,change)
     local prior,cells=U.copy(j.poseRecovery),U.copy(s.cells)

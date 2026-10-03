@@ -95,14 +95,23 @@ function M.new(app,config,e,network,clock)
       if t.phase=='blocked' then resumeTask(); save() end
     end
   end
-  app.navigation.guard=function(from,target)
+  local function reserve(from,target,work)
+    if work and (s.poseRecovery or not s.currentTask or not config.automation.enabled) then return false,'mutation requires active enabled task ownership' end
     if s.poseRecovery then return app.poseRecovery:guard(from,target) end
     if not s.currentTask or not config.automation.enabled then return true end
     local r=s.motionReservation; local id=s.currentTask.id
-    if r and r.jobId==id and r.granted and U.distance(r.target,target)==0 then return true end
-    s.motionReservation={jobId=id,from={x=from.x,y=from.y,z=from.z},target={x=target.x,y=target.y,z=target.z},granted=false}; save()
+    if r and r.jobId==id and (r.work==true)==(work==true) and U.distance(r.target,target)==0 then
+      if r.granted then return true end
+      return false,'movement reservation pending'..(r.reason and ': '..r.reason or '')
+    end
+    s.motionReservation={jobId=id,from={x=from.x,y=from.y,z=from.z},target={x=target.x,y=target.y,z=target.z},work=work,granted=false}; save()
     send('task_reserve',s.motionReservation)
     return false,'movement reservation pending'
+  end
+  app.navigation.guard=function(from,target) return reserve(from,target) end
+  app.navigation.workGuard=function(target) return reserve(app.navigation.pose,target,true) end
+  app.navigation.workDone=function()
+    if s.motionReservation and s.motionReservation.work then s.motionReservation=nil;return save() end
   end
   app.navigation.afterMove=function()
     if s.poseRecovery then return end
@@ -178,7 +187,7 @@ function M.new(app,config,e,network,clock)
       save(); return true
     elseif m.type=='task_grant' then
       local r=s.motionReservation
-      if r and r.jobId==p.jobId and U.distance(r.target,p.target)==0 then r.granted=p.granted; save(); return true end
+      if r and r.jobId==p.jobId and (r.work==true)==(p.work==true) and U.distance(r.target,p.target)==0 then r.granted=p.granted;r.reason=p.reason;save();return true end
     elseif m.type=='task_supply' and t.supplyRequest and t.supplyRequest.item==p.item and t.supplyRequest.id==p.supplyId then
       t.supplyRequest.granted=true; t.supplyRequest.amount=p.count; save(); return true
     end

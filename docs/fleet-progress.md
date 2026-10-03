@@ -28,8 +28,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   two native pane trials and final review fixes.
 - Worker home/unloading and project settlement integrated/pushed at `bb9c41e`:
   623 Lua/18 Python, two native trials, final review fixes and release checks.
-- Current branch `milestone/0.23.0`: general automatic site preparation, starting
-  with immutable footprint/foundation geometry and bounded survey contracts.
+- Current branch `milestone/0.23.0`: general automatic site preparation. Immutable
+  geometry, project surface surveys and shared protection/admission are implemented;
+  excavation/fill, debris collection and verified construction gates remain.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -488,3 +489,23 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Tests reject invalid/changed observations, preserve progress on failed saves and
   cover pause, surface/empty columns and exact transformed geometry. Regional project
   scheduling, adaptive access, protection and physical preparation remain in progress.
+
+- Survey foundation gate at69651ea:634 Lua/18 Python passed, release/check clean.
+  Shared site protection is now under test: registered infrastructure/other projects,
+  offline worker positions, active regions/routes and physical-change reservations.
+  Regressions reject unplanned/protected targets, distinguish movement/action grants,
+  restore cells after failed saves and allow clear overhead transit above owned work.
+
+- Task43 project surveys now keep four active region payloads, save observations in
+  separate checked region files before shrinking the controller checkpoint, and
+  create higher immutable attempts for obstructed access. Root-save and evidence-save
+  regressions preserve receipts without duplicate completion. Actual project runtime
+  covers pause/resume, controller restart and read-only footprint/workspace coverage.
+- Ownership regression fixed admission over offline workers, pending traffic cells
+  and owned mining routes; survey completion now first exits to overhead clearance.
+  The preceding protection/exit full gate passed643 Lua tests. Final combined survey
+  gates follow. General physical preparation and scaling are not yet accepted.
+- Combined Task43 survey foundation gate:649 Lua/18 Python tests passed; release0.23
+  generation/check and whitespace checks passed. Native-hardware-style runtime also
+  verifies a real obstructed overhead cell triggers a higher immutable survey job.
+  No new live Minecraft acceptance is claimed for this intermediate foundation.

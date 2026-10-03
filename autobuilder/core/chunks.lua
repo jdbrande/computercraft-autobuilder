@@ -186,6 +186,10 @@ function M.new(state,config,save)
       providers[x..','..z]=p
     end end
     assert(not job.loadedArea or Equal(job.loadedArea,area),'changed loaded mission envelope')
+    if assign then
+      local allowed,reason=require('autobuilder.core.protection').canOwn(state,job,worker.id)
+      if not allowed then return nil,reason end
+    end
     local lease={status='held',workerId=worker.id,area=area,providers=providers,origin={position=U.copy(t.position),depot=U.copy(t.depot)}}
     local before,owner,status=job.loadedArea,job.workerId,job.status
     persist(function()

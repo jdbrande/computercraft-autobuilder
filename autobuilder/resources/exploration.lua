@@ -232,12 +232,14 @@ function M.record(records,trip,report)
   r.observations={}; for i=math.max(1,#keys-63),#keys do r.observations[#r.observations+1]=positions[keys[i]] end
   return true
 end
-function M.protectedAreas(state,config)
+function M.protectedAreas(state,config,exceptProject)
   local boxes=U.copy(config.restrictedAreas or {})
   for _,b in ipairs(require('autobuilder.storage.nodes').protected(config,state)) do boxes[#boxes+1]=b end
-  for _,p in pairs((state.automation or {}).projects or {}) do
-    if p.protectedBounds then boxes[#boxes+1]=U.copy(p.protectedBounds)
-    elseif config.exploration.enabled then error('exploration requires project protection migration') end
+  for name,p in pairs((state.automation or {}).projects or {}) do
+    if name~=exceptProject then
+      if p.protectedBounds then boxes[#boxes+1]=U.copy(p.protectedBounds)
+      elseif config.exploration.enabled then error('exploration requires project protection migration') end
+    end
   end
   if config.depot then boxes[#boxes+1]={min={x=config.depot.x,y=config.depot.y-1,z=config.depot.z},max={x=config.depot.x,y=config.depot.y+2,z=config.depot.z}} end
   if M.box(config.exploration.baseProtection) then boxes[#boxes+1]=U.copy(config.exploration.baseProtection) end

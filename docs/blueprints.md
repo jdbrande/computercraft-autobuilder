@@ -7,6 +7,22 @@ preparation/construction. To inspect first, use `build import /house.schem house
 the same project across restarts; changed source bytes or an existing unrelated
 name require `build import /house.schem new_name`.
 
+On the0.23 development branch, `build survey house` performs a read-only survey of
+the transformed footprint and working margin. It inspects columns from overhead,
+records the first surface or the configured lower boundary, and preserves exact
+blocked coordinates. Hidden cells below the first solid surface remain unknown.
+`build pause house` and `build resume house` control this work. Blocked overhead
+access produces a new immutable attempt eight blocks higher, up to the dimension
+ceiling. `surveyed` means observations were collected; it does not mean terrain has
+been leveled or construction is safe to start.
+
+Configure `build.site.minY`, `build.site.maxY` and `build.site.margin` before import
+(defaults-64,319 and1). These settings and `build.regionSize` are captured with the
+project. At most four survey payloads are pending at once. Bounded region evidence
+is checkpointed under `<dataDir>/sites/<project>/<geometry identity>/<generation>/`;
+missing or corrupt evidence cannot certify preparation. Automatic excavation/fill
+and the normal construction gate are still being implemented.
+
 Import reads one binary snapshot, validates the whole structure, and saves an
 immutable JSON copy. Corrupt data creates no project; unsupported entities or
 block metadata remain analyzable but prevent automatic physical work. Native gzip

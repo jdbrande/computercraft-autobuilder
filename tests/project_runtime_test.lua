@@ -39,7 +39,7 @@ local function fixture(options)
     return e
   end
   local ce,we=env(7),env(12); we.turtle=w.turtle
-  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},turtleFuelReserveItems={},supply={inventory='stage',side='front'},logistics={nodes={{id='home',inventory='stock',position={x=-3,y=1,z=0},buffers={{inventory='home',position={x=0,y=2,z=0}}}}}},clearSite=options.clearSite or false,build={enabled=true,origin={x=2,y=0,z=0},rotation=options.rotation or 0,mirrorX=options.mirrorX or false},autoDepotExpansion={enabled=options.expansion~=nil,freeSlots=0},depotExpansion=options.expansion or {}})
+  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},turtleFuelReserveItems={},supply={inventory='stage',side='front'},logistics={nodes={{id='home',inventory='stock',position={x=-3,y=1,z=0},buffers={{inventory='home',position={x=0,y=2,z=0}}}}}},clearSite=options.clearSite or false,build={enabled=true,origin={x=2,y=0,z=0},rotation=options.rotation or 0,mirrorX=options.mirrorX or false,site=options.site or {}},autoDepotExpansion={enabled=options.expansion~=nil,freeSlots=0},depotExpansion=options.expansion or {}})
   local wc=C.load({role='worker',controllerId=7,automation={building=true},clearSite=options.clearSite or false,minimumFuelReserve=0,depot=U.copy(w.pose),supply={inventory='stage',side='front'},initialPosition=U.copy(w.pose)})
   local R=require('autobuilder.core.runtime'); local c,b=R.new(cc,ce),R.new(wc,we)
   local blueprint={schema=1,size={x=2,y=1,z=1},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=2}},metadata={},requirements={['minecraft:stone']=2}}
@@ -408,4 +408,40 @@ test('project consumes durable home settlement evidence before later unrelated c
     if mode=='cargo' or mode=='offline' then eq(p.phase,'built')
     else eq(p.phase,'settling');if mode=='stale' then assert(p.returnRequests['12']~=r.id,'stale completed return was reused') end end
   end
+end)
+
+test('build survey schedules every footprint and workspace column with pause and controller restart',function()
+  local w,ce,we,c,b,step,reboot=fixture({site={minY=-2,maxY=15}})
+  w.blocks['2,1,0']={name='minecraft:dirt',state={}}
+  assert(c:command('build import /example.json survey'))
+  assert(c:command('build survey survey'),'project survey command unavailable')
+  local restarted,paused=false,false
+  for _=1,1500 do
+    step()
+    local p=c.state.automation.projects.survey
+    if not paused and b.state.currentTask then
+      assert(c:command('build pause survey'))
+      for _=1,10 do step();if b.state.currentTask.paused then break end end
+      assert(b.state.currentTask.paused);local position=U.copy(w.pose)
+      for _=1,5 do step() end;eq(U.distance(position,w.pose),0)
+      assert(c:command('build resume survey'));paused=true
+    end
+    if not restarted and b.state.currentTask and (b.state.currentTask.progress or 0)>0 then c,b=reboot();restarted=true end
+    if p.phase=='surveyed' and not b.state.currentTask then break end
+  end
+  local p=c.state.automation.projects.survey;eq(p.phase,'surveyed');eq(p.completed,12)
+  assert(paused and restarted);eq(w.digs,0);eq(w.places,0);eq(w.blocks['2,1,0'].name,'minecraft:dirt')
+  assert(not next(c.state.automation.requests),'read-only survey acquired building stock')
+end)
+
+test('project survey retries real overhead obstructions with higher immutable access',function()
+  local w,ce,we,c,b,step=fixture({site={minY=-2,maxY=15}})
+  w.blocks['2,2,0']={name='minecraft:stone',state={}}
+  assert(c:command('build import /example.json hill'));assert(c:command('build survey hill'))
+  for _=1,2500 do step();if c.state.automation.projects.hill.phase=='surveyed' and not b.state.currentTask then break end end
+  local p=c.state.automation.projects.hill;eq(p.phase,'surveyed');eq(p.completed,12);eq(w.digs,0);eq(w.places,0)
+  local count,height=0,0
+  for _,j in pairs(c.state.automation.jobs) do if j.type=='SURVEY_SITE' then count=count+1;height=math.max(height,j.clearanceY) end end
+  assert(count>1 and height>3,'obstructed route never caused a higher attempt')
+  eq(w.blocks['2,2,0'].name,'minecraft:stone');eq(p.protectedBounds.max.y,height)
 end)

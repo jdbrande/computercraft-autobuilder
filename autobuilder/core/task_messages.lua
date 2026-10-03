@@ -104,8 +104,10 @@ function M.validate(kind,p)
         or p.reason~=nil and not U.shortString(p.reason,512)
         or kind=='task_pose_grant' and type(p.granted)~='boolean' then return false,'invalid pose recovery contract' end
     elseif kind=='task_reserve' or kind=='task_position' then
+      if p.work~=nil and (kind~='task_reserve' or type(p.work)~='boolean') then return false,'invalid mutation reservation' end
       if not U.position(p.from) or not U.position(p.target) then return false,'invalid movement reservation' end
     elseif kind=='task_grant' then
+      if p.work~=nil and type(p.work)~='boolean' or p.reason~=nil and not U.shortString(p.reason,512) then return false,'invalid mutation grant' end
       if not U.position(p.target) or type(p.granted)~='boolean' then return false,'invalid movement grant' end
     elseif kind=='task_supply' then
       if not U.shortString(p.item,128) or not U.integer(p.count) or p.count<1 or p.count>64 then return false,'invalid supply grant' end

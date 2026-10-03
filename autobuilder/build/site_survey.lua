@@ -70,7 +70,7 @@ function M.new(task,e,config,nav,save)
     commit(function()
       task.siteReport.observations[#task.siteReport.observations+1]=o;task.progress=#task.siteReport.observations
       task.surveyRoute=nil;task.surveyScanning=nil;task.error=nil;task.blockedCategory=nil
-      task.phase=task.progress==#task.siteSurvey.columns and 'completed' or 'work'
+      task.phase='work'
     end)
     return true
   end
@@ -81,6 +81,13 @@ function M.new(task,e,config,nav,save)
     assert(F.equal(canonical,{survey=task.siteSurvey,bounds=task.bounds,clearanceY=task.clearanceY}),'site survey contract changed')
     local pose=nav.pose
     if not pose.known or pose.pending or pose.uncertain or not U.heading(pose.heading) then return block('trusted pose required for site survey','inaccessible') end
+    if task.progress==#task.siteSurvey.columns then
+      if pose.y<task.clearanceY then
+        local ok,why=nav:up();if not ok then return block(why,'inaccessible') end
+        return true
+      end
+      commit(function() task.phase='completed' end);return true
+    end
     local c=task.siteSurvey.columns[task.progress+1]
     if not task.surveyScanning then
       if not task.surveyRoute then
