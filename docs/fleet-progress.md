@@ -1101,3 +1101,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Final0.24.0 complete Lua gate passed788 tests, with18 Python tests and
   release/whitespace checks. Log: /tmp/fleet-024-final-full-v5.log. Ordered integration
   waits for0.24 native worker settlement; no feature gate is waived.
+
+
+-0.24 native acceptance complete: project built with48/48 correct; all six workers
+  home/idle/empty, both requests/groups complete, no active supply/mining/leases.
+  Independent reads confirm150 solid foundation cells and402 clear workspace cells.
+ 40 mined cobblestone =32 structure +4 foundation +4 stored surplus;8 cleared dirt
+  stored. Finite fuel reconciles. Complete gates788 Lua/18 Python pass. Permanent
+  report validation-0.24.0.md records fixes, default timing and overload limitation.
+  Computers212–218 are shut down,20 force-load tickets removed, monitor stopped.

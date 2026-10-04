@@ -1,7 +1,7 @@
 # 0.24.0 dynamic fleet scaling validation
 
-Status: final complete test gate passed; native48-block worker settlement remains.
-Current implementation: `cebe08e`. This report does not claim release acceptance.
+Status: accepted. Final source `cebe08e` passes788 Lua tests,18 Python tests,
+release/whitespace checks and native48-block construction/settlement acceptance.
 
 ## Automated evidence
 
@@ -28,7 +28,7 @@ A21-message burst test covers backlog rescheduling without changing atomic handl
 semantics. Detours retain the256-node and16-obstacle limits and existing fuel,
 protection, ownership and loaded-coverage checks.
 
-## Native trial in progress — 2026-10-03
+## Native acceptance — 2026-10-03
 
 PrismLauncher1.20.1 world `TESTINMG` uses Forge47.4.10, CC:Tweaked1.120.0 and
 Advanced Peripherals0.7.48r. The separate fixture near `(1040,300,0)` contains
@@ -43,8 +43,10 @@ Only builder213 and miner217 initially ran. Additional builders and miner218 joi
 after initial owned survey/mining work. Recorded history proves concurrent peaks
 of two miners, four clearers and two builders. Both miners and all four construction
 workers participated automatically. Controller and worker restarts preserved active
-work. Final structure, foundation, stock, cargo, fuel and idle/lease reconciliation
-remain pending; interim progress is not final acceptance.
+work. The project reached `built` with48 correct positions and no reported
+errors. All six workers returned home empty and idle. Both finite production
+requests and both acquisition groups completed; no supply owner, active mining
+trip or held inventory lease remained.
 
 Fixture corrections are retained in local audit evidence. Two missing home-area
 coverage chunks were added. Replacing a stalled controller removed its wireless
@@ -56,8 +58,15 @@ seven fixture computers and restarted through the existing command audit harness
 Setup, source hashes, registration/restart receipts, state history and participation
 extraction are retained under ignored `dist/live-scaling/`. Workers use real turtle,
 peripheral and rednet APIs. Operator commands enter the controller event-handler
-boundary; this is not a terminal-input reliability test. The rig and its force-load
-tickets remain active until completion and independent inspection.
+boundary; this is not a terminal-input reliability test. Independent inspection confirmed32 cobblestone and16 glass structure blocks,
+146 original stone plus4 cobblestone foundation cells, and402 clear workspace cells.
+Of64 staged stone deposits,40 were mined and24 remained. The40 cobblestone reconcile
+as32 structure +4 foundation +4 remaining in miner218's wired deposit chest.
+Eight cleared dirt remained in central stock. Private home/supply chests and all
+worker inventories were empty. Final fuel for213–218 was18536,18106,19032,18982,
+19774 and19868 respectively, independently read from the world.
+The rig and finished structure remain for inspection. Cleanup receipts are retained
+alongside final snapshots; fixture computers are shut down and20 chunk tickets removed.
 
 ## Limits
 
