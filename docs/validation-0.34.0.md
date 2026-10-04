@@ -1,8 +1,9 @@
 # 0.34.0 container metadata and sign geometry acceptance
 
-Candidate source `ecc6c67` passed 955 Lua tests and native acceptance. The inherited
-0.33 supply-ascent correction now requires a fresh full gate before integration.
-This report records completed evidence and does not yet claim release acceptance.
+Accepted source `3cd7f70` passed **956 Lua tests**, **20 Python tests**, release
+and diff checks, including inherited0.33 ascent and paired-checkpoint corrections.
+The native acceptance below and final-source gates completed before integration.
+Final logs: `/tmp/fleet-034-final-full-v3.log` and corresponding Python evidence.
 
 ## Automated evidence
 
