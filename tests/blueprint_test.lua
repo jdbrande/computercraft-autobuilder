@@ -91,3 +91,13 @@ test('ceiling attachments and cross-tile beds order supports at default region s
   end
  end
 end)
+
+
+test('sign material aliases survive transforms and wall support dependencies',function()
+ local B=require('autobuilder.blueprint.blueprint');local d=fixture()
+ d.palette[2]={name='minecraft:oak_wall_sign',state={facing='west',waterlogged='false'}}
+ eq(B.quantities(d)['minecraft:oak_sign'],2)
+ local blocks=B.blocks(d,{x=0,y=0,z=0},90);eq(blocks[1].state.facing,'north')
+ local regions=B.regions({{x=0,y=1,z=0,name='minecraft:oak_wall_sign',state={facing='west',waterlogged='false'}},{x=1,y=1,z=0,name='minecraft:stone',state={}}},1)
+ eq(regions[1].blocks[1].name,'minecraft:stone');eq(regions[2].blocks[1].name,'minecraft:oak_wall_sign')
+end)

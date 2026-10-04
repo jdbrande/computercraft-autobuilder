@@ -3,7 +3,7 @@ local T=require('autobuilder.blueprint.transforms')
 local Cooperate=require('autobuilder.core.cooperate')
 local M={}
 local air={['minecraft:air']=true,['minecraft:cave_air']=true,['minecraft:void_air']=true}
-local aliases={['minecraft:wall_torch']='minecraft:torch',['minecraft:redstone_wall_torch']='minecraft:redstone_torch',['minecraft:soul_wall_torch']='minecraft:soul_torch',['minecraft:redstone_wire']='minecraft:redstone',['minecraft:wheat']='minecraft:wheat_seeds',['minecraft:carrots']='minecraft:carrot',['minecraft:potatoes']='minecraft:potato',['minecraft:beetroots']='minecraft:beetroot_seeds'}
+local C=require('autobuilder.build.blockstates')
 function M.blocks(data,origin,rotation,mirrorX,mirrorZ)
   local valid,err=S.validate(data); assert(valid,err)
   origin=origin or {x=0,y=0,z=0}
@@ -31,7 +31,7 @@ function M.quantities(data)
     local entry=data.palette[run.id]; local name,state=entry.name,entry.state
     local paired=(name:match('_door$') and state.half=='upper') or (name:match('_bed$') and state.part=='head')
     if not air[name] and not paired then
-      local item=aliases[name] or name
+      local item=C.item(entry) or name
       local multiplier=(name:match('_slab$') and state.type=='double') and 2 or 1
       out[item]=(out[item] or 0)+run.count*multiplier
     end

@@ -19,10 +19,11 @@ def tag(kind, name, payload):
 def compound(fields):
     return b''.join(fields) + b'\0'
 
-def fixture(version=2, data=b'\0\1\1\0', palette=None, extra=(), width=2):
+def fixture(version=2, data=b'\0\1\1\0', palette=None, extra=(), width=2, block_extra=()):
     palette = palette or [('minecraft:air', 0), ('minecraft:oak_log[axis=x]', 1)]
     pal = tag(10, 'Palette', compound([tag(3, n, struct.pack('>i', i)) for n,i in palette]))
     block = pal + tag(7, 'Data' if version == 3 else 'BlockData', struct.pack('>i', len(data))+data)
+    block += b''.join(block_extra)
     fields = [tag(3,'Version',struct.pack('>i',version)),tag(3,'DataVersion',struct.pack('>i',3700)),tag(2,'Width',struct.pack('>h',width)),tag(2,'Height',struct.pack('>h',1)),tag(2,'Length',struct.pack('>h',2))]
     fields += [tag(10,'Blocks',block+b'\0')] if version==3 else [block]
     fields.extend(extra)

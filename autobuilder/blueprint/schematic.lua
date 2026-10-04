@@ -62,6 +62,7 @@ function M.validate(d)
     return (type(v)=='string' and #v<=65536) or type(v)=='boolean' or (type(v)=='number' and v==v and math.abs(v)<math.huge)
   end
   if not safe(d.metadata,0) then return nil,'invalid metadata' end
+  if d.metadata.blockEntities~=nil and not require('autobuilder.blueprint.block_entities').inBlueprint(d.metadata.blockEntities,d) then return nil,'invalid or mismatched block entity metadata' end
   for item,count in pairs(d.requirements) do
     if not name(item) or not integer(count,0,M.MAX_BLOCKS*2) then return nil,'invalid material requirement' end
   end

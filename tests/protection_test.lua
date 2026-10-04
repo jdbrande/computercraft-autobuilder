@@ -341,3 +341,18 @@ test('placement capability covers new verification and substrate survey while ow
  local survey={identity=string.rep('a',64),region=1,columns={{x=0,z=0,minY=-1,foundationY=-1,substrateY=-1,clearanceY=2}}}
  j=q:submit('SURVEY_SITE',{siteSurvey=survey,clearanceY=2,bounds={min={x=0,y=-1,z=0},max={x=0,y=2,z=0}}});eq(j.requiredCapability,'placementV1')
 end)
+
+
+test('container tasks reserve neighboring chest footprint and negotiate observation capability',function()
+ local state={};local q=require('autobuilder.core.workflows').new(state,function() return true end,function() return 1 end,7)
+ local b={x=15,y=1,z=0,name='minecraft:chest',state={facing='south',type='single',waterlogged='false'}}
+ local j=q:submit('BUILD',{blocks={b}})
+ eq(j.requiredCapability,'metadataV1');eq(j.bounds.min.x,14);eq(j.bounds.max.x,16);eq(j.bounds.min.z,-1);eq(j.bounds.max.z,1)
+ local workers={['12']={id=12,online=true,telemetry={status='idle',capabilities={building=true,placementV1=true}}}}
+ eq(q:assign(workers),nil);workers['12'].telemetry.capabilities.metadataV1=true;eq(q:assign(workers).id,j.id)
+ state.workers=workers;j.status='running'
+ local other=q:submit('BUILD',{blocks={{x=16,y=1,z=0,name='minecraft:stone',state={}}}})
+ workers['13']={id=13,online=true,telemetry={status='idle',capabilities={building=true}}}
+ eq(q:assign(workers),nil);eq(other.workerId,nil)
+ local c=require('autobuilder.config').load({role='worker',controllerId=7,automation={building=true}});eq(c.capabilities.metadataV1,true)
+end)

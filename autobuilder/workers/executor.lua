@@ -166,6 +166,7 @@ function M.new(app,config,e,network,clock)
       local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',PREPARE_REGION='siteWorkV1',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if j.siteAccess then cap='siteAccessV1' end
       if require('autobuilder.build.blockstates').requiresModern(j.blocks,j.siteSurvey) and not config.capabilities.placementV1 then return false,'worker lacks placementV1' end
+      if require('autobuilder.build.blockstates').requiresMetadata(j.blocks) and not config.capabilities.metadataV1 then return false,'worker lacks metadataV1' end
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end
       if j.privateStation and not require('autobuilder.factory.stations').matches(j.privateStation,config,s.id) then return false,'private crafting station does not match worker configuration' end
       s.currentTask=U.copy(j); s.currentTask.phase='setup';

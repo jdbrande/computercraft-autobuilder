@@ -5,6 +5,11 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.34 metadata/sign geometry:956 Lua/20 Python tests, release/diff checks
+  and native Sponge v3 nine-cell import/build/restart/verification passed.
+  [Permanent evidence](validation-0.34.0.md) distinguishes the clean repeat from
+  the assisted first trial.0.35–0.37 remain separate candidates.
+
 - Accepted0.33 deterministic placement:940 Lua/18 Python tests and final release/
   diff checks passed. Native140-cell mixed adapters verified independently; ascent
   and paired-checkpoint bugs are regression-covered. Its underside-access fixture
@@ -1546,6 +1551,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   completed, computers241/242 shut down and4 force-load tickets removed. Permanent
   candidate report validation-0.32.0.md distinguishes assisted pre-fix recovery
   from the clean retest; final complete Lua/Python gates are running.
+- Started0.34 design in `.worktrees/placement-metadata`: supported containers/signs
+  and bounded verifiable block-entity payloads through existing import/placement
+  journals.0.33 remains under its single final review with native mixed rig prepared;
+ 0.31 and0.32 complete release gates continue. No metadata implementation is claimed.
 -0.33 single final review found unsafe destructive bed repair plus six integration
   defects. Consolidated regressions/fixes refuse paired bed removal, remove ceiling
   support cycles, separate bed floors from pair regions, include generated cells in
@@ -1565,6 +1574,24 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Controller240 shut down and both temporary tickets removed;239 was shut down
   before the reset. Permanent candidate report records failed pre-fix evidence,
   final successful run, exact conservation and limits. Complete Lua gate remains.
+-0.34 now normalizes bounded empty-container metadata in native Sponge v2/v3 and
+  Python import, with parity regressions and explicit unsupported payload issues.
+  Container actors observe inventory contents during placement/restart/final verify,
+  refuse destructive repairs and tagged items, and reserve isolated chest neighbors.
+  Cardinal sign geometry uses native-observed rotations; sign text remains unsupported
+  because ordinary native hardware exposes no read-back API. Barrel native probes
+  corrected horizontal look direction and excluded downward facing. Focused actor,
+  ownership, binary import and full19-test Python checks pass. The actual project
+  runtime test builds through preparation/supply/restart and reports subsequently
+  added contents without removing them. Native controller247/builder248 rig prepared;
+  final review and complete gates remain before acceptance.
+-0.34 single final review found unsafe destructive sign repair, grass support
+  rejection, the trapped-chest entity ID omission, Python/NBT tag-kind divergence,
+  and omitted optional v3 Data rejection. Consolidated corrections preserve existing
+  unreadable sign text, reuse finite stable support, match exact entity identities,
+  retain immediate compound tag kinds in Python, and accept absent default-empty
+  v3 data. Red/green binary parity and actual sign-over-grass project regressions
+  cover all findings. No rereview is planned; final full gates/native acceptance follow.
 
 -0.32 accepted after all923 Lua/18 Python tests passed on final sourcea01825b,
   with release/check/diff clean. Permanent acceptance report distinguishes assisted
@@ -1572,6 +1599,16 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   documentation merge did not change tested code/tests/tools/artifacts. Integrating
   and pushing before continuing placement, metadata and inventory recovery work.
 
+###0.34 final-source native acceptance completed
+
+- Clean native gzip Sponge v3 import placed/verified9 cells, including3 empty
+  containers and2 sign geometries. Paused settled-pose controller/worker reboot
+  resumed without intervention; independent world states/empty inventories/grass
+  matched. All jobs/supply settled and worker returned idle; fixture shutdown and
+ 4 operator tickets removed. First run's ambiguous turn required explicit pose
+  confirmation and is separately documented as assisted.
+-20 Python and focused review regressions passed. Full Lua gate remains running;
+  candidate permanent report: [0.34 validation](validation-0.34.0.md).
 ### 0.33 live supply-ascent correction
 
 The full pre-correction gate passed 939 Lua tests. Native placement then exposed a
@@ -1604,3 +1641,9 @@ access cut is explicitly assisted evidence. Permanent candidate report is
 
 Final source940 Lua/18 Python tests, generated release verification and clean diff
 passed. Permanent report records the native evidence and assistance limits.
+
+### 0.34 accepted — 2026-10-04
+
+Final-source956 Lua/20 Python tests and release/diff checks passed. The native
+container/sign project and final inventories were independently checked; fixture
+computers are off and temporary tickets removed.

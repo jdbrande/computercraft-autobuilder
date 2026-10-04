@@ -39,6 +39,13 @@ local function fixture(blocks)
         for _,at in ipairs({p,head}) do if not w.blocks[key({x=at.x,y=at.y-1,z=at.z})] then return false,'bed floor missing' end end
         state={part='foot',facing=w.pose.heading,occupied=false};local top=U.copy(state);top.part='head'
         if not w.badPair then w.blocks[key(head)]={name=name,state=top} end
+      elseif name=='minecraft:chest' or name=='minecraft:trapped_chest' then
+        state={facing=order[(index[w.pose.heading]+1)%4+1],type='single',waterlogged=false}
+      elseif name=='minecraft:barrel' then state={facing=suffix~='' and 'up' or w.pose.heading,open=false}
+      elseif name=='minecraft:furnace' or name=='minecraft:blast_furnace' or name=='minecraft:smoker' then state={facing=order[(index[w.pose.heading]+1)%4+1],lit=false}
+      elseif name:match('_sign$') then
+        if suffix=='' then name=name:gsub('_sign$','_wall_sign');state={facing=order[(index[w.pose.heading]+1)%4+1],waterlogged=false}
+        else state={rotation=(index[w.pose.heading]-1)*4,waterlogged=false} end
       elseif name:match('_slab$') then state={type=suffix=='Down' and 'bottom' or 'top',waterlogged=false}
       elseif connected(name) then state={north=false,east=false,south=false,west=false,waterlogged=false}
       elseif name:match('_button$') or name=='minecraft:lever' then
@@ -78,7 +85,7 @@ local function fixture(blocks)
     local nav=require('autobuilder.core.navigation').new(t,U.copy(w.pose),config,save)
     nav.workGuard=function() return true end
     if w.gated then nav.guard=function() if (w.allowance or 0)<1 then return false,'movement reservation pending' end; w.allowance=w.allowance-1; return true end end
-    return require('autobuilder.build.builder').new(task,{turtle=t},config,nav,save,mode)
+    return require('autobuilder.build.builder').new(task,{turtle=t,peripheral=w.peripheral},config,nav,save,mode)
   end
   return w,task,create,function() return U.copy(saved) end
 end
@@ -319,4 +326,86 @@ test('repair refuses destructive bed halves even when desired block has no pair'
   w.t.digDown=function() w.dugBed=true;error('must not dig a paired bed') end
   run(new(nil,{minimumFuelReserve=0},'repair'));eq(task.phase,'blocked');eq(w.places,0);eq(w.blocks['3,1,0'].name,'minecraft:red_bed');eq(w.dugBed,nil)
  end end
+end)
+
+local function container(name,facing)
+ local state={facing=facing or 'south'}
+ if name=='chest' or name=='trapped_chest' then state.type='single';state.waterlogged='false'
+ elseif name=='barrel' then state.open='false' else state.lit='false' end
+ return block(name,state)
+end
+local function reader(w)
+ w.peripheral={call=function(side,method)
+  assert(({bottom=true,top=true,front=true})[side]);eq(method,'list');w.reads=(w.reads or 0)+1
+  if w.readerError then error('disconnected') end
+  return U.copy(w.contents or {})
+ end}
+end
+test('empty containers recover one placement and verify inventory through adjacent peripherals',function()
+ for _,name in ipairs({'chest','trapped_chest','furnace','blast_furnace','smoker','barrel'}) do
+  local b=container(name,name=='barrel' and 'up' or 'south');local w,task,new,saved=fixture({b});reader(w)
+  w.items[1]={name=b.name,count=2};w.crash=true
+  run(new());task=saved();assert(task.intent,task.error);task.phase='work';run(new(task))
+  eq(task.phase,'completed');eq(task.progress,1);eq(w.places,1);eq(w.items[1].count,1);assert(w.reads>0)
+  local verify={blocks={b}};w.contents={[1]={name='minecraft:diamond',count=1}};run(new(verify,nil,'verify'))
+  eq(verify.report.counts.correct,nil);eq(verify.report.counts.wrong,1);eq(w.places,1)
+ end
+end)
+test('container placement refuses neighbor merges tagged items and destructive repairs',function()
+ for _,failure in ipairs({'neighbor','tagged','repair'}) do
+  local b=container('chest');local w,task,new=fixture({b});reader(w);w.items[1]={name=b.name,count=1}
+  if failure=='neighbor' then w.blocks['4,1,0']={name=b.name,state=U.copy(b.state)}
+  elseif failure=='tagged' then w.items[1].nbt='stored contents'
+  else task.blocks={block('air')};w.blocks['3,1,0']={name=b.name,state=U.copy(b.state)};w.t.digDown=function() error('must not destroy container') end end
+  run(new(nil,nil,failure=='repair' and 'repair' or nil));eq(task.phase,'blocked');eq(w.places,0)
+  assert(tostring(task.error):find(failure=='neighbor' and 'adjacent' or failure=='tagged' and 'missing inventory' or 'refusing',1,true),task.error)
+ end
+end)
+test('container verification never infers empty contents from missing or failed readers',function()
+ for _,case in ipairs({'missing','error','malformed'}) do
+  local b=container('furnace');local w,task,new=fixture({b});w.blocks['3,1,0']={name=b.name,state=b.state}
+  if case~='missing' then reader(w);w.readerError=case=='error';if case=='malformed' then w.peripheral.call=function() return false end end end
+  run(new(nil,nil,'verify'));eq(task.report.counts.correct,nil);eq(task.report.counts.wrong,1)
+  assert(task.report.entries[1].reason:find('inventory',1,true))
+ end
+end)
+test('isolated chest preflight resumes through movement reservations and reboot',function()
+ local b=container('chest');local w,task,new,saved=fixture({b});reader(w);w.items[1]={name=b.name,count=1}
+ task=gatedRun(w,task,new,saved,true);eq(task.phase,'completed');eq(w.places,1)
+end)
+test('cardinal standing and wall signs preserve geometry and item aliases',function()
+ local C=require('autobuilder.build.blockstates');
+ for _,case in ipairs({{block('oak_sign',{rotation='0',waterlogged='false'}),'3,0,0'},
+  {block('oak_sign',{rotation='4',waterlogged='false'}),'3,0,0'},
+  {block('spruce_wall_sign',{facing='east',waterlogged='false'}),'2,1,0'}}) do
+  local b=case[1];local w,task,new,saved=fixture({b});w.items[1]={name=C.item(b),count=1};w.blocks[case[2]]={name='minecraft:stone',state={}}
+  task=gatedRun(w,task,new,saved,true);eq(task.phase,'completed');eq(w.places,1)
+ end
+ eq(C.item(block('spruce_wall_sign',{})),'minecraft:spruce_sign')
+ for _,b in ipairs({container('chest'),block('oak_sign',{rotation='0',waterlogged='false'})}) do assert(C.requiresMetadata({b})) end
+ for _,b in ipairs({block('oak_sign',{rotation='1',waterlogged='false'}),block('oak_hanging_sign',{}),block('chest',{facing='north',type='left',waterlogged='false'}),block('furnace',{facing='north',lit='true'})}) do eq(C.classify(b.name,b.state),'UNSUPPORTED') end
+end)
+
+test('native barrel probe limits vertical placement and preserves horizontal look direction',function()
+ local C=require('autobuilder.build.blockstates');eq(C.classify('minecraft:barrel',{facing='down',open='false'}),'UNSUPPORTED')
+ for _,facing in ipairs({'north','east','south','west','up'}) do
+  local b=container('barrel',facing);local w,task,new=fixture({b});reader(w);w.items[1]={name=b.name,count=1}
+  run(new());eq(task.phase,'completed');eq(w.blocks['3,1,0'].state.facing,facing)
+ end
+end)
+
+test('repair preserves unobservable sign text for air stone and orientation replacements',function()
+ for _,name in ipairs({'oak_sign','oak_wall_sign'}) do for _,desired in ipairs({'air','stone','orientation'}) do
+  local state=name=='oak_sign' and {rotation='0',waterlogged='false'} or {facing='north',waterlogged='false'}
+  local actual=block(name,state);local wanted=block(desired=='orientation' and name or desired,U.copy(state))
+  if desired=='orientation' then if name=='oak_sign' then wanted.state.rotation='4' else wanted.state.facing='east' end else wanted.state={} end
+  local w,task,new=fixture({wanted});w.blocks['3,1,0']=actual;w.items[1]={name='minecraft:stone',count=1};w.items[2]={name='minecraft:oak_sign',count=1}
+  for _,suffix in ipairs({'','Up','Down'}) do w.t['dig'..suffix]=function() w.lostText=true;return false end end
+  run(new(nil,nil,'repair'));eq(task.phase,'blocked');eq(w.lostText,nil);assert(task.error:find('refusing',1,true),task.error)
+ end end
+end)
+test('standing signs accept stable retained grass as native support',function()
+ local b=block('oak_sign',{rotation='0',waterlogged='false'});local w,task,new=fixture({b})
+ w.blocks['3,0,0']={name='minecraft:grass_block',state={snowy=false}};w.items[1]={name=b.name,count=1}
+ run(new());eq(task.phase,'completed');eq(w.places,1);eq(w.blocks['3,0,0'].name,'minecraft:grass_block')
 end)

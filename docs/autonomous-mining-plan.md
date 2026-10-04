@@ -1317,3 +1317,22 @@ in `.worktrees/placement-adapters` follows0.32; propagate its final renewable fi
   regressions. Verify a mixed native structure and final-state reports independently.
 - [x] Complete one final review/consolidated fixes, full gates and permanent
   evidence; continue supported metadata/fluid placement and remaining requirements.
+
+## Milestone0.34: supported containers, signs and schematic metadata
+
+Spec: [placement metadata design](placement-metadata-design.md). Inline execution
+in `.worktrees/placement-metadata`, following0.33 final placement corrections.
+
+### Task71: Bounded metadata and placement contracts
+
+- [x] Test native empty-container/sign placement and available observations.
+- [x] Add only verifiable empty metadata normalization and matching adapters,
+  retaining explicit errors for unsupported payloads and states.
+- [x] Preserve aliases, dependency ordering, inventory identity and recovery.
+
+### Task72: Native metadata acceptance and integration
+
+- [x] Exercise ordinary import/build/verify and interrupted placement with real
+  hardware; independently inspect world data and preserve exact limitations.
+- [x] Complete one final review, consolidated fixes, full gates, permanent evidence
+  and ordered integration; continue every remaining fleet requirement.

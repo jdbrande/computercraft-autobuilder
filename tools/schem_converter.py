@@ -14,6 +14,13 @@ MAX_PALETTE = 65536
 AIR = {'minecraft:air', 'minecraft:cave_air', 'minecraft:void_air'}
 
 
+class Compound(dict):
+    """Keep immediate field tag kinds for block-entity contract validation."""
+    def __init__(self):
+        super().__init__()
+        self.kinds = {}
+
+
 class NBT:
     """Decode big-endian named binary tags with allocation and nesting bounds."""
     def __init__(self, data):
@@ -58,7 +65,7 @@ class NBT:
                 raise ValueError('invalid NBT list')
             return [self.payload(element, depth + 1) for _ in range(count)]
         if kind == 10:
-            out = {}
+            out = Compound()
             while True:
                 child = self.number('B')
                 if child == 0:
@@ -67,6 +74,7 @@ class NBT:
                 if key in out:
                     raise ValueError('duplicate NBT compound key')
                 out[key] = self.payload(child, depth + 1)
+                out.kinds[key] = child
         if kind in (11, 12):
             count = self.count()
             width, fmt = (4, 'i') if kind == 11 else (8, 'q')
@@ -110,7 +118,40 @@ def consumption(block):
     if name in AIR or (name.endswith('_door') and state.get('half') == 'upper') or (name.endswith('_bed') and state.get('part') == 'head'):
         return name, 0
     aliases = {'minecraft:wall_torch':'minecraft:torch', 'minecraft:redstone_wall_torch':'minecraft:redstone_torch', 'minecraft:soul_wall_torch':'minecraft:soul_torch', 'minecraft:redstone_wire':'minecraft:redstone', 'minecraft:wheat':'minecraft:wheat_seeds', 'minecraft:carrots':'minecraft:carrot', 'minecraft:potatoes':'minecraft:potato', 'minecraft:beetroots':'minecraft:beetroot_seeds'}
+    if re.fullmatch(r'minecraft:(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|bamboo|crimson|warped)_wall_sign', name):
+        name = name.replace('_wall_sign', '_sign')
     return aliases.get(name, name), 2 if name.endswith('_slab') and state.get('type') == 'double' else 1
+
+
+def empty_block_entity(entry, size, version):
+    supported = {'minecraft:chest', 'minecraft:trapped_chest', 'minecraft:barrel', 'minecraft:furnace', 'minecraft:blast_furnace', 'minecraft:smoker'}
+    if not isinstance(entry, Compound):
+        return None, 'invalid block entity compound'
+    name, pos = entry.get('Id'), entry.get('Pos')
+    if entry.kinds.get('Id') != 8 or name not in supported:
+        return None, 'unsupported block entity type or metadata observation'
+    if entry.kinds.get('Pos') != 11 or not isinstance(pos, list) or len(pos) != 3 or any(type(v) is not int for v in pos):
+        return None, 'invalid block entity coordinates'
+    if any(not 0 <= n < size[axis] for axis, n in zip(('x', 'y', 'z'), pos)):
+        return None, 'block entity coordinates outside schematic'
+    data = entry
+    if version == 3:
+        for key in entry:
+            if key not in ('Id', 'Pos', 'Data'):
+                return None, 'unsupported block entity field ' + key
+        data = entry.get('Data', Compound())
+        if not isinstance(data, Compound):
+            return None, 'invalid block entity Data'
+    furnace = name in ('minecraft:furnace', 'minecraft:blast_furnace', 'minecraft:smoker')
+    for key, value in data.items():
+        header = version == 2 and key in ('Id', 'Pos')
+        empty = key == 'Items' and data.kinds.get(key) == 9 and value == []
+        inactive = furnace and key in ('BurnTime', 'CookTime') and data.kinds.get(key) == 2 and value == 0
+        recipe_time = furnace and key == 'CookTimeTotal' and data.kinds.get(key) == 2 and value in (0, 200)
+        recipes = furnace and key == 'RecipesUsed' and data.kinds.get(key) == 10 and value == {}
+        if not (header or empty or inactive or recipe_time or recipes):
+            return None, 'unsupported or nonempty block entity field ' + key
+    return dict(zip(('x', 'y', 'z'), pos), id=name, kind='empty_inventory'), None
 
 
 def convert(source, *, max_bytes=MAX_BYTES, max_blocks=MAX_BLOCKS):
@@ -192,16 +233,38 @@ def convert(source, *, max_bytes=MAX_BYTES, max_blocks=MAX_BLOCKS):
     offset = root.get('Offset', [0, 0, 0])
     if not isinstance(offset, list) or len(offset) != 3 or any(type(v) is not int for v in offset):
         raise ValueError('invalid schematic offset')
-    issues = []
+    issues, block_entities = [], []
     for key, owner, label in [('Entities',root,'entities'), ('BlockEntities',container,'block entities')]:
         if key in owner:
             if not isinstance(owner[key], list):
                 raise ValueError('invalid ' + key)
-            if owner[key]:
+            if key == 'BlockEntities':
+                if len(owner[key]) > 4096:
+                    raise ValueError('block entity limit exceeded')
+                for entry in owner[key]:
+                    record, reason = empty_block_entity(entry, size, version)
+                    if record: block_entities.append(record)
+                    else: issues.append('Unsupported block entities: ' + reason)
+            elif owner[key]:
                 issues.append(f'Unsupported {label}: {len(owner[key])}; entity/NBT data is not restored')
     if 'Biomes' in root or 'BiomeData' in root:
         issues.append('Unsupported biomes: biome data is not restored')
     metadata = {'sourceVersion':version, 'dataVersion':root['DataVersion'], 'offset':dict(zip(('x','y','z'),offset)), 'issues':issues}
+    if block_entities:
+        seen = set()
+        ordered = sorted(block_entities, key=lambda r: (r['y'], r['z'], r['x']))
+        cursor = end = 0
+        for run in runs:
+            end += run['count']
+            while cursor < len(ordered):
+                record = ordered[cursor]
+                index = record['y'] * size['x'] * size['z'] + record['z'] * size['x'] + record['x']
+                if index >= end: break
+                name = entries[run['id'] - 1]['name']
+                if index in seen or name != record['id']:
+                    raise ValueError('invalid or mismatched block entity metadata')
+                seen.add(index); cursor += 1
+        metadata['blockEntities'] = block_entities
     return {'schema':1, 'size':size, 'palette':entries, 'runs':runs, 'metadata':metadata, 'requirements':dict(sorted(requirements.items()))}
 
 

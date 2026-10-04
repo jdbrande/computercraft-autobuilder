@@ -23,7 +23,16 @@ function M.plan(block)
   elseif family=='slab' then vertical(state.type=='top')
   elseif family=='stairs' then p.heading=state.facing or 'north'; vertical(state.half=='top')
   elseif family=='torch' or family=='gravity' or family=='carpet' or family=='pane' or family=='fence' then vertical(false)
-  elseif family=='wall_torch' or family=='ladder' then horizontal(opposite[state.facing or 'north'])
+  elseif family=='chest' or family=='furnace' then
+    p.heading=opposite[state.facing]
+    if family=='chest' then
+      p.isolate=true;p.neighbors={}
+      for _,v in pairs(vectors) do p.neighbors[#p.neighbors+1]={x=block.x+v[1],y=block.y,z=block.z+v[2]} end
+    end
+  elseif family=='barrel' then
+    if state.facing~='up' then horizontal(state.facing);p.support=nil end
+  elseif family=='sign' then p.heading=({['0']='north',['4']='east',['8']='south',['12']='west'})[tostring(state.rotation)];vertical(false)
+  elseif family=='wall_torch' or family=='ladder' or family=='wall_sign' then horizontal(opposite[state.facing or 'north'])
   elseif family=='lantern' then vertical(tostring(state.hanging)=='true')
   elseif family=='control' then
     if state.face=='wall' then horizontal(opposite[state.facing]) else p.heading=state.facing;vertical(state.face=='ceiling') end

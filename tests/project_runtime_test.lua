@@ -880,3 +880,47 @@ test('ordinary seedling project preserves supplied farmland through preparation 
  eq(c.state.automation.projects.seedling.phase,'built');assert(restarted);eq(w.trampled,nil);eq(w.blocks['2,-1,0'].name,'minecraft:farmland');eq(w.blocks['2,0,0'].name,'minecraft:wheat')
  for _,r in pairs(c.state.automation.requests) do assert(not r.requirements['minecraft:cobblestone'],'unnecessary foundation acquisition') end
 end)
+
+test('empty container metadata builds through ordinary preparation supply restart and read-only final verification',function()
+ local bp={schema=1,size={x=1,y=1,z=1},palette={{name='minecraft:chest',state={facing='south',type='single',waterlogged='false'}}},runs={{id=1,count=1}},
+ metadata={blockEntities={{x=0,y=0,z=0,id='minecraft:chest',kind='empty_inventory'}}},requirements={}}
+ local w,ce,we,c,b,step,reboot=fixture({blueprint=bp,stock={[1]={name='minecraft:chest',count=1}},site={minY=-1,maxY=10,margin=1}})
+ w.items={};w.blocks['2,-1,0']={name='minecraft:stone',state={}};local contents={};local reads=0
+ local call=we.peripheral.call;we.peripheral.call=function(name,method,...)
+  if name=='bottom' and method=='list' and w.pose.x==2 and w.pose.y==1 and w.pose.z==0 then reads=reads+1;return U.copy(contents) end
+  return call(name,method,...)
+ end
+ local place=w.turtle.placeDown;w.turtle.placeDown=function(...)
+  local item=w.items[w.selected];local chest=item and item.name=='minecraft:chest';local ok,why=place(...)
+  if ok and chest then w.blocks['2,0,0'].state={facing='south',type='single',waterlogged=false} end;return ok,why
+ end
+ assert(c:command('build import /example.json containers'));assert(c:command('build auto containers'))
+ local restarted=false
+ for _=1,2200 do
+  step();local p=c.state.automation.projects.containers
+  if not restarted and w.places>0 then c,b=reboot();restarted=true end
+  if p.phase=='built' and not b.state.currentTask then break end
+ end
+ eq(c.state.automation.projects.containers.phase,'built');assert(restarted);eq(w.places,1);assert(reads>0)
+ contents[1]={name='minecraft:diamond',count=1};assert(c:command('build verify containers'))
+ for _=1,500 do step();if c.state.automation.projects.containers.phase=='needs_repair' and not b.state.currentTask then break end end
+ local p=c.state.automation.projects.containers;eq(p.phase,'needs_repair');eq(p.report.counts.wrong,1);eq(w.digs,0);eq(w.places,1)
+ eq(contents[1].count,1)
+end)
+
+test('ordinary standing sign project retains existing grass through preparation and restart',function()
+ local bp={schema=1,size={x=1,y=1,z=1},palette={{name='minecraft:oak_sign',state={rotation='4',waterlogged='false'}}},runs={{id=1,count=1}},metadata={},requirements={}}
+ local w,ce,we,c,b,step,reboot=fixture({blueprint=bp,stock={[1]={name='minecraft:oak_sign',count=1}},site={minY=-1,maxY=10,margin=1}})
+ w.items={};w.blocks['2,-1,0']={name='minecraft:grass_block',state={snowy=false}}
+ local place=w.turtle.placeDown;w.turtle.placeDown=function(...)
+  local item=w.items[w.selected];local sign=item and item.name=='minecraft:oak_sign';local ok,why=place(...)
+  if ok and sign then eq(w.pose.heading,'east');w.blocks['2,0,0'].state={rotation=4,waterlogged=false} end;return ok,why
+ end
+ assert(c:command('build import /example.json sign'));assert(c:command('build auto sign'));local restarted=false
+ for _=1,2200 do
+  step();local p=c.state.automation.projects.sign
+  if not restarted and p.site and p.site.work then c,b=reboot();restarted=true end
+  if p.phase=='built' and not b.state.currentTask then break end
+ end
+ eq(c.state.automation.projects.sign.phase,'built');assert(restarted);eq(w.places,1);eq(w.digs,0);eq(w.blocks['2,-1,0'].name,'minecraft:grass_block')
+end)
