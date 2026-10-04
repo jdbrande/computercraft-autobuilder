@@ -1233,9 +1233,9 @@ and integration decisions. Preserve queued ownership and legacy protocol support
 
 - [x] Gate new role assignments on known hardware/software failures, restore idle
   eligibility after repair, and retain active owners and recovery pathways.
-- [ ] Run actual runtime and native read-only checks, one final review/consolidated
+- [x] Run actual runtime and native read-only checks, one final review/consolidated
   fixes, complete Lua/Python/release checks and permanent documentation.
-- [ ] Integrate in dependency order, then implement single-command fleet discovery,
+- [x] Integrate in dependency order, then implement single-command fleet discovery,
   software verification/update and configuration using existing installer/setup.
 
 ## Milestone0.30: single-command fleet enrollment
