@@ -1277,3 +1277,24 @@ in `.worktrees/processing-network` follows0.30; propagate final enrollment fixes
   blast-furnace/smoker processing with exact conservation and final cleanup.
 - [x] Complete one final review/consolidated fixes, full gates and documentation;
   integrate in dependency order and continue renewable/provider requirements.
+
+## Milestone0.32: renewable provider coverage and reserves
+
+Spec: [renewable providers design](renewable-providers-design.md). Inline execution
+in `.worktrees/renewable-providers` follows0.31; carry its final processor corrections.
+
+### Task67: Registered renewable definitions and retained planting reserves
+
+- [x] Extract bounded plant definitions, retain selected definitions in farm jobs,
+  add common crops and registered column/crop support without a new scheduler.
+- [x] Make seed/sapling retention explicit; correctly account seed-as-output crops
+  and use selected geometry in mission fuel budgets.
+- [x] Respect known worker health when choosing unowned acquisition providers,
+  preserving assigned/offline ownership and alternative-source fallback.
+
+### Task68: Renewable acceptance
+
+- [x] Add actual actor/provider/restart/conservation regressions and useful native
+  mature crop/replant/reserve/home acceptance, documenting external farm contracts.
+- [x] Complete one final review/consolidated fixes, full Lua/Python/release gates,
+  permanent evidence and ordered integration; continue every remaining requirement.

@@ -99,3 +99,22 @@ test('harvest forecast separates held output from future yield and measured deli
   t.harvestDelivered=nil;f=F.build(s,{log=2},{a}).a;eq(f.materialUnknown,true);eq(f.items.log.held,3)
   s.workers['12'].online=false;f=F.build(s,{log=2},{a}).a;eq(f.materialUnknown,true);eq(f.items.log.held,0)
 end)
+
+test('harvest forecast excludes planting reserves when output is its own seed',function()
+ local item='minecraft:carrot'
+ local job={id='farm',type='FARM',item=item,quantity=4,status='running',workerId=12,
+  farm={kind='carrot',seedReserve=2,sites={{x=0,y=64,z=0},{x=1,y=64,z=0}}}}
+ local a=scope('a',{[item]=4},{farm=job});local t={task='farm',harvestDelivered=0,cargo={items={[item]=3}}}
+ local state={workers={['12']={online=true,telemetry=t}}}
+ local row=require('autobuilder.resources.material_forecast').build(state,{}, {a}).a.items[item]
+ eq(row.held,1);eq(row.harvesting,3);eq(row.deficit,0)
+end)
+
+test('harvest forecast excludes outstanding replant item after dig and restart',function()
+ local item='minecraft:carrot';local j={id='farm',type='FARM',item=item,quantity=3,status='running',workerId=12,farm={kind='carrot',sites={{x=0,y=64,z=0}}}}
+ local a=scope('a',{[item]=3},{farm=j});local t={task='farm',harvestDelivered=0,harvestPlanting=1,cargo={items={[item]=4}}}
+ for _=1,2 do
+  local row=require('autobuilder.resources.material_forecast').build({workers={['12']={online=true,telemetry=t}}},{},{a}).a.items[item]
+  eq(row.held,2);eq(row.harvesting,1);t=require('autobuilder.core.util').copy(t)
+ end
+end)

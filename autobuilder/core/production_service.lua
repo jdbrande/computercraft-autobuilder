@@ -120,13 +120,14 @@ function M.new(app,config,e,queue)
     if not ok then error(result,0) end
     return result
   end
-  local function hasWorker(capability,item)
+  local function hasWorker(capability,item,farm)
     -- Small integrations predating the registry can still drive production.
     if app.state.workers==nil then return true end
     for _,worker in pairs(app.state.workers) do
       local t=worker.telemetry
       if worker.online and t and t.capabilities and t.capabilities[capability]
-        and not (capability=='mining' and t.capabilities.explorationV1) then
+        and not (capability=='mining' and t.capabilities.explorationV1)
+        and require('autobuilder.workers.health').eligible(t,{type=({registeredLoggingV1='HARVEST',registeredFarmingV1='FARM',logging='HARVEST',farming='FARM',crafting='CRAFT',mining='MINE',explorationV1='MINE'})[capability],farm=farm}) then
         if not item or Materials.accepts(t.miningResources,item) then return true end
       end
     end
@@ -141,7 +142,7 @@ function M.new(app,config,e,queue)
   local function blocked(material,reason)
     material.status='blocked'; material.error=reason; return false
   end
-  local function retireSatisfied(r,j)
+  local function retireSatisfied(r,j,reason)
     if not j or j.status~='queued' or j.workerId or j.assignedAt or j.intent or j.production or j.childId or j.parent
       or j.miningArea or (j.retryCount or 0)>0 or app.state.assignmentRecovery then return end
     local progress=j.progress
@@ -158,8 +159,9 @@ function M.new(app,config,e,queue)
       local lease=ledger.leases and ledger.leases[j.id];if lease and lease.status=='held' then return end
     end
     require('autobuilder.factory.factory').commit(j,save,function()
-      j.status='completed';j.cancelled=true;j.error=nil;j.retiredReason='demand satisfied before assignment'
+      j.status='completed';j.cancelled=true;j.error=nil;j.retiredReason=reason or 'demand satisfied before assignment'
     end)
+    return true
   end
   local function acquire(r,item,target)
     local material=progress(r,item,target); local count=material.count
@@ -177,19 +179,14 @@ function M.new(app,config,e,queue)
     for _,w in pairs(app.state.workers or {}) do
       if queued and w.telemetry and w.telemetry.task==queued.id then claimed=true end
     end
+    local changed=candidate and (candidate.type~=oldType or harvest and not require('autobuilder.factory.factory').equal(candidate.farm,harvest.farm))
     if queued and queued.status=='queued' and not claimed and not queued.paused and not groupId
-      and candidate and candidate.available and candidate.type~='storage' and candidate.type~=oldType
-      and not hasWorker(capability,legacy and item or nil) then
-      -- Never-assigned work may change source. Persist retirement before creating
-      -- a replacement; assigned/offline owners and their journals never expire.
+      and candidate and candidate.available and candidate.type~='storage' and changed
+      and not hasWorker(queued.requiredCapability or capability,legacy and item or nil,harvest and harvest.farm)
+      and retireSatisfied(r,queued,'unowned provider became unavailable') then
       local links=legacy and r.mines or r.harvests
-      queued.status='completed'; queued.cancelled=true; links[item]=nil
-      local called,ok,why=pcall(save)
-      if not called or not ok then
-        queued.status='queued'; queued.cancelled=nil; links[item]=queued.id
-        error(called and (why or 'Provider retirement checkpoint failed') or ok,0)
-      end
-      legacy=nil; harvest=nil
+      if legacy then links[item]=nil end
+      save();legacy=nil;harvest=nil
     end
     local provider
     -- Durable jobs keep their source and saved geometry even when configuration

@@ -28,6 +28,9 @@ local function world()
       local k=key(point(suffix)); local b=w.blocks[k]; if not b then return false end
       local item=b.name=='minecraft:wheat' and 'minecraft:wheat' or b.name
       if b.name:match('_leaves$') then item=nil end
+      if w.drops and w.drops[b.name] then
+        for name,n in pairs(w.drops[b.name]) do assert(add(name,n)) end;item=nil
+      end
       if item and not add(item,1) then return false,'full' end
       if b.name=='minecraft:wheat' then add('minecraft:wheat_seeds',1) end
       w.blocks[k]=nil; w.digs=w.digs+1
@@ -37,7 +40,7 @@ local function world()
   end
   t.placeDown=function()
     local k=key(point('Down')); local item=w.items[w.selected]; if w.blocks[k] or not item then return false end
-    local name=item.name=='minecraft:wheat_seeds' and 'minecraft:wheat' or item.name
+    local name=w.plantBlocks and w.plantBlocks[item.name] or (item.name=='minecraft:wheat_seeds' and 'minecraft:wheat' or item.name)
     w.blocks[k]={name=name,state={age=0}}; item.count=item.count-1; if item.count==0 then w.items[w.selected]=nil end; w.plants=w.plants+1
     if w.crashPlace then w.crashPlace=false; error('power cut after plant') end
     return true
@@ -52,7 +55,10 @@ local function world()
   local headings={'north','east','south','west'}; local index={north=1,east=2,south=3,west=4}
   t.turnRight=function() w.pose.heading=headings[index[w.pose.heading]%4+1]; return true end
   t.turnLeft=function() w.pose.heading=headings[(index[w.pose.heading]+2)%4+1]; return true end
-  for action,suffix in pairs({forward='',up='Up',down='Down'}) do t[action]=function() local p=point(suffix); if w.blocks[key(p)] then return false,'blocked' end; w.pose.x,w.pose.y,w.pose.z=p.x,p.y,p.z; w.fuel=w.fuel-1; return true end end
+  for action,suffix in pairs({forward='',up='Up',down='Down'}) do t[action]=function() local p=point(suffix); if w.blocks[key(p)] then return false,'blocked' end; w.pose.x,w.pose.y,w.pose.z=p.x,p.y,p.z; w.fuel=w.fuel-1;
+    local below=w.blocks[key({x=p.x,y=p.y-1,z=p.z})]
+    if w.farmlandTicks and below and below.name=='minecraft:farmland' then below.name='minecraft:dirt' end
+    return true end end
   return w
 end
 local function setup(kind,quantity)
@@ -164,7 +170,7 @@ test('farm soil inspection and planting resume with independent movement and mut
  for _=1,600 do
   if task.phase=='blocked' then assert(task.error:find('movement reservation pending',1,true),task.error);assert(engine:resume()) end
   engine:step()
-  if task.plantSoilSite and not rebooted then engine,task=restart();rebooted=true end
+  if task.harvestedSite and not task.intent and not rebooted then engine,task=restart();rebooted=true end
   if task.phase=='completed' then break end
  end
  eq(task.phase,'completed');assert(rebooted);eq(w.digs,1);eq(w.plants,1);eq(task.delivered,1)
@@ -198,4 +204,83 @@ test('renewable forecast follows collected cargo partial delivery and reboot wit
     w.capacity=10;assert(e:resume());run(e,task);eq(task.phase,'completed');eq(task.delivered,2)
     f=forecast();eq(f.items[task.item].held,0);eq(f.items[task.item].stored,2);eq(f.items[task.item].deficit,0)
   end
+end)
+
+test('carrot harvest retains planting reserve and delivers only replanted surplus',function()
+ local w,task,config,new=setup('carrot',2)
+ w.blocks['3,1,0']={name='minecraft:carrots',state={age=7}};w.blocks['3,0,0']={name='minecraft:farmland',state={}}
+ w.items[1]={name='minecraft:carrot',count=1};w.drops={['minecraft:carrots']={['minecraft:carrot']=3}};w.plantBlocks={['minecraft:carrot']='minecraft:carrots'}
+ local e=new();run(e,task);eq(task.phase,'completed');eq(task.delivered,2);eq(w.stock['minecraft:carrot'],2)
+ eq(w.items[1].count,1);eq(w.blocks['3,1,0'].name,'minecraft:carrots');eq(w.blocks['3,1,0'].state.age,0)
+end)
+test('beetroot maturity and interrupted custom replant preserve the selected definition',function()
+ local w,task,config,new,restart=setup('beetroot',1)
+ w.blocks['3,1,0']={name='minecraft:beetroots',state={age=2}};w.blocks['3,0,0']={name='minecraft:farmland',state={}}
+ w.items[1]={name='minecraft:beetroot_seeds',count=1};w.drops={['minecraft:beetroots']={['minecraft:beetroot']=1,['minecraft:beetroot_seeds']=1}};w.plantBlocks={['minecraft:beetroot_seeds']='minecraft:beetroots'}
+ local e=new();run(e,task);eq(task.blockedCategory,'immature');eq(w.digs,0)
+ w.blocks['3,1,0'].state.age=3;assert(e:resume());w.crashPlace=true;run(e,task);assert(task.intent and task.intent.kind=='plant')
+ local resumed,saved=restart();assert(resumed:resume());run(resumed,saved);eq(saved.phase,'completed');eq(saved.delivered,1);eq(w.plants,1)
+end)
+test('registered crop definition stays with its journal after controller configuration changes',function()
+ local w,task,config,new,restart=setup('custom',1);task.item='test:fruit'
+ config.farmAdapters={custom={mode='crop',block='test:crop',item='test:fruit',seed='test:seed',age=4}}
+ w.blocks['3,1,0']={name='test:crop',state={age=4}};w.blocks['3,0,0']={name='minecraft:farmland',state={}}
+ w.items[1]={name='test:seed',count=1};w.drops={['test:crop']={['test:fruit']=1,['test:seed']=1}};w.plantBlocks={['test:seed']='test:crop'}
+ w.crashDig=true;local e=new();run(e,task);assert(task.intent);eq(task.farm.adapter.age,4)
+ config.farmAdapters.custom={mode='column',block='test:other',item='test:other'}
+ local resumed,saved=restart();assert(resumed:resume());run(resumed,saved);eq(saved.phase,'completed');eq(saved.delivered,1);eq(w.plants,1)
+end)
+test('explicit larger planting reserve does not stop a seed-output harvest early',function()
+ local w,task,config,new=setup('carrot',3);task.farm.seedReserve=2;task.farm.sites[2]={x=5,y=1,z=0}
+ for _,x in ipairs({3,5}) do w.blocks[x..',1,0']={name='minecraft:carrots',state={age=7}};w.blocks[x..',0,0']={name='minecraft:farmland',state={}} end
+ w.items[1]={name='minecraft:carrot',count=2};w.drops={['minecraft:carrots']={['minecraft:carrot']=3}};w.plantBlocks={['minecraft:carrot']='minecraft:carrots'}
+ local e=new();run(e,task);eq(task.phase,'completed');eq(w.digs,2);eq(w.plants,2);eq(task.delivered,4);eq(w.items[1].count,2)
+end)
+
+test('registered column keeps its base with the same bounded navigation and return',function()
+ local w,task,config,new=setup('reed',2);task.item='test:reed'
+ config.farmAdapters={reed={mode='column',block='test:reed',item='test:reed'}}
+ for y=1,3 do w.blocks['3,'..y..',0']={name='test:reed',state={}} end
+ local e=new();run(e,task);eq(task.phase,'completed');eq(task.delivered,2);eq(w.digs,2);eq(w.blocks['3,1,0'].name,'test:reed')
+end)
+
+test('same identifier crop uses age and replants across restart',function()
+ local w,task,config,new,restart=setup('custom',1);task.item='test:fruit'
+ config.farmAdapters={custom={mode='crop',block='test:crop',item='test:fruit',seed='test:crop',age=4}}
+ w.blocks['3,1,0']={name='test:crop',state={age=3}};w.blocks['3,0,0']={name='minecraft:farmland',state={}}
+ w.items[1]={name='test:crop',count=1};w.drops={['test:crop']={['test:fruit']=1,['test:crop']=1}};w.plantBlocks={['test:crop']='test:crop'}
+ local e=new();run(e,task);eq(w.digs,0);eq(task.blockedCategory,'immature')
+ w.blocks['3,1,0'].state.age=4;assert(e:resume());w.crashPlace=true;run(e,task);eq(w.digs,1);assert(task.intent)
+ e,task=restart();assert(e:resume());run(e,task);eq(task.phase,'completed');eq(w.plants,1);eq(task.delivered,1)
+end)
+
+test('crop telemetry preserves pending planting obligation across reboot',function()
+ local w,task,c,new,restart=setup('carrot',3)
+ w.blocks['3,1,0']={name='minecraft:carrots',state={age=7}};w.blocks['3,0,0']={name='minecraft:farmland',state={}}
+ w.items[1]={name='minecraft:carrot',count=1};w.drops={['minecraft:carrots']={['minecraft:carrot']=3}};w.plantBlocks={['minecraft:carrot']='minecraft:carrots'}
+ c.automation={enabled=true};c.capabilities={};c.mining={}
+ local e=new();assert(e:step());eq(task.progress,3);eq(w.plants,0)
+ for _=1,2 do
+  local agent=require('autobuilder.workers.agent').new({id=12,position=U.copy(w.pose),currentTask=task},c,{},w.t,function() return true end)
+  eq(agent:telemetry().harvestPlanting,1);e,task=restart()
+ end
+ run(e,task);eq(w.plants,1)
+ local agent=require('autobuilder.workers.agent').new({id=12,position=U.copy(w.pose),currentTask=task},c,{},w.t,function() return true end)
+ eq(agent:telemetry().harvestPlanting,0)
+end)
+
+test('crop replant never occupies the crop cell and native soil rejection retains ownership',function()
+ for _,missing in ipairs({false,true}) do
+  local w,task,c,new,restart=setup('carrot',2);w.farmlandTicks=true
+  w.blocks['3,1,0']={name='minecraft:carrots',state={age=7}};w.blocks['3,0,0']={name=missing and 'minecraft:dirt' or 'minecraft:farmland',state={}}
+  w.items[1]={name='minecraft:carrot',count=1};w.drops={['minecraft:carrots']={['minecraft:carrot']=3}};w.plantBlocks={['minecraft:carrot']='minecraft:carrots'}
+  local place=w.t.placeDown
+  w.t.placeDown=function() if w.blocks['3,0,0'].name~='minecraft:farmland' then return false,'Cannot plant here' end;return place() end
+  local e=new();run(e,task)
+  if missing then
+   eq(task.phase,'blocked');eq(task.delivered,0);eq(w.plants,0)
+   w.blocks['3,0,0'].name='minecraft:farmland';e,task=restart();assert(e:resume());run(e,task)
+  end
+  eq(task.phase,'completed');eq(w.plants,1);eq(w.blocks['3,0,0'].name,'minecraft:farmland');eq(task.delivered,2)
+ end
 end)

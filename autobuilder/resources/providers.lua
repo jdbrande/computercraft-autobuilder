@@ -1,6 +1,7 @@
 local U=require('autobuilder.core.util')
 local Materials=require('autobuilder.resources.materials')
 local Recipes=require('autobuilder.factory.recipes')
+local Renewables=require('autobuilder.resources.renewables')
 local M={}
 local types={storage=true,exploration=true,mining=true,tree_farm=true,farm=true,crafting=true,smelting=true,processing=true}
 function M.validatePreferences(preferences)
@@ -32,8 +33,11 @@ function M.candidates(item,config)
     local explore=(config.exploration or {}).enabled
     add(explore and 'exploration' or 'mining',explore and 'explorationV1' or 'mining')
   end
-  for index,farm in ipairs(config.treeFarms or {}) do if farm.item==item then add('tree_farm','logging',{index=index,farm=U.copy(farm)}) end end
-  for index,farm in ipairs(config.farms or {}) do if farm.item==item then add('farm','farming',{index=index,farm=U.copy(farm)}) end end
+  for _,group in ipairs({{config.treeFarms or {},'tree_farm',true},{config.farms or {},'farm',false}}) do
+    for index,farm in ipairs(group[1]) do if farm.item==item then
+      local saved=Renewables.freeze(farm,config);add(group[2],Renewables.capability(saved,group[3]),{index=index,farm=saved})
+    end end
+  end
   return out
 end
 local function available(p,config,context)
@@ -44,7 +48,8 @@ local function available(p,config,context)
   for _,w in pairs(context.workers) do
     local t=w.telemetry
     if w.online and t and t.capabilities and t.capabilities[p.capability]
-      and not (p.type=='mining' and t.capabilities.explorationV1) then
+      and not (p.type=='mining' and t.capabilities.explorationV1)
+      and require('autobuilder.workers.health').eligible(t,{type=({tree_farm='HARVEST',farm='FARM',crafting='CRAFT',mining='MINE',exploration='MINE'})[p.type],farm=p.farm}) then
       if (p.type~='mining' and p.type~='exploration') or Materials.accepts(t.miningResources,p.item) then return true end
     end
   end

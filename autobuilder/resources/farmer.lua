@@ -1,11 +1,7 @@
 -- Managed plots only. Each physical mutation has durable intent and observed recovery.
 local U=require('autobuilder.core.util')
 local M={}
-local crops={wheat={block='minecraft:wheat',item='minecraft:wheat',seed='minecraft:wheat_seeds'},
-  bamboo={block='minecraft:bamboo',item='minecraft:bamboo',column=true},
-  cactus={block='minecraft:cactus',item='minecraft:cactus',column=true},
-  sugar_cane={block='minecraft:sugar_cane',item='minecraft:sugar_cane',column=true}}
-local trees={oak=true,birch=true,spruce=true}
+local Registry=require('autobuilder.resources.renewables')
 local containers={['minecraft:chest']=true,['minecraft:trapped_chest']=true,['minecraft:barrel']=true}
 local soil={['minecraft:dirt']=true,['minecraft:grass_block']=true,['minecraft:podzol']=true,['minecraft:coarse_dirt']=true,['minecraft:rooted_dirt']=true,['minecraft:moss_block']=true}
 local function same(a,b)
@@ -16,13 +12,15 @@ end
 function M.new(task,e,config,nav,save,treeMode)
   assert(type(task)=='table' and U.integer(task.quantity) and task.quantity>0 and task.quantity<=262144,'bounded renewable quantity required')
   assert(e and e.turtle and nav and type(save)=='function','renewable hardware/navigation/persistence required')
-  config=config or {}; local t=e.turtle; local farm=task.farm or {}; local spec=crops[farm.kind]
-  if treeMode and trees[farm.kind] then spec={block='minecraft:'..farm.kind..'_log',item='minecraft:'..farm.kind..'_log',seed='minecraft:'..farm.kind..'_sapling',leaves='minecraft:'..farm.kind..'_leaves',tree=true}
-  elseif treeMode then spec=nil end
-  if not treeMode and trees[farm.kind] then spec=nil end
+  config=config or {}; local t=e.turtle; local farm=task.farm or {}
+  local ok,spec=pcall(Registry.forFarm,farm,config)
   local self={task=task}; local fault; local invalid; local height=farm.maxHeight or 8; local ceiling=-math.huge
-  if not spec then invalid='unsupported managed farm kind: '..tostring(farm.kind)
-  elseif task.item~=spec.item then invalid='farm output does not match requested item' end
+  if not ok then invalid=tostring(spec);spec=nil
+  elseif not spec or (treeMode and spec.mode~='tree') or (not treeMode and spec.mode=='tree') then invalid='unsupported managed farm kind: '..tostring(farm.kind)
+  elseif task.item~=spec.item then invalid='farm output does not match requested item'
+  else
+    farm.adapter=U.copy(spec);spec.tree=spec.mode=='tree';spec.column=spec.mode=='column'
+  end
   if not U.position(config.depot) then invalid='valid depot position required' end
   if not U.integer(height) or height<2 or height>32 then invalid='maxHeight must be 2..32'; height=8 end
   if type(farm.sites)~='table' or #farm.sites<1 or #farm.sites>64 then invalid='farm requires 1..64 explicit sites'
@@ -42,6 +40,8 @@ function M.new(task,e,config,nav,save,treeMode)
   if farm.travelHeight~=nil then
     if not U.integer(farm.travelHeight) or farm.travelHeight<ceiling or farm.travelHeight>30000000 then invalid='travelHeight must clear every configured column' else ceiling=farm.travelHeight end
   end
+  local plantingReserve=0
+  if not invalid then local valid,n=pcall(Registry.reserve,farm);if valid then plantingReserve=n else invalid=tostring(n) end end
   task.phase=task.phase or 'setup'; task.stage=task.stage or 'harvest'; task.site=task.site or 1
   task.progress=task.progress or 0; task.delivered=task.delivered or 0
   local reserved={[config.fuelSlot or 15]=true,[16]=true}
@@ -107,7 +107,7 @@ function M.new(task,e,config,nav,save,treeMode)
   end
   local function nextSite()
     task.site=task.site+1; task.cursor=nil; task.harvestedSite=nil; task.stage='harvest'
-    if task.site>#farm.sites or task.delivered+total(snapshot(),task.item)>=task.quantity then task.stage='deposit'; task.passFinished=true end
+    if task.site>#farm.sites or task.delivered+math.max(0,total(snapshot(),task.item)-(spec.seed==task.item and plantingReserve or 0))>=task.quantity then task.stage='deposit'; task.passFinished=true end
   end
   local function finishMutation()
     task.intent=nil;task.plantSoilSite=nil;persist();if nav.workDone then nav.workDone() end;return true
@@ -174,7 +174,7 @@ function M.new(task,e,config,nav,save,treeMode)
     local ok,err=move(config.depot); if not ok then return block(err,'inaccessible') end
     local present,b,why=inspect('Down'); if why or not present or not containers[b.name] then return block(why or 'depot chest missing; refusing world drop','depot') end
     -- Keep seeds/saplings to maintain every configured planting site.
-    local keep=spec.seed and #farm.sites or 0
+    local keep=plantingReserve
     for slot=1,16 do
       local item=t.getItemDetail(slot)
       if item and not reserved[slot] then
@@ -240,7 +240,9 @@ function M.new(task,e,config,nav,save,treeMode)
     if task.stage=='plant' then
       if present then return block('planting target changed before planting','ambiguous') end
       local slot,before=slotFor(spec.seed); if not slot then return missing() end
-      if task.plantSoilSite~=task.site then
+      -- A solid turtle in the empty crop cell converts farmland to dirt. Native
+      -- seed placement validates farmland without occupying or changing it.
+      if spec.tree and task.plantSoilSite~=task.site then
         -- Save the observation before the ascent: its movement grant may arrive
         -- on a later tick or after reboot. Repeating the descent would consume
         -- that grant and prevent replanting indefinitely.
@@ -264,7 +266,7 @@ function M.new(task,e,config,nav,save,treeMode)
       else task.cursor=task.cursor-1 end
       return persist()
     end
-    if b.name==spec.seed or (b.name==spec.block and not spec.column and not spec.tree and tonumber((b.state or {}).age)~=7) then nextSite(); return persist() end
+    if (spec.tree and b.name==spec.seed) or (b.name==spec.block and not spec.column and not spec.tree and tonumber((b.state or {}).age)~=spec.age) then nextSite(); return persist() end
     if b.name~=spec.block and b.name~=spec.leaves then return block('foreign block in managed column: '..b.name,'unsupported') end
     if (config.protectedBlocks or {})[b.name] then return block('protected farm block: '..b.name,'protected') end
     if spec.tree and b.name==spec.block and (b.state or {}).axis~='y' then return block('nonvertical tree log is unsupported','unsupported') end

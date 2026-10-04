@@ -5,16 +5,15 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
-- Accepted0.31 registered processors:905 Lua/18 Python tests, release/diff checks,
-  final-source parallel native processing/restart/conservation and cleanup passed.
-  Permanent evidence: [0.31 validation](validation-0.31.0.md).
+- Accepted0.32 registered renewables:923 Lua/18 Python tests, release/diff checks,
+  final-source native carrot harvest/replant/restart/reserve acceptance and cleanup
+  passed. Permanent evidence: [0.32 validation](validation-0.32.0.md).
 
-- Active development:0.31 registered processors completed its release gates.0.32 renewable
-  adapters passed final-source carrot/replant/reserve acceptance with both crops
-  and farmland independently checked; its complete Lua gate is running.0.33 paired/
-  attached/basic redstone placement is under its single final review; native probes
-  passed and mixed schematic analysis exposed a ceiling-support dependency cycle.
- 0.34 container/sign metadata design and native observation probes have started.
+- Active development:0.33 placement adapters completed its single review and
+  consolidated regression fixes; complete Lua and native mixed-project gates run.
+ 0.34 empty-container metadata/cardinal sign adapters completed its single review;
+  consolidated regressions and native acceptance run.0.35 reachable inventory
+  recovery has a committed design and initial donor actor regressions in progress.
   Candidate evidence lives in the corresponding `.worktrees` documentation until
   ordered integration. No unfinished candidate is treated as accepted.
 
@@ -1478,6 +1477,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   controller239 with two blast furnaces and a smoker is prepared; acceptance,
   final review and full gates remain pending.
 
+- Started0.32 in isolated `.worktrees/renewable-providers`: extend the existing
+  renewable actor through registered plant definitions, explicit planting reserves,
+  seed-as-output accounting and health-aware acquisition choices. Processor0.31
+  remains under its single final review/native acceptance; earlier gates continue.
 -0.31 single final review and native trial found four Important issues plus uneven
   multi-wave lane balance. Regressions reproduced nominal-fuel exhaustion after
   streamed burn loss, obsolete acquisition dispatch after external supply, output
@@ -1502,6 +1505,35 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Accepted0.28 merged with tested implementation unchanged; ordered integration
   proceeds while enrollment and processor milestones continue independently.
 
+-0.32 actual actor regressions now cover carrot seed-as-output surplus, beetroot
+  maturity, interrupted replanting, immutable custom definitions, retained reserves,
+  custom column bases, forecast exclusion and versioned worker eligibility. Focused
+  registry/actor/fuel/forecast/provider/runtime suites pass; native controller241 and
+  farmer242 are starting a two-plot carrot/replant/reserve acceptance run.
+
+-0.32 single final review reproduced five issues: frozen adapters rejected by
+  controller protection, same-identifier crop maturity skipped, unowned farm
+  fallback stuck on the old capability contract, missing replant placement health
+  admission, and pending planting cargo overstated in forecasts. Consolidated
+  corrections preserve configured territory and durable adapters, reuse guarded
+  acquisition retirement, check actual replant contracts, and carry one bounded
+  planting obligation through telemetry. Regressions include real provider/queue
+  mutation grants, overlapping owners, registry changes/reboots, retirement save
+  failure and owned/offline/journal preservation. Native initial carrot task was
+  blocked before any digging; its retained owner is resumed with these fixes.
+-0.32 native acceptance then exposed a physical soil bug: descending into an
+  empty crop cell for soil inspection converts farmland to dirt under the solid
+  turtle. Crop replanting now relies on native seed-placement substrate validation
+  from above; tree soil checks remain. A world-faithful regression fails before
+  the fix and passes after, including rejected substrate, retained ownership and
+  restart. The first native owner completed after operator restoration of the
+  soil damaged by the old code; an untouched-plot final-source retest follows.
+-0.32 final-source native untouched-plot retest passed after controller/worker
+  restart: both crops replanted, both farmland blocks intact,7 carrots stored,
+ 2 retained planting carrots, farmer home/idle with1,942 fuel. Both requests/jobs
+  completed, computers241/242 shut down and4 force-load tickets removed. Permanent
+  candidate report validation-0.32.0.md distinguishes assisted pre-fix recovery
+  from the clean retest; final complete Lua/Python gates are running.
 -0.31 final-source native acceptance passed on controller240: two real blast
   furnaces produced10+10 iron across controller restart and a smoker produced2
   cooked beef. Independent world reads match20 iron/2 beef/16 remaining coal from
@@ -1510,3 +1542,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Controller240 shut down and both temporary tickets removed;239 was shut down
   before the reset. Permanent candidate report records failed pre-fix evidence,
   final successful run, exact conservation and limits. Complete Lua gate remains.
+
+-0.32 accepted after all923 Lua/18 Python tests passed on final sourcea01825b,
+  with release/check/diff clean. Permanent acceptance report distinguishes assisted
+  pre-fix soil repair from the clean final-source untouched plot run. Accepted0.31
+  documentation merge did not change tested code/tests/tools/artifacts. Integrating
+  and pushing before continuing placement, metadata and inventory recovery work.

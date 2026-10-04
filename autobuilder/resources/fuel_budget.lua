@@ -88,7 +88,8 @@ function M.mission(config,task,telemetry)
     end
     local site=farm.sites[task.site or 1]
     if task.stage=='deposit' or not site then return result(task,current,0,0,route(pose,home),reserve) end
-    local column=task.type=='HARVEST' or farm.kind=='bamboo' or farm.kind=='cactus' or farm.kind=='sugar_cane'
+    local spec=require('autobuilder.resources.renewables').forFarm(farm,config)
+    local column=task.type=='HARVEST' or spec and spec.mode=='column'
     local y=task.stage=='plant' and site.y or task.cursor or (column and site.y+height-1 or site.y)
     local stand={x=site.x,y=y+1,z=site.z}
     return result(task,current,route(pose,stand),4,route(stand,home),reserve)
