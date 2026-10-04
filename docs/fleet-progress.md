@@ -31,6 +31,26 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Automatic site preparation0.23 completed:748 Lua/18 Python tests, one final
   review/fix pass and native multiworker terrain, finite water/lava, scanner support,
   within/cross-region hidden access and external-inflow containment acceptance.
+  Integrated and pushed at `71b21ed`. Later milestones remain isolated until
+  their complete acceptance gates pass.
+- Accepted0.24:788 Lua/18 Python tests, native48/48 verified, six workers home
+  empty, stock/foundation/workspace reconciliation and cleanup complete.
+  High-rate network overload remains documented for later performance work.
+- Active0.25 (`.worktrees/mining-intelligence`): native hazard/route/outcome learning
+  and restart acceptance complete. Earlier802-test gate passed; final rerun includes
+  the shared navigation fix. Integration follows0.24.
+- Active0.26 (`.worktrees/fuel-forecast`): native proactive refuel and home return
+  accepted, including measured finite fuel and coal conservation. Final Lua rerun
+  includes the shared navigation fix. Integration follows0.25.
+- Active0.27 (`.worktrees/supply-forecast`, `c755627`): material forecasts and early
+  capacity-bounded supply. Single final review fixes have regressions.18 Python tests
+  and release checks pass; complete Lua suite runs. Native two-block trial passed:
+  mining began while the builder held its last cobblestone, before placement;
+  independent world checks passed and workers returned empty. Restart retest runs.
+- Active0.28 (`.worktrees/continuous-pipeline`): automatic builds now use verified
+  regions and bounded supply production. Empty-stock, legacy ownership and actual
+  two-builder/miner/factory overlap regressions pass across restarts. Final review,
+  complete release gates and native acceptance remain pending.
   Integrated and pushed at`71b21ed`. Dynamic scaling0.24 continues in the isolated
   `.worktrees/fleet-scaling` checkout, including final0.23 documentation.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
@@ -960,6 +980,34 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   [inflow](validation-external-inflow.md) and [0.23](validation-0.23.0.md) reports record
   fixture assumptions, sampling limits, full final gates and the single review pass.
 
+
+## Current acceptance notes
+
+-0.24's previous full gate exposed a chest encountered inside a traffic detour.
+  The shared navigation fix persists only inspected physical obstacles, replans
+  within the existing bounded route and never digs the chest. Deterministic reboot
+  and opposing-worker regressions pass. All dependent final suites include it.
+-0.27 review found early supply could exceed inventory capacity and strand staging.
+  Native stack-space limits and conservative empty-slot capacity now bound demand;
+  the actual runtime regression passes with64- and16-item stacks, partial receipt
+  power loss,65 placements and exactly64 supplied items.
+-0.27 review also found harvested progress was mistaken for deposited output.
+  Task-bound measured delivery plus fresh cargo now keeps held and expected output
+  disjoint. Actual HARVEST/FARM partial delivery and reboot regressions pass.
+-0.28 retains explicit `build prepare`/`build start` full-stock behavior and owned
+  legacy requests. New `build auto` runs use existing finite supply journals, so
+  placing workers can overlap later mining/processing without a second ledger.
+- Full implementation remains incomplete. Next work continues through software and
+  equipment negotiation, processor/provider coverage, placement adapters, inventory
+  rescue, scheduling and fleet monitoring, plus larger integrated acceptance.
+
+
+- Review correction: the0.28 overlap test passed, but its cumulative-placement
+  assertion did not prove a placement event concurrent with production. That
+  concurrency claim is withdrawn pending stronger event-timed evidence. Final
+  review also reproduced streaming supply acquisition continuing after project
+  pause and a stale stockOnly flag disabling new-run acquisition. These remain
+  release blockers for the consolidated regression-backed correction pass.
 - Isolated next branch`milestone/0.24.0` at`.worktrees/fleet-scaling` starts
   requirement44 while0.23 final gates run in the main checkout. Its demand model
   validates limits for all five roles, computes active/idle/queue/work/rate views,
@@ -1198,3 +1246,32 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 
 - Propagated the shared physical-detour correction into0.26. Superseded the
   incomplete final Lua run and restarted on the merged source before integration.
+- Final0.25.0 complete Lua gate passed804 tests, with18 Python tests and
+  release/whitespace checks. Log: /tmp/fleet-025-final-full-v2.log. Ordered integration
+  waits for0.24 native worker settlement; no feature gate is waived.
+- Native0.24's accelerated1s heartbeat/3s registration fixture saturated the
+  controller inbox, with repeated dropped-message warnings and slow durable retries.
+  Restored shipped defaults5s/15s on212–218 through checkpoint-preserving reboots.
+  Source code/ownership/physical cargo were unchanged. Audit settings and logs are
+  in dist/live-scaling/default-network-timing/. High-rate overload remains a known
+  limitation for later large-fleet performance acceptance; do not claim it solved.
+
+- Final0.24.0 complete Lua gate passed788 tests, with18 Python tests and
+  release/whitespace checks. Log: /tmp/fleet-024-final-full-v5.log. Ordered integration
+  waits for0.24 native worker settlement; no feature gate is waived.
+
+
+-0.24 native acceptance complete: project built with48/48 correct; all six workers
+  home/idle/empty, both requests/groups complete, no active supply/mining/leases.
+  Independent reads confirm150 solid foundation cells and402 clear workspace cells.
+ 40 mined cobblestone =32 structure +4 foundation +4 stored surplus;8 cleared dirt
+  stored. Finite fuel reconciles. Complete gates788 Lua/18 Python pass. Permanent
+  report validation-0.24.0.md records fixes, default timing and overload limitation.
+  Computers212–218 are shut down,20 force-load tickets removed, monitor stopped.
+
+- Integrated accepted0.24 dynamic scaling on main. Source/test/release artifacts
+  match the fully tested milestone; integration only reconciles progress documents.
+
+- Accepted0.25 mining intelligence:804 Lua/18 Python, final review regressions,
+  native hazard/yield/restart/initial-cargo checks and cleanup complete. Imported
+  accepted0.24 evidence without changing tested implementation.
