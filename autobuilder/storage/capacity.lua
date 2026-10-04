@@ -9,11 +9,16 @@ local function contract(requests)
     n=n+1; assert(bounded(i,#requests) and type(r)=='table','invalid capacity request array')
     assert(U.shortString(r.inventory,128) and not seen[r.inventory],'invalid/duplicate capacity inventory'); seen[r.inventory]=true
     assert(r.exclusive==nil or type(r.exclusive)=='boolean','invalid exclusive capacity flag')
+    if r.emptySlots~=nil then
+      assert(r.exclusive==true and bounded(r.emptySlots,4096) and bounded(r.minimumSlotLimit,1000000)
+        and r.items==nil and r.limits==nil,'invalid exclusive empty-slot capacity request')
+    else
     assert(type(r.items)=='table' and next(r.items),'capacity item quantities required')
     local count=0
     for item,amount in pairs(r.items) do count=count+1; assert(count<=64 and U.shortString(item,128) and bounded(amount,100000000),'invalid capacity quantity') end
     assert(r.limits==nil or type(r.limits)=='table','invalid capacity stack limits')
     for item,limit in pairs(r.limits or {}) do assert(r.items[item] and bounded(limit,1000000),'invalid capacity stack limit') end
+    end
   end
   assert(n==#requests,'sparse capacity request array')
   return U.copy(requests)
@@ -80,7 +85,15 @@ function M.new(state,save)
         slots[i]={limit=limit,stack=stack,max=max}
       end
       local node={exclusive=r.exclusive==true,allocations={}}; lease.nodes[r.inventory]=node
-      local items={}; for item in pairs(r.items) do items[#items+1]=item end; table.sort(items)
+      if r.emptySlots then
+        for i,slot in ipairs(slots) do
+          if not slot.stack and slot.limit>=r.minimumSlotLimit and #node.allocations<r.emptySlots then
+            node.allocations[#node.allocations+1]={slot=i,count=r.minimumSlotLimit}
+          end
+        end
+        if #node.allocations<r.emptySlots then return nil,'insufficient empty recovery slots in '..r.inventory end
+      end
+      local items={}; for item in pairs(r.items or {}) do items[#items+1]=item end; table.sort(items)
       for _,item in ipairs(items) do
         local left=r.items[item]
         for i,slot in ipairs(slots) do

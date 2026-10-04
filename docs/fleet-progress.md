@@ -1600,3 +1600,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   pre-fix soil repair from the clean final-source untouched plot run. Accepted0.31
   documentation merge did not change tested code/tests/tools/artifacts. Integrating
   and pushing before continuing placement, metadata and inventory recovery work.
+-0.35 initial donor/courier actors and exclusive empty-slot capacity contracts are
+  implemented in isolation. Regressions cover tagged identities, partial transfer,
+  after-effect restart, unchanged local cargo, wrong adjacent computer ID, uncertain
+  pose, outstanding journals and failed checkpoints. Native feasibility probes249/250
+  transferred a damaged pickaxe with its unchanged NBT hash and2/5 cobblestone;
+  independent world inventories agree. Both probes are shut down and their one
+  temporary force-load ticket removed. Controller integration, quarantine controls,
+  end-to-end recovery acceptance and complete milestone gates remain unfinished.
