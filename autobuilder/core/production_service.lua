@@ -280,6 +280,37 @@ function M.new(app,config,e,queue)
     return table.concat(#errors>0 and errors or waiting,'; ')
   end
   local factoryTypes={CRAFT=true,SMELT=true,PROCESS=true}
+  function self:supplyRequest(job)
+    local completed
+    local key='supply:'..job.id..':'..job.missingItem
+    for _,r in pairs(s.requests) do if r.key==key then
+      if r.status~='completed' then return r.id end
+      if not completed or tonumber(r.id:match('(%d+)$'))>tonumber(completed:match('(%d+)$')) then completed=r.id end
+    end end
+    return nil,completed
+  end
+  function self:attemptedSupply(job)
+    local pending,completed=self:supplyRequest(job)
+    if pending or not completed then return end
+    local old=job.supplyHandoffAttempted
+    if old and old.batch==job.supplyId and old.request==completed then return end
+    require('autobuilder.factory.factory').commit(job,save,function()
+      job.supplyHandoffAttempted={batch=job.supplyId,request=completed}
+    end)
+  end
+  local function awaitingSupply(r)
+    if ((config.supply or {}).inventory or '')=='' and #(config.supplyStations or {})==0 then return end
+    for _,j in pairs(s.jobs) do
+      local w=(app.state.workers or {})[tostring(j.workerId)]
+      if j.workerId and w and w.online and j.status~='completed' and not j.workerFinished and not j.paused
+        and j.type~='CRAFT' and j.supplyId and j.missingItem and not (s.completedSupplyBatches or {})[j.supplyId]
+        and Scheduling.priority(app.state,j)>=Scheduling.priority(app.state,r) then
+        local pending,completed=self:supplyRequest(j);local old=j.supplyHandoffAttempted
+        if not pending and completed and not (old and old.batch==j.supplyId and old.request==completed)
+          and self.ledger:view(j.missingItem,app.mining.storage.counts).available>(config.turtleFuelReserveItems[j.missingItem] or 0) then return j end
+      end
+    end
+  end
   local factoryAdmission
   local function requestOf(j)
     return j.productionRequest or j.key and j.key:match('^(request:%d+):op:')
@@ -339,6 +370,12 @@ function M.new(app,config,e,queue)
     end
     local remaining=math.max(0,op.batches-completed)
     if remaining==0 then return true end
+    local handoff=awaitingSupply(r)
+    if handoff then
+      local why='waiting for finite supply handoff '..handoff.supplyId
+      if r.jobId or r.jobIds or r.privateCraft then replan(r,why) end
+      return false,why
+    end
     if op.type=='CRAFT' and not craftOperationAvailable(r) then
       local why='No available crafting-capable worker for '..op.item
       if r.jobId or r.privateCraft then replan(r,why) end

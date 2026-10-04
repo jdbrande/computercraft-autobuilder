@@ -1823,3 +1823,22 @@ both casings and all seven sentinel inventories. Five computers are off and six
 temporary tickets removed. Protected work intentionally remains paused/owned;
 its traffic wait is not reported as fleet drain. Permanent candidate evidence is
 in [0.37 validation](validation-0.37.0.md). Final-source full Lua gate continues.
+### 0.36 final-gate correction — finite supply handoff
+
+The first full candidate run passed997/998 Lua tests; its streaming overlap case
+failed. Concurrent request advancement could admit another factory operation in
+the same tick that a builder's finite supply request completed, leaving no supply
+handoff opportunity. An online unpaused consumer now gets one checkpointed offer
+opportunity per batch/completed-request pair before fresh equal/lower-priority
+manufacturing. Existing physical ownership drains unchanged. Actionable station
+failures consume the opportunity; transient ownership and inventory gates do not.
+Empty factory preferences retire before they can block the handoff.
+
+Regressions cover normal runtime staging, an obstructed station, restart before
+handoff, checkpoint rollback, newer demand, unavailable consumers, priority,
+committed work and empty preferences. Production and logistics suites passed.
+The overlap fixture also moves its second coal ore four blocks farther away within
+its existing bounds, preserving the placement-time physical-miner witness while
+parallel acquisition runs earlier. Its focused full-chain case passed unchanged
+assertions and exact final material accounting. Final full gates are restarting;
+0.36 is not yet accepted.

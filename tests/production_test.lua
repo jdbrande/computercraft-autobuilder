@@ -635,3 +635,47 @@ test('shared mining follows highest active consumer and survives original projec
  eq(j.paused,false);eq(S.priority(app.state,j),20);eq(j.workerId,2);eq(j.miningArea.min.x,area.min.x)
  projects:command({'build','pause','low'});eq(j.paused,true);eq(j.workerId,2)
 end)
+
+local function handoffFixture()
+ local app,p,q,c,h=productionFixture({[1]={name=mc('glass'),count=1},[2]={name=mc('cobblestone'),count=4},[3]={name=mc('coal'),count=1}})
+ c.supply={inventory='stage',side='down',batch=1};c.supplyStations={}
+ local j={id='task:1:90',type='BUILD',status='blocked',workerId=2,missingItem=mc('glass'),missingCount=1,supplyId='batch:1'};q.state.jobs[j.id]=j
+ app.state.workers['2']={id=2,online=true,telemetry={task=j.id,status='blocked'}}
+ local ready=p:request({[mc('glass')]=1},'supply:'..j.id..':'..mc('glass'))
+ local nextRequest=p:request({[mc('stone')]=4})
+ return app,p,q,c,h,j,ready,nextRequest
+end
+test('completed finite supply gets a durable handoff before the next empty factory admission',function()
+ local app,p,q,c,h,j,ready,later=handoffFixture();p:tick()
+ eq(ready.status,'completed');eq(later.jobIds,nil);assert(require('autobuilder.core.workflows').canOfferSupply(app.state,j))
+ app.state=U.copy(app.saved);q=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,function() return app.now end,1)
+ p=require('autobuilder.core.production_service').new(app,c,h,q);j=q.state.jobs[j.id];later=q.state.requests[later.id]
+ p:tick();eq(later.jobIds,nil)
+ p:attemptedSupply(j);eq(app.saved.automation.jobs[j.id].supplyHandoffAttempted.request,ready.id)
+ p:tick();assert(later.jobIds,'failed station offer must not indefinitely block manufacturing')
+end)
+test('finite supply handoff ignores unavailable consumers and preserves committed manufacturing',function()
+ for _,mode in ipairs({'offline','paused','newer-request','lower-priority','committed'}) do
+  local app,p,q,c,h,j,ready,later=handoffFixture()
+  if mode=='offline' then app.state.workers['2'].online=false
+  elseif mode=='paused' then j.paused=true
+  elseif mode=='lower-priority' then q.state.projects.low={name='low',priority=20};j.project='low'
+  elseif mode=='newer-request' then ready.status='completed';p:request({[mc('glass')]=2},ready.key)
+  else j.paused=true;p:tick();p:syncClaims();j.paused=nil;assert(later.jobIds);assert(p.ledger.state.leases[later.jobIds[1]]) end
+  p:tick();assert(later.jobIds,mode..' incorrectly blocked manufacturing')
+ end
+end)
+test('finite supply handoff marker rolls back and a new completed request gets another opportunity',function()
+ local app,p,q,c,h,j,ready,later=handoffFixture();p:tick()
+ local save=app.save;app.save=function() return false,'disk full' end
+ assert(not pcall(p.attemptedSupply,p,j));eq(j.supplyHandoffAttempted,nil);app.save=save
+ p:attemptedSupply(j);local r=p:request({[mc('glass')]=1},ready.key);r.status='completed';app:save();p:tick()
+ eq(r.status,'completed');eq(later.jobIds,nil)
+ p:attemptedSupply(j);p:tick();assert(later.jobIds)
+end)
+test('finite supply handoff retires an empty factory preference before it becomes a barrier',function()
+ local app,p,q,c,h,j,ready,later=handoffFixture();j.paused=true;p:tick();local old=q.state.jobs[later.jobIds[1]]
+ eq(p.ledger.state.leases[old.id],nil);j.paused=nil;p:tick()
+ eq(old.cancelled,true);eq(later.jobIds,nil);assert(require('autobuilder.core.workflows').canOfferSupply(app.state,j))
+ p:attemptedSupply(j);p:tick();assert(later.jobIds);assert(later.jobIds[1]~=old.id)
+end)
