@@ -571,6 +571,7 @@ function M.new(app,config,e,queue)
   end
   function self:tick()
     if self.working then return end
+    for id in pairs(reported) do if not s.requests[id] then reported[id]=nil end end
     factoryAdmission=nil
     local existing={};for id in pairs(s.jobs) do existing[id]=true end
     local requests={}

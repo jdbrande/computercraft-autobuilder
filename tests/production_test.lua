@@ -679,3 +679,24 @@ test('finite supply handoff retires an empty factory preference before it become
  eq(old.cancelled,true);eq(later.jobIds,nil);assert(require('autobuilder.core.workflows').canOfferSupply(app.state,j))
  p:attemptedSupply(j);p:tick();assert(later.jobIds);assert(later.jobIds[1]~=old.id)
 end)
+
+test('retired streamed requests release production logging snapshots without reboot',function()
+ local app,p,q,c,h=productionFixture({[1]={name=mc('stone'),count=1}});c.dataDir='/autobuilder'
+ local projects=require('autobuilder.blueprint.projects').new(app,c,h,q,p)
+ local function cache(fn,seen)
+  seen=seen or {};if seen[fn] then return end;seen[fn]=true
+  for i=1,100 do
+   local name,value=debug.getupvalue(fn,i);if not name then break end
+   if name=='reported' then return value end
+   if type(value)=='function' then local found=cache(value,seen);if found then return found end end
+  end
+ end
+ local reported=assert(cache(p.tick),'production event cache missing')
+ for i=1,20 do
+  local name='batch_'..i;q.state.projects[name]={name=name,phase='imported',jobs={},path='/batch.json'}
+  local r=p:request({[mc('stone')]=1},'project:'..name,{projectName=name,stockOnly=true});p:tick()
+  eq(r.status,'completed');assert(reported[r.id]);q.state.projects[name].phase='built'
+  assert(projects:retire(name));eq(next(q.state.requests),nil);p:tick()
+  eq(next(reported),nil)
+ end
+end)

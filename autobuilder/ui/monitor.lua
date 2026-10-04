@@ -1,10 +1,11 @@
 local M={}
 function M.new(e,config)
- local self={page=0};local last=-math.huge;local rendered
+ local self={page=0};local last=-math.huge;local rendered;local failure
+ function self:invalidate() rendered=nil;last=-math.huge end
  function self:touch() self.page=self.page+1;last=-math.huge end
  function self:draw(lines,now)
   if config.name=='' then return true end
-  if now-last<config.interval then return true end;last=now
+  if now-last<config.interval then return failure==nil,failure end;last=now
   local ok,why=pcall(function()
    local term=assert(e.peripheral.wrap(config.name),'Configured monitor is disconnected')
    if term.setTextScale then term.setTextScale(config.scale) end
@@ -22,7 +23,8 @@ function M.new(e,config)
     rendered=signature
    end
   end)
-  if not ok then rendered=nil;return false,tostring(why) end
+  failure=not ok and tostring(why) or nil
+  if not ok then rendered=nil;return false,failure end
   return true
  end
  return self
