@@ -159,7 +159,7 @@ function M.new(app,config,e,queue,production)
   end
   local function startRun(p,productionLinked)
     p.run=p.run and p.run+1 or (p.phase=='built' or p.phase=='verified') and 1 or 0;p.actors={};p.returnRequests={};p.settlement=nil;p.includeProduction=productionLinked
-    p.siteRequired=nil
+    p.siteRequired=nil;p.streaming=nil
     p.repairAttempts=nil;p.repairHistory=nil
   end
   local function preparationPending(p)
@@ -330,7 +330,13 @@ function M.new(app,config,e,queue,production)
       p.includeProduction=true
       if action=='auto' then p.autoStart=true;ensureSite(p) end
       local message
-      if not next(a.requirements) then
+      local existing=p.requestId and s.requests[p.requestId]
+      -- Saved full-stock requests keep their owned work. New automatic runs
+      -- acquire finite batches through the normal builder supply journals.
+      p.streaming=action=='auto' and not (existing and existing.status~='completed') or nil
+      if p.streaming then
+        p.requestId=nil;p.preparedEmpty=nil;p.phase='ready';message='Preparing site; materials follow bounded builder supply requests'
+      elseif not next(a.requirements) then
         p.preparedEmpty=true;p.requestId=nil;p.phase='ready';message='No materials required'
       else
         local r=production:request(a.requirements,'project:'..p.name,{projectName=p.name});p.requestId=r.id;p.phase='preparing';message=r.id
@@ -348,7 +354,7 @@ function M.new(app,config,e,queue,production)
       if action=='clear' then assert(config.clearSite,'Set clearSite=true before clearing schematic air cells') end
       if action=='start' then
         local r=p.requestId and s.requests[p.requestId]
-        assert((p.preparedEmpty and not next(a.requirements)) or (r and r.status=='completed'),'Run build prepare and wait for resources first')
+        assert(p.streaming or (p.preparedEmpty and not next(a.requirements)) or (r and r.status=='completed'),'Run build prepare and wait for resources first')
       end
       if action=='start' or action=='repair' then
         if action=='repair' and p.autoStart~='repair' then p.repairAttempts=nil;p.repairHistory=nil end
@@ -383,7 +389,7 @@ function M.new(app,config,e,queue,production)
       if p.phase=='preparing' and p.requestId and s.requests[p.requestId].status=='completed' then p.phase='ready'; save() end
       if p.autoStart and not p.paused then
         local r=p.requestId and s.requests[p.requestId]
-        if (p.autoStart=='repair' or p.preparedEmpty or r and r.status=='completed') and p.site and p.site.work and (p.site.work.preparedCount or 0)>0 then
+        if (p.streaming or p.autoStart=='repair' or p.preparedEmpty or r and r.status=='completed') and p.site and p.site.work and (p.site.work.preparedCount or 0)>0 then
           local ok,err=pcall(self.command,self,{'build',p.autoStart=='repair' and 'repair' or 'start',p.name})
           if not ok then p.error=tostring(err);save() else p.error=nil end
         end

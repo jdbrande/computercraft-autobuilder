@@ -1254,3 +1254,13 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   a second project-consumption ledger is unnecessary for fleet-wide overlap.
   Cost: each builder still waits during its own top-up; other builders/providers
   supply concurrency. Implementation and acceptance remain pending.
+
+- Task59 empty-stock automatic run regression passes across pause/restart: verified
+  site regions ask for bounded supplies without a whole-project stock request.
+  Explicit preparation and saved legacy requests preserve their existing ownership.
+- Task60 actual-runtime overlap regression passes: two builders place while later
+  production remains active, then survive controller/builder restarts. Real miner,
+  furnace, crafter and builder modules reconcile4 cobblestone,1 sand,4 smelted stone,
+  1 glass,4 crafted bricks,3 placements and2 surplus bricks. Both builders return
+  empty with finite fuel; requests complete and staging/ownership drain.
+  Full regressions, native acceptance and final review remain pending.

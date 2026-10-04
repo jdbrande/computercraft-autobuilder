@@ -103,7 +103,7 @@ test('build commands reject unsupported palette and modified imported data befor
   assert(not c:command('build prepare sample')); eq(w.places,0)
   assert(not c:command('request minecraft:stone nope')); assert(not c:command('request minecraft:stone -1'))
 end)
-test('build auto prepares stock and resumes through reboot without a separate start command',function()
+test('build auto streams supply and resumes through reboot without a separate start command',function()
   local w,ce,we,c,b,step,reboot=fixture()
   assert(c:command('build import /example.json automatic'))
   assert(c:command('build auto automatic'))
@@ -112,7 +112,7 @@ test('build auto prepares stock and resumes through reboot without a separate st
   assert(c:command('build pause automatic'))
   for _=1,5 do step() end
   eq(w.places,0)
-  assert(c.state.automation.requests[p.requestId].paused)
+  eq(p.requestId,nil);eq(p.streaming,true);eq(p.paused,true)
   c,b=reboot(); assert(c:command('build resume automatic'))
   for _=1,1500 do step(); if c.state.automation.projects.automatic.phase=='built' and not b.state.currentTask then break end end
   eq(c.state.automation.projects.automatic.phase,'built'); eq(w.places,2)
@@ -771,4 +771,34 @@ test('build forecast exposes current shared materials without submitting product
   assert(require('autobuilder.factory.factory').equal(before,c.state.automation.requests))
   c.state.automation.projects.forecast=nil;c.state.automation.currentProject=nil
   c:tick();assert(c.state.forecastLines[1]:find('No selected project'))
+end)
+
+test('automatic empty-stock build prepares regions and asks for finite supply without whole-project stock',function()
+  local w,ce,we,c,b,step,reboot=fixture({stock={}});w.items={}
+  assert(c:command('build import /example.json streaming'));assert(c:command('build auto streaming'))
+  local p=c.state.automation.projects.streaming;eq(p.streaming,true);eq(p.requestId,nil)
+  assert(c:command('build pause streaming'));for _=1,5 do step() end;eq(w.places,0);eq(next(c.state.automation.requests),nil)
+  c,b=reboot();assert(c:command('build resume streaming'));local supplied=false
+  for _=1,1500 do
+    step();p=c.state.automation.projects.streaming
+    for _,r in pairs(c.state.automation.requests) do
+      assert(r.key:sub(1,8)~='project:','automatic run created a whole-project target')
+      if r.key:sub(1,7)=='supply:' then supplied=true;eq(r.requirements['minecraft:stone'],2) end
+    end
+    if supplied then break end
+  end
+  assert(supplied,'prepared region never asked for its bounded material batch');eq(p.phase,'building');eq(w.places,0)
+  assert(p.site.work.preparedCount>0);eq(p.requestId,nil)
+end)
+
+test('explicit preparation and saved automatic requests retain their whole-stock ownership',function()
+  local w,ce,we,c,b,step,reboot=fixture({stock={}})
+  assert(c:command('build import /example.json legacy'));assert(c:command('build prepare legacy'))
+  local p=c.state.automation.projects.legacy;local rid=assert(p.requestId)
+  assert(not p.streaming);assert(not c:command('build start legacy'))
+  p.autoStart=true;assert(c:save());c,b=reboot()
+  p=c.state.automation.projects.legacy;eq(p.requestId,rid);assert(not p.streaming)
+  assert(c:command('build auto legacy'));eq(p.requestId,rid);assert(not p.streaming)
+  local n=0;for _ in pairs(c.state.automation.requests) do n=n+1 end;eq(n,1)
+  assert(c:command('build pause legacy'));eq(c.state.automation.requests[rid].paused,true)
 end)

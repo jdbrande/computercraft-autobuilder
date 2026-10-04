@@ -43,8 +43,15 @@ local function fixture(options)
     craftingStation={input='input',output='output',inputSide='up',outputSide='down'},
     heartbeatInterval=1,registrationInterval=3,workerTimeout=8,gps={enabled=false},
     supply={inventory='stage',side='down',batch=64}}
-  local cc=U.copy(common); cc.build={enabled=true,origin={x=2,y=0,z=0}}
+  local cc=U.copy(common); cc.build={enabled=true,origin={x=2,y=0,z=0},regionSize=options.parallelBuilders and 2 or 8}
+  if options.parallelBuilders then
+    f.inventories.stage2={}
+    cc.supply={inventory='',batch=2}
+    cc.supplyStations={{workerId=25,inventory='stage',position={x=0,y=2,z=0},side='down'},
+      {workerId=28,inventory='stage2',position={x=8,y=2,z=0},side='down'}}
+  end
   cc.scaling={roles={mining={min=options.scaling and 0 or (options.exploration and 4 or 3)}}}
+  if options.parallelBuilders then cc.scaling.roles.building={min=2};cc.scaling.roles.clearing={min=2} end
   if options.exploration then cc.exploration={enabled=true,base={x=0,y=0,z=0},bounds={min={x=16,y=0,z=0},max={x=103,y=0,z=1}},baseProtection={min={x=-12,y=-1,z=-2},max={x=8,y=3,z=2}},dimensionMinY=-64,dimensionMaxY=319} end
   f.controller=actor(7,cc)
   local sources={{id=21,x=20,item='cobblestone',block='stone',count=options.fill and 5 or 4},
@@ -93,22 +100,40 @@ local function fixture(options)
   end
   local cw=U.copy(common); cw.role='worker'; cw.controllerId=7; cw.initialPosition={x=-10,y=2,z=0,heading='north'}; cw.depot=U.copy(cw.initialPosition); cw.automation={crafting=true}
   f.craft=actor(24,cw,t); f.craft.slots=crafty.slots
-  local w=require('tests.build_world').new(); w.blocks['0,1,0']={name=mc('chest'),state={}}
-  -- This production-chain fixture starts on solid ground; uneven terrain has
-  -- separate preparation coverage and must not consume these exact mining quotas.
-  for x=2,4 do w.blocks[x..','..(options.fill and x==3 and -2 or -1)..',0']={name=mc('stone'),state={}} end
-  w.turtle.getItemSpace=function(slot) return 64-w.turtle.getItemCount(slot) end
-  w.turtle.suckDown=function(n)
-    assert(w.pose.x==0 and w.pose.y==2 and w.pose.z==0,'builder must physically return for supplies')
-    for slot in pairs(f.inventories.stage) do
-      local moved,item=move(f.inventories.stage,slot,w.items,w.selected,n)
-      f.stats.pulled[item]=(f.stats.pulled[item] or 0)+moved; return moved>0
+  local builderBlocks={['0,1,0']={name=mc('chest'),state={}}}
+  -- Solid prepared support; terrain mutations have separate exact-yield fixtures.
+  for x=2,4 do builderBlocks[x..','..(options.fill and x==3 and -2 or -1)..',0']={name=mc('stone'),state={}} end
+  f.builders={}
+  for _,id in ipairs(options.parallelBuilders and {25,28} or {25}) do
+    local w=require('tests.build_world').new();w.blocks=builderBlocks
+    local home={x=id==25 and 0 or 8,y=2,z=0,heading='north'};w.pose=U.copy(home);w.pose.known=true
+    local inventory=id==25 and 'stage' or 'stage2';builderBlocks[home.x..',1,0']={name=mc('chest'),state={}}
+    w.turtle.getItemSpace=function(slot) return 64-w.turtle.getItemCount(slot) end
+    w.turtle.suckDown=function(n)
+      assert(U.distance(w.pose,home)==0,'builder must physically return for supplies')
+      for slot in pairs(f.inventories[inventory]) do
+        local moved,item=move(f.inventories[inventory],slot,w.items,w.selected,n)
+        f.stats.pulled[item]=(f.stats.pulled[item] or 0)+moved; return moved>0
+      end
+      return false
     end
-    return false
+    if options.parallelBuilders then
+      w.fuel=8000;w.turtle.getFuelLevel=function() return w.fuel end
+      for _,action in ipairs({'forward','up','down'}) do local original=w.turtle[action];w.turtle[action]=function()
+        if w.fuel==0 then return false,'out of fuel' end
+        local ok,why=original()
+        if ok then
+          for _,other in ipairs(f.builders) do if other.id~=id then assert(U.distance(other.world.pose,w.pose)>0,'physical builder collision') end end
+          w.fuel=w.fuel-1
+        end
+        return ok,why
+      end end
+    end
+    local bw=U.copy(common);bw.role='worker';bw.controllerId=7;bw.initialPosition=U.copy(home)
+    bw.depot=U.copy(home);bw.automation={building=true};bw.supply.inventory=inventory
+    local builder=actor(id,bw,w.turtle);builder.world=w;f.builders[#f.builders+1]=builder
+    if id==25 then f.builder=builder end
   end
-  local bw=U.copy(common); bw.role='worker'; bw.controllerId=7; bw.initialPosition=U.copy(w.pose)
-  bw.depot={x=0,y=2,z=0}; bw.automation={building=true}
-  f.builder=actor(25,bw,w.turtle); f.builder.world=w
   local bp={schema=1,size={x=3,y=1,z=1},palette={{name=mc('stone_bricks'),state={}},{name=mc('glass'),state={}}},
     runs={{id=1,count=2},{id=2,count=1}},metadata={},requirements={[mc('stone_bricks')]=2,[mc('glass')]=1}}
   f.controller.e.fs.files['/chain.json']=f.controller.e.textutils.serialize(bp)
@@ -305,4 +330,36 @@ test('early builder top-up launches real exploration while its last held block r
   eq(f.builder.world.blocks['2,0,0'].name,mc('cobblestone'));eq(f.builder.world.blocks['3,0,0'].name,mc('cobblestone'))
   for _,r in pairs(c.state.automation.requests) do eq(r.status,'completed') end
   for _,a in ipairs(f.miners) do eq(a.runtime.state.currentTask,nil);eq(a.world.pose.x,a.source.x);assert(a.world.fuel>0) end
+end)
+
+
+test('automatic pipeline overlaps finite production with multiple prepared-region builders across restart',function()
+  local f=fixture({parallelBuilders=true,finiteFuel=true});local c=f.controller.runtime
+  assert(c:command('build import /chain.json pipeline'));assert(c:command('build auto pipeline'))
+  eq(c.state.automation.projects.pipeline.requestId,nil)
+  local overlap,restarted=false,false;local buildOwners={}
+  for _=1,5000 do
+    f:step()
+    local placed=0;for _,b in ipairs(f.builders) do placed=placed+b.world.places end
+    local pending=false
+    for _,r in pairs(f.controller.runtime.state.automation.requests) do if r.status~='completed' then pending=true end end
+    for _,b in ipairs(f.builders) do local t=b.runtime.state.currentTask;if t and t.type=='BUILD' then buildOwners[b.id]=true end end
+    if placed>0 and placed<3 and pending then
+      overlap=true
+      if not restarted then f:reboot(f.controller);for _,b in ipairs(f.builders) do f:reboot(b) end;restarted=true end
+    end
+    local p=f.controller.runtime.state.automation.projects.pipeline
+    if p.phase=='built' then break end
+  end
+  local s=f.controller.runtime.state;local p=s.automation.projects.pipeline
+  assert(overlap,'no measured placement while later production remained active');assert(restarted)
+  assert(buildOwners[25] and buildOwners[28],'construction did not use both builders')
+  assert(p.phase=='built',p.phase..':'..tostring(p.error));eq(p.report.counts.correct,3)
+  for _,b in ipairs(f.builders) do eq(b.runtime.state.currentTask,nil);eq(next(b.world.items),nil);eq(U.distance(b.world.pose,b.config.depot),0);assert(b.world.fuel>0 and b.world.fuel<8000) end
+  for _,a in ipairs(f.miners) do eq(a.runtime.state.currentTask,nil);eq(a.world.pose.x,a.source.x) end
+  for _,r in pairs(s.automation.requests) do eq(r.status,'completed');assert(r.key:sub(1,8)~='project:') end
+  eq(s.automation.supply,nil);eq(next(f.inventories.stage),nil);eq(next(f.inventories.stage2),nil)
+  eq(f.stats.crafts,1);eq(f.stats.smelted[mc('stone')],4);eq(f.stats.smelted[mc('glass')],1)
+  eq(f.stats.deposited[mc('cobblestone')],4);eq(f.stats.deposited[mc('sand')],1)
+  eq(f.stats.pulled[mc('stone_bricks')],2);eq(f.stats.pulled[mc('glass')],1);eq(f:count('stone_bricks'),2)
 end)
