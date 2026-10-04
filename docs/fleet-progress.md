@@ -1884,3 +1884,23 @@ new intersection, roofed-corridor and offline-owner scenarios will identify any
 required corrections. See[traffic acceptance design](traffic-acceptance-design.md).
 0.36/0.37 final suites and0.38 review/native corrections remain active dependencies.
 Sustained fleet load and the final combined unassisted build remain unfinished.
+### 0.38 consolidated review corrections
+
+The single final review found four reproducible issues: overflow could replace an
+operator queue while its drain handler yielded and cause `unpack(nil)`; throttled
+monitor draws could clear a real disconnect warning; a quick identical monitor
+replacement could retain the previous display signature and remain blank; and
+retired streamed production requests retained event-projection snapshots.
+
+Each regression failed before correction. Drains now check the live queue, monitor
+results persist through throttling and attachment events invalidate rendering, and
+production ticks prune retired request projections. Runtime/dashboard/production
+focused suites passed. Full gates and final-source native checks are in progress.
+
+The first native observation build verified three blocks, parsed148 structured
+events and exercised keyboard/script input during real peripheral waits, paging,
+controller restart and deliberate input overflow. Fixture corrections supplied the
+actual CraftOS Enter code257 (rather than28), the Crafty's accessible wired modem
+and its missing depot setting; no finished materials were injected. The monitor
+warning defect above was also observed natively. Permanent acceptance remains
+pending final-source monitor/overflow checks and complete gates.

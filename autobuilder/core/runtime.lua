@@ -362,7 +362,10 @@ function M.new(config,e)
       local input=self.input..a:gsub('[%c]','')
       if #input>256 then self:event('autobuilder_input_discard') else self.input=input end
     elseif name=='key' and a==((e.keys or {}).backspace or 14) then self.input=self.input:sub(1,-2)
-    elseif name=='peripheral' or name=='peripheral_detach' then self:tick() end
+    elseif name=='peripheral' or name=='peripheral_detach' then
+      if a==config.monitor.name then self.monitor:invalidate() end
+      self:tick()
+    end
     return true
   end
   return self
@@ -405,6 +408,7 @@ function M.run(config,e)
     local started=e.os.epoch('utc')
     for _=1,math.min(16,#operators) do
       local event=table.remove(operators,1)
+      if not event then break end -- overflow may replace the queue while a handler yields
       if not app:event(table.unpack(event)) then return false end
       if e.os.epoch('utc')-started>=250 then break end
     end

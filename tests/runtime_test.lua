@@ -213,7 +213,10 @@ test('controller drains a queued network burst in bounded turns without losing o
     while true do local ev={coroutine.yield(filter)};if not filter or ev[1]==filter then return table.unpack(ev) end end
   end
   e.sleep=function() e.os.pullEvent('sleep') end
-  e.peripheral.call=function() if blocked then blocked=false;e.os.pullEvent('task_complete') end;return true end
+  e.peripheral.call=function(_,method)
+  if blocked or blockLists and method=='list' then blocked=false;e.os.pullEvent('task_complete') end
+  if method=='list' then return {} end;return true
+ end
   local send=e.rednet.send;e.rednet.send=function(to,m,p)
     if m.type=='ack' then turnCount=turnCount+1;assert(turnCount<=8,'unbounded message burst exceeded CraftOS turn budget');processed[#processed+1]=to end
     return send(to,m,p)
@@ -250,14 +253,17 @@ end)
 
 -- Broadcast through parallel's real filter semantics while an ordinary peripheral
 -- call is suspended. Keep runtime, dispatcher, storage and command handlers real.
-local function operatorLoop(events,before)
+local function operatorLoop(events,before,blockLists)
  local R=require('autobuilder.core.runtime');local e=env(1);local timer=0;local blocked=false
  e.os.startTimer=function() timer=timer+1;return timer end;e.os.cancelTimer=function() end
  e.os.pullEvent=function(filter)
   while true do local ev={coroutine.yield(filter)};if not filter or ev[1]==filter then return table.unpack(ev) end end
  end
  e.sleep=function() e.os.pullEvent('sleep') end
- e.peripheral.call=function() if blocked then blocked=false;e.os.pullEvent('task_complete') end;return true end
+ e.peripheral.call=function(_,method)
+  if blocked or blockLists and method=='list' then blocked=false;e.os.pullEvent('task_complete') end
+  if method=='list' then return {} end;return true
+ end
  local replies={};e.os.queueEvent=function(...) replies[#replies+1]={...} end
  local app,commands;local original=R.new
  R.new=function(...)
@@ -378,4 +384,31 @@ test('project events follow imported analyzed priority and pause checkpoints wit
  assert(app:command('project pause event'));eq(#events,4)
  assert(app:command('project resume event'));eq(events[5].paused,false)
  assert(app:command('project status event'));eq(#events,5)
+end)
+
+
+test('overflow during a yielding command drain preserves its reply and rejects queued scripts without crashing',function()
+ operatorLoop(function(send,app,commands,replies,release)
+  app.config.storageInventories[1]='chest'
+  send({'autobuilder_command','running','resources'})
+  send({'autobuilder_command','queued:1','workers'});send({'autobuilder_command','queued:2','workers'})
+  for _=1,10 do send({'task_complete'});if #commands>0 then break end end -- ordinary tick reads finish before resources
+  eq(#commands,1);eq(commands[1],'resources')
+  for _=1,140 do send({'char',' '}) end
+  send({'task_complete'});eq(#replies,3)
+  local seen={};for _,r in ipairs(replies) do assert(not seen[r[2]]);seen[r[2]]=r end
+  eq(seen.running[3],true);eq(seen['queued:1'][3],false);eq(seen['queued:2'][3],false)
+  send({'key',28});send({'paste','workers'});send({'key',28});eq(#commands,2)
+ end,nil,true)
+end)
+
+test('quick monitor replacement redraws an identical cached page',function()
+ local e=env(7);local c=cfg('controller');c.monitor={name='front',scale=.5,interval=1}
+ local attached=true;local writes=0
+ e.peripheral.wrap=function() if attached then return {getSize=function() return 30,10 end,setTextScale=function() end,
+  clear=function() end,setCursorPos=function() end,write=function() writes=writes+1 end} end end
+ local app=require('autobuilder.core.runtime').new(c,e);app:tick();app:draw();assert(writes>0)
+ e.now=e.now+.1;attached=false;app:event('peripheral_detach','front');app:draw()
+ e.now=e.now+.1;attached=true;writes=0;app:event('peripheral','front')
+ e.now=e.now+1;app:draw();assert(writes>0,'replacement monitor kept an old screen signature and stayed blank')
 end)

@@ -22,6 +22,7 @@ test('monitor redraw is bounded paged and recovers from resize detach and reconn
  assert(m:draw(lines,0));local first=writes;assert(m:draw(lines,.5));eq(writes,first)
  assert(m:draw(lines,1));eq(writes,first);m:touch();assert(m:draw(lines,2));assert(writes>first);assert(table.concat(screen,'\n'):find('Page 2/2',1,true))
  attached=false;local ok,why=m:draw(lines,3);eq(ok,false);assert(why)
+ local retry,reason=m:draw(lines,3.1);eq(retry,false);eq(reason,why)
  attached=true;width=16;height=8;assert(m:draw(lines,4));assert(table.concat(screen,'\n'):find('Page 1/1',1,true))
  local disabled=require('autobuilder.ui.monitor').new({peripheral={wrap=function() error('disabled monitor touched hardware') end}},{name='',interval=1})
  assert(disabled:draw(lines,0))
