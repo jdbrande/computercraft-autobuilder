@@ -1627,3 +1627,38 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   automation, fuel budget, managed logistics and capacity regressions pass.
 - Native adjacent-turtle feasibility probes passed; complete native acceptance,
   final review and full release gates remain pending. No acceptance claim yet.
+
+###0.34 final-source native acceptance completed
+
+- Clean native gzip Sponge v3 import placed/verified9 cells, including3 empty
+  containers and2 sign geometries. Paused settled-pose controller/worker reboot
+  resumed without intervention; independent world states/empty inventories/grass
+  matched. All jobs/supply settled and worker returned idle; fixture shutdown and
+ 4 operator tickets removed. First run's ambiguous turn required explicit pose
+  confirmation and is separately documented as assisted.
+-20 Python and focused review regressions passed. Full Lua gate remains running;
+  candidate permanent report: [0.34 validation](validation-0.34.0.md).
+### 0.33 live supply-ascent correction
+
+The full pre-correction gate passed 939 Lua tests. Native placement then exposed a
+supply departure whose first vertical cell was empty but the next was a ceiling.
+The saved route repeatedly retried the blocked ascent. The shared travel helper now
+replans only a confirmed obstruction on its initial ascent, retaining reservation
+waits and uncertain moves. A regression failed before the fix and passes after it,
+including restart and reservation preservation; all focused logistics tests pass.
+The fixture also required a two-cell underside access opening for its low ceiling
+button. That operator intervention is separate from the routing fix and will be
+recorded in acceptance. Final-source full gates and native completion follow.
+
+### 0.35 native cargo recovery passed; review service unavailable
+
+- A real transport worker picked up five stone and stopped at native bedrock.
+  `worker recover 252` froze it; courier 253 recovered both that stack and a tagged
+  damaged pickaxe through two capacity-owned jobs. A settled three-computer restart
+  preserved custody. Independent world data confirmed five central stone, unchanged
+  tagged tool in the recovery buffer, original courier fuel items, empty quarantined
+  donor, intact obstruction and released recovery capacity. Fixture shut down and
+  four temporary tickets removed. See [0.35 validation](validation-0.35.0.md).
+- The delegated final review failed with a service usage-limit error and supplied
+  no findings or verdict. This is recorded as pending, not a completed review.
+  Independent remaining implementation and final test gates continue.
