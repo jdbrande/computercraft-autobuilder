@@ -1,8 +1,8 @@
 # 0.26.0 mission fuel forecast validation
 
-Status: native acceptance and focused regressions passed; complete Lua gate and
-ordered integration remain pending. Fuel implementation: `90fd4c0`, followed by the shared0.24 physical-detour
-correction and its navigation/two-worker regressions.
+Status: accepted. Final source `70e9718` passes829 Lua tests,18 Python tests,
+release/whitespace checks and native proactive-refuel/return acceptance. It includes
+the shared0.24 physical-detour correction and its navigation/two-worker regressions.
 
 ## Automated evidence
 
@@ -11,7 +11,9 @@ coordination and coverage tests pass. Actual controller/worker runtime tests cov
 above-low proactive refueling, controller restart, mixed-cargo home return beneath
 a station chest, and worker reboot after a physical cargo deposit. The Python suite
 passed all18 tests. Release generation, release verification and whitespace checks
-passed. The final complete Lua suite is running; no complete pass is claimed yet.
+passed. The final complete Lua suite passed829 tests on `70e9718`
+(`/tmp/fleet-026-final-full-v3.log`). Accepted0.24/0.25 evidence is merged without
+changing the tested implementation, tests or release artifacts.
 
 The single final review and consolidated fix pass addressed five Important issues:
 fixed miners lacked worker-specific entry geometry, small native tanks could hide a
