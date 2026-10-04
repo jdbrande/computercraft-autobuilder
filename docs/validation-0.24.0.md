@@ -65,3 +65,10 @@ Targets are estimates; physical ownership, finite fuel, material and station
 availability, dependencies, protection, coverage and traffic still decide dispatch.
 Automatic turtle manufacturing/deployment is not assumed. This staged loaded trial
 must not be presented as arbitrary terrain or natural resource-scale acceptance.
+
+The accelerated1-second heartbeat/3-second registration setup saturated the
+controller inbox during the long native run. Durable retries preserved progress
+but throughput was poor. The fixture was switched to the shipped5-second heartbeat
+and15-second registration defaults through normal checkpoint-preserving reboots.
+Ownership/cargo and source code were retained. High-rate message overload remains
+a known limitation; this acceptance must not claim sustained1-second fleet traffic.

@@ -1090,3 +1090,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   without digging. The regression passes across reboot; an actual two-worker
   runtime with opposing routes and station chests also passes. This is a release
   blocker corrected before restarting the full gate, not a waived flaky test.
+
+- Native0.24's accelerated1s heartbeat/3s registration fixture saturated the
+  controller inbox, with repeated dropped-message warnings and slow durable retries.
+  Restored shipped defaults5s/15s on212–218 through checkpoint-preserving reboots.
+  Source code/ownership/physical cargo were unchanged. Audit settings and logs are
+  in dist/live-scaling/default-network-timing/. High-rate overload remains a known
+  limitation for later large-fleet performance acceptance; do not claim it solved.
