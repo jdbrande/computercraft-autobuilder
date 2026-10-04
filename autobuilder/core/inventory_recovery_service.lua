@@ -205,7 +205,10 @@ function M.new(app,config,e,queue,production,network,clock)
     for _,r in pairs(s.inventoryRecoveries) do if r.status=='collecting' then
       local status,why=F.protect(function() return collect(r) end)
       if status=='blocked' then r.error=why;assert(save()) else production:syncClaims(false) end
-      return true
+      if status~='blocked' then return true end
+      -- A saved transfer must reconcile before another action can change its
+      -- observation. Waiting for capacity without a journal does not own a turn.
+      for _,flow in pairs(r.collection) do if flow.intent then return true end end
     end end
     return false
   end
@@ -219,7 +222,11 @@ function M.new(app,config,e,queue,production,network,clock)
     end
   end
   function self:describe()
-    local lines={};for _,r in pairs(s.inventoryRecoveries) do lines[#lines+1]=r.id..' worker='..r.owner..' '..r.status..' '..(r.error or '') end
+    local lines={};for _,r in pairs(s.inventoryRecoveries) do
+      local j=r.jobId and s.jobs[r.jobId]
+      lines[#lines+1]=r.id..' worker='..r.owner..' '..r.status..(j and ' courier='..tostring(r.courier)..' task='..j.id or '')
+        ..' '..(r.error or j and (j.error or j.coverageError) or '')
+    end
     table.sort(lines);return #lines>0 and table.concat(lines,'; ') or 'No inventory recovery requested'
   end
   return self

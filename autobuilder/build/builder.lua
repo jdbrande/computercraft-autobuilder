@@ -257,7 +257,7 @@ function M.new(task,e,config,nav,save,mode)
       local count=item and item.count or 0; local matches=matchesBlock(b,found,actual,p)
       if p.pair then
         local paired,other,why=pairInspection(b,p,'recover'); if why then return false,why end
-        task.pairResults.existing=task.pairResults.recover
+        task.pairResults.existing=U.copy(task.pairResults.recover)
         if matches and not P.compare(p.pair,paired,other) then return false,'paired block half does not match recorded placement' end
         if not found and paired then return false,'paired block space changed during placement recovery' end
       end

@@ -1697,3 +1697,22 @@ priority. Focused priority/scaling/production/coordination checks pass. Concurre
 factory request advancement is still under development: it must not duplicate
 furnace ownership or strand ungranted batches after competing inputs are consumed.
 This branch is not accepted or integrated.
+0.35 final review and consolidated corrections — 2026-10-04: the successful
+review identified courier deposit-journal replay missing from the executor,
+refueling blocked by the recovery-wide courier reservation, collection waiting
+that starved other controller actions, and missing child-job diagnostics.
+Regression tests reproduced each issue. The fixes reconcile courier journals in
+the normal action loop, permit only registered home refueling before an unassigned
+trip, preserve the exclusive courier across the between-trip gap, yield blocked
+collection without a journal, and expose the child error/task. Focused recovery
+and fuel tests pass; broader integration and final full gates remain pending.
+The earlier service-limit error was not a review; this is the one completed review,
+with no rereview. A native refueling retest is next.
+Native paired-placement checkpoint correction — 2026-10-04: bed recovery
+reused one inspection table under both `pairResults.recover` and `.existing`.
+CraftOS rejects repeated table references; the simulation fixture's deep-copy
+save silently removed the alias. The fixture now checks the original object
+graph before copying. Eight door/bed cases failed before the one-line independent
+copy and all advanced placement tests pass afterward. This is a new runtime bug,
+not a second branch review. The final full gate is superseded and will rerun on
+the corrected source; native recovery retains the original physical contract.

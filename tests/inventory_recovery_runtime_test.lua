@@ -2,7 +2,8 @@ local U=require('autobuilder.core.util')
 local S=require('tests.support')
 local R=require('autobuilder.core.runtime')
 local C=require('tests.loaded_config')
-test('real recovery runtimes preserve tagged cargo donor ownership and receipts across interrupted drop and reboot',function()
+for _,crashAt in ipairs({'donor','courier'}) do
+test('real recovery runtimes preserve custody across interrupted '..crashAt..' drop and reboot',function()
  local f=require('tests.managed_logistics_support').new();local now=100;local apps,envs,configs,packets={},{},{},{}
  local slots={[12]={[1]={name='minecraft:stone',count=5},[16]={name='minecraft:diamond_pickaxe',count=1,nbt='tool-tag'}},[13]={[15]={name='minecraft:coal',count=3}}}
  local drops=0;local crash=true
@@ -30,9 +31,14 @@ test('real recovery runtimes preserve tagged cargo donor ownership and receipts 
    t.inspectDown=function() local p=apps[id].state.position;return true,{name=p.x==2 and p.z==2 and 'computercraft:turtle_advanced' or 'minecraft:chest'} end
    t.dropUp=function(n)
     assert(id==12 and t.inspectUp());drops=drops+1;local moved=transfer(slots[id],selected,slots[13],n)
-    if crash then crash=false;error('power lost after donor drop') end;return moved
+    if crash and crashAt=='donor' then crash=false;error('power lost after donor drop') end;return moved
    end
-   t.dropDown=function(n) local p=apps[id].state.position;assert(id==13 and p.x==4 and p.y==1 and p.z==0);return transfer(slots[id],selected,f.inventories.b,n) end
+   t.dropDown=function(n)
+    local p=apps[id].state.position;assert(id==13 and p.x==4 and p.y==1 and p.z==0)
+    local moved=transfer(slots[id],selected,f.inventories.b,n)
+    if crash and crashAt=='courier' then crash=false;error('power lost after courier drop') end
+    return moved
+   end
   end
   local opts={role=id==7 and 'controller' or 'worker',controllerId=7,automation={enabled=true,courier=id==13},minimumFuelReserve=0,
    depot={x=id==13 and 4 or 2,y=1,z=id==13 and 0 or 2},initialPosition={x=id==13 and 4 or 2,y=1,z=id==13 and 0 or 2,heading='north'},
@@ -68,3 +74,5 @@ test('real recovery runtimes preserve tagged cargo donor ownership and receipts 
  assert(not d.automation:handle(7,{boot=c.state.boot,sequence=999999,type='task_resume',payload={jobId='mine:7:1'}}))
  assert(not d.mining:handle(7,{type='mine_resume',payload={jobId='mine:7:1'}}));d:workStep();eq(envs[12].turtle.calls,0)
 end)
+
+end
