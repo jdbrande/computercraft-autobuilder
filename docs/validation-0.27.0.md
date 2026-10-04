@@ -60,8 +60,9 @@ and mining ownership, finished two correct blocks and returned empty. Final fuel
 was536 for the builder and1986 for the miner. All four finite production requests
 across both runs completed, with no active supply owner or mining trip.
 
-Independent final inspection and fixture shutdown/coverage cleanup are pending
-at this report checkpoint. Audit startup/state copies, exact setup/stock-loss
+All22 independent final checks passed. Computers225–227 were shut down and all
+ten fixture force-load tickets removed; observer command receipts confirm cleanup.
+The player was not moved. Audit startup/state copies, exact setup/stock-loss
 commands, restart snapshots and observer receipts are under ignored
 `dist/live-supply-forecast/`.
 

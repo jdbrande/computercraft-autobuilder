@@ -1254,3 +1254,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   builder536,miner1986. Four finite production requests completed. Final independent
   inspection/cleanup and complete Lua gate remain before integration; see
   validation-0.27.0.md and ignored dist/live-supply-forecast/.
+
+- Native0.27 final22 independent checks passed; computers225–227 are shut down,
+  ten fixture force-load tickets removed and evidence monitor stopped. No player
+  movement or world backup. Complete Lua gate and ordered integration remain.
