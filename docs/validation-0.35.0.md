@@ -69,3 +69,29 @@ adjacent-turtle probes under the parent folder established native NBT-preserving
 operator commands at the controller event boundary. It does not establish recovery
 from an ambiguous physical move, powered-off donors, unreachable routes, arbitrary
 terrain, automatic chunk loading or automatic repair of quarantined assignments.
+
+## Final-source native refueling retest — 2026-10-04
+
+Controller 254, blocked donor 255 and courier 256 repeated the two-stack recovery
+at a separate rig around `(2370..2392,300,0..4)`, running source `391db98`. Courier
+256 began with only 68 movement fuel and no carried fuel items. Its registered
+station held 16 coal; central stock held three coal for automatic replenishment.
+The first attempt used stale fixture inventory names; those were corrected before
+any recovery trip and the fleet rebooted. No inventory checkpoint was synthesized.
+
+After the first pickup returned, the next trip's conservative mission budget
+exceeded remaining fuel. The controller retained the recovery courier and buffer,
+created an ordinary home `REFUEL` job, consumed three station coal and then resumed
+the next recovery trip. A `FUEL_STATION` job replenished those three coal from central
+stock. Both cargo jobs, refueling, replenishment and collection completed.
+
+Independent world data confirmed five central stone, one unchanged `Damage:3`
+pickaxe in the private buffer, 16 station coal, empty donor/pickup/courier inventories,
+intact bedrock and the idle home courier at 228 fuel. The donor remained quarantined
+at its original blocked position and retained its original transport ownership.
+All three computers were shut down and four temporary chunk tickets removed.
+Evidence is under ignored `dist/live-inventory-recovery/refuel-retest/`.
+
+This retest establishes native automatic fuel handoff between recovery trips. The
+post-deposit power-loss regression and full controller-service starvation regression
+are automated evidence; they were not induced as additional native crashes.

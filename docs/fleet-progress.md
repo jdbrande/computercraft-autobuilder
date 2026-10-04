@@ -1682,3 +1682,13 @@ graph before copying. Eight door/bed cases failed before the one-line independen
 copy and all advanced placement tests pass afterward. This is a new runtime bug,
 not a second branch review. The final full gate is superseded and will rerun on
 the corrected source; native recovery retains the original physical contract.
+
+0.35 final-source native refueling passed — 2026-10-04: courier256 started at68fuel,
+completed its first pickup, automatically refueled at its registered home station
+while retaining the recovery, then completed the second pickup. The controller
+replenished three station coal from registered central stock. Independent data
+confirmed five central stone, unchanged tagged pickaxe,16station coal, empty idle
+courier home at228fuel, empty quarantined donor and intact obstruction. All recovery,
+fuel and collection jobs settled; computers254–256off and fourtickets removed.
+Fixture inventory names were corrected before the first trip. Final full gates are
+running on391db98; see the permanent0.35report and ignored native audit records.
