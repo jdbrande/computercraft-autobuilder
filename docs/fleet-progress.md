@@ -1461,3 +1461,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   and fail closed on incomplete unpinned discovery. All four new regressions failed
   before the changes and pass afterward; enrollment/setup/install/runtime focused
   suites pass. Full gates and final-source native repair retest follow.
+
+-0.30 final-source native retest passed: real HTTP software repair preserved local
+  settings and checkpoint bytes; partial profile refresh retained supply inventory,
+  side and west heading, changed batch2→1 and consumed no fuel(1,188 unchanged).
+  Worker registered idle with verified0.30.0 software. Computers237/238 shut down
+  and all four temporary tickets removed with confirmed cleanup receipt. Permanent
+  candidate report validation-0.30.0.md records automated/native evidence and limits;
+  complete Lua gate is still running and acceptance is not yet claimed.
