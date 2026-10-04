@@ -37,6 +37,10 @@ function M.draw(term,state,agent,page,input)
   elseif state.role=='controller' and state.view=='exploration' then
     local x=state.exploration or {}; line('EXPLORATION '..(x.paused and '[PAUSED]' or ''))
     local details={}
+    for _,text in ipairs(state.explorationLines or {}) do
+      while #text>width do details[#details+1]=text:sub(1,width);text=text:sub(width+1) end
+      details[#details+1]=text
+    end
     local ids={}; for id in pairs(x.groups or {}) do ids[#ids+1]=id end; table.sort(ids)
     for _,id in ipairs(ids) do
       local g=x.groups[id]

@@ -69,3 +69,67 @@ test('exploration routes avoid protected claims and deny insufficient return fue
   context.availableFuel=100; context.activeJobs={{workerId=2,status='running',exploration={bounds=sector.bounds,route={}}}}
   local _,why=E.plan(sector,context); assert(why:find('owned'))
 end)
+
+test('exploration physical evidence is bounded validated cleaned and optional for older workers',function()
+  local E=require('autobuilder.resources.exploration');local N=require('autobuilder.core.mining_messages')
+  local r={cursor=1,clearedRouteCount=0,observations={}}
+  assert(E.report(r))
+  for _,kind in ipairs({'clear','liquid','blocked','protected'}) do
+    r.evidence={{x=1,y=0,z=0,kind=kind,name='minecraft:water',reason='observed obstacle',unexpected='discard'}}
+    assert(E.report(r));local clean=N.clean('mine_progress',{jobId='mine:1',phase='work',delivered=0,held=0,exploration=r})
+    eq(clean.exploration.evidence[1].kind,kind);eq(clean.exploration.evidence[1].unexpected,nil)
+  end
+  for _,entry in ipairs({{x=1,y=0,z=0,kind='invented'},{x=1.5,y=0,z=0,kind='clear'},
+    {x=1,y=0,z=0,kind='blocked',reason=string.rep('x',129)},{x=1,y=0,z=0,kind='liquid',name=string.rep('x',129)}}) do
+    r.evidence={entry};assert(not E.report(r),'malformed physical evidence accepted')
+  end
+  r.evidence={[2]={x=1,y=0,z=0,kind='clear'}};assert(not E.report(r))
+  r.evidence={};for i=1,65 do r.evidence[i]={x=i,y=0,z=0,kind='clear'} end;assert(not E.report(r))
+end)
+
+test('sector physical evidence stays inside owned geometry and retains only bounded latest observations',function()
+  local E=require('autobuilder.resources.exploration')
+  local g={sectorId='0,0,0',bounds={min={x=0,y=0,z=0},max={x=7,y=2,z=7}},route={{x=-1,y=0,z=0}},exitRoute={{x=-2,y=0,z=0}}}
+  local r={cursor=1,clearedRouteCount=0,observations={},evidence={{x=99,y=0,z=0,kind='clear'}}};local records={}
+  assert(not E.record(records,{item='minecraft:coal',exploration=g},r));eq(next(records),nil)
+  for _,x in ipairs({-2,-1,0,7}) do r.evidence={{x=x,y=0,z=0,kind='blocked',reason='solid obstacle'}};assert(E.record(records,{item='minecraft:coal',exploration=g},r)) end
+  eq(#records['0,0,0'].evidence,4)
+  local progress={}
+  for i=1,70 do E.addEvidence(progress,{x=i,y=0,z=0},'blocked','minecraft:stone','blocked path') end
+  eq(#progress.evidence,64);eq(progress.evidence[1].x,7)
+  E.addEvidence(progress,{x=70,y=0,z=0},'clear');eq(#progress.evidence,64);eq(progress.evidence[64].kind,'clear')
+  r.evidence={{x=-1,y=0,z=0,kind='clear'}};assert(E.record(records,{item='minecraft:coal',exploration=g},r))
+  local seen;for _,p in ipairs(records['0,0,0'].evidence) do if p.x==-1 then seen=p end end;eq(seen.kind,'clear')
+end)
+
+
+test('sector ranking uses observed density confirmed yield and hazard cost before travel ties',function()
+  local E=require('autobuilder.resources.exploration');local c=config();c.bounds.min.x=0
+  local records={};for _,s in ipairs(E.sectors(c)) do records[s.id]={observations={},surveys={},outcomes={}} end
+  records['0,0,0'].observations={{x=1,y=0,z=0,name='minecraft:coal_ore'},{x=2,y=0,z=0,name='minecraft:stone'}}
+  records['1,0,0'].observations={{x=8,y=0,z=0,name='minecraft:coal_ore'},{x=9,y=0,z=0,name='minecraft:coal_ore'}}
+  local function first() return E.candidates(records,c,'minecraft:coal',{x=0,y=0,z=0})[1] end
+  eq(first().id,'1,0,0');eq(first().density,1)
+  records['1,0,0'].observations[2].name='minecraft:stone'
+  records['1,0,0'].outcomes['minecraft:coal']={delivered=4,mined=4,trips=2}
+  eq(first().id,'1,0,0');eq(first().yield,2)
+  records['0,0,0'].outcomes['minecraft:coal']={delivered=4,mined=4,trips=2}
+  records['0,0,0'].evidence={{x=3,y=0,z=0,kind='liquid',name='minecraft:lava'}}
+  eq(first().id,'1,0,0')
+  records['1,0,0'].surveys['minecraft:coal']={exhausted=true,bounds=E.sectors(c)[2].bounds,cursor=193}
+  eq(first().id,'0,0,0')
+end)
+
+test('exploration routes avoid retained hazards and prefer confirmed clear cells without overriding protection',function()
+  local E=require('autobuilder.resources.exploration');local c=config();c.bounds.min.x=0;c.bounds.max.z=15
+  local sector;for _,s in ipairs(E.sectors(c)) do if s.id=='1,0,1' then sector=s end end
+  local ctx={config={exploration=c,maxTravelDistance=1024,minimumFuelReserve=0,mining={pathBudget=4096,returnMargin=0}},
+    depot={x=0,y=0,z=0},exitRoute={},protectedAreas={},activeJobs={},availableFuel=1000,records={old={evidence={}}}}
+  for z=1,8 do ctx.records.old.evidence[#ctx.records.old.evidence+1]={x=0,y=0,z=z,kind='clear'} end
+  local g=assert(E.plan(sector,ctx));eq(g.route[1].z,1)
+  ctx.records.old.evidence[#ctx.records.old.evidence+1]={x=0,y=0,z=2,kind='liquid',name='minecraft:water'}
+  ctx.protectedAreas={{min={x=0,y=0,z=1},max={x=0,y=0,z=1}}}
+  g=assert(E.plan(sector,ctx))
+  for _,p in ipairs(g.route) do assert(not (p.x==0 and p.y==0 and (p.z==1 or p.z==2)),'historical clear route bypassed hazard or protection') end
+  ctx.availableFuel=1;assert(not E.plan(sector,ctx))
+end)

@@ -1100,6 +1100,37 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   restarting. Preliminary full-suite runs were terminated after this new finding
   and cannot serve as final acceptance. No extra review pass was requested.
 
+- Prepared the next dependency-following milestone for requirement10, persistent mining
+  intelligence, in isolated `.worktrees/mining-intelligence` (`milestone/0.25.0`).
+  The design reuses bounded exploration records and physical journals for inspection
+  evidence, hazards, route history, density/yield ranking and explicit safe sector
+  retries. Tasks50–52 record implementation and native acceptance. No0.25 implementation
+  or acceptance is claimed yet;0.24 scaling native/final validation remains active.
+
+- Task50 implementation now retains at most64 physical evidence cells per trip/sector,
+  optional on the existing protocol for older workers. Inspection and scanner sightings
+  persist alongside liquids, protected/failed digs and clear movement reconciled through
+  the existing journal. Reservation denial never becomes geological evidence. Focused
+  tests cover waterlogged blocks, movement recovery, sparse/oversized/out-of-contract
+  evidence and retained ore sightings after excavation.
+- A failing checkpoint regression exposed premature in-memory completion of exploration
+  trips. Progress now rolls back the trip, sector history and acquisition together on
+  failed save. Material-specific actual yield, successful/empty/inaccessible trip counts
+  survive reboot and ignore duplicate terminal reports. Exploration, miner and mining
+  runtime focused suites pass; this is implementation evidence, not0.25 acceptance.
+
+- Task51 now ranks candidate sectors by retained material density, average physical
+  yield and hazard count before distance ties. Route planning avoids retained negative
+  cells and prefers confirmed clear direct steps while preserving current protection,
+  leases, fuel and bounded search. Sector diagnostics expose coordinates and outcome
+  counts; explicit retry preserves delivery history and refuses active/offline ownership.
+  Retry checkpoint failures restore prior coverage and evidence.
+- Both scanner and inspection-only actual-runtime autonomous-chain scenarios pass with
+  controller/worker restarts. Their sector delivery totals equal independently simulated
+  physical deposits; confirmed travel and resource sightings survive the restarts.
+  The separate native219/220 learning fixture is running with2,000 finite fuel, a staged
+  protected obstacle, empty first sector and six stone blocks beyond it. Eight chunks
+  are explicitly loaded. Native acceptance and final review/gates remain pending.
 - The larger scaling rerun exposed a separate movement stall: a traffic detour could
   enter another worker's reserved preparation volume, but that denial did not resume
   route planning. The worker now recognizes active preparation ownership as a traffic
@@ -1130,6 +1161,27 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   checks pass. Controller212 was restarted from its saved files with this fix; no
   worker ownership or cargo was reset. Final full-suite evidence will use this source.
 
+- The single final0.25 review found three reproducible Important learning errors:
+  inspected turtles became permanent hazards, long returns evicted discovered hazards,
+  and preloaded depot cargo falsely credited unvisited sectors. Consolidated fixes now
+  keep physical turtles on the transient reservation/retry path, retain unresolved
+  negative evidence ahead of clear travel, and journal initial cargo separately from
+  attributed mined yield. Total acquisition receipts remain unchanged; old reports
+  conservatively add no mined yield. Regressions cover both scanner/inspection paths,
+  a70-cell hazardous trip and its next route, initial-unload recovery, malformed/regressing
+  counters and legacy reports. Focused exploration/miner/runtime tests pass. No second
+  review is planned. Final native regression extension and complete gates remain pending.
+
+- Native0.25 final-source review extension passed: preloaded depot cargo was excluded
+  from mined yield; an actual turtle obstruction retained its active trip across a
+  controller restart, then resumed automatically when removed. Independent reads
+  confirmed nine stored cobblestone (eight mined plus one explicit preload), empty
+  home cargo and1,846 finite fuel. Both computers are off and their eight test chunks
+  are unloaded. See validation-0.25.0.md. Complete Lua gates remain running.
+
+- Final0.25 clean-source gate completed:802 Lua tests,18 Python tests, release
+  verification and whitespace checks pass. Native acceptance is complete.
+  Integration remains ordered behind the still-running0.24 native scaling trial.
 - Final0.24 full gate failed1/786 tests: the48-block ramp/drain fixture stalled at
  46 blocks. Retained state identified builder14 blocked by a chest encountered
   inside a traffic detour. The earlier focused pass did not exercise that ordering.
@@ -1139,6 +1191,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   runtime with opposing routes and station chests also passes. This is a release
   blocker corrected before restarting the full gate, not a waived flaky test.
 
+- Propagated0.24 physical-detour correction after the earlier802-test pass. The
+  complete0.25 gate is restarting on the merged source before integration.
+
+- Final0.25.0 complete Lua gate passed804 tests, with18 Python tests and
+  release/whitespace checks. Log: /tmp/fleet-025-final-full-v2.log. Ordered integration
+  waits for0.24 native worker settlement; no feature gate is waived.
 - Native0.24's accelerated1s heartbeat/3s registration fixture saturated the
   controller inbox, with repeated dropped-message warnings and slow durable retries.
   Restored shipped defaults5s/15s on212–218 through checkpoint-preserving reboots.
@@ -1161,3 +1219,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 
 - Integrated accepted0.24 dynamic scaling on main. Source/test/release artifacts
   match the fully tested milestone; integration only reconciles progress documents.
+
+- Accepted0.25 mining intelligence:804 Lua/18 Python, final review regressions,
+  native hazard/yield/restart/initial-cargo checks and cleanup complete. Imported
+  accepted0.24 evidence without changing tested implementation.

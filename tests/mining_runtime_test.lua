@@ -291,3 +291,21 @@ test('fresh exploration setup replaces a saved expansion at the same base',funct
   local fresh=U.copy(original); fresh.exploration.bounds.min.y=10; fresh.exploration.bounds.max.y=12
   c=R.new(fresh,ce); eq(fresh.exploration.bounds.max.x,8); eq(fresh.exploration.bounds.min.y,10)
 end)
+
+
+test('exploration sector diagnostics and retry expose retained history through native commands',function()
+  local _,ce,_,_,_,cc=fixture()
+  cc.exploration={enabled=true,base={x=0,y=0,z=0},bounds={min={x=0,y=0,z=0},max={x=15,y=2,z=7}},
+    baseProtection={min={x=0,y=-1,z=0},max={x=0,y=-1,z=0}},dimensionMinY=-64,dimensionMaxY=319}
+  local R=require('autobuilder.core.runtime');local c=R.new(cc,ce)
+  c.state.exploration.sectors['0,0,0']={observations={{x=2,y=0,z=0,name='minecraft:coal_ore'}},
+    surveys={['minecraft:coal']={cursor=3,exhausted=true,bounds={min={x=0,y=0,z=0},max={x=7,y=2,z=7}}}},
+    outcomes={['minecraft:coal']={trips=2,delivered=3,successful=1,empty=0,inaccessible=1,lastResult='route_blocked'}},
+    evidence={{x=1,y=0,z=0,kind='liquid',name='minecraft:water',reason='observed water'}}}
+  assert(c:save());assert(c:command('exploration sector 0,0,0'))
+  local text=table.concat(c.state.explorationLines,'\n');assert(text:find('minecraft:coal',1,true));assert(text:find('delivered=3',1,true))
+  assert(text:find('1,0,0',1,true) and text:find('observed water',1,true));assert(text:find('density=',1,true))
+  assert(c:command('exploration retry 0,0,0'));c=R.new(cc,ce)
+  eq(#c.state.exploration.sectors['0,0,0'].evidence,0);eq(c.state.exploration.sectors['0,0,0'].outcomes['minecraft:coal'].delivered,3)
+  assert(not c:command('exploration sector unknown'));assert(not c:command('exploration retry'))
+end)

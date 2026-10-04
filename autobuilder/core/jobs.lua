@@ -72,6 +72,23 @@ function M.new(state,save,clock,controllerId,config,chunks)
     return not Coordination.workerBusy(state,w.id,job.id),'worker already owns work'
   end
   local planning={}
+  function self:retrySector(id)
+    local r=exploration.sectors[id];if not r then return false,'unknown exploration sector' end
+    local bounds;for _,sector in ipairs(E.sectors(config.exploration)) do if sector.id==id then bounds=sector.bounds;break end end
+    if not bounds then return false,'sector is outside current exploration envelope' end
+    for _,j in pairs(state.jobs) do if j.workerId and not j.physicalComplete and j.status~='completed' then
+      local g=j.exploration
+      if not g or g.sectorId==id or E.overlaps(g.bounds,bounds) then return false,'sector retains active mining ownership' end
+      for _,route in ipairs({g.route or {},g.exitRoute or {}}) do for _,p in ipairs(route) do
+        if require('autobuilder.core.pathfinding').inside(p,bounds) then return false,'sector contains an owned mining route' end
+      end end
+    end end
+    local previous=U.copy(r);r.surveys={};local clear={}
+    for _,p in ipairs(r.evidence or {}) do if p.kind=='clear' then clear[#clear+1]=p end end;r.evidence=clear
+    local ok,why=pcall(persist)
+    if not ok then for k in pairs(r) do r[k]=nil end;for k,v in pairs(previous) do r[k]=v end;return false,why end
+    planning={};return true,'Retry enabled for sector '..id
+  end
   local function assignExploration(workers,counts)
     if not config or not (config.exploration or {}).enabled or exploration.paused or Coordination.factoryPending(state) or not counts then return end
     local attempts=0
@@ -125,7 +142,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
                   g.status='running'; g.error='Planning reachable search sectors'; return
                 end
                 attempts=attempts+1; local sector=choices[ci]
-                local geometry,why=E.plan(sector,{config=config,depot=home.depot,exitRoute=home.exitRoute,protectedAreas=areas,activeJobs=state.jobs,availableFuel=t.fuel})
+                local geometry,why=E.plan(sector,{config=config,depot=home.depot,exitRoute=home.exitRoute,protectedAreas=areas,activeJobs=state.jobs,availableFuel=t.fuel,records=exploration.sectors})
                 if geometry then
                   local j=create(g.item,math.min(64,math.ceil(remaining/math.max(1,eligible))),0); geometry.groupId=g.id
                   j.exploration=geometry; j.miningArea=U.copy(geometry.bounds); j.miningResources=U.copy(t.miningResources or {})
@@ -289,15 +306,28 @@ function M.new(state,save,clock,controllerId,config,chunks)
     if j.status=='completed' or j.physicalComplete then return true end
     if p.delivered<j.progress.delivered then return false,'stale progress' end
     if j.exploration then
-      if not E.report(p.exploration) or p.exploration.cursor>193 or p.delivered<0 then return false,'invalid exploration result' end
+      if not E.report(p.exploration,j.exploration) or p.exploration.cursor>193 or p.delivered<0 then return false,'invalid exploration result' end
+      local initial=p.exploration.initialDelivered or 0
+      if initial>p.delivered or initial<((j.progress.exploration or {}).initialDelivered or 0) then return false,'invalid initial cargo receipt' end
       if p.phase=='completed' and (not p.exploration.result or p.held~=0 or stock==nil) then return false,'exploration completion needs unloaded inventory and live stock' end
+      local previous=U.copy(j);local sectorId=j.exploration.sectorId
+      local sector=U.copy(exploration.sectors[sectorId]);local group=exploration.groups[j.exploration.groupId]
+      local priorGroup=U.copy(group)
       if p.phase=='completed' then
-        assert(E.record(exploration.sectors,j,p.exploration)); j.physicalComplete=true; j.status='completed'; j.error=nil
+        assert(E.record(exploration.sectors,j,p.exploration,p.delivered)); j.physicalComplete=true; j.status='completed'; j.error=nil
       elseif p.phase=='blocked' then j.status='blocked'; j.error=p.error
       else j.status='running' end
       j.progress={delivered=p.delivered,held=p.held,phase=p.phase,exploration=E.cleanReport(p.exploration)}
       if j.physicalComplete then j.physicalCompletedAt=j.physicalCompletedAt or clock() end
-      self:refreshAcquisition(j.exploration.groupId,stock or 0); persist(); return true
+      self:refreshAcquisition(j.exploration.groupId,stock or 0)
+      local ok,why=pcall(persist)
+      if not ok then
+        for k in pairs(j) do j[k]=nil end;for k,v in pairs(previous) do j[k]=v end
+        exploration.sectors[sectorId]=sector
+        for k in pairs(group) do group[k]=nil end;for k,v in pairs(priorGroup) do group[k]=v end
+        error(why,0)
+      end
+      return true
     end
     j.progress={delivered=p.delivered,held=p.held,phase=p.phase}
     if p.phase=='completed' then

@@ -70,20 +70,47 @@ function M.candidates(records,c,item,start)
       sector.surveyed={}
       local visited=coverage(survey); local keys={}; for k in pairs(visited) do keys[#keys+1]=k end; table.sort(keys)
       for _,k in ipairs(keys) do if P.inside(visited[k],sector.bounds) then sector.surveyed[#sector.surveyed+1]=U.copy(visited[k]) end end
-      sector.known=false
-      for _,p in ipairs(r.observations or {}) do if material.blocks[p.name] and P.inside(p,sector.bounds) then sector.known=true; break end end
+      local seen,matching=0,0
+      for _,p in ipairs(r.observations or {}) do if P.inside(p,sector.bounds) then
+        seen=seen+1;if material.blocks[p.name] then matching=matching+1 end
+      end end
+      sector.known=matching>0;sector.density=matching/math.max(1,seen,#sector.surveyed)
+      local outcome=(r.outcomes or {})[item] or {}
+      sector.yield=(outcome.mined or 0)/math.max(1,outcome.trips or 0);sector.hazards=0
+      for _,p in ipairs(r.evidence or {}) do if p.kind~='clear' and P.inside(p,sector.bounds) then sector.hazards=sector.hazards+1 end end
       sector.distance=U.distance(start,sector.bounds.min)
       result[#result+1]=sector
     end
   end
   table.sort(result,function(a,b)
     if a.known~=b.known then return a.known end
+    if a.density~=b.density then return a.density>b.density end
+    if a.yield~=b.yield then return a.yield>b.yield end
+    if a.hazards~=b.hazards then return a.hazards<b.hazards end
     if a.distance~=b.distance then return a.distance<b.distance end
     local ay=math.abs(a.bounds.min.y-(material.suggestedY or start.y)); local by=math.abs(b.bounds.min.y-(material.suggestedY or start.y))
     if ay~=by then return ay<by end
     if a.x~=b.x then return a.x<b.x end; if a.y~=b.y then return a.y<b.y end; return a.z<b.z
   end)
   return result
+end
+function M.describe(id,r)
+  local lines={'Sector '..id..' sightings='..#(r.observations or {})..' evidence='..#(r.evidence or {})}
+  local items={};for item in pairs(r.surveys or {}) do items[item]=true end;for item in pairs(r.outcomes or {}) do items[item]=true end
+  local ordered={};for item in pairs(items) do ordered[#ordered+1]=item end;table.sort(ordered)
+  for _,item in ipairs(ordered) do
+    local h=(r.outcomes or {})[item] or {};local survey=(r.surveys or {})[item];local searched=0
+    for _ in pairs(coverage(survey)) do searched=searched+1 end
+    local matching=0;local material=Materials.get(item)
+    for _,p in ipairs(r.observations or {}) do if material and material.blocks[p.name] then matching=matching+1 end end
+    local density=matching/math.max(1,#(r.observations or {}),searched)
+    lines[#lines+1]=item..' density='..string.format('%.3f',density)..' searched='..searched..' delivered='..(h.delivered or 0)..' mined='..(h.mined or 0)
+    lines[#lines+1]='trips='..(h.trips or 0)..' successful='..(h.successful or 0)..' empty='..(h.empty or 0)..' inaccessible='..(h.inaccessible or 0)..' last='..(h.lastResult or 'unknown')
+  end
+  for _,p in ipairs(r.evidence or {}) do
+    lines[#lines+1]=P.key(p)..' '..p.kind..(p.name and ' '..p.name or '')..(p.reason and ': '..p.reason or '')
+  end
+  return lines
 end
 function M.protected(p,boxes)
   for _,box in ipairs(boxes or {}) do if P.inside(p,box) then return true end end
@@ -103,8 +130,12 @@ function M.plan(sector,ctx)
       claims[#claims+1]=g
     end
   end
+  local clear,hazards={},{}
+  for _,r in pairs(ctx.records or {}) do for _,p in ipairs(r.evidence or {}) do
+    if p.kind=='clear' then clear[P.key(p)]=true else hazards[P.key(p)]=true end
+  end end
   local function allowed(p)
-    if not P.inside(p,envelope) or M.protected(p,ctx.protectedAreas) then return false end
+    if hazards[P.key(p)] or not P.inside(p,envelope) or M.protected(p,ctx.protectedAreas) then return false end
     for _,g in ipairs(claims) do
       if P.inside(p,g.bounds) then return false end
       for _,r in ipairs(g.route) do if P.key(r)==P.key(p) then return false end end
@@ -140,13 +171,14 @@ function M.plan(sector,ctx)
   if lower>limit then return nil,'route exceeds travel limit' end
   if ctx.availableFuel~='unlimited' and ctx.availableFuel<lower*2+c.minimumFuelReserve+c.mining.returnMargin+2 then return nil,'insufficient round-trip fuel' end
   local route={}; local position=U.copy(start)
-  for _,axis in ipairs({'x','y','z'}) do
-    while position[axis]~=entry[axis] do
-      position[axis]=position[axis]+(entry[axis]>position[axis] and 1 or -1)
-      if not allowed(position) then route=nil; break end
-      route[#route+1]=U.copy(position)
-    end
-    if not route then break end
+  while U.distance(position,entry)>0 do
+    local chosen
+    for _,axis in ipairs({'x','y','z'}) do if position[axis]~=entry[axis] then
+      local p={x=position.x,y=position.y,z=position.z};p[axis]=p[axis]+(entry[axis]>p[axis] and 1 or -1)
+      if allowed(p) and (not chosen or clear[P.key(p)] and not clear[P.key(chosen)]) then chosen=p end
+    end end
+    if not chosen then route=nil;break end
+    route[#route+1]=chosen;position=chosen
   end
   local why
   -- ponytail: bounded detour search; a failed candidate gives the next sector a turn.
@@ -190,13 +222,38 @@ function M.geometry(g)
   return P.key(p)==P.key(g.entry)
 end
 local results={quota=true,survey_exhausted=true,cargo=true,fuel=true,paused=true,route_blocked=true}
-function M.report(r)
+local evidenceKinds={clear=true,liquid=true,blocked=true,protected=true}
+local function validEvidence(p)
+  return U.position(p) and evidenceKinds[p.kind]==true and (p.name==nil or U.shortString(p.name,128))
+    and (p.reason==nil or U.shortString(p.reason,128))
+end
+local function ownedEvidence(p,g)
+  if not g or P.inside(p,g.bounds) or g.depot and U.distance(p,g.depot)==0 then return true end
+  for _,route in ipairs({g.route or {},g.exitRoute or {}}) do
+    for _,q in ipairs(route) do if U.distance(p,q)==0 then return true end end
+  end
+  return false
+end
+function M.report(r,g)
   return type(r)=='table' and (r.result==nil or results[r.result]==true)
+    and (r.initialDelivered==nil or U.integer(r.initialDelivered) and r.initialDelivered>=0 and r.initialDelivered<=1000000)
     and U.integer(r.cursor) and r.cursor>=1 and r.cursor<=193
     and U.integer(r.clearedRouteCount) and r.clearedRouteCount>=0 and r.clearedRouteCount<=1024
     and M.list(r.observations,64,function(p) return U.position(p) and U.shortString(p.name,128) end)
+    and (r.evidence==nil or M.list(r.evidence,64,function(p) return validEvidence(p) and ownedEvidence(p,g) end))
 end
 local function point(p) return {x=p.x,y=p.y,z=p.z} end
+function M.addEvidence(progress,p,kind,name,reason)
+  local entry=point(p);entry.kind=kind;entry.name=name;entry.reason=reason
+  assert(validEvidence(entry),'invalid physical mining evidence')
+  local entries=progress.evidence or {};progress.evidence=entries
+  for i=#entries,1,-1 do if P.key(entries[i])==P.key(entry) then table.remove(entries,i) end end
+  entries[#entries+1]=entry
+  if #entries>64 then
+    local oldest=1;for i,v in ipairs(entries) do if v.kind=='clear' then oldest=i;break end end
+    table.remove(entries,oldest)
+  end
+end
 local function box(b) return {min=point(b.min),max=point(b.max)} end
 function M.cleanHome(h)
   local out={depot=point(h.depot),exitRoute={},protectedAreas={}}
@@ -213,14 +270,27 @@ function M.cleanGeometry(g)
   return out
 end
 function M.cleanReport(r)
-  local out={result=r.result,cursor=r.cursor,clearedRouteCount=r.clearedRouteCount,observations={}}
+  local out={result=r.result,cursor=r.cursor,clearedRouteCount=r.clearedRouteCount,initialDelivered=r.initialDelivered,observations={}}
   for _,p in ipairs(r.observations) do local v=point(p); v.name=p.name; out.observations[#out.observations+1]=v end
+  if r.evidence then out.evidence={};for _,p in ipairs(r.evidence) do M.addEvidence(out,p,p.kind,p.name,p.reason) end end
   return out
 end
-function M.record(records,trip,report)
-  if not M.report(report) then return nil,'invalid exploration progress' end
+function M.record(records,trip,report,delivered)
+  delivered=delivered or (trip.progress or {}).delivered or 0
+  if not U.integer(delivered) or delivered<0 then return nil,'invalid delivered yield' end
+  if not M.report(report,trip.exploration) or report.initialDelivered and report.initialDelivered>delivered then return nil,'invalid exploration progress' end
   local g=trip.exploration; local r=records[g.sectorId] or {surveys={},observations={}}; records[g.sectorId]=r
   r.surveys=r.surveys or {}; r.observations=r.observations or {}
+  r.outcomes=r.outcomes or {}
+  local h=r.outcomes[trip.item] or {trips=0,delivered=0,successful=0,empty=0,inaccessible=0}
+  -- Older reports cannot distinguish initial depot cargo from mined output.
+  local mined=report.initialDelivered~=nil and delivered-report.initialDelivered or 0
+  if h.mined==nil then h.mined=0;h.successful=0 end
+  r.outcomes[trip.item]=h;h.trips=h.trips+1;h.delivered=h.delivered+delivered;h.mined=h.mined+mined
+  if mined>0 then h.successful=h.successful+1 end
+  if report.result=='survey_exhausted' and (delivered==0 or report.initialDelivered~=nil and mined==0) then h.empty=h.empty+1 end
+  if report.result=='route_blocked' then h.inaccessible=h.inaccessible+1 end
+  h.lastResult=report.result
   local visited=coverage(r.surveys[trip.item])
   for k,p in pairs(coverage({bounds=g.bounds,cursor=report.cursor,surveyed=g.surveyed})) do visited[k]=p end
   local keys={}; for k in pairs(visited) do keys[#keys+1]=k end; table.sort(keys)
@@ -230,6 +300,7 @@ function M.record(records,trip,report)
   for _,p in ipairs(report.observations) do if P.inside(p,g.bounds) then positions[P.key(p)]={x=p.x,y=p.y,z=p.z,name=p.name} end end
   local keys={}; for k in pairs(positions) do keys[#keys+1]=k end; table.sort(keys)
   r.observations={}; for i=math.max(1,#keys-63),#keys do r.observations[#r.observations+1]=positions[keys[i]] end
+  for _,p in ipairs(report.evidence or {}) do M.addEvidence(r,p,p.kind,p.name,p.reason) end
   return true
 end
 function M.protectedAreas(state,config,exceptProject,skipMiningBase,purpose)

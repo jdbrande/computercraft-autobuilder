@@ -3,6 +3,7 @@ local P=require('autobuilder.core.pathfinding')
 local Materials=require('autobuilder.resources.materials')
 local E=require('autobuilder.resources.exploration')
 local M={}
+local transient={['computercraft:turtle_normal']=true,['computercraft:turtle_advanced']=true}
 local forbidden={['minecraft:water']=true,['minecraft:lava']=true,['minecraft:bedrock']=true,
   ['minecraft:chest']=true,['minecraft:trapped_chest']=true,['minecraft:barrel']=true,
   ['minecraft:spawner']=true,['minecraft:ender_chest']=true}
@@ -20,7 +21,7 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
     exitCells[P.key(g.depot)]=true
     for _,p in ipairs(g.route) do travel[#travel+1]=p; routeCells[P.key(p)]=true end
     for _,p in ipairs(g.surveyed or {}) do surveyed[P.key(p)]=true end
-    task.explorationProgress=task.explorationProgress or {cursor=g.cursor,observations={},clearedRouteCount=0}
+    task.explorationProgress=task.explorationProgress or {cursor=g.cursor,observations={},clearedRouteCount=0,initialDelivered=0}
     task.survey=task.explorationProgress.cursor
     nav.clearExit=function(p) return task.phase~='completed' and exitCells[P.key(p)]==true end
   end
@@ -47,11 +48,27 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
   local function passable(p)
     if not P.inside(p,c.bounds) or restricted(p) or avoided[P.key(p)] then return false end
     local name=observed[P.key(p)]
-    return not name or name=='minecraft:air' or name=='minecraft:cave_air' or diggable(name,p)
+    return not name or name=='minecraft:air' or name=='minecraft:cave_air' or transient[name] or diggable(name,p)
+  end
+  local function evidence(p,kind,name,reason)
+    if g then E.addEvidence(task.explorationProgress,p,kind,name,reason and tostring(reason):sub(1,128)) end
+  end
+  local function sighting(p,name)
+    if not g or transient[name] or not P.inside(p,g.bounds) then return end
+    local entries=task.explorationProgress.observations
+    for i=#entries,1,-1 do if same(entries[i],p) then table.remove(entries,i) end end
+    local v=point(p);v.name=name;entries[#entries+1]=v;if #entries>64 then table.remove(entries,1) end
+  end
+  local function obstacle(p,b,reason)
+    if transient[b.name] then return end
+    local liquid=b.name=='minecraft:water' or b.name=='minecraft:lava'
+      or b.state and (b.state.waterlogged==true or b.state.waterlogged=='true')
+    evidence(p,liquid and 'liquid' or not diggable(b.name,p) and 'protected' or 'blocked',b.name,reason)
   end
   local function recoverMove()
     local m=task.pendingMove; if not m then return true end
     if same(pose,m.to) then
+      evidence(m.to,'clear')
       if m.kind=='return' then
         if same(task.trail[#task.trail],m.from) then table.remove(task.trail) end
       elseif not same(task.trail[#task.trail],m.to) then task.trail[#task.trail+1]=point(m.to) end
@@ -64,7 +81,12 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
     if item and item.name~=d.name then return false,'deposit slot changed during recovery' end
     local current=item and item.count or 0
     if current>d.before then return false,'deposit inventory grew during recovery' end
-    if d.name==task.item then task.delivered=task.delivered+d.before-current end
+    if d.name==task.item then
+      local delivered=d.before-current;task.delivered=task.delivered+delivered
+      if g and task.returnReason=='initial' and task.explorationProgress.initialDelivered~=nil then
+        task.explorationProgress.initialDelivered=task.explorationProgress.initialDelivered+delivered
+      end
+    end
     task.depositIntent=nil; persist(); return true
   end
   local function equal(a,b)
@@ -91,7 +113,10 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
     return gain
   end
   local function move(p,kind)
-    if U.distance(pose,p)~=1 or restricted(p) and not (g and exitCells[P.key(p)]) then return false,'unsafe or nonadjacent move' end
+    if U.distance(pose,p)~=1 then return false,'unsafe or nonadjacent move' end
+    if restricted(p) and not (g and exitCells[P.key(p)]) then
+      evidence(p,'protected',nil,'restricted mining position');return false,'unsafe or nonadjacent move'
+    end
     local suffix=''
     if p.y>pose.y then suffix='Up' elseif p.y<pose.y then suffix='Down'
     else
@@ -106,10 +131,15 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
       else return false,'ambiguous exploration dig outcome; preserve target and inventory' end
     end
     if present then
-      if g and kind=='return' then return false,'return route obstructed; no excavation authorized' end
-      if g and b.state and (b.state.waterlogged==true or b.state.waterlogged=='true') then return false,'waterlogged exploration obstacle' end
+      if transient[b.name] then
+        if nav.guard then nav.guard(pose,p) end
+        return false,'movement reservation pending: physical turtle occupies destination'
+      end
+      sighting(p,b.name)
+      if g and kind=='return' then obstacle(p,b,'return route obstructed');return false,'return route obstructed; no excavation authorized' end
+      if g and b.state and (b.state.waterlogged==true or b.state.waterlogged=='true') then obstacle(p,b,'waterlogged exploration obstacle');return false,'waterlogged exploration obstacle' end
       observed[P.key(p)]=b.name
-      if not diggable(b.name,p) then avoided[P.key(p)]=true; return false,'protected or disallowed obstacle: '..b.name end
+      if not diggable(b.name,p) then avoided[P.key(p)]=true;obstacle(p,b,'protected or disallowed obstacle');return false,'protected or disallowed obstacle: '..b.name end
       if inventory:freeSlots()==0 then return false,'inventory full before dig' end
       if not nav.workGuard then return false,'controller mutation permission required' end
       local permitted,why=nav.workGuard(p);if not permitted then return false,why end
@@ -127,7 +157,7 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
         if ok and gained(intent.inventory,after) and (not found or equal(actual,b)) then
           task.digIntent=nil;persist();if nav.workDone then nav.workDone() end
           if found then return true end
-        elseif found and equal(actual,b) and equal(intent.inventory,after) then task.digIntent=nil;persist();if nav.workDone then nav.workDone() end; return false,err or 'dig failed'
+        elseif found and equal(actual,b) and equal(intent.inventory,after) then task.digIntent=nil;obstacle(p,b,err or 'dig failed');persist();if nav.workDone then nav.workDone() end; return false,err or 'dig failed'
         else return false,'ambiguous exploration dig outcome; preserve target and inventory' end
       else ok,err=t['dig'..suffix](); if not ok then return false,err or 'dig failed (diamond pickaxe required)' end end
       if not g and nav.workDone then nav.workDone() end
@@ -184,6 +214,7 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
         end
         local found,b=t['inspect'..suffix]()
         observed[P.key(p)]=found and b.name or 'minecraft:air'
+        if found then sighting(p,b.name);if not diggable(b.name,p) or b.state and (b.state.waterlogged==true or b.state.waterlogged=='true') then obstacle(p,b,'inspected exploration obstacle') end end
         if found and Materials.get(task.item).blocks[b.name] and diggable(b.name,p) then results[#results+1]=p end
       end
     end
@@ -203,9 +234,10 @@ function M.new(task,hw,config,nav,inventory,scanner,save,clock)
       local candidates={}
       if blocks then
         if g then
-          local observations={}
-          for _,b in ipairs(blocks) do if P.inside(b,g.bounds) and #observations<64 then observations[#observations+1]=U.copy(b) end end
-          task.explorationProgress.observations=observations
+          for _,b in ipairs(blocks) do if P.inside(b,g.bounds) then
+            sighting(b,b.name)
+            if not diggable(b.name,b) and b.name~='minecraft:air' and b.name~='minecraft:cave_air' then obstacle(b,b,'scanned exploration obstacle') end
+          end end
         end
         for _,b in ipairs(blocks) do observed[P.key(b)]=b.name end
         for _,vein in ipairs(scanner:veins(blocks,Materials.get(task.item).blocks,pose)) do

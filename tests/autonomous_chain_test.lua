@@ -216,6 +216,14 @@ for _,scan in ipairs({true,false}) do
     assert(p.phase=='built',table.concat(errors,'; ')); assert(restarted); assert(f.emptyTrip,'expected automatic advance after an empty sector')
     assert(f.assignmentOwners[mc('cobblestone')][21] and f.assignmentOwners[mc('cobblestone')][26])
     eq(p.report.counts.correct,3); eq(f.builder.world.places,3)
+    local delivered,clear,observations={},0,0
+    for _,record in pairs(f.controller.runtime.state.exploration.sectors) do
+      for item,h in pairs(record.outcomes or {}) do delivered[item]=(delivered[item] or 0)+h.delivered end
+      for _,v in ipairs(record.evidence or {}) do if v.kind=='clear' then clear=clear+1 end end
+      observations=observations+#record.observations
+    end
+    for item,count in pairs(f.stats.deposited) do eq(delivered[item],count) end
+    assert(clear>0 and observations>0,'physical learning did not survive runtime restarts')
     for _,a in ipairs(f.miners) do eq(a.runtime.state.currentTask,nil); eq(a.world.pose.x,a.source.x) end
   end)
 end

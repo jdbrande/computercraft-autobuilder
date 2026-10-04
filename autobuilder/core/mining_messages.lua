@@ -20,6 +20,7 @@ function M.validate(kind,p)
     if p.exploration and (not E.report(p.exploration) or p.phase=='completed' and not p.exploration.result) then return false,'invalid exploration report' end
     if not phases[p.phase] or not U.integer(p.delivered) or p.delivered<0 or p.delivered>1000000
       or not U.integer(p.held) or p.held<0 or p.held>1024 then return false,'invalid mining progress' end
+    if p.exploration and p.exploration.initialDelivered and p.exploration.initialDelivered>p.delivered then return false,'initial cargo exceeds total delivery' end
     if p.assignedQuantity~=nil and (not U.integer(p.assignedQuantity) or p.assignedQuantity<1 or p.assignedQuantity>1000000) then return false,'invalid assigned quantity' end
     if p.error~=nil and not U.shortString(p.error,512) then return false,'invalid job error' end
   elseif kind~='mine_ack' and kind~='mine_resume' and kind~='mine_return' then return false,'unsupported message type' end
