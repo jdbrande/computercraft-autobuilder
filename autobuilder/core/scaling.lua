@@ -153,7 +153,7 @@ local function competing(state,c,role,w,counts)
   local function matches(j)
     if M.role(j)~=role or owner(j) or j.status~='queued' or not ready(state,j) or j.preparationError or j.coverageError
       or j.preferredWorker and j.preferredWorker~=w.id or j.requiredCapability and not (w.telemetry.capabilities or {})[j.requiredCapability] then return false end
-    if not Q.canDispatch(state,j) then return false end
+    if not Q.canDispatch(state,j) or not require('autobuilder.workers.health').eligible(w.telemetry,j) then return false end
     if not require('autobuilder.core.protection').canOwn(state,j,w.id) then return false end
     return true
   end
@@ -163,7 +163,7 @@ local function competing(state,c,role,w,counts)
     for _,j in pairs(state.jobs or {}) do
       if matches(j) and caps.mining and require('autobuilder.resources.materials').accepts(w.telemetry.miningResources,j.item) then return true end
     end
-    if caps.explorationV1 and require('autobuilder.resources.exploration').home(w.telemetry.explorationHome) and not (state.exploration or {}).paused then
+    if caps.explorationV1 and require('autobuilder.workers.health').eligible(w.telemetry,{type='MINE'}) and require('autobuilder.resources.exploration').home(w.telemetry.explorationHome) and not (state.exploration or {}).paused then
       for _,g in pairs((state.exploration or {}).groups or {}) do
         if g.status=='running' and not g.paused and g.target>((counts or {})[g.item] or 0)
           and require('autobuilder.resources.materials').accepts(w.telemetry.miningResources,g.item) then return true end

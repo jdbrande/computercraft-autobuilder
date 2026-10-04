@@ -36,22 +36,6 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Accepted0.24:788 Lua/18 Python tests, native48/48 verified, six workers home
   empty, stock/foundation/workspace reconciliation and cleanup complete.
   High-rate network overload remains documented for later performance work.
-- Active0.25 (`.worktrees/mining-intelligence`): native hazard/route/outcome learning
-  and restart acceptance complete. Earlier802-test gate passed; final rerun includes
-  the shared navigation fix. Integration follows0.24.
-- Active0.26 (`.worktrees/fuel-forecast`): native proactive refuel and home return
-  accepted, including measured finite fuel and coal conservation. Final Lua rerun
-  includes the shared navigation fix. Integration follows0.25.
-- Active0.27 (`.worktrees/supply-forecast`, `c755627`): material forecasts and early
-  capacity-bounded supply. Single final review fixes have regressions.18 Python tests
-  and release checks pass; complete Lua suite runs. Native two-block trial passed:
-  mining began while the builder held its last cobblestone, before placement;
-  independent world checks passed and workers returned empty. Restart retest runs.
-- Active0.28 (`.worktrees/continuous-pipeline`): automatic builds now use verified
-  regions and bounded supply production. Empty-stock, legacy ownership and actual
-  two-builder/miner/factory overlap regressions pass across restarts. Final review,
-  complete release gates and native acceptance remain pending.
-  Integrated and pushed at`71b21ed`.
 - Dynamic scaling0.24 accepted/pushed at`5ec2f40`:788 Lua/18 Python tests and
   native four-builder/two-miner ramp-up,48 verified blocks and final idle drain.
 - Mining intelligence0.25 accepted/pushed at`29a3879`:804 Lua/18 Python tests
@@ -62,8 +46,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   native replacement-acquisition trials including controller/builder reboot.
 - Continuous pipeline0.28 accepted:853 Lua/18 Python tests and native overlapping
   placement/acquisition through controller/builder restart and final conservation.
-- Worker health0.29 final gate and0.30 single-command enrollment implementation
-  and native HTTP installation acceptance are in progress.
+- Worker health0.29 accepted:868 Lua/18 Python tests, final review corrections and
+  native read-only hardware/software checks.0.30 single-command enrollment remains
+  under its complete gate; native HTTP installation and final-source repair passed.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -1345,6 +1330,39 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   (3 material blocks plus4 required air), with exact material counts and idle drain.
   This replaces the withdrawn cumulative-placement claim. No second review is
   planned; complete release gates and native acceptance remain.
+
+- Started0.29 health prerequisite design in `.worktrees/fleet-onboarding`: read-only
+  equipment/peripheral evidence, managed installation integrity, bounded registration
+  and new-work eligibility. Existing configured roles remain opt-in; owned work is
+  retained. Source-copy fixtures must report unmanaged, not verified. The subsequent
+  single-command onboarding flow remains required and is not declared complete.
+
+- Task61/62 health implementation passes focused hardware/software/network/runtime
+  and dispatch tests. Health is checked again after yielding coverage admission;
+  existing owners retain assignments despite later damage. A legacy coordination
+  fixture lacked the digging API its advertised mining role requires; its stub now
+  explicitly exposes that API without permitting physical test effects.
+- Native235/236 read-only checks report advanced pickaxe and normal crafting-table
+  turtles correctly. Both retain777 fuel. A test-generated managed receipt verifies,
+  detects an intentionally edited file, and verifies after restoration; source-copy
+  software reports unmanaged. This is integrity/hardware evidence, not installer
+  workflow acceptance. Final review, complete gates and integration remain.
+
+- The single final0.29 review identified four important integration bugs and one
+  hardware-reporting issue. Consolidated red/green regressions cover unhealthy
+  courier/private-crafter selection before staging, health changes during capacity
+  observations, impossible competing mining roles, repair digging requirements,
+  incomplete manifest/receipt agreement and redirected terminal color. New stock
+  claims now check health before ownership; owned journals still drain unchanged.
+  Installer required-file invariants are shared with integrity verification.
+- Focused health/network/runtime/coordination/logistics/scaling/install checks and
+  actual private-crafting regression pass. Complete0.29 gates are starting; native
+  integrity checks will be repeated on the final correction. No second review.
+
+- Final-source0.29 native health retest passed on `c482afa`, retaining777 fuel
+  on both turtles and correct verified/modified/restored/unmanaged reports.
+  Both computers are off and their force-load ticket removed. Python18 tests pass;
+  the complete Lua gate continues. Single-command enrollment remains in progress.
 - Native0.27 passed twice. First run observed positive-cargo early mining and2/2
   verified blocks; independent world/foundation/inventory checks passed. Second
   run rebooted controller225 and builder226 during the ungranted replacement
@@ -1406,3 +1424,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Final0.28 full gate passed853 Lua tests,18 Python tests and release/diff checks.
   Accepted0.27 documentation merged without changing the tested source. Both
   native trials, overlap/restart proof and cleanup are permanently documented.
+
+- Accepted0.29 worker health:868 Lua/18 Python tests, release/diff checks, single
+  final review fixes and final-source native hardware/integrity checks complete.
+  Accepted0.28 merged with tested implementation unchanged; ordered integration
+  proceeds while enrollment and processor milestones continue independently.

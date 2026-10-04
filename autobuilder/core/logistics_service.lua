@@ -66,7 +66,7 @@ function M.new(app,config,e,queue,production)
     for _,w in pairs(app.state.workers or {}) do
       local t=w.telemetry
       if w.online and t and t.status=='idle' and not t.task and t.position and t.position.known and U.position(t.position) and t.capabilities and t.capabilities.logisticsV1
-        and t.capabilities.courier and not Q.workerBusy(app.state,w.id) then ids[#ids+1]=w.id end
+        and t.capabilities.courier and require('autobuilder.workers.health').eligible(t,{type='TRANSPORT'}) and not Q.workerBusy(app.state,w.id) then ids[#ids+1]=w.id end
     end
     table.sort(ids);return ids[1]
   end
@@ -109,6 +109,7 @@ function M.new(app,config,e,queue,production)
     assert(worker and worker.online and telemetry and telemetry.status=='idle' and not telemetry.task
       and not Q.workerBusy(app.state,job.preferredWorker,job.id),'waiting for available preferred courier')
     local function eligible()
+      local healthy,healthError=require('autobuilder.workers.health').eligible(worker.telemetry,job);assert(healthy,healthError)
       assert(not job.paused and job.status~='completed','logistics batch paused or retired during observation')
       local allowed,why=require('autobuilder.core.scaling').canAssign(app.state,config,job,worker,app.mining.storage.counts);assert(allowed,why)
     end

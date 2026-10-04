@@ -1213,3 +1213,27 @@ integration and do not pause for routine milestone approvals.
 - [x] Run native acceptance where useful, one final review and consolidated fixes,
   full Lua/Python/release/diff checks. Update permanent evidence and progress,
   integrate/push in dependency order, then continue every remaining requirement.
+
+## Milestone0.29: worker hardware and software health
+
+Spec: [fleet health design](fleet-health-design.md). Inline execution in
+`.worktrees/fleet-onboarding` follows0.28. User authorization covers routine design
+and integration decisions. Preserve queued ownership and legacy protocol support.
+
+### Task61: Read-only hardware and managed software evidence
+
+- [x] Add failing tests for equipped tools/peripherals/API capabilities and missing
+  legacy APIs without movement, crafting, digging or equipment swapping.
+- [x] Reuse installation receipts/hashes for bounded startup integrity reporting,
+  preserving supported custom startup/settings and reporting unmanaged copies.
+- [x] Validate/clean optional telemetry health; reject malformed fields and expose
+  worker equipment/version/status in the existing worker view.
+
+### Task62: Evidence-based eligibility and acceptance
+
+- [x] Gate new role assignments on known hardware/software failures, restore idle
+  eligibility after repair, and retain active owners and recovery pathways.
+- [x] Run actual runtime and native read-only checks, one final review/consolidated
+  fixes, complete Lua/Python/release checks and permanent documentation.
+- [x] Integrate in dependency order, then implement single-command fleet discovery,
+  software verification/update and configuration using existing installer/setup.

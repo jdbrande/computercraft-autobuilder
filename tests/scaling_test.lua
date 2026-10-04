@@ -244,3 +244,14 @@ test('crafting allocation includes unexpanded operation output and subtracts onl
   local j=s.automation.jobs.craft1;j.progress=2;j.factoryFlow={collect={delivered=4}}
   local view=S.snapshot(s,c,{},100);eq(view.crafting.remaining,244);eq(view.crafting.desired,2)
 end)
+
+test('scaling does not reserve a tool-less builder for an impossible exploration bottleneck',function()
+ local s,c=fixture(1);local t=s.workers['1'].telemetry;t.capabilities={building=true,mining=true,explorationV1=true}
+ t.explorationHome={depot={x=0,y=1,z=0},exitRoute={{x=1,y=1,z=0}},protectedAreas={}}
+ local h=require('autobuilder.workers.health').observe({}, {status='unmanaged'});h.movement=true;h.placing=true;h.digging=true;h.left='none';h.right='none';t.health=h
+ s.exploration.groups.g={id='g',item='minecraft:cobblestone',target=64,status='running',tripIds={}}
+ local q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c)
+ local j=q:submit('BUILD',{blocks={{x=0,y=1,z=1,name='minecraft:stone',state={}}}})
+ eq(q:assign(s.workers),j);eq(j.workerId,1)
+ h.left='minecraft:diamond_pickaxe';eq(require('autobuilder.workers.health').eligible(t,{type='MINE'}),true)
+end)

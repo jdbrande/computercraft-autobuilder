@@ -143,13 +143,15 @@ function M.draw(term,state,agent,page,input)
     local ids={}; local online=0
     for id,w in pairs(state.workers) do ids[#ids+1]=id; if w.online then online=online+1 end end
     table.sort(ids,function(a,b) return tonumber(a)<tonumber(b) end)
-    local perPage=math.max(1,math.floor((height-5)/3)); local pages=math.max(1,math.ceil(#ids/perPage)); page=(page or 0)%pages
+    local perPage=math.max(1,math.floor((height-5)/5)); local pages=math.max(1,math.ceil(#ids/perPage)); page=(page or 0)%pages
     line('Workers '..online..'/'..#ids..' online | page '..(page+1)..'/'..pages)
     for i=page*perPage+1,math.min(#ids,(page+1)*perPage) do
       local w=state.workers[ids[i]]; local t=w.telemetry
       line(ids[i]..' '..t.label..' ['..(w.online and 'ONLINE' or 'OFFLINE')..'] '..t.status)
       line('  '..position(t.position))
       line('  fuel '..tostring(t.fuel)..' | slots '..t.inventory.used..'/16 | '..(t.task or 'idle'))
+      line('  '..require('autobuilder.workers.health').describe(t.health))
+      if t.health then line('  '..t.health.kind..' L:'..t.health.left:gsub('^[^:]+:','')..' R:'..t.health.right:gsub('^[^:]+:','')) else line('  Equipment unknown') end
     end
     if #ids==0 then line('Waiting for worker registration...') end
   else

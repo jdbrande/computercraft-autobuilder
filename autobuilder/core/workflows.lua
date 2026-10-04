@@ -135,6 +135,8 @@ function M.new(state,save,clock,id,chunks,config)
   function self:assign(workers)
     local Scaling=require('autobuilder.core.scaling')
     local function admit(j,w)
+      local healthy,healthError=require('autobuilder.workers.health').eligible(w.telemetry,j)
+      if not healthy then return false,healthError end
       local fueled,why=require('autobuilder.resources.fuel_budget').admit(config,j,w)
       if not fueled then return false,why end
       if config and config.scaling then return Scaling.canAssign(state,config,j,w,nil,clock(),workers) end

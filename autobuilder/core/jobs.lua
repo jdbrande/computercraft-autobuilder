@@ -64,6 +64,8 @@ function M.new(state,save,clock,controllerId,config,chunks)
     return g
   end
   local function admission(job,w,workers,counts)
+    local healthy,healthError=require('autobuilder.workers.health').eligible(w.telemetry,job)
+    if not healthy then return false,healthError end
     local t=w.telemetry
     if not w.online or not t or not (t.capabilities or {}).mining or job.item and not Materials.accepts(t.miningResources,job.item) then
       return false,'mining worker capability or resources changed'

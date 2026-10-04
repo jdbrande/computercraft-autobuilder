@@ -6,6 +6,7 @@ local short=U.shortString
 local Chunks=require('autobuilder.core.chunks')
 local E=require('autobuilder.resources.exploration')
 local function telemetry(p)
+  if p.health~=nil and not require('autobuilder.workers.health').valid(p.health) then return false end
   if not short(p.label) or not short(p.status) then return false end
   if p.controllerBoot~=nil and (not U.integer(p.controllerBoot) or p.controllerBoot<1 or p.controllerBoot>9007199254740991) then return false end
   for _,field in ipairs({'fuelRequired','fuelLimit'}) do
@@ -106,6 +107,7 @@ function M.new(hw,config,id,boot)
       if p.position.known then clean.position.x,clean.position.y,clean.position.z=p.position.x,p.position.y,p.position.z end
       if p.chunkAnchor then clean.chunkAnchor={provider=p.chunkAnchor.provider,x=p.chunkAnchor.x,z=p.chunkAnchor.z} end
       clean.poseRecovery=TaskMessages.poseReport(p.poseRecovery)
+      clean.health=require('autobuilder.workers.health').clean(p.health)
       clean.harvestDelivered=p.harvestDelivered
       clean.cargo=require('autobuilder.storage.returns').cleanCargo(p.cargo)
       if p.depot then clean.depot={x=p.depot.x,y=p.depot.y,z=p.depot.z,heading=p.depot.heading} end

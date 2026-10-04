@@ -276,3 +276,17 @@ test('pause during native capacity observation preserves pause and cannot stage 
   f:step(20);local other=f:jobs()[2];assert(other.logisticsReady);f:deliver(other);f:step(20)
   first.paused=nil;f:step(20);assert(first.logisticsReady,'resumed haul never staged')
 end)
+
+test('managed logistics skips unhealthy workers before staging and rechecks health after capacity observation',function()
+ local H=require('autobuilder.workers.health')
+ local f=fixture();f.app.state.workers['12'].telemetry.health=H.observe({}, {status='modified',reason='changed'})
+ f.service:request(item,8,'base','site','health');f:step(20);local j=assert(f:jobs()[1]);eq(j.preferredWorker,13);eq(j.logisticsReady,true)
+ local g=fixture();g.app.state.workers['13']=nil;g.service:request(item,8,'base','site','yield-health')
+ local call=g.e.peripheral.call
+ g.e.peripheral.call=function(name,method,...)
+  local v=call(name,method,...);if method=='getItemLimit' then g.app.state.workers['12'].telemetry.health=H.observe({}, {status='modified',reason='changed during capacity'}) end;return v
+ end
+ g:step(20);eq(g.transfers,0)
+ for _,lease in pairs(g.app.state.inventoryLedger.leases) do assert(lease.status~='held') end
+ for _,lease in pairs(g.app.state.capacityLedger.leases) do assert(lease.status~='held') end
+end)
