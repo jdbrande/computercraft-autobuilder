@@ -675,3 +675,28 @@ test('empty builder requests one bed and reconciles its sole supply item across 
  assert(requested and rebooted);assert(f.controller.state.automation.jobs[j.id].status=='completed',tostring(f.worker.state.currentTask and f.worker.state.currentTask.error))
  eq(f.stats.staged,1);eq(f.stats.pulled,1);eq(f.world.places,1);eq(f.controller.state.automation.supply,nil)
 end)
+
+test('runtime offers completed finite supply before admitting the next factory batch',function()
+ for _,stationBroken in ipairs({false,true}) do
+  local f=fixture();f:startBuild();f.inventories.stock={}
+  local j
+  for _=1,100 do
+   f:step()
+   for _,job in pairs(f.controller.state.automation.jobs) do if job.supplyId and job.missingItem then j=job end end
+   if j and next(f.controller.state.automation.requests) then break end
+  end
+  assert(j and j.supplyId);local p=f.controller.automation.production
+  local pending=p:supplyRequest(j);assert(pending)
+  f.inventories.stock={[1]={name='minecraft:stone',count=1},[2]={name='minecraft:oak_log',count=1}}
+  f.controller.state.workers['9']={id=9,online=true,lastSeen=f.ce.now,telemetry={status='idle',capabilities={crafting=true}}}
+  local later=p:request({['minecraft:oak_planks']=4})
+  if stationBroken then f.inventories.stage={[1]={name='minecraft:dirt',count=1}} end
+  for _=1,10 do f:step();if j.supplyHandoffAttempted then break end end
+  assert(j.supplyHandoffAttempted,'normal supply loop must durably consume the handoff opportunity')
+  eq(j.supplyHandoffAttempted.request,pending)
+  if stationBroken then
+   for _=1,10 do f:step();if later.jobId then break end end
+   assert(later.jobId,'an actionable station fault must leave later manufacturing possible')
+  else eq(f.stats.staged,1);assert(f.stats.supplyGrants>0) end
+ end
+end)
