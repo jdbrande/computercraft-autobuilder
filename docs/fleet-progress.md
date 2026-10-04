@@ -1595,3 +1595,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   pre-fix soil repair from the clean final-source untouched plot run. Accepted0.31
   documentation merge did not change tested code/tests/tools/artifacts. Integrating
   and pushing before continuing placement, metadata and inventory recovery work.
+
+###0.34 final-source native acceptance completed
+
+- Clean native gzip Sponge v3 import placed/verified9 cells, including3 empty
+  containers and2 sign geometries. Paused settled-pose controller/worker reboot
+  resumed without intervention; independent world states/empty inventories/grass
+  matched. All jobs/supply settled and worker returned idle; fixture shutdown and
+ 4 operator tickets removed. First run's ambiguous turn required explicit pose
+  confirmation and is separately documented as assisted.
+-20 Python and focused review regressions passed. Full Lua gate remains running;
+  candidate permanent report: [0.34 validation](validation-0.34.0.md).
