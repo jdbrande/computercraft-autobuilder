@@ -1460,3 +1460,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   transfer accounting for inventory-exposed machines, with explicit slot recipes,
   item fuel, capacity and processing-time estimates. Non-automatable hardware is
   reported unsupported. Implementation and acceptance remain pending.
+-0.30 single final review found four Important issues; consolidated fixes preserve
+  source-copy worker settings/checkpoints, separate software release discovery from
+  enrollment GPS validation, reuse configuration object/collection merge semantics,
+  and fail closed on incomplete unpinned discovery. All four new regressions failed
+  before the changes and pass afterward; enrollment/setup/install/runtime focused
+  suites pass. Full gates and final-source native repair retest follow.

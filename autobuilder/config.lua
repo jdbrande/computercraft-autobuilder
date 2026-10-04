@@ -35,16 +35,20 @@ M.defaults={
 for _,material in pairs(require('autobuilder.resources.materials').all()) do
   for block in pairs(material.blocks) do M.defaults.allowedMiningBlocks[block]=true end
 end
-local function merge(dst,src)
+local function merge(dst,src,schema)
+  schema=schema or dst
   for k,v in pairs(src) do
-    assert(dst[k]~=nil or k=='controllerId' or k=='initialPosition' or k=='depot' or k=='label' or k=='entry' or k=='bounds' or k=='x' or k=='y' or k=='z' or k=='min' or k=='max', 'Unknown config key: '..tostring(k))
+    assert(schema[k]~=nil or k=='controllerId' or k=='initialPosition' or k=='depot' or k=='label' or k=='entry' or k=='bounds' or k=='x' or k=='y' or k=='z' or k=='min' or k=='max', 'Unknown config key: '..tostring(k))
     if type(v)=='table' and type(dst[k])=='table' then
       -- These maps/lists are user-defined rather than schema objects.
       if k=='profiles' or k=='nodes' or k=='areas' or k=='values' or k=='returns' or k=='stations' or k=='providerPreferences' or k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
         or k=='craftingStations' or k=='supplyStations' or k=='furnaces' or k=='turtleFuelReserveItems' or k=='treeFarms' or k=='farms' or k=='depotExpansion' then dst[k]=U.copy(v)
-      else merge(dst[k],v) end
+      else merge(dst[k],v,schema[k]) end
     else dst[k]=U.copy(v) end
   end
+end
+function M.overlay(overrides,profile)
+  local result=U.copy(overrides);merge(result,profile,M.defaults);return result
 end
 function M.load(overrides)
   local c=U.copy(M.defaults); merge(c,overrides or {})

@@ -33,8 +33,8 @@ function M.run(args,e,base,recovery)
   local ok,x,y,z=pcall(e.gps.locate,2,false)
   if ok and type(x)=='number' and type(y)=='number' and type(z)=='number' then position={x=x,y=y,z=z} end
  end
- local offer=Discovery.find(e,{controllerId=opts.controllerId,position=position})
- local applying=not old or opts.configure or e.fs.exists(pending)
+ local applying=not cfg or opts.configure or e.fs.exists(pending)
+ local offer=Discovery.find(e,{controllerId=opts.controllerId,position=position,purpose=applying and 'configure' or 'update'})
  if applying then
   assert(type(offer.profile)=='table' and offer.profile.role=='worker' and offer.profile.controllerId==offer.controllerId,'Controller did not provide a worker profile')
   I.write(e.fs,pending,e.textutils.serializeJSON(offer.profile))

@@ -363,7 +363,7 @@ function M.applyFleet(e,value)
  assert(config.role=='worker','Fleet profile requires a worker')
  local profile=require('autobuilder.core.enrollment').profile(value,config.controllerId)
  local _,state=idle(e,config)
- for key,v in pairs(profile) do overrides[key]=U.copy(v) end
+ overrides=Config.overlay(overrides,profile)
  local pose=not (state and state.position.known) and profile.initialPosition or nil
  persist(e,config,overrides,pose,original)
  return true

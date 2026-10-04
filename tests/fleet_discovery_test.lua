@@ -28,3 +28,13 @@ test('fleet discovery rejects cyclic oversized or executable profile values and 
  end
  eq(pcall(D.find,env({}),{}),false)
 end)
+
+test('fleet discovery packet exhaustion cannot silently select the first fleet',function()
+ for _,stale in ipairs({false,true}) do
+  local offers={};for i=1,32 do offers[i]={id=7,nonce=stale and i>1 and 'stale' or nil} end;offers[33]={id=8}
+  local e=env(offers);local ok,why=pcall(D.find,e,{})
+  eq(ok,false);assert(tostring(why):find('controller'));eq(e.now,0);eq(#offers,1)
+ end
+ local offers={};for i=1,33 do offers[i]={id=7} end
+ eq(D.find(env(offers),{controllerId=7}).controllerId,7)
+end)

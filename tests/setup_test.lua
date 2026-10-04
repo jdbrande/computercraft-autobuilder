@@ -377,3 +377,17 @@ test('fleet profile application uses idle setup persistence without moving refue
  state=store:load();state.currentTask={id='owned'};assert(store:save(state));local original=e.fs.files['/autobuilder/settings.lua']
  eq(pcall(W.applyFleet,e,p),false);eq(e.fs.files['/autobuilder/settings.lua'],original);eq(store:load().currentTask.id,'owned')
 end)
+
+test('fleet partial profiles preserve nested local options and replace collections explicitly',function()
+ local e=env('worker',{});local localSettings=settings(e)
+ localSettings.supply={inventory='local:chest',side='down',batch=64};localSettings.gps={enabled=true,timeout=7,interval=42}
+ localSettings.automation={building=true,courier=true};localSettings.storageInventories={'old:a','old:b'}
+ localSettings.protectedBlocks={['minecraft:bedrock']=true,['minecraft:stone']=true}
+ e.fs.files['/autobuilder/settings.lua']='return '..e.textutils.serialize(localSettings)
+ assert(require('autobuilder.setup_wizard').applyFleet(e,{role='worker',controllerId=1,
+  initialPosition={x=12,y=64,z=-9,heading='east'},depot={x=12,y=64,z=-9},
+  supply={batch=16},gps={enabled=false},automation={building=false},storageInventories={'new:a'},protectedBlocks={}}))
+ local c=settings(e);eq(c.supply.inventory,'local:chest');eq(c.supply.side,'down');eq(c.supply.batch,16)
+ eq(c.gps.enabled,false);eq(c.gps.timeout,7);eq(c.gps.interval,42);eq(c.automation.building,false);eq(c.automation.courier,true)
+ eq(#c.storageInventories,1);eq(c.storageInventories[1],'new:a');eq(next(c.protectedBlocks),nil)
+end)

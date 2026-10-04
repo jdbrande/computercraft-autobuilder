@@ -42,10 +42,11 @@ end
 function M.reply(e,config,release,sender,message)
  if config.role~='controller' or not config.fleet.enabled or not release or not U.integer(sender) or sender<0
   or type(message)~='table' or message.version~=1 or message.type~='fleet_discover' or not U.shortString(message.requestId,100)
+  or message.purpose~=nil and message.purpose~='configure' and message.purpose~='update'
   or message.position~=nil and not U.position(message.position) then return false,'fleet discovery unavailable' end
  local found
  for _,p in ipairs(config.fleet.profiles) do if p.workerId==sender then found=p;break end end
- if found and message.position and U.distance(found.settings.initialPosition,message.position)~=0 then return false,'configured berth differs from GPS' end
+ if message.purpose~='update' and found and message.position and U.distance(found.settings.initialPosition,message.position)~=0 then return false,'configured berth differs from GPS' end
  if not found and message.position then
   for _,p in ipairs(config.fleet.profiles) do
    if p.workerId==nil and U.distance(p.settings.initialPosition,message.position)==0 then found=p;break end
