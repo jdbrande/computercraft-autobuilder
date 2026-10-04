@@ -1813,3 +1813,13 @@ container could save an oversized map and fail every subsequent startup. The
 effective map now uses the same validation before any checkpoint. A regression
 failed before the fix and verifies the512 boundary, unchanged-config restart,
 rejection without state mutation and corrected-config recovery.
+
+###0.37 native protection gate
+
+Completed missing-location migration, actual miner/builder mutation denial,
+offline Crafty endpoint protection, independent one-block construction and
+conflicting-configuration rejection/recovery. Independent world reads preserved
+both casings and all seven sentinel inventories. Five computers are off and six
+temporary tickets removed. Protected work intentionally remains paused/owned;
+its traffic wait is not reported as fleet drain. Permanent candidate evidence is
+in [0.37 validation](validation-0.37.0.md). Final-source full Lua gate continues.
