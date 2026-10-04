@@ -1246,3 +1246,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   power loss after a partial pull:65 placements,64 supplied items, empty staging
   and released ownership. Python18 tests, generated release verification and
   whitespace checks pass. Complete Lua and native acceptance are next.
+
+- Native0.27 passed twice. First run observed positive-cargo early mining and2/2
+  verified blocks; independent world/foundation/inventory checks passed. Second
+  run rebooted controller225 and builder226 during the ungranted replacement
+  request, then verified2/2 and returned both workers empty. Final finite fuel:
+  builder536,miner1986. Four finite production requests completed. Final independent
+  inspection/cleanup and complete Lua gate remain before integration; see
+  validation-0.27.0.md and ignored dist/live-supply-forecast/.
