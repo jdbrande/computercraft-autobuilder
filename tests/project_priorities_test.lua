@@ -79,3 +79,12 @@ test('material forecast allocates shared unreserved stock by the same project pr
  eq(result.z_high.items['minecraft:stone'].stored,4);eq(result.a_low.items['minecraft:stone'].stored,0)
  eq(result.z_high.priority,80)
 end)
+test('project priority never postpones an eligible return obligation',function()
+ local Q=require('autobuilder.core.workflows');local c=require('tests.loaded_config').load({minimumFuelReserve=0})
+ local s={workers={},jobs={}};local q=Q.new(s,function() return true end,function() return 1 end,7,nil,c)
+ s.automation.projects.high={name='high',priority=100}
+ s.workers['12']={id=12,online=true,telemetry={status='idle',fuel=1000,position={x=0,y=2,z=0,known=true},depot={x=0,y=2,z=0},capabilities={building=true,telemetry=true}}}
+ local build=q:submit('BUILD',{project='high',blocks={{x=1,y=0,z=0,name='minecraft:stone',state={}}}},{})
+ local home=q:submit('RETURN_HOME',{home={x=0,y=2,z=0}},{})
+ eq(q:assign(s.workers).id,home.id);eq(build.workerId,nil)
+end)

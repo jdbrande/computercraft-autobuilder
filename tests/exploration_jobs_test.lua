@@ -233,3 +233,14 @@ test('unmaterialized exploration fuel demand triggers a forecast without inventi
   jobs:setAcquisitionPaused(group.id,false);t.fuel=200
   local trip=assert(jobs:assign(workers,{}),'refueled explorer did not resume');eq(trip.workerId,1);eq(#group.tripIds,1)
 end)
+test('exploration demand follows project priority and changing it retains owned trips',function()
+ local jobs,state,workers,config=fixture();config.scaling.roles.mining.min=2
+ state.automation={projects={low={name='low',priority=20},high={name='high',priority=80}}}
+ for _,p in pairs(state.automation.projects) do p.protectedBounds={min={x=100,y=10,z=20},max={x=103,y=12,z=22}} end
+ local low=jobs:requestAcquisition('minecraft:cobblestone',1,0,'project:low')
+ local high=jobs:requestAcquisition('minecraft:coal',1,0,'project:high')
+ local first=assert(jobs:assign(workers,{}));eq(first.exploration.groupId,high.id);first.status='running'
+ state.automation.projects.low.priority=100
+ local second=assert(jobs:assign(workers,{}));eq(second.exploration.groupId,low.id)
+ assert(first.workerId~=second.workerId);eq(first.exploration.groupId,high.id)
+end)

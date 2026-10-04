@@ -395,7 +395,7 @@ function M.new(app,config,e,queue,production)
       p.autoStart=nil
       save(); return true,p.phase..' '..p.name
     end
-    return false,'build import|analyze|materials|forecast|survey|level|auto|prepare|start|status|pause|resume|verify|repair|clear [name]'
+    return false,'build import|analyze|materials|forecast|survey|level|auto|prepare|start|status|priority|pause|resume|verify|repair|clear [name]'
   end
   function self:tick()
     if s.retiredBlueprints and #s.retiredBlueprints>0 then

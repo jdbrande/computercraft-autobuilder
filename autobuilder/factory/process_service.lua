@@ -16,7 +16,7 @@ function M.new(app,config,e,queue,production)
    local machine=assert(Registry.machine(config,lane.machineId),'planned processor removed')
    local j=queue:submit('PROCESS',{item=op.item,batches=lane.batches,quantity=lane.batches*recipe.yield,
     machineId=lane.machineId,processor=U.copy(machine),processRecipe=U.copy(recipe),stockInputs=inputs,stockOutputs={[op.item]=lane.batches*recipe.yield},
-    productionRequest=r.id,productionOperation=r.operation},{},r.id..':op:'..r.operation..':processor:'..i..':replan:'..(r.replans or 0))
+    productionRequest=r.id,productionOperation=r.operation,productionGeneration=r.replans or 0},{},r.id..':op:'..r.operation..':processor:'..i..':replan:'..(r.replans or 0))
    F.commit(r,save,function() r.jobIds[i]=j.id end)
   end end
   local complete,why=true

@@ -45,3 +45,12 @@ one final review/consolidated corrections and full gates before integration.
 Strict priority can delay lower-priority work while higher-priority demand continues.
 This explicit operator policy has no hidden priority aging. Operators can change a
 project's priority or pause it; fairness within equal priorities remains deterministic.
+
+Implementation finding: shared factory graphs and acquisition targets assume one
+admitted manufacturing operation. Keep concurrent request acquisition/status and
+parallel lanes/workers within that operation. At finite operation boundaries, admit
+the highest-priority feasible request. Derive commitments from existing workers,
+journals and stock/capacity leases. Retire and replan only losing empty preferences;
+revalidate unreserved inputs before creating a new factory barrier. Separate
+normal scheduling generations from the repeated external-consumption retry budget.
+This preserves current factory isolation without a second scheduler or owner ledger.

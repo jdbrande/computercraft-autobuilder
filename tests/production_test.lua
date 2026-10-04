@@ -266,11 +266,13 @@ test('production waits for configured farms and discovers newly configured farms
   eq(material.error,nil)
 end)
 test('production recovers after furnaces and crafting workers become available',function()
-  local app,p,q,config=productionFixture({[1]={name=mc('cobblestone'),count=4},[2]={name=mc('coal'),count=1}})
+  local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=4},[2]={name=mc('coal'),count=1}})
   config.furnaces={}; local r=p:request({[mc('stone_bricks')]=4}); p:tick()
   assert(r.error:find('No configured furnaces',1,true),tostring(r.error)); eq(next(q.state.jobs),nil)
   config.furnaces={'furnace'}; p:tick(); assert(r.jobIds)
-  local job=q.state.jobs[r.jobIds[1]]; eq(job.furnaceLane,'furnace'); job.status='completed'; p:tick(); p:tick()
+  local job=q.state.jobs[r.jobIds[1]]; eq(job.furnaceLane,'furnace')
+  for _=1,30 do p:tick();p:step();h:smelt() end
+  eq(job.status,'completed')
   assert(r.error:find('No online crafting',1,true),tostring(r.error)); eq(r.jobId,nil)
   app.state.workers['9']={id=9,online=true,telemetry={capabilities={crafting=true}}}; p:tick()
   eq(q.state.jobs[r.jobId].type,'CRAFT'); eq(r.error,nil); eq(r.status,'running')
@@ -332,7 +334,7 @@ test('material progress keeps live stock counts after acquisition while factory 
   local r=p:request({[mc('stone')]=4}); p:tick()
   h.inventories.store[2]={name=mc('cobblestone'),count=4}; p:tick()
   eq(r.materials[mc('cobblestone')].status,'ready')
-  h.inventories.store[2].count=2; p:tick()
+  p:syncClaims();h.limit=2;p:step();p:tick()
   eq(r.materials[mc('cobblestone')].count,2)
   eq(r.materials[mc('cobblestone')].status,'ready'); assert(r.acquired)
 end)
@@ -535,4 +537,50 @@ test('unowned farm switches capability contracts durably while preserving existi
    else eq(r.harvests[item],id);eq(old.cancelled,nil) end
   end
  end
+end)
+
+test('priority manufacturing admits one request bank and retires only losing unclaimed preferences',function()
+ local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=8},[2]={name=mc('coal'),count=2}})
+ q.state.projects.low={name='low',priority=20};q.state.projects.high={name='high',priority=80}
+ local low=p:request({[mc('stone')]=4},'project:low',{projectName='low'});p:tick()
+ local old=q.state.jobs[low.jobIds[1]];assert(old);eq(old.workerId,nil)
+ local high=p:request({[mc('stone')]=8},'project:high',{projectName='high'});p:tick()
+ eq(old.cancelled,true);eq(old.status,'completed')
+ assert(high.jobIds and #high.jobIds>0);eq(low.jobIds,nil)
+ for _,j in pairs(q.state.jobs) do if j.status~='completed' then eq(j.productionRequest,high.id) end end
+ p:step();assert(not tostring(high.error):find('duplicate ownership',1,true))
+end)
+test('priority handover preserves held factory inputs and chooses the next uncommitted batch',function()
+ local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=12},[2]={name=mc('coal'),count=3}})
+ q.state.projects.low={name='low',priority=20};q.state.projects.high={name='high',priority=80}
+ local low=p:request({[mc('stone')]=4},'project:low',{projectName='low'});p:tick();p:syncClaims()
+ local owned=q.state.jobs[low.jobIds[1]];assert(p.ledger.state.leases[owned.id]);local original=U.copy(owned)
+ local high=p:request({[mc('stone')]=8},'project:high',{projectName='high'});p:tick()
+ eq(high.jobIds,nil);eq(owned.cancelled,nil);eq(owned.quantity,original.quantity);eq(p.ledger.state.leases[owned.id].status,'held')
+ for _=1,100 do p:step();h:smelt();p:tick() end
+ assert(high.status=='completed',high.error);eq(low.status,'completed')
+end)
+
+test('uncommitted factory input loss replans acquisition instead of leaving a mining barrier',function()
+ local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=4},[2]={name=mc('coal'),count=1}})
+ local r=p:request({[mc('stone')]=4});p:tick();local old=q.state.jobs[r.jobIds[1]]
+ h.inventories.store[1]=nil;p:tick();eq(old.cancelled,true);eq(old.status,'completed');eq(r.plan,nil)
+ app.state.workers['2']=miningWorker(2,mc('cobblestone'),20);p:tick()
+ assert(r.mines[mc('cobblestone')]);eq(require('autobuilder.core.workflows').factoryPending(app.state),false)
+ h.inventories.store[1]={name=mc('cobblestone'),count=4}
+ for _=1,60 do p:tick();p:step();h:smelt() end;eq(r.status,'completed')
+end)
+test('failed unclaimed factory retirement restores live records and retry survives reboot',function()
+ local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=8},[2]={name=mc('coal'),count=2}})
+ q.state.projects.low={name='low',priority=20};q.state.projects.high={name='high',priority=80}
+ local low=p:request({[mc('stone')]=4},'project:low',{projectName='low'});p:tick();local old=q.state.jobs[low.jobIds[1]]
+ local high=p:request({[mc('stone')]=8},'project:high',{projectName='high'});local save=app.save
+ function app:save() if old.cancelled then return false,'disk full' end;return save(self) end
+ assert(not pcall(p.tick,p));eq(old.cancelled,nil);eq(old.status,'queued');assert(low.jobIds);assert(q.state.jobs[old.id]==old)
+ app.save=save;p:tick();eq(old.cancelled,true);assert(high.jobIds)
+ app.state=U.copy(app.saved);q=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,function() return app.now end,1)
+ p=require('autobuilder.core.production_service').new(app,config,h,q)
+ for _=1,80 do p:tick();p:step();h:smelt() end
+ eq(q.state.requests[high.id].status,'completed');eq(q.state.requests[low.id].status,'completed')
+ eq(require('autobuilder.factory.factory').count(h.inventories.store,mc('stone')),8)
 end)

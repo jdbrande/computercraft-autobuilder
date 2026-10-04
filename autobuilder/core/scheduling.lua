@@ -1,6 +1,9 @@
 local U=require('autobuilder.core.util')
 local M={}
 function M.valid(n) return U.integer(n) and n>=0 and n<=100 end
+function M.urgent(j)
+  return j.siteAccess and true or ({RESCUE=true,RECOVER_CARGO=true,REFUEL=true,RETURN_HOME=true})[j.type]==true
+end
 function M.priority(state,work)
   local a=state.automation or {};local projects=a.projects or {};local seen={}
   local function resolve(j,depth)

@@ -941,3 +941,26 @@ test('private crafting skips missing craft hardware before claims and rechecks a
  for _,lease in pairs(g.c.state.inventoryLedger.leases) do assert(lease.status~='held') end
  for _,lease in pairs(g.c.state.capacityLedger.leases) do assert(lease.status~='held') end
 end)
+
+test('project priority replaces empty private station preferences and both requests finish',function()
+ local f=parallelFixture();f:request(32);local p=f.c.automation.production;local a=f.c.state.automation
+ a.projects.low={name='low',priority=20};a.projects.high={name='high',priority=80};local low=a.requests[f.id];low.project='low'
+ p:tick();local old={};for _,j in pairs(a.jobs) do if j.privateStation then old[#old+1]=j end end;eq(#old,2)
+ local high=p:request({[mc('stone_bricks')]=16},'project:high',{projectName='high'});p:tick()
+ for _,j in ipairs(old) do eq(j.cancelled,true) end
+ local highFirst=false
+ for _=1,400 do f:step();if high.status=='completed' and low.status~='completed' then highFirst=true end;if high.status=='completed' and low.status=='completed' and not f.w.state.currentTask and not f.other.w.state.currentTask then break end end
+ eq(high.status,'completed');eq(low.status,'completed');eq(highFirst,true);eq(f.h:count(mc('stone_bricks')),32)
+end)
+test('higher project drains owned private batch then takes admission before lower expansion',function()
+ local f=parallelFixture();f:request(32);local p=f.c.automation.production;local a=f.c.state.automation
+ a.projects.low={name='low',priority=20};a.projects.high={name='high',priority=80};local low=a.requests[f.id];low.project='low'
+ p:tick();p.parallel:step();local owned,empty
+ for _,j in pairs(a.jobs) do if j.privateStation then if j.factoryFlow then owned=j else empty=j end end end
+ assert(owned and empty);local lease=U.copy(f.c.state.inventoryLedger.leases[owned.id])
+ local high=p:request({[mc('stone_bricks')]=16},'project:high',{projectName='high'});p:tick()
+ eq(owned.cancelled,nil);assert(require('autobuilder.factory.factory').equal(lease,f.c.state.inventoryLedger.leases[owned.id]));eq(empty.cancelled,true)
+ local highFirst=false
+ for _=1,500 do f:step();if high.status=='completed' and low.status~='completed' then highFirst=true end;if high.status=='completed' and low.status=='completed' and not f.w.state.currentTask and not f.other.w.state.currentTask then break end end
+ eq(high.status,'completed');eq(low.status,'completed');eq(highFirst,true);eq(f.h:count(mc('stone_bricks')),32)
+end)

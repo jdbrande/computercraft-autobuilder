@@ -228,3 +228,7 @@ observed or restored. Standing signs accept the same finite stable support predi
 as preparation, including retained grass blocks. Trapped-chest metadata uses the exact
 `minecraft:trapped_chest` entity ID. Both importers validate field tag kinds; optional
 Sponge v3 `Data` may be absent for default-empty containers.
+
+Project scheduling uses `build priority <name> <0..100>` (default50). See
+[project priorities](project-priorities.md) for committed ownership, factory
+handoffs and travel-aware worker selection.

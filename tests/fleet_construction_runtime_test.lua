@@ -263,3 +263,31 @@ test('opposing construction detours recover physical station obstructions withou
   for x=0,20 do eq(f.blocks[x..',0,2'].name,'minecraft:stone') end
   eq(f.blocks['10,2,1'].name,'minecraft:chest');eq(f.blocks['11,2,-1'].name,'minecraft:chest')
 end)
+
+test('concurrent project priorities survive handover reboot and exact shared-stock construction',function()
+ local f=fixture({width=2,workers=1,scaling=true});f.inventories.stock={[1]={name='minecraft:stone',count=4}}
+ for _,z0 in ipairs({0,8}) do for x=3,6 do for z=z0-1,z0+1 do
+  f.blocks[x..',-1,'..z]={name='minecraft:stone',state={}};f.blocks[x..',0,'..z]=nil
+ end end end
+ local c=f.apps[7];assert(c:command('build import /fleet.json alpha'))
+ f.configs[7].build.origin.z=8;assert(c:command('build import /fleet.json beta'))
+ assert(c:command('build priority alpha 20'));assert(c:command('build priority beta 80'))
+ assert(c:command('build auto alpha'));assert(c:command('build auto beta'))
+ local switched,owned,nextProject=false,nil,nil
+ for _=1,6000 do
+  f:cycle();c=f.apps[7];local a=c.state.automation;local task=f.apps[12].state.currentTask
+  if not switched and task and task.project then
+   eq(task.project,'beta');owned=task.id;assert(c:command('build priority alpha 100'))
+   eq(a.jobs[owned].workerId,12);assert(a.jobs[owned].status~='completed')
+   assert(not f.apps[12].state.position.pending);f:reboot(12);f:reboot(7);switched=true
+  elseif switched and task and task.project and task.id~=owned and not nextProject then nextProject=task.project end
+  a=f.apps[7].state.automation
+  if a.projects.alpha.phase=='built' and a.projects.beta.phase=='built' and not f.apps[12].state.currentTask then break end
+ end
+ local a=f.apps[7].state.automation;assert(switched);eq(nextProject,'alpha');eq(a.projects.alpha.priority,100)
+ for _,name in ipairs({'alpha','beta'}) do eq(a.projects[name].phase,'built');eq(a.projects[name].report.counts.correct,2) end
+ for _,z in ipairs({0,8}) do for x=4,5 do eq(f.blocks[x..',0,'..z].name,'minecraft:stone') end end
+ eq(F.count(f.inventories.stock,'minecraft:stone'),0);eq(next(f.inventories.home12),nil);eq(next(f.inventories.supply12),nil)
+ eq(next(f.worlds[12].items),nil);eq(a.supply,nil);eq(f.apps[12].state.status,'idle')
+ for _,j in pairs(a.jobs) do eq(j.status,'completed') end
+end)

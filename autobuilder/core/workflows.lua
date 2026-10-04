@@ -170,6 +170,7 @@ function M.new(state,save,clock,id,chunks,config)
     local allocation=config and config.scaling and Scaling.snapshot(state,config,nil,clock(),workers)
     table.sort(ordered,function(a,b)
       local policy=require('autobuilder.core.scheduling');local pa,pb=policy.priority(state,a),policy.priority(state,b)
+      if policy.urgent(a)~=policy.urgent(b) then return policy.urgent(a) end
       if pa~=pb then return pa>pb end
       if allocation then local pa,pb=Scaling.priority(allocation,a),Scaling.priority(allocation,b);if pa~=pb then return pa>pb end end
       return a.created<b.created or (a.created==b.created and a.id<b.id)

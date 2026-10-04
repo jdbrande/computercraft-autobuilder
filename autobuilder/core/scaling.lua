@@ -152,7 +152,7 @@ function M.priority(view,j)
 end
 local function competing(state,c,role,w,counts)
   local best
-  local function consider(j) best=math.max(best or 0,Scheduling.priority(state,j)) end
+  local function consider(j) best=math.max(best or 0,Scheduling.urgent(j) and 101 or Scheduling.priority(state,j)) end
   local function matches(j)
     if M.role(j)~=role or owner(j) or j.status~='queued' or not ready(state,j) or j.preparationError or j.coverageError
       or j.preferredWorker and j.preferredWorker~=w.id or j.requiredCapability and not (w.telemetry.capabilities or {})[j.requiredCapability] then return false end
@@ -203,7 +203,9 @@ function M.preference(state,c,j,w)
   if c then
     local budget=require('autobuilder.resources.fuel_budget').mission(c,j,w.telemetry)
     -- Mission cost dominates the bounded role count; specialization breaks ties.
-    return budget and budget.required*(#M.roles+1)+n or math.huge
+    -- Unknown geometry sorts after the budget's 100,000,000 upper bound while
+    -- retaining specialization among equally unknown routes.
+    return (budget and budget.required or 100000001)*(#M.roles+1)+n
   end
   return n
 end

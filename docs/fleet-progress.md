@@ -1716,3 +1716,19 @@ graph before copying. Eight door/bed cases failed before the one-line independen
 copy and all advanced placement tests pass afterward. This is a new runtime bug,
 not a second branch review. The final full gate is superseded and will rerun on
 the corrected source; native recovery retains the original physical contract.
+
+0.36 scheduling implementation and focused acceptance — 2026-10-04: new work
+follows persisted project priority through requests, acquisition, stock, supply,
+preparation and construction. Mission cost chooses among otherwise eligible
+workers; unknown routes still preserve specialization ties. Recovery/return/access
+obligations retain precedence. Manufacturing admission preserves held batches,
+retires only empty losing preferences and replans missing inputs so a factory job
+cannot block its own replacement miners. Scheduling generations do not consume
+the external-output-loss retry budget.
+
+Focused services, furnace/private crafting runtimes, mining ordering and command
+restart tests pass. A real controller/builder two-project simulation changes
+priority while beta owns a survey, reboots both, finishes that contract, assigns
+alpha next, then constructs/verifies both projects using exactly four shared stone
+and settles all jobs/inventories. Native two-project acceptance, the single final
+review, full gates and ordered integration remain pending.

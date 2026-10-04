@@ -924,3 +924,13 @@ test('ordinary standing sign project retains existing grass through preparation 
  end
  eq(c.state.automation.projects.sign.phase,'built');assert(restarted);eq(w.places,1);eq(w.digs,0);eq(w.blocks['2,-1,0'].name,'minecraft:grass_block')
 end)
+test('project priority commands persist validate and appear in status and forecasts after reboot',function()
+ local w,ce,we,c,b,step,reboot=fixture()
+ assert(c:command('build import /example.json sample'))
+ assert(c:command('build priority sample 80'));eq(c.state.automation.projects.sample.priority,80)
+ for _,value in ipairs({'-1','101','1.5','wrong'}) do eq(c:command('build priority sample '..value),false) end
+ eq(c:command('build priority missing 50'),false);eq(c.state.automation.projects.sample.priority,80)
+ c,b=reboot();eq(c.state.automation.projects.sample.priority,80)
+ local ok,status=c:command('build status sample');assert(ok);assert(status:find('priority=80',1,true))
+ ok,status=c:command('build forecast sample');assert(ok);assert(status:find('priority=80',1,true))
+end)
