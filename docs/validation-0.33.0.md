@@ -1,8 +1,8 @@
 # 0.33.0 deterministic placement adapter validation
 
-Candidate source `abfe12d` passed focused regressions, 18 Python tests and native
-placement acceptance. Its final full Lua gate is running. This report records the
-evidence; it does not yet claim release acceptance.
+Accepted source `abfe12d` passed all **940 Lua tests**, **18 Python tests**,
+release generation/check, diff checks and the native acceptance below. Final
+source gates completed on 2026-10-04 from a clean candidate checkout.
 
 ## Automated evidence
 
@@ -21,8 +21,8 @@ placement capability negotiation. Two subsequent native bugs have regressions:
   existing door/bed cases failed with the strict save before the one-line fix;
   normal placement, interrupted placement, reservation yields and reboot now pass.
 
-Release generation/check and diff checks pass. The full gate is rerunning because
-both native corrections changed the candidate source after the earlier full pass.
+The final whole-suite gate includes both native corrections. Logs are retained
+locally as `/tmp/fleet-033-final-full-v3.log` and the corresponding Python log.
 
 ## Native Minecraft acceptance — 2026-10-03–04
 
