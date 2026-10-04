@@ -1494,3 +1494,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   custom column bases, forecast exclusion and versioned worker eligibility. Focused
   registry/actor/fuel/forecast/provider/runtime suites pass; native controller241 and
   farmer242 are starting a two-plot carrot/replant/reserve acceptance run.
+
+-0.32 single final review reproduced five issues: frozen adapters rejected by
+  controller protection, same-identifier crop maturity skipped, unowned farm
+  fallback stuck on the old capability contract, missing replant placement health
+  admission, and pending planting cargo overstated in forecasts. Consolidated
+  corrections preserve configured territory and durable adapters, reuse guarded
+  acquisition retirement, check actual replant contracts, and carry one bounded
+  planting obligation through telemetry. Regressions include real provider/queue
+  mutation grants, overlapping owners, registry changes/reboots, retirement save
+  failure and owned/offline/journal preservation. Native initial carrot task was
+  blocked before any digging; its retained owner is resumed with these fixes.

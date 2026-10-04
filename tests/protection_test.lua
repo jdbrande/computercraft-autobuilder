@@ -290,3 +290,26 @@ test('mutation reservations protect above and below foreign workers in both gran
     assert(not q:reserve(13,j.id,from,target,s.workers,true),'mutation ignored the earlier vertical movement reservation')
   end
 end)
+
+test('frozen renewable providers retain controller mutation geometry across registry changes',function()
+ for _,kind in ipairs({'wheat','carrot','reed'}) do
+  local c,s=fixture();s.automation.jobs={};s.automation.sequence=0
+  c.farmAdapters={reed={mode='column',block='test:reed',item='test:reed'}}
+  c.farms={{kind=kind,item='test:output',sites={{x=30,y=1,z=0}},maxHeight=4}}
+  local farm=require('autobuilder.resources.providers').select('test:output',c,{}).farm
+  local cap=require('autobuilder.resources.renewables').capability(farm,false)
+  s.workers={['13']={id=13,online=true,telemetry={status='idle',capabilities={[cap]=true,farming=true}}},['14']={id=14,online=true,telemetry={status='idle',capabilities={[cap]=true,farming=true}}}}
+  local function queue() return require('autobuilder.core.workflows').new(s,function() return true end,function() return 100 end,7,nil,c) end
+  local q=queue();local j=q:submit('FARM',{farm=farm,item='test:output',quantity=1})
+  local other=q:submit('FARM',{farm=U.copy(farm),item='test:output',quantity=1})
+  local assigned=q:assign(s.workers);assert(assigned,kind..': '..tostring(j.coverageError));eq(assigned.id,j.id);j.status='running';eq(q:assign(s.workers),nil);eq(other.workerId,nil)
+  c.farmAdapters.reed={mode='crop',block='test:other',item='test:output',seed='test:seed',age=4}
+  s=U.copy(s);q=queue();j=s.automation.jobs[j.id]
+  local y=kind=='reed' and 2 or 1
+  assert(q:reserve(13,j.id,{x=30,y=y+1,z=0},{x=30,y=y,z=0},s.workers,true),'frozen provider denied')
+  assert(not q:reserve(13,j.id,{x=30,y=1,z=0},{x=30,y=0,z=0},s.workers,true),'soil allowed')
+  if kind=='reed' then assert(not q:reserve(13,j.id,{x=30,y=2,z=0},{x=30,y=1,z=0},s.workers,true),'column base allowed') end
+  j.farm.sites[1].x=31
+  assert(not q:reserve(13,j.id,{x=31,y=y+1,z=0},{x=31,y=y,z=0},s.workers,true),'changed territory allowed')
+ end
+end)

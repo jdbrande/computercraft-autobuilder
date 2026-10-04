@@ -49,7 +49,7 @@ local function available(p,config,context)
     local t=w.telemetry
     if w.online and t and t.capabilities and t.capabilities[p.capability]
       and not (p.type=='mining' and t.capabilities.explorationV1)
-      and require('autobuilder.workers.health').eligible(t,{type=({tree_farm='HARVEST',farm='FARM',crafting='CRAFT',mining='MINE',exploration='MINE'})[p.type]}) then
+      and require('autobuilder.workers.health').eligible(t,{type=({tree_farm='HARVEST',farm='FARM',crafting='CRAFT',mining='MINE',exploration='MINE'})[p.type],farm=p.farm}) then
       if (p.type~='mining' and p.type~='exploration') or Materials.accepts(t.miningResources,p.item) then return true end
     end
   end

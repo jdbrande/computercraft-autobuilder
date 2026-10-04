@@ -264,7 +264,7 @@ function M.new(task,e,config,nav,save,treeMode)
       else task.cursor=task.cursor-1 end
       return persist()
     end
-    if b.name==spec.seed or (b.name==spec.block and not spec.column and not spec.tree and tonumber((b.state or {}).age)~=spec.age) then nextSite(); return persist() end
+    if (spec.tree and b.name==spec.seed) or (b.name==spec.block and not spec.column and not spec.tree and tonumber((b.state or {}).age)~=spec.age) then nextSite(); return persist() end
     if b.name~=spec.block and b.name~=spec.leaves then return block('foreign block in managed column: '..b.name,'unsupported') end
     if (config.protectedBlocks or {})[b.name] then return block('protected farm block: '..b.name,'protected') end
     if spec.tree and b.name==spec.block and (b.state or {}).axis~='y' then return block('nonvertical tree log is unsupported','unsupported') end

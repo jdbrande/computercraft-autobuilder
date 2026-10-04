@@ -240,3 +240,28 @@ test('registered column keeps its base with the same bounded navigation and retu
  for y=1,3 do w.blocks['3,'..y..',0']={name='test:reed',state={}} end
  local e=new();run(e,task);eq(task.phase,'completed');eq(task.delivered,2);eq(w.digs,2);eq(w.blocks['3,1,0'].name,'test:reed')
 end)
+
+test('same identifier crop uses age and replants across restart',function()
+ local w,task,config,new,restart=setup('custom',1);task.item='test:fruit'
+ config.farmAdapters={custom={mode='crop',block='test:crop',item='test:fruit',seed='test:crop',age=4}}
+ w.blocks['3,1,0']={name='test:crop',state={age=3}};w.blocks['3,0,0']={name='minecraft:farmland',state={}}
+ w.items[1]={name='test:crop',count=1};w.drops={['test:crop']={['test:fruit']=1,['test:crop']=1}};w.plantBlocks={['test:crop']='test:crop'}
+ local e=new();run(e,task);eq(w.digs,0);eq(task.blockedCategory,'immature')
+ w.blocks['3,1,0'].state.age=4;assert(e:resume());w.crashPlace=true;run(e,task);eq(w.digs,1);assert(task.intent)
+ e,task=restart();assert(e:resume());run(e,task);eq(task.phase,'completed');eq(w.plants,1);eq(task.delivered,1)
+end)
+
+test('crop telemetry preserves pending planting obligation across reboot',function()
+ local w,task,c,new,restart=setup('carrot',3)
+ w.blocks['3,1,0']={name='minecraft:carrots',state={age=7}};w.blocks['3,0,0']={name='minecraft:farmland',state={}}
+ w.items[1]={name='minecraft:carrot',count=1};w.drops={['minecraft:carrots']={['minecraft:carrot']=3}};w.plantBlocks={['minecraft:carrot']='minecraft:carrots'}
+ c.automation={enabled=true};c.capabilities={};c.mining={}
+ local e=new();assert(e:step());eq(task.progress,3);eq(w.plants,0)
+ for _=1,2 do
+  local agent=require('autobuilder.workers.agent').new({id=12,position=U.copy(w.pose),currentTask=task},c,{},w.t,function() return true end)
+  eq(agent:telemetry().harvestPlanting,1);e,task=restart()
+ end
+ run(e,task);eq(w.plants,1)
+ local agent=require('autobuilder.workers.agent').new({id=12,position=U.copy(w.pose),currentTask=task},c,{},w.t,function() return true end)
+ eq(agent:telemetry().harvestPlanting,0)
+end)

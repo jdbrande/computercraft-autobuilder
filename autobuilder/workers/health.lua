@@ -100,6 +100,10 @@ function M.eligible(t,job)
   if kind=='CRAFT' then return h.crafting,'crafting table upgrade unavailable' end
   if not h.movement then return false,'movement API unavailable' end
   if (kind=='BUILD' or kind=='REPAIR' or kind=='PREPARE_REGION') and not h.placing then return false,'placement API unavailable' end
+  if (kind=='FARM' or kind=='HARVEST') and job.farm then
+    local ok,spec=pcall(require('autobuilder.resources.renewables').forFarm,job.farm,{})
+    if ok and spec and spec.seed and not h.placing then return false,'placement API unavailable for replanting' end
+  end
   local mining=kind=='MINE';local digging=mining or kind=='REPAIR' or kind=='HARVEST' or kind=='FARM' or kind=='CLEAR' or kind=='PREPARE_REGION' or kind=='PREPARE_SITE'
   if digging then
     if not h.digging then return false,'digging API unavailable' end
