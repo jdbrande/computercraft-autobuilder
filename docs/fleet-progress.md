@@ -60,8 +60,10 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   tests and finite-fuel native proactive-refill acceptance.
 - Material forecasts/early supply0.27 accepted:846 Lua/18 Python tests, two
   native replacement-acquisition trials including controller/builder reboot.
-- Continuous pipeline0.28 final gate/native retest,0.29 health review corrections,
-  and0.30 single-command enrollment implementation are in progress.
+- Continuous pipeline0.28 accepted:853 Lua/18 Python tests and native overlapping
+  placement/acquisition through controller/builder restart and final conservation.
+- Worker health0.29 final gate and0.30 single-command enrollment implementation
+  and native HTTP installation acceptance are in progress.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -1304,6 +1306,45 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   and released ownership. Python18 tests, generated release verification and
   whitespace checks pass. Complete Lua and native acceptance are next.
 
+- Started0.28 design in `.worktrees/continuous-pipeline`: automatic builds will use
+  verified site regions and existing finite builder supply requests instead of
+  waiting for a full-schematic stock target. Explicit prepare/start remains.
+  Ruling: bounded supply journals already provide ownership and restart semantics;
+  a second project-consumption ledger is unnecessary for fleet-wide overlap.
+  Cost: each builder still waits during its own top-up; other builders/providers
+  supply concurrency. Implementation and acceptance remain pending.
+
+- Task59 empty-stock automatic run regression passes across pause/restart: verified
+  site regions ask for bounded supplies without a whole-project stock request.
+  Explicit preparation and saved legacy requests preserve their existing ownership.
+- Task60 actual-runtime overlap regression passes: two builders place while later
+  production remains active, then survive controller/builder restarts. Real miner,
+  furnace, crafter and builder modules reconcile4 cobblestone,1 sand,4 smelted stone,
+  1 glass,4 crafted bricks,3 placements and2 surplus bricks. Both builders return
+  empty with finite fuel; requests complete and staging/ownership drain.
+  Full regressions, native acceptance and final review remain pending.
+
+
+- Review correction: the0.28 overlap test passed, but its cumulative-placement
+  assertion did not prove a placement event concurrent with production. That
+  concurrency claim is withdrawn pending stronger event-timed evidence. Final
+  review also reproduced streaming supply acquisition continuing after project
+  pause and a stale stockOnly flag disabling new-run acquisition. These remain
+  release blockers for the consolidated regression-backed correction pass.
+
+- Consolidated0.28 review correction passes targeted regressions: queued supply
+  pause and active exploration pause survive restart without new acquisition;
+  resume keeps request identities. A fresh ordinary run clears stale stockOnly,
+  while active stock-only ownership remains. Shorthand idempotence reflects zero
+  upfront project requests. An inherited first-site checkpoint interruption also
+  has a red/green recovery fix through completed construction.
+- Corrected overlap evidence now passes at the actual placement call while another
+  miner is away on an active acquisition. Independent regions are separated beyond
+  traffic exclusion and physically prepared first; adjacent regions correctly
+  serialize. Controller/builders restart after that event;7 positions verify
+  (3 material blocks plus4 required air), with exact material counts and idle drain.
+  This replaces the withdrawn cumulative-placement claim. No second review is
+  planned; complete release gates and native acceptance remain.
 - Native0.27 passed twice. First run observed positive-cargo early mining and2/2
   verified blocks; independent world/foundation/inventory checks passed. Second
   run rebooted controller225 and builder226 during the ungranted replacement
@@ -1352,3 +1393,16 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Final0.27 gate passed846 Lua tests and18 Python tests, with release/diff checks.
   Accepted0.26 documentation merged without changing tested implementation files.
   Permanent0.27 report includes both completed native trials and confirmed cleanup.
+
+- Native0.28 completed both runs. First empty-stock construction finished but did
+  not capture overlap. The second consumed its two measured surplus bricks while
+  acquiring new glass ingredients; brick placement overlapped an away sand miner,
+  then controller/builders rebooted and all7 positions verified. All60 independent
+  final world checks passed, all workers returned empty, three requests completed,
+  and stock/supply/mining ownership drained. Seven computers shut down and twenty
+  force-load tickets removed. Full Lua gate remains; permanent candidate report
+  records the first-run limitation and stronger retest evidence separately.
+
+- Final0.28 full gate passed853 Lua tests,18 Python tests and release/diff checks.
+  Accepted0.27 documentation merged without changing the tested source. Both
+  native trials, overlap/restart proof and cleanup are permanently documented.

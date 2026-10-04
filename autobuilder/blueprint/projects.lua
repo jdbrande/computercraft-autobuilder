@@ -25,7 +25,9 @@ function M.new(app,config,e,queue,production)
   end
   local function ensureSite(p,refresh)
     local plan=sitePlan(p,true)
-    if refresh or not p.site or (p.site.projectRun or 0)~=(p.run or 0) then siteService:start(p,plan) end
+    if refresh or not p.site or (p.site.projectRun or 0)~=(p.run or 0) then
+      p.levelAfterSurvey=true;p.siteRequired=true;siteService:start(p,plan)
+    end
     assert(p.site.identity==plan.identity,'site geometry changed; finish owned work before importing a new project')
     p.levelAfterSurvey=not p.site.work or nil;p.siteRequired=true;assert(save());return plan
   end
@@ -159,7 +161,7 @@ function M.new(app,config,e,queue,production)
   end
   local function startRun(p,productionLinked)
     p.run=p.run and p.run+1 or (p.phase=='built' or p.phase=='verified') and 1 or 0;p.actors={};p.returnRequests={};p.settlement=nil;p.includeProduction=productionLinked
-    p.siteRequired=nil
+    p.siteRequired=nil;p.streaming=nil
     p.repairAttempts=nil;p.repairHistory=nil
   end
   local function preparationPending(p)
@@ -233,20 +235,24 @@ function M.new(app,config,e,queue,production)
       if r then r.paused=paused end
       if j and j.status~='completed' then j.paused=paused;if not paused then j.resumeRequested=true end end
     end
-    local r=p.requestId and s.requests[p.requestId]; if not r then return end
-    r.paused=paused
-    for _,id in pairs(r.acquisitions or {}) do app.mining.jobs:setAcquisitionPaused(id,paused) end
-    for _,id in pairs(r.mines or {}) do
-      local j=(app.state.jobs or {})[id]
-      -- Assigned miners return safely; pause prevents claiming a new tunnel.
-      local seen={}
-      while j and not seen[j.id] do
-        seen[j.id]=true; j.paused=paused; j=j.childId and app.state.jobs[j.childId]
-      end
-    end
-    for _,j in pairs(s.jobs) do
-      if j.key and j.key:sub(1,#r.id+1)==r.id..':' then
-        j.paused=paused; if not paused then j.resumeRequested=true end
+    local _,requests=linked(p)
+    for rid in pairs(requests) do
+      local r=s.requests[rid]
+      if r then
+        r.paused=paused
+        for _,id in pairs(r.acquisitions or {}) do app.mining.jobs:setAcquisitionPaused(id,paused) end
+        for _,id in pairs(r.mines or {}) do
+          local j=(app.state.jobs or {})[id];local seen={}
+          -- Assigned miners return safely; pause prevents claiming a new tunnel.
+          while j and not seen[j.id] do
+            seen[j.id]=true;j.paused=paused;j=j.childId and app.state.jobs[j.childId]
+          end
+        end
+        for _,j in pairs(s.jobs) do
+          if j.productionRequest==rid or j.key and j.key:sub(1,#rid+1)==rid..':' then
+            j.paused=paused;if not paused then j.resumeRequested=true end
+          end
+        end
       end
     end
   end
@@ -328,13 +334,20 @@ function M.new(app,config,e,queue,production)
       assert(not ({building=true,clearing=true,verifying=true,repairing=true,settling=true,surveying=true,preparing_site=true})[p.phase],'Project is already active; use pause/resume')
       if not p.run or p.phase=='built' or p.phase=='verified' then startRun(p,true) end
       p.includeProduction=true
-      if action=='auto' then p.autoStart=true;ensureSite(p) end
       local message
-      if not next(a.requirements) then
+      local existing=p.requestId and s.requests[p.requestId]
+      -- Saved full-stock requests keep their owned work. New automatic runs
+      -- acquire finite batches through the normal builder supply journals.
+      p.streaming=action=='auto' and not (existing and existing.status~='completed') or nil
+      if p.streaming then
+        p.stockOnly=false;p.requestId=nil;p.preparedEmpty=nil;p.phase='ready';message='Preparing site; materials follow bounded builder supply requests'
+      elseif not next(a.requirements) then
         p.preparedEmpty=true;p.requestId=nil;p.phase='ready';message='No materials required'
       else
         local r=production:request(a.requirements,'project:'..p.name,{projectName=p.name});p.requestId=r.id;p.phase='preparing';message=r.id
       end
+      -- Persist the run's acquisition policy before site setup can checkpoint.
+      if action=='auto' then p.autoStart=true;ensureSite(p) end
       if action=='auto' and p.site.status=='surveying' then p.phase='surveying' end
       save();return true,message
     elseif action=='start' or action=='verify' or action=='repair' or action=='clear' then
@@ -348,7 +361,7 @@ function M.new(app,config,e,queue,production)
       if action=='clear' then assert(config.clearSite,'Set clearSite=true before clearing schematic air cells') end
       if action=='start' then
         local r=p.requestId and s.requests[p.requestId]
-        assert((p.preparedEmpty and not next(a.requirements)) or (r and r.status=='completed'),'Run build prepare and wait for resources first')
+        assert(p.streaming or (p.preparedEmpty and not next(a.requirements)) or (r and r.status=='completed'),'Run build prepare and wait for resources first')
       end
       if action=='start' or action=='repair' then
         if action=='repair' and p.autoStart~='repair' then p.repairAttempts=nil;p.repairHistory=nil end
@@ -383,7 +396,7 @@ function M.new(app,config,e,queue,production)
       if p.phase=='preparing' and p.requestId and s.requests[p.requestId].status=='completed' then p.phase='ready'; save() end
       if p.autoStart and not p.paused then
         local r=p.requestId and s.requests[p.requestId]
-        if (p.autoStart=='repair' or p.preparedEmpty or r and r.status=='completed') and p.site and p.site.work and (p.site.work.preparedCount or 0)>0 then
+        if (p.streaming or p.autoStart=='repair' or p.preparedEmpty or r and r.status=='completed') and p.site and p.site.work and (p.site.work.preparedCount or 0)>0 then
           local ok,err=pcall(self.command,self,{'build',p.autoStart=='repair' and 'repair' or 'start',p.name})
           if not ok then p.error=tostring(err);save() else p.error=nil end
         end
