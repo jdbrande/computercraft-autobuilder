@@ -87,8 +87,8 @@ function M.new(task,e,config,nav,save,mode)
     if cached then return cached.found,cached.actual,cached.error end
     local check=task.pairCheck
     if not check then
-      local stand={x=p.stand.x,y=p.stand.y+p.pair.y-b.y,z=p.stand.z}
-      if restricted(p.pair) or restricted(stand) then return nil,nil,'paired door cell or inspection stand is protected' end
+      local stand={x=p.stand.x+p.pair.x-b.x,y=p.stand.y+p.pair.y-b.y,z=p.stand.z+p.pair.z-b.z}
+      if restricted(p.pair) or restricted(stand) then return nil,nil,'paired block cell or inspection stand is protected' end
       check={purpose=purpose,stage='out',stand=stand}; task.pairCheck=check; persist()
     end
     if check.purpose~=purpose then return nil,nil,'paired inspection purpose changed before completion' end
@@ -123,7 +123,14 @@ function M.new(task,e,config,nav,save,mode)
       local found,solid,why=inspect(p.support)
       check.safe=found and (C.family(solid.name)=='cube' or C.family(solid.name)=='log') or false
       check.error=why or (not check.safe and 'required solid support face is missing or unsupported' or nil)
-      check.stage=p.pair and check.safe and 'sides' or 'return'; check.level=0; check.side=1; persist()
+      check.stage=check.safe and (C.family(b.name)=='door' and 'sides' or C.family(b.name)=='bed' and 'pairFloor' or 'return') or 'return'; check.level=0; check.side=1; persist()
+    end
+    if check.stage=='pairFloor' then
+      local ok,err=nav:goTo(p.pair);if not ok then return false,err end
+      local found,solid,why=inspect({direction='down'})
+      check.safe=found and (C.family(solid.name)=='cube' or C.family(solid.name)=='log') or false
+      check.error=why or (not check.safe and 'paired bed floor is missing or unsupported' or nil)
+      check.stage='return';persist()
     end
     local sides={north={'west','east'},east={'north','south'},south={'east','west'},west={'south','north'}}
     while check.stage=='sides' or check.stage=='upper' do
@@ -156,10 +163,11 @@ function M.new(task,e,config,nav,save,mode)
   local function matchesBlock(b,found,actual)
     if mode=='prepare' and found then
       if b.retain and P.compare(b.retain,found,actual) then return true end
+      if b.substrate then return actual.name==b.substrate,'required plant substrate is missing' end
       if b.support and Site.support(actual.name) then return true end
     end
     local family=C.family(b.name)
-    local defer=mode~='verify' and not task.recheck and (family=='pane' or family=='fence')
+    local defer=mode~='verify' and not task.recheck and C.connected(family)
     return P.compare(b,found,actual,defer)
   end
   local function inventory()
@@ -194,7 +202,7 @@ function M.new(task,e,config,nav,save,mode)
       return persist()
     end
     local family=C.family(b.name)
-    if status=='correct' and mode~='verify' and (family=='pane' or family=='fence') then
+    if status=='correct' and mode~='verify' and C.connected(family) then
       status='pending'; task.deferred[#task.deferred+1]=task.index
     end
     r.entries[#r.entries+1]={index=task.index,x=b.x,y=b.y,z=b.z,status=status,reason=reason,expected={name=b.name,state=U.copy(b.state or {})},actual=type(actual)=='table' and U.copy(actual) or nil}
@@ -228,9 +236,9 @@ function M.new(task,e,config,nav,save,mode)
       local count=item and item.count or 0; local matches=matchesBlock(b,found,actual)
       if p.pair then
         local paired,other,why=pairInspection(b,p,'recover'); if why then return false,why end
-        task.pairResults.existing=task.pairResults.recover
-        if matches and not P.compare(p.pair,paired,other) then return false,'paired door half does not match recorded placement' end
-        if not found and paired then return false,'paired door space changed during placement recovery' end
+        task.pairResults.existing=U.copy(task.pairResults.recover)
+        if matches and not P.compare(p.pair,paired,other) then return false,'paired block half does not match recorded placement' end
+        if not found and paired then return false,'paired block space changed during placement recovery' end
       end
       if matches and count==i.before-1 or (not found or mode=='prepare' and i.fluidBefore and found and Site.fluid(actual.name)) and count==i.before then
         task.intent=nil;persist();if nav.workDone then nav.workDone() end;return true
@@ -284,10 +292,13 @@ function M.new(task,e,config,nav,save,mode)
     task.phase='work'; local b=task.blocks[task.recheck and task.deferred[task.recheck] or task.index]
     if restricted(b) then return issue(b,'inaccessible','target is in a restricted area') end
     local p,why=P.plan(b)
+    if mode=='prepare' and b.substrate and p then
+      p.stand={x=b.x-1,y=b.y,z=b.z};p.direction='forward';p.heading='east';p.support=nil
+    end
     if mode=='prepare' and task.siteAccess and p then p=Site.approach(task.siteAccess,b,p)
     elseif mode=='prepare' and task.siteApproach then p=task.siteApproach end
     if not p then return issue(b,'unsupported',why) end
-    if p.pair and restricted(p.pair) then return issue(b,'inaccessible','paired door cell is in a restricted area') end
+    if p.pair and restricted(p.pair) then return issue(b,'inaccessible','paired block cell is in a restricted area') end
     if restricted(p.stand) then return issue(b,'inaccessible','placement stand is in a restricted area') end
     if task.pairCheck then
       local _,_,err=pairInspection(b,p,task.pairCheck.purpose)
@@ -316,7 +327,7 @@ function M.new(task,e,config,nav,save,mode)
           local blocks,why,_,category=scanner:scan(pose)
           if category=='hardware' then return blocked(why,'hardware') end
           for _,observed in ipairs(blocks or {}) do
-            if observed.x==b.x and observed.y==b.y and observed.z==b.z and Site.support(observed.name) then
+            if observed.x==b.x and observed.y==b.y and observed.z==b.z and (b.substrate and observed.name==b.substrate or not b.substrate and Site.support(observed.name)) then
               return record(b,'correct','fresh scanner support observation',{name=observed.name})
             end
           end
@@ -341,13 +352,14 @@ function M.new(task,e,config,nav,save,mode)
           return issue(b,'inaccessible',why)
         end
         local correct,pairReason=P.compare(p.pair,paired,other)
-        if not correct then return issue(b,'wrong','paired door half: '..tostring(pairReason),other) end
+        if not correct then return issue(b,'wrong','paired block half: '..tostring(pairReason),other) end
       end
       return record(b,'correct',nil,actual)
     end
     if mode=='verify' or mode=='prepare' and task.siteWork.stage=='verify' then return record(b,found and 'wrong' or 'missing',reason,actual) end
     if task.recheck then return blocked('final connected block verification failed: '..tostring(reason),'wrong') end
-    if p.observeOnly then return blocked('upper door half must be generated by a matching lower half','unsupported') end
+    if b.substrate then return issue(b,'unsupported','required plant substrate is missing; preparation will not replace it',actual) end
+    if p.observeOnly then return blocked('secondary paired block must be generated by its matching primary block','unsupported') end
     local replaceFluid=mode=='prepare' and (task.siteWork.stage=='fill' or task.siteWork.stage=='seal') and found and Site.fluid(actual.name)
     if replaceFluid and (config.protectedBlocks or {})[actual.name] then return issue(b,'unsupported','fluid block is protected',actual) end
     if found and not replaceFluid then
@@ -355,7 +367,7 @@ function M.new(task,e,config,nav,save,mode)
       local classification=C.classify(actual.name,actual.state)
       local actualFamily=C.family(actual.name)
       local allowed=mode=='prepare' and Site.drops(actual,config)
-      if mode=='prepare' and not allowed or mode~='prepare' and ((config.protectedBlocks or {})[actual.name] or actualFamily=='door' or (classification~='SUPPORTED' and classification~='PARTIALLY_SUPPORTED') or actual.name:find('computercraft:',1,true)) then
+      if mode=='prepare' and not allowed or mode~='prepare' and ((config.protectedBlocks or {})[actual.name] or actualFamily=='door' or actualFamily=='bed' or (classification~='SUPPORTED' and classification~='PARTIALLY_SUPPORTED') or actual.name:find('computercraft:',1,true)) then
         return issue(b,'unsupported','refusing to dig protected or unsupported block: '..actual.name,actual)
       end
       if p.item and not slotFor(p.item) then return missing(p.item) end
@@ -387,10 +399,10 @@ function M.new(task,e,config,nav,save,mode)
     if C.isAir(b.name) then return record(b,'correct') end
     if p.pair then
       local paired,_,why=pairInspection(b,p,'empty')
-      if why or paired then return blocked(why or 'upper door space must be empty before lower placement','unsupported') end
+      if why or paired then return blocked(why or 'paired space must be empty before primary placement','unsupported') end
       for _,other in ipairs(task.blocks) do
         if other.x==p.pair.x and other.y==p.pair.y and other.z==p.pair.z and not P.compare(p.pair,true,other) then
-          return blocked('blueprint door halves disagree','unsupported')
+          return blocked('blueprint paired blocks disagree','unsupported')
         end
       end
     end
@@ -401,9 +413,6 @@ function M.new(task,e,config,nav,save,mode)
       found,actual,inspectError=inspect(p)
       if inspectError or found then return blocked(inspectError or 'target changed during support inspection','wrong') end
     end
-    -- Any observation made before placement belongs to the pre-mutation world.
-    -- Recovery must inspect the actual generated pair, even after a power loss.
-    task.pairResults=nil; task.supportApproved=nil
     do
       local granted,why,denied=false,'controller mutation permission required'
       if nav.workGuard then granted,why,denied=nav.workGuard(b) end
@@ -412,6 +421,10 @@ function M.new(task,e,config,nav,save,mode)
         return blocked(why,'inaccessible')
       end
     end
+    -- Keep preflight observations while awaiting the mutation grant: repeating
+    -- navigation would discard that grant. Invalidate them with the intent so
+    -- recovery always observes the actual post-placement paired cells.
+    task.pairResults=nil;task.supportApproved=nil
     assert(t.select(slot),'cannot select placement item')
     countAttempt('place'); task.intent={kind='place',index=task.index,slot=slot,item=p.item,before=before,inventory=mode=='prepare' and inventory() or nil,fluidBefore=replaceFluid or nil}; persist()
     local callOk,result,detail=pcall(t['place'..P.suffix(p.direction)])

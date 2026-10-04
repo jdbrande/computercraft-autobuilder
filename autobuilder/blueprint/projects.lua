@@ -90,14 +90,28 @@ function M.new(app,config,e,queue,production)
       end
     end
     local counts=bp.quantities(source); local issues={}; local partial=0
+    local families,strategies,cells={},{},{}
+    local function cell(b) return b.x..','..b.y..','..b.z end
+    for _,b in ipairs(volume) do cells[cell(b)]=b;local category=states.category(b.name);families[category]=(families[category] or 0)+1 end
+    local placement=require('autobuilder.build.placement')
+    for _,b in ipairs(blocks) do
+      local plan=placement.plan(b)
+      if plan and plan.pair then
+        local other=cells[cell(plan.pair)]
+        if not other or not placement.compare(plan.pair,true,other) then
+          issues[#issues+1]={name=b.name,status='UNSUPPORTED',reason='paired block is absent or contradictory in schematic at '..cell(plan.pair)}
+        end
+      end
+    end
     for _,entry in ipairs(source.palette) do
       local status,reason=states.classify(entry.name,entry.state)
+      strategies[#strategies+1]={name=entry.name,family=states.category(entry.name),status=status,requirements=reason}
       if status=='UNSUPPORTED' or status=='SPECIAL_ACQUISITION' then issues[#issues+1]={name=entry.name,status=status,reason=reason}
       elseif status=='PARTIALLY_SUPPORTED' then partial=partial+1 end
     end
     for _,issue in ipairs((source.metadata or {}).issues or {}) do issues[#issues+1]={name='metadata',status='UNSUPPORTED',reason=tostring(issue)} end
     local regions=bp.regions(blocks,config.build.regionSize)
-    local result={blocks=blocks,requirements=counts,regions=regions,issues=issues,partial=partial,clearanceY=t.origin.y+source.size.y+1,
+    local result={blocks=blocks,requirements=counts,regions=regions,issues=issues,partial=partial,placementFamilies=families,placementStrategies=strategies,clearanceY=t.origin.y+source.size.y+1,
       volume=#volume,airCount=#air,airRegions=inspectionRegions(air),verificationRegions=inspectionRegions(volume)}
     cache[p.name]=result; return result
   end
@@ -325,6 +339,7 @@ function M.new(app,config,e,queue,production)
       p.analysis=require('autobuilder.blueprint.planner').expand(a.requirements,stock,config)
       p.analysis.storageError=not ok and err or nil
       p.analysis.estimatedMovement=#a.blocks*4; p.analysis.estimatedFuel=#a.blocks*4+config.minimumFuelReserve
+      p.analysis.placementFamilies=U.copy(a.placementFamilies);p.analysis.placementStrategies=U.copy(a.placementStrategies)
       p.analysis.partialStrategies=a.partial; p.phase=p.phase=='imported' and 'analyzed' or p.phase
       app.state.view='project'; save()
       return true,p.name..': '..#a.blocks..' blocks, '..#a.regions..' regions, '..#a.issues..' unsupported entries; materials saved in project analysis'

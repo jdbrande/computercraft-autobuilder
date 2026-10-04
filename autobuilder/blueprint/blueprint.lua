@@ -3,7 +3,7 @@ local T=require('autobuilder.blueprint.transforms')
 local Cooperate=require('autobuilder.core.cooperate')
 local M={}
 local air={['minecraft:air']=true,['minecraft:cave_air']=true,['minecraft:void_air']=true}
-local aliases={['minecraft:wall_torch']='minecraft:torch',['minecraft:redstone_wall_torch']='minecraft:redstone_torch',['minecraft:soul_wall_torch']='minecraft:soul_torch',['minecraft:redstone_wire']='minecraft:redstone'}
+local aliases={['minecraft:wall_torch']='minecraft:torch',['minecraft:redstone_wall_torch']='minecraft:redstone_torch',['minecraft:soul_wall_torch']='minecraft:soul_torch',['minecraft:redstone_wire']='minecraft:redstone',['minecraft:wheat']='minecraft:wheat_seeds',['minecraft:carrots']='minecraft:carrot',['minecraft:potatoes']='minecraft:potato',['minecraft:beetroots']='minecraft:beetroot_seeds'}
 function M.blocks(data,origin,rotation,mirrorX,mirrorZ)
   local valid,err=S.validate(data); assert(valid,err)
   origin=origin or {x=0,y=0,z=0}
@@ -93,6 +93,9 @@ function M.regions(blocks,size)
   assert(type(size)=='table','invalid region size')
   for _,axis in ipairs({'x','y','z'}) do assert(type(size[axis])=='number' and size[axis]%1==0 and size[axis]>=1 and size[axis]<=256,'invalid region size') end
   assert(type(blocks)=='table' and #blocks<=S.MAX_BLOCKS,'invalid block list')
+  -- A bed can span horizontal tiles. Keep its supporting floor in an earlier
+  -- height layer so the head/foot ownership edges cannot cycle through floors.
+  for _,b in ipairs(blocks) do if b.name:match('_bed$') then size={x=size.x,y=1,z=size.z};break end end
   local nodes,cells,regions,groups={},{},{},{}
   for index,b in ipairs(blocks) do
     Cooperate.every(index)
@@ -119,7 +122,9 @@ function M.regions(blocks,size)
   for index,node in ipairs(nodes) do
     Cooperate.every(index)
     local b=node.block; local state=b.state
-    depend(node,b.x,b.y-1,b.z)
+    local below=cells[key(b.x,b.y-1,b.z)]
+    local bs=below and below.block.state or {}
+    if bs.face~='ceiling' and tostring(bs.hanging)~='true' then depend(node,b.x,b.y-1,b.z) end
     local wall=b.name:find('wall_',1,true) or b.name:match(':ladder$') or state.face=='wall' or (b.name:match(':tripwire_hook$'))
     if wall and vectors[state.facing] then
       local v=vectors[state.facing]; depend(node,b.x-v.x,b.y,b.z-v.z)
@@ -128,6 +133,9 @@ function M.regions(blocks,size)
       local below=cells[key(b.x,b.y-1,b.z)]
       if below then node.deps[below]=nil end
       depend(node,b.x,b.y+1,b.z)
+    end
+    if b.name:match('_bed$') and state.part=='foot' and vectors[state.facing] then
+      local v=vectors[state.facing];depend(node,b.x+v.x,b.y-1,b.z+v.z)
     end
     if b.name:match('_bed$') and state.part=='head' and vectors[state.facing] then
       local v=vectors[state.facing]; depend(node,b.x-v.x,b.y,b.z-v.z)

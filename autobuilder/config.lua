@@ -115,6 +115,7 @@ function M.load(overrides)
   c.capabilities.registeredFarmingV1=c.capabilities.farming and true or nil
   c.capabilities.registeredLoggingV1=c.capabilities.logging and true or nil
   c.capabilities.logisticsV1=c.capabilities.courier and true or nil
+  c.capabilities.placementV1=c.capabilities.building and true or nil
   c.capabilities.sitePreparation=c.capabilities.building and true or nil
   c.capabilities.siteSurveyV1=c.capabilities.building and true or nil
   c.capabilities.siteWorkV1=c.capabilities.building and true or nil

@@ -221,3 +221,12 @@ test('external fluid barrier fills only outside required workspace in bounded ve
   assert(not pcall(p.barrier,p,2,1,8,'minecraft:oak_planks',false,1))
   assert(not verify.blocks[1].support,'flammable generic support could satisfy containment')
 end)
+
+test('crop foundations retain a read-only substrate contract without treating farmland as solid support',function()
+ local d={schema=1,size={x=1,y=1,z=1},palette={{name='minecraft:wheat',state={age='0'}}},runs={{id=1,count=1}},metadata={},requirements={}}
+ local p=plan(d,{origin={x=0,y=0,z=0}},{margin=0,regionSize=1,minY=-1,maxY=10})
+ local survey=p:survey(1,1,64);eq(survey.siteSurvey.columns[1].substrateY,-1)
+ local record={identity=p.identity,region=1,clearanceY=2,report={identity=p.identity,region=1,observations={{x=0,y=-1,z=0,status='surface',name='minecraft:farmland'}}}}
+ local job=p:work(1,record,'fill',1,64,'minecraft:cobblestone');eq(#job.blocks,1);eq(job.blocks[1].substrate,'minecraft:farmland')
+ assert(require('autobuilder.build.site_work').validContract(job));eq(require('autobuilder.build.site_work').support('minecraft:farmland'),false)
+end)

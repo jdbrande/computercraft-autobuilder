@@ -1,21 +1,19 @@
 # Fleet requirements progress
 
 Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
-[autonomous mining plan](autonomous-mining-plan.md). Updated 2026-10-03.
+[autonomous mining plan](autonomous-mining-plan.md). Updated 2026-10-04.
 
 ## Current work
 
-- Accepted0.32 registered renewables:923 Lua/18 Python tests, release/diff checks,
-  final-source native carrot harvest/replant/restart/reserve acceptance and cleanup
-  passed. Permanent evidence: [0.32 validation](validation-0.32.0.md).
-
-- Active development:0.33 placement adapters completed its single review and
-  consolidated regression fixes; complete Lua and native mixed-project gates run.
- 0.34 empty-container metadata/cardinal sign adapters completed its single review;
-  consolidated regressions and native acceptance run.0.35 reachable inventory
-  recovery has a committed design and initial donor actor regressions in progress.
-  Candidate evidence lives in the corresponding `.worktrees` documentation until
-  ordered integration. No unfinished candidate is treated as accepted.
+- Accepted0.33 deterministic placement:940 Lua/18 Python tests and final release/
+  diff checks passed. Native140-cell mixed adapters verified independently; ascent
+  and paired-checkpoint bugs are regression-covered. Its underside-access fixture
+  assistance remains explicit in [0.33 validation](validation-0.33.0.md).
+- Candidates0.34 metadata and0.35 inventory recovery have completed their single
+  reviews, focused corrections and native gates; final full gates continue.0.36
+  priorities passed native two-project acceptance and its review regressions;
+  final gate continues.0.37 inventory protection is under active implementation.
+  No unfinished candidate is treated as accepted.
 
 - Accepted0.30 enrollment:885 Lua/18 Python tests, release/diff checks and final-source
   native HTTP install/repair/profile refresh passed; fixture shut down and tickets
@@ -1511,6 +1509,20 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   registry/actor/fuel/forecast/provider/runtime suites pass; native controller241 and
   farmer242 are starting a two-plot carrot/replant/reserve acceptance run.
 
+- Started0.33 placement-adapter design in isolated `.worktrees/placement-adapters`:
+  extend existing classification/plans/journals for paired beds, attachments,
+  deterministic rail/redstone states and simple plants, with explicit analyzer
+  feature/tool diagnostics. Renewable0.32 remains in final review/native acceptance;
+  enrollment/processor complete gates continue without source changes.
+
+-0.33 implements bed pair journals/accounting/support order, finite attached and
+  basic redstone/rail strategies, native seedling placement, final neighborhood
+  verification and analyzer family/paired-footprint checks. Focused actor tests
+  cover per-cell grants and restart, missing paired floors, protected cells,
+  contradictory halves and powered-state rejection. Native probes confirm floor,
+  wall and ceiling facings, both rail axes, bed orientation, wire connections,
+  opposite repeater/comparator facing and farmland seed placement. Full project
+  acceptance, single final review and release gates remain pending.
 -0.32 single final review reproduced five issues: frozen adapters rejected by
   controller protection, same-identifier crop maturity skipped, unowned farm
   fallback stuck on the old capability contract, missing replant placement health
@@ -1534,6 +1546,17 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   completed, computers241/242 shut down and4 force-load tickets removed. Permanent
   candidate report validation-0.32.0.md distinguishes assisted pre-fix recovery
   from the clean retest; final complete Lua/Python gates are running.
+-0.33 single final review found unsafe destructive bed repair plus six integration
+  defects. Consolidated regressions/fixes refuse paired bed removal, remove ceiling
+  support cycles, separate bed floors from pair regions, include generated cells in
+  ownership/coverage, count one reactive supply item, preserve existing farmland
+  through side inspection, and negotiate new placement capabilities. Ordinary crop
+  project preparation/build/restart passes without trampling or replacing soil.
+  The actual bed supply regression additionally exposed preflight cache invalidation
+  before a mutation grant, which repeatedly discarded the grant through navigation.
+  Invalidation now checkpoints with the placement intent; one stocked bed completes
+  both halves after interrupted supply and controller/worker restart. Focused
+  consolidated suites pass; native mixed-project retest and full gates follow.
 -0.31 final-source native acceptance passed on controller240: two real blast
   furnaces produced10+10 iron across controller restart and a smoker produced2
   cooked beef. Independent world reads match20 iron/2 beef/16 remaining coal from
@@ -1548,3 +1571,36 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   pre-fix soil repair from the clean final-source untouched plot run. Accepted0.31
   documentation merge did not change tested code/tests/tools/artifacts. Integrating
   and pushing before continuing placement, metadata and inventory recovery work.
+
+### 0.33 live supply-ascent correction
+
+The full pre-correction gate passed 939 Lua tests. Native placement then exposed a
+supply departure whose first vertical cell was empty but the next was a ceiling.
+The saved route repeatedly retried the blocked ascent. The shared travel helper now
+replans only a confirmed obstruction on its initial ascent, retaining reservation
+waits and uncertain moves. A regression failed before the fix and passes after it,
+including restart and reservation preservation; all focused logistics tests pass.
+The fixture also required a two-cell underside access opening for its low ceiling
+button. That operator intervention is separate from the routing fix and will be
+recorded in acceptance. Final-source full gates and native completion follow.
+
+Native paired-placement checkpoint correction — 2026-10-04: bed recovery
+reused one inspection table under both `pairResults.recover` and `.existing`.
+CraftOS rejects repeated table references; the simulation fixture's deep-copy
+save silently removed the alias. The fixture now checks the original object
+graph before copying. Eight door/bed cases failed before the one-line independent
+copy and all advanced placement tests pass afterward. This is a new runtime bug,
+not a second branch review. The final full gate is superseded and will rerun on
+the corrected source; native recovery retains the original physical contract.
+
+0.33 native placement completed — 2026-10-04: `mixed_adapters` reached built with
+140 correct cells. Independent observer 90 matched all 140 names/states; depot and
+supply were empty, all jobs completed and builder245 was idle home with 12,348 fuel.
+The rig was shut down and ten temporary tickets removed. The two-cell operator
+access cut is explicitly assisted evidence. Permanent candidate report is
+`validation-0.33.0.md`; final-source full Lua gate remains running.
+
+### 0.33 accepted — 2026-10-04
+
+Final source940 Lua/18 Python tests, generated release verification and clean diff
+passed. Permanent report records the native evidence and assistance limits.

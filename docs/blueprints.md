@@ -151,3 +151,48 @@ Final verification after construction now starts up to three automatic repair
 rounds, each with a fresh preparation survey. Correct blocks are retained. Repeated
 defects stop with an exact report and retry-limit explanation. `build verify`
 remains read-only; `build repair` explicitly starts a fresh repair budget.
+
+## Deterministic attached, paired and redstone adapters
+
+Beds require both explicit foot/head entries, matching facing and unoccupied state.
+They consume one bed item. The foot waits for both floors; the builder journals and
+verifies both generated cells. Missing or contradictory paired schematic entries
+are analyzer errors, including door halves. Head/upper entries never consume a
+second item in supply forecasts or material reports.
+
+Buttons and levers support floor, wall and ceiling placement when unpowered. Rails
+support dry straight flat shapes; powered/detector/activator rails must be unpowered.
+Repeaters support delay1, unlocked, unpowered; comparators support compare mode,
+unpowered. Redstone torches support lit states with explicit wall facing where
+applicable. Wire requires power0 and explicit connection states. Neighborhood-derived
+states are verified after placement and again by whole-project verification. Sloped
+or curved rails, powered circuits and interaction-configured settings remain explicit
+unsupported states pending their interaction adapters.
+
+Ordinary small flowers, listed vanilla saplings at stage0 and wheat/carrot/potato/
+beetroot seedlings at age0 have native placement adapters. Native item placement
+validates soil without putting a solid turtle on farmland. Supplying an existing
+plantable substrate is required; creating/maintaining farmland and mature growth
+states is a separate substrate/tool operation. Site preparation must not be treated
+as evidence that arbitrary soil is already plantable. Growth after placement may
+change the exact state before verification.
+
+`build analyze` saves `placementFamilies` and per-palette `placementStrategies` in
+project analysis, alongside resource planning and exact unsupported reasons. Fluids,
+unknown blocks and special acquisition blocks remain visible even without a placement
+adapter; metadata is never silently treated as supported.
+
+Bed-containing schematics use one-block-high construction regions so a foot can
+wait for the floor across a horizontal tile boundary without cycling through the
+head region. Generated cells are included in ownership and chunk coverage. New
+adapters and crop preparation require `placementV1`; existing owners retain their
+recovery path. Destructive repair of doors and beds is refused because removing one
+half can affect the other. Both halves must be handled by a future paired removal
+contract before automatic destructive repair can be enabled.
+
+Existing farmland beneath a seedling footprint is retained as an explicit read-only
+substrate requirement. Surveys stop above its empty crop cell and record the soil as
+unobserved; preparation then inspects it from a side or beneath using the existing
+access recovery path. Farmland is never classified as a general solid support and
+missing soil is not replaced with fill. This supports supplied farmland without
+claiming automatic creation of farmland.

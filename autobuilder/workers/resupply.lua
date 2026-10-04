@@ -124,7 +124,18 @@ function M.travel(s,task,nav,target,save,turtle,config)
     s.route={index=1,points=points}; save()
   end
   while s.route.index<=#s.route.points do
-    local ok,err=nav:goTo(s.route.points[s.route.index]); if not ok then return false,err end
+    local point=s.route.points[s.route.index]
+    local ok,err=nav:goTo(point)
+    if not ok then
+      -- The first empty cell can hide a ceiling farther up. Re-observe the
+      -- confirmed stand and select a side exit on the next attempt; never reset
+      -- a reservation wait or an ambiguous physical move.
+      local pose=nav.pose
+      if s.route.index==1 and pose.known and not pose.pending and not pose.uncertain
+        and point.x==pose.x and point.z==pose.z and point.y>pose.y
+        and tostring(err):find('Movement obstructed',1,true) then s.route=nil;save() end
+      return false,err
+    end
     s.route.index=s.route.index+1; save()
   end
   if target.heading then local ok,err=nav:face(target.heading); if not ok then return false,err end end

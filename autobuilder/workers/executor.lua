@@ -165,6 +165,7 @@ function M.new(app,config,e,network,clock)
       if j.logistics and (not config.capabilities.logisticsV1 or not require('autobuilder.storage.nodes').validContract(j)) then return false,'invalid managed transport assignment' end
       local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',PREPARE_REGION='siteWorkV1',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if j.siteAccess then cap='siteAccessV1' end
+      if require('autobuilder.build.blockstates').requiresModern(j.blocks,j.siteSurvey) and not config.capabilities.placementV1 then return false,'worker lacks placementV1' end
       if cap and not config.capabilities[cap] then return false,'worker lacks '..cap end
       if j.privateStation and not require('autobuilder.factory.stations').matches(j.privateStation,config,s.id) then return false,'private crafting station does not match worker configuration' end
       s.currentTask=U.copy(j); s.currentTask.phase='setup';
@@ -315,7 +316,7 @@ function M.new(app,config,e,network,clock)
           needed=0
           for index=t.index or 1,#t.blocks do
             local b=t.blocks[index]
-            if require('autobuilder.build.blockstates').item(b)==t.missingItem and not (b.state.half=='upper' and b.name:match('_door$')) then needed=needed+1 end
+            if Reports.materialItem(b)==t.missingItem then needed=needed+1 end
           end
           needed=math.max(needed,t.missingCount or 1)
         end
