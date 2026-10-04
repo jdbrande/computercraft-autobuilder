@@ -332,7 +332,7 @@
       "version": "0.30.0"
     },
     {
-      "bytes": 11557,
+      "bytes": 11722,
       "path": "autobuilder/config.lua",
       "roles": [
         "controller",
@@ -342,7 +342,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "065dfde21aebdf14d1bd62ef5a67c6d294a67be076cdd3d1cce8d24cbea71909",
+      "sha256": "2be662f36210ea320ab49dbd9477233118270259333b065e04e25792d8443296",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/config.lua",
       "version": "0.30.0"
     },
@@ -417,7 +417,7 @@
       "version": "0.30.0"
     },
     {
-      "bytes": 4509,
+      "bytes": 4628,
       "path": "autobuilder/core/enrollment.lua",
       "roles": [
         "controller",
@@ -427,7 +427,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "e4c0c8415db27585d714b891630fdc372de3a5f4c17c07ad7c76a3a041adeb66",
+      "sha256": "df2bf2ccc68ae0cb84ab8aae6551154f86c0d09f962bd0b0e8d374b177fab282",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/enrollment.lua",
       "version": "0.30.0"
     },
@@ -942,7 +942,7 @@
       "version": "0.30.0"
     },
     {
-      "bytes": 2894,
+      "bytes": 3123,
       "path": "autobuilder/install/discovery.lua",
       "roles": [
         "controller",
@@ -952,12 +952,12 @@
         "logger",
         "courier"
       ],
-      "sha256": "d6bd342f46e478210f2a04621c0dd125163c1b9d49d1f40ac4480c32e6f1b6c7",
+      "sha256": "5f8f7228ab4f668d9f653d76fb5f1441334727e389620cb30c483bcb60fde4fe",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/install/discovery.lua",
       "version": "0.30.0"
     },
     {
-      "bytes": 3153,
+      "bytes": 3198,
       "path": "autobuilder/install/fleet.lua",
       "roles": [
         "controller",
@@ -967,7 +967,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "946bd63bef7c0ab7b9fa2887fa66641dd63a016dc5a2ec00172168f95eabdd16",
+      "sha256": "d6961f081f7d9aaec664b2aca7dcbd9aab193a4d7c379a9915876aa029089ec5",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/install/fleet.lua",
       "version": "0.30.0"
     },
@@ -1241,7 +1241,7 @@
       "version": "0.30.0"
     },
     {
-      "bytes": 30079,
+      "bytes": 30063,
       "path": "autobuilder/setup_wizard.lua",
       "roles": [
         "controller",
@@ -1251,7 +1251,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "a2fe77910547d03d0c8f076dc79785b3233e72414d8ff0bcf18c28b52a4a18e5",
+      "sha256": "080a9831f363f3ed3669bcb72bf00bb9954f4dc5416f3c819e1ad8d3f4381346",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/setup_wizard.lua",
       "version": "0.30.0"
     },
@@ -1570,7 +1570,7 @@
       "version": "0.30.0"
     },
     {
-      "bytes": 46132,
+      "bytes": 46406,
       "path": "fleet.lua",
       "roles": [
         "controller",
@@ -1580,12 +1580,12 @@
         "logger",
         "courier"
       ],
-      "sha256": "a0763bba3c3f7fb6e2deb0c0381832f8fcf1e61277e0d47a1ff8ac1e8daa6eee",
+      "sha256": "f2486dcb143759dae6389993c80628f21fe013950b94cfba8d9fdb49abe3dd5c",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/fleet.lua",
       "version": "0.30.0"
     },
     {
-      "bytes": 46108,
+      "bytes": 46382,
       "path": "installer.lua",
       "roles": [
         "controller",
@@ -1595,7 +1595,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "874e24eae4785482babdff464a2709d9fd5615dc9ce734df284ead2d1dec838c",
+      "sha256": "d526549ed978c421a34a33bf571e92a2cddf92bb9f37aa10c20b106d52b32ec7",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/installer.lua",
       "version": "0.30.0"
     },

@@ -1454,3 +1454,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Final0.28 full gate passed853 Lua tests,18 Python tests and release/diff checks.
   Accepted0.27 documentation merged without changing the tested source. Both
   native trials, overlap/restart proof and cleanup are permanently documented.
+
+-0.30 single final review found four Important issues; consolidated fixes preserve
+  source-copy worker settings/checkpoints, separate software release discovery from
+  enrollment GPS validation, reuse configuration object/collection merge semantics,
+  and fail closed on incomplete unpinned discovery. All four new regressions failed
+  before the changes and pass afterward; enrollment/setup/install/runtime focused
+  suites pass. Full gates and final-source native repair retest follow.

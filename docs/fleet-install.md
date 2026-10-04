@@ -47,12 +47,22 @@ If multiple controllers reply, select one explicitly:
 fleet install --controller 7
 ```
 
-Existing installations retain their controller and settings byte-for-byte. Run
+If discovery reaches its packet limit before the discovery window ends, unpinned
+installation stops with a retry/explicit-controller message. It does not select
+the first reply from an incomplete discovery window.
+
+Existing installations, including source-copy workers without a managed receipt,
+retain their controller and settings byte-for-byte. Run
 `fleet install --configure` to refresh a controller profile while idle. Saved known
 pose is preserved during refresh; only initial enrollment installs the declared
-berth pose. Local labels/options absent from the profile remain intact.
+berth pose. Local labels/options absent from the profile remain intact, including nested
+supply/GPS/automation options. Explicit lists and item maps replace their prior
+values rather than accumulating entries.
 
-`fleet update` verifies and repairs managed software, retaining settings. Both
+`fleet update` verifies and repairs managed software, retaining settings. Release
+discovery for software-only installation/update does not require the worker to be
+at its original enrollment berth. Fresh enrollment and `--configure` still reject
+conflicting GPS evidence. Both
 commands refuse active jobs, supply acknowledgements and unresolved recovery.
 Append `--no-reboot` for inspection or scripting. `--base HTTPS_DIRECTORY` explicitly
 selects a source; its version must match the controller's advertised release.

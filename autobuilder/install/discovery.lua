@@ -33,13 +33,14 @@ function M.find(e,opts)
   assert(opened,'Attach a wireless modem for fleet discovery')
   sequence=sequence+1
   local request={version=1,type='fleet_discover',requestId=e.os.getComputerID()..':'..e.os.epoch('utc')..':'..sequence}
+  request.purpose=opts.purpose or 'configure'
   if opts.position then request.position=M.copy(opts.position) end
   if selected then assert(e.rednet.send(selected,request,M.protocol),'Cannot contact controller')
   else e.rednet.broadcast(request,M.protocol) end
-  local deadline=e.os.epoch('utc')+3000;local offers={}
+  local deadline=e.os.epoch('utc')+3000;local offers={};local exhausted=true
   for _=1,32 do
-    local remaining=(deadline-e.os.epoch('utc'))/1000;if remaining<=0 then break end
-    local sender,m=e.rednet.receive(M.protocol,remaining);if sender==nil then break end
+    local remaining=(deadline-e.os.epoch('utc'))/1000;if remaining<=0 then exhausted=false;break end
+    local sender,m=e.rednet.receive(M.protocol,remaining);if sender==nil then exhausted=false;break end
     if id(sender) and (not selected or sender==selected) and type(m)=='table' and m.version==1 and m.type=='fleet_offer'
       and m.requestId==request.requestId and m.controllerId==sender then
       local ok,offer=pcall(function()
@@ -49,6 +50,7 @@ function M.find(e,opts)
       if ok then offers[sender]=offer end
     end
   end
+  assert(selected or not exhausted or e.os.epoch('utc')>=deadline,'Discovery packet limit reached; retry or use --controller ID')
   local result
   for _,offer in pairs(offers) do assert(not result,'Found multiple controllers; use --controller ID');result=offer end
   assert(result,'No enabled fleet controller replied');return result
