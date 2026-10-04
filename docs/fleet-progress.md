@@ -5,6 +5,15 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.37 infrastructure protection:1,015 Lua/20 Python tests, final release/
+  diff checks, one review/fix pass and native protected-inventory acceptance passed.
+  [Permanent evidence](validation-0.37.0.md).0.38–0.40 candidate gates continue.
+
+- Accepted0.36 priorities:1,003 Lua/20 Python tests, final release/diff checks,
+  the single final review and native two-project acceptance passed. The finite
+  supply handoff correction is included in the repeated full gate.
+  [Permanent evidence](validation-0.36.0.md). Continue0.37–0.40 candidate gates.
+
 - Accepted0.35 reachable inventory recovery:976 Lua/20 Python tests and final
   release/diff checks passed. Two native trials verified exact plain/NBT cargo,
   frozen donor ownership, restart, home refueling between trips and cleanup.
@@ -1908,3 +1917,14 @@ workers settled, computers265–267 shut down and6 force-load tickets removed.
 [Candidate report](validation-0.38.0.md) records fixture corrections, metrics and
 the distinction between automated resize evidence and native monitor recovery.
 Complete gates remain active; the candidate is not yet accepted.
+-0.36 accepted after the repeated clean-source gate passed1,003/1,003 Lua tests
+  with20/20 Python tests and release/diff checks. No unintended tracked or untracked
+  files were present; ignored native audit artifacts remain local.
+
+-0.37 final full gate passed1,015/1,015 Lua tests and20/20 Python tests. Merging
+accepted0.36 documentation changed no implementation/test/release files relative
+to the tested source. Final release/diff checks passed and status was clean.
+
+-0.38 accepted: the final implementation passed1,032/1,032 Lua and23/23 Python
+  tests. Final-source native input/monitor recovery, release generation/check and
+  whitespace checks passed. Accepted0.37 documentation merged without source changes.

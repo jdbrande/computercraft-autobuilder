@@ -1,7 +1,8 @@
-# 0.38.0 operator observability acceptance candidate
+# 0.38.0 operator observability acceptance
 
-Final implementation:7e8a092. Complete Lua gate is running; this candidate is not
-accepted until that gate and final release checks pass.
+Accepted implementation:7e8a092. The final complete gate passed1,032 Lua tests
+and23 Python tests. Release generation/check and `git diff --check` passed.
+Merging accepted0.37 documentation did not change tested implementation files.
 
 ## Automated evidence
 
