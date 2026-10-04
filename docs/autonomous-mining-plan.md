@@ -1306,16 +1306,16 @@ in `.worktrees/placement-adapters` follows0.32; propagate its final renewable fi
 
 ### Task69: Paired and attached placement contracts
 
-- [ ] Extend finite state classification, aliases, support/dependency plans and
+- [x] Extend finite state classification, aliases, support/dependency plans and
   analyzer feature/tool diagnostics for beds, attachments, rails/redstone and plants.
-- [ ] Generalize paired geometry/ownership with one-item bed accounting; retain
+- [x] Generalize paired geometry/ownership with one-item bed accounting; retain
   specific door hinge checks and validate both bed supports/generated cells.
 
 ### Task70: Native placement and recovery acceptance
 
-- [ ] Add actual builder, transform, cross-region, support and side-effect recovery
+- [x] Add actual builder, transform, cross-region, support and side-effect recovery
   regressions. Verify a mixed native structure and final-state reports independently.
-- [ ] Complete one final review/consolidated fixes, full gates and permanent
+- [x] Complete one final review/consolidated fixes, full gates and permanent
   evidence; continue supported metadata/fluid placement and remaining requirements.
 
 ## Milestone0.34: supported containers, signs and schematic metadata
@@ -1325,16 +1325,16 @@ in `.worktrees/placement-metadata`, following0.33 final placement corrections.
 
 ### Task71: Bounded metadata and placement contracts
 
-- [ ] Test native empty-container/sign placement and available observations.
-- [ ] Add only verifiable empty metadata normalization and matching adapters,
+- [x] Test native empty-container/sign placement and available observations.
+- [x] Add only verifiable empty metadata normalization and matching adapters,
   retaining explicit errors for unsupported payloads and states.
-- [ ] Preserve aliases, dependency ordering, inventory identity and recovery.
+- [x] Preserve aliases, dependency ordering, inventory identity and recovery.
 
 ### Task72: Native metadata acceptance and integration
 
-- [ ] Exercise ordinary import/build/verify and interrupted placement with real
+- [x] Exercise ordinary import/build/verify and interrupted placement with real
   hardware; independently inspect world data and preserve exact limitations.
-- [ ] Complete one final review, consolidated fixes, full gates, permanent evidence
+- [x] Complete one final review, consolidated fixes, full gates, permanent evidence
   and ordered integration; continue every remaining fleet requirement.
 
 ## Milestone0.35: reachable worker inventory recovery
