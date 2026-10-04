@@ -1399,15 +1399,15 @@ Spec: [inventory protection design](infrastructure-protection-design.md).
 
 ### Task77: Durable spatial registration and migration
 
-- [ ] Add named inventory bounds, reuse existing endpoint identities, preserve
+- [x] Add named inventory bounds, reuse existing endpoint identities, preserve
   offline/held ownership, and block incomplete destructive admission/grants.
-- [ ] Collect missing bounds transactionally in controller/factory setup and
+- [x] Collect missing bounds transactionally in controller/factory setup and
   carry worker-local crafting endpoint names through bounded telemetry.
 
 ### Task78: Protection acceptance
 
-- [ ] Cover migration, restart, yielded admission, factory contracts, double
+- [x] Cover migration, restart, yielded admission, factory contracts, double
   chests, bounded exploration payloads and meaningful native protected inventory
   overlap with independent progress.
-- [ ] Complete one final review/fix pass, full gates, report and integration;
+- [x] Complete one final review/fix pass, full gates, report and integration;
   continue operator observability, traffic and combined fleet acceptance.

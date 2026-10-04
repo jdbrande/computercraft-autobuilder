@@ -1,7 +1,8 @@
-#0.37.0 inventory geometry validation
+# 0.37.0 inventory geometry acceptance
 
-Candidate source `90fbba4`; final full Lua gate is running.20 Python tests,
-focused geometry/setup/network/runtime integration, release and diff checks pass.
+Accepted source `b9f1434`, including inventory-map correction90fbba4 and the
+inherited supply handoff fix42b2a62:1,015 Lua tests and20 Python tests passed.
+Focused geometry/setup/network/runtime integration, release and diff checks pass.
 The single final review found an effective-map overflow: inferred registrations
 could produce a checkpoint exceeding the explicit512-location limit. A failing
 regression now verifies the boundary, unchanged restart, rejection without state
