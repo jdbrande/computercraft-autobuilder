@@ -546,3 +546,46 @@ test('supply protocol rejects malformed station identity and station metadata on
   assert(V.validate('task_supply',p));assert(not V.validate('task_supply_done',p));assert(not V.validate('task_supply_ack',p))
   p.station.position.heading=nil;assert(not V.validate('task_supply',p))
 end)
+
+test('queued distant work triggers above low station refuel before assignment across controller reboot',function()
+  local f=fixture();finiteBuilder(f,100);local w=f.world
+  f.inventories.fuel={};f.inventories.stock={[1]={name='minecraft:coal',count=4}}
+  w.blocks['0,3,0']={name='minecraft:chest',state={}};w.blocks['50,0,0']={name='minecraft:stone',state={}}
+  w.turtle.suckUp=function(n)
+    eq(w.pose.x,0);eq(w.pose.y,2);eq(w.pose.z,0)
+    local item=f.inventories.fuel[1];if not item then return false end
+    local moved=math.min(n,item.count);w.items[w.selected]={name=item.name,count=moved};item.count=item.count-moved
+    if item.count==0 then f.inventories.fuel[1]=nil end;return moved>0
+  end
+  w.turtle.refuel=function(n)
+    local item=assert(w.items[15]);eq(w.selected,15);eq(item.name,'minecraft:coal')
+    n=math.min(n,item.count);w.refuels=w.refuels+n;w.fuel=w.fuel+80*n;item.count=item.count-n
+    if item.count==0 then w.items[15]=nil end;return true
+  end
+  for _,e in ipairs({f.ce,f.we}) do local call=e.peripheral.call;e.peripheral.call=function(name,method,...)
+    if method=='size' then return 27 elseif method=='getItemLimit' then return 64
+    elseif method=='getItemDetail' then local slot=...;local item=U.copy((f.inventories[name] or {})[slot]);if item then item.maxCount=64 end;return item end
+    return call(name,method,...)
+  end end
+  for _,config in ipairs({f.controller.config,f.worker.config}) do
+    config.minimumFuelReserve=20;config.fuel.enabled=true;config.fuel.low=80;config.fuel.target=120
+  end
+  f.controller.config.fuel.stations={{id='home',workerId=12,inventory='fuel',position={x=0,y=2,z=0},targetItems=1}}
+  f:reboot(true,true)
+  local job=f.controller.automation.queue:submit('VERIFY',{blocks={{x=50,y=0,z=0,name='minecraft:stone',state={}}},clearanceY=4},{})
+  local id=job.id;local rebooted,assigned=false,false
+  for _=1,600 do
+    f:step();job=f.controller.state.automation.jobs[id]
+    local row=f.controller.state.fuel.stations.home
+    if row and row.refuel and not rebooted then eq(job.workerId,nil);f:reboot(true,false);rebooted=true end
+    if job.workerId and not assigned then assert(w.refuels>0,'ordinary task left before station refuel');assigned=true end
+    if job.status=='completed' and not f.worker.state.currentTask then break end
+  end
+  assert(rebooted);assert(assigned);eq(job.status,'completed');eq(job.report.counts.correct,1);eq(w.refuels,1)
+  assert(w.fuel>=20+U.distance(w.pose,f.worker.config.depot),'verification lost its return reserve')
+  local total=0;for _,inv in ipairs({f.inventories.stock,f.inventories.fuel}) do for _,item in pairs(inv) do if item.name=='minecraft:coal' then total=total+item.count end end end
+  eq(total+w.refuels,4);eq(next(w.items),nil)
+  local home=f.controller.automation.queue:submit('RETURN_HOME',{}, {})
+  for _=1,500 do f:step();if home.status=='completed' and not f.worker.state.currentTask then break end end
+  eq(home.status,'completed');eq(U.distance(w.pose,f.worker.config.depot),0);eq(w.refuels,1)
+end)

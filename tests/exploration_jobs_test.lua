@@ -213,3 +213,23 @@ test('initial cargo accounting cannot regress or be inflated in an owned explora
   assert(jobs:progress(j.workerId,p,3));local h=s.exploration.sectors[j.exploration.sectorId].outcomes['minecraft:coal']
   eq(h.delivered,3);eq(h.mined,1);eq(h.successful,1)
 end)
+
+test('unmaterialized exploration fuel demand triggers a forecast without inventing trip ownership',function()
+  local jobs,state,workers,config=fixture();workers['2']=nil;state.workers=workers
+  config.minimumFuelReserve=20;config.fuel.enabled=true;config.fuel.low=80;config.fuel.target=160
+  config.exploration.bounds={min={x=0,y=0,z=0},max={x=7,y=2,z=7}}
+  config.exploration.base={x=-60,y=0,z=0};config.exploration.baseProtection={min={x=-61,y=0,z=0},max={x=-60,y=0,z=0}}
+  local t=workers['1'].telemetry;t.fuel=100;t.fuelLimit=20000;t.position={known=true,x=-60,y=0,z=0};t.depot={x=-60,y=0,z=0}
+  t.explorationHome={depot=U.copy(t.depot),exitRoute={},protectedAreas={}}
+  for x=-59,0 do t.explorationHome.exitRoute[#t.explorationHome.exitRoute+1]={x=x,y=0,z=0} end
+  local group=jobs:requestAcquisition('minecraft:cobblestone',1,0,'forecast-exploration')
+  eq(jobs:assign(workers,{}),nil);eq(next(state.jobs),nil)
+  local f=require('autobuilder.resources.fuel_budget').forecast(state,config)
+  assert(f.required>=150,'live acquisition shortage vanished before concrete trip creation');assert(f.shortfall>=50);eq(#group.tripIds,0)
+  t.miningRoute={entry={x=0,y=0,z=0},fuelTarget=1000}
+  f=require('autobuilder.resources.fuel_budget').forecast(state,config);eq(f.required,1000);eq(f.shortfall,900)
+  t.miningRoute=nil
+  jobs:setAcquisitionPaused(group.id,true);eq(require('autobuilder.resources.fuel_budget').forecast(state,config).required,0)
+  jobs:setAcquisitionPaused(group.id,false);t.fuel=200
+  local trip=assert(jobs:assign(workers,{}),'refueled explorer did not resume');eq(trip.workerId,1);eq(#group.tripIds,1)
+end)

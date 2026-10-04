@@ -169,7 +169,7 @@ function M.plan(sector,ctx)
   local lower=U.distance(start,entry)+#(ctx.exitRoute or {})
   local limit=math.min(math.floor(c.maxTravelDistance),1024)
   if lower>limit then return nil,'route exceeds travel limit' end
-  if ctx.availableFuel~='unlimited' and ctx.availableFuel<lower*2+c.minimumFuelReserve+c.mining.returnMargin+2 then return nil,'insufficient round-trip fuel' end
+  if ctx.availableFuel~='unlimited' and ctx.availableFuel<lower*2+c.minimumFuelReserve+c.mining.returnMargin+2 then return nil,'insufficient round-trip fuel',lower*2+c.minimumFuelReserve+c.mining.returnMargin+2 end
   local route={}; local position=U.copy(start)
   while U.distance(position,entry)>0 do
     local chosen
@@ -186,7 +186,7 @@ function M.plan(sector,ctx)
   if not route then return nil,why end
   local distance=#route+#(ctx.exitRoute or {})
   if distance>math.min(math.floor(c.maxTravelDistance),1024) then return nil,'route exceeds travel limit' end
-  if ctx.availableFuel~='unlimited' and ctx.availableFuel<distance*2+c.minimumFuelReserve+c.mining.returnMargin+2 then return nil,'insufficient round-trip fuel' end
+  if ctx.availableFuel~='unlimited' and ctx.availableFuel<distance*2+c.minimumFuelReserve+c.mining.returnMargin+2 then return nil,'insufficient round-trip fuel',distance*2+c.minimumFuelReserve+c.mining.returnMargin+2 end
   return {version=1,depot=U.copy(ctx.depot),sectorId=sector.id,bounds=U.copy(sector.bounds),entry=entry,route=route,exitRoute=U.copy(ctx.exitRoute or {}),
     cursor=sector.cursor or 1,surveyed=U.copy(sector.surveyed or {}),envelope=U.copy(envelope),protectedAreas=U.copy(ctx.protectedAreas or {})}
 end

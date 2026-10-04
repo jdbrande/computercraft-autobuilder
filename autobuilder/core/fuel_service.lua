@@ -1,6 +1,7 @@
 local U=require('autobuilder.core.util')
 local F=require('autobuilder.factory.factory')
 local Q=require('autobuilder.core.workflows')
+local Budget=require('autobuilder.resources.fuel_budget')
 local M={}
 function M.new(app,config,e,queue,production,clock)
   app.state.fuel=app.state.fuel or {stations={}}
@@ -12,7 +13,7 @@ function M.new(app,config,e,queue,production,clock)
     for _,stack in pairs(inv) do assert(stack.name==item and not stack.nbt,'fuel station contains foreign items') end
     return inv,F.count(inv,item)
   end
-  local function stationTick(station)
+  local function stationTick(station,forecast)
     for _,j in pairs(queue.state.jobs) do
       if j.type=='RESCUE' and not j.rescueSettled and j.station.id==station.id then return end
     end
@@ -23,9 +24,15 @@ function M.new(app,config,e,queue,production,clock)
     -- including while offline. Never reconcile a fill against a moving endpoint.
     if refuel and refuel.workerId then return end
     local worker=app.state.workers[tostring(station.workerId)]; local t=worker and worker.telemetry
-    if not refuel and t and type(t.fuel)=='number' and row.goal and t.fuel>=row.goal then row.goal=nil; assert(save()) end
+    local mission=forecast.workers[tostring(station.workerId)]
+    local required=mission and mission.budget and mission.budget.required or 0
+    if t and t.fuelLimit and required>t.fuelLimit then error('Mission '..mission.taskId..' requires '..required..'; native fuel limit is '..t.fuelLimit,0) end
+    local goal=math.max(config.fuel.target,required,row.goal or 0)
+    if t and t.fuelLimit then goal=math.min(goal,t.fuelLimit) end
+    if not refuel and t and type(t.fuel)=='number' and row.goal and t.fuel>=math.min(row.goal,t.fuelLimit or row.goal) then row.goal=nil; assert(save()) end
     if not refuel and worker and worker.online and t and t.status=='idle' and not t.task
-      and t.capabilities and t.capabilities.fuelV1 and type(t.fuel)=='number' and t.fuel<(row.goal or config.fuel.low)
+      and t.capabilities and t.capabilities.fuelV1 and type(t.fuel)=='number' and t.fuel<math.max(row.goal or config.fuel.low,required)
+      and t.fuel<goal
       and not Q.workerBusy(app.state,worker.id) then
       assert(t.position and t.position.known and U.position(t.depot),'fuel worker needs a known position and depot')
       assert(U.distance(t.depot,station.position)==0,'fuel station does not match worker depot')
@@ -35,8 +42,8 @@ function M.new(app,config,e,queue,production,clock)
       local required=distance==0 and 0 or distance+8+(config.minimumFuelReserve or 100)
       assert(required<=t.fuel,'worker needs remote fuel rescue')
       refuel=queue:submit('REFUEL',{managedFuel=true,fuelReady=false,preferredWorker=worker.id,
-        fuelTarget=config.fuel.target,station=U.copy(station)}, {}, 'fuel-worker:'..station.id..':'..tostring(row.refuel or 'first'))
-      row.refuel=refuel.id; row.goal=config.fuel.target; assert(save())
+        fuelTarget=goal,station=U.copy(station)}, {}, 'fuel-worker:'..station.id..':'..tostring(row.refuel or 'first'))
+      row.refuel=refuel.id; row.goal=goal; assert(save())
     end
     if active(row.fill) then return end
     local item=station.item or config.fuel.item
@@ -61,8 +68,9 @@ function M.new(app,config,e,queue,production,clock)
   function self:tick()
     if not config.fuel.enabled or app.state.assignmentRecovery then return end
     production:inventoryAction(function()
+      local forecast=Budget.forecast(app.state,config)
       for _,station in ipairs(config.fuel.stations) do
-        local ok,why=pcall(stationTick,station)
+        local ok,why=pcall(stationTick,station,forecast)
         local row=stations[station.id]
         if row and not ok then row.error=tostring(why); save() end
       end
@@ -95,6 +103,10 @@ function M.new(app,config,e,queue,production,clock)
   end
   function self:describe()
     local lines={'FUEL '..(config.fuel.enabled and 'automatic' or 'disabled')..' low='..config.fuel.low..' target='..config.fuel.target}
+    local forecast=Budget.forecast(app.state,config)
+    lines[#lines+1]='Next excursions required='..forecast.required..' shortfall='..forecast.shortfall..' unknown='..forecast.unknown
+    local items={};for item in pairs(forecast.items) do items[#items+1]=item end;table.sort(items)
+    for _,item in ipairs(items) do lines[#lines+1]='Estimated additional fuel '..item..'='..forecast.items[item]..' (not stock)' end
     for _,station in ipairs(config.fuel.stations) do
       local row=stations[station.id] or {}
       lines[#lines+1]=station.id..' worker='..station.workerId..' stock='..tostring(row.stock or 'unknown')..'/'..(station.targetItems or 16)
@@ -109,6 +121,11 @@ function M.new(app,config,e,queue,production,clock)
       lines[#lines+1]='Worker '..id..' fuel='..tostring(t.fuel or 'unknown')..' required='..tostring(t.fuelRequired or config.fuel.low)
         ..' '..(w.online and 'online' or 'offline')
       local why=(app.state.fuel.errors or {})[id]; if why then lines[#lines+1]=why end
+      local mission=forecast.workers[id]
+      if mission then
+        local b=mission.budget
+        lines[#lines+1]=mission.taskId..' '..(b and b.scope..' outward='..b.outward..' work='..b.work..' return='..b.returning..' reserve='..b.reserve..' required='..b.required or mission.error or 'budget unavailable')
+      end
     end
     local jobs={}; for _,j in pairs(queue.state.jobs) do if j.type=='RESCUE' and not j.rescueSettled then jobs[#jobs+1]=j end end
     table.sort(jobs,function(a,b) return a.id<b.id end)

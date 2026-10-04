@@ -1091,3 +1091,59 @@ Review focus: historical sightings must never become excavation authority; a neg
 route report must belong to its trip; blocked turtle traffic is not a terrain hazard;
 terminal duplicates and failed checkpoints must conserve counters; retries must never
 release another owner's sector or route. Each is covered in Tasks50–51.
+
+
+## Milestone0.26: mission fuel budgets and proactive station forecasts
+
+Spec: [mission fuel forecasts](fuel-forecast-design.md). Native inline execution
+continues in `.worktrees/fuel-forecast`; merge accepted0.24/0.25 before integration.
+Reuse physical fuel, queued ownership, station journals and finite excursion checks.
+
+### Task53: Shared role budgets and validated telemetry
+
+**Files:** resources/fuel_budget.lua, workers/executor.lua, workers/agent.lua,
+core/network.lua; fuel-budget, agent and network tests.
+**Interfaces:** `Budget.mission(config,task,telemetry)` returns a scoped `Fuel.budget`
+or `nil,reason`; `Budget.construction(config,task,pose,current)` preserves the
+existing worker gate and route-distance errors; `Budget.valid/clean` validate and
+copy optional task-bound telemetry.
+
+- [x] Add failing finite/unlimited cases for construction, survey/preparation, mining,
+  renewables, transport, rescue, home, refuel and stationary craft. Include missing
+  pose, progressed work, access geometry and maximum travel distance.
+- [x] Extract construction calculation without weakening its existing checks;
+  implement remaining role estimates using current route rules. Run focused tests.
+- [x] Add malformed/inconsistent/task-mismatch/legacy telemetry tests; publish and
+  validate the optional budget. Run worker/network regressions and commit.
+
+### Task54: Forecast-driven admission and station targets
+
+**Files:** fuel budget module, core/workflows.lua, core/fuel_service.lua,
+core/jobs.lua where needed; fuel-service/queue/loaded-coverage tests.
+**Interfaces:** `Budget.forecast(state,config)` maps each worker to its owned or
+one distinct next compatible ready task and budget. Shared ordinary admission uses
+its concrete task budget; station target uses the same requirement.
+
+- [x] Add failing tests for above-low under-budget workers, alternate ready workers,
+  deterministic unique forecast matching, a changed budget across yielding coverage,
+  retained active/offline ownership and recovery-task eligibility.
+- [x] Enforce final admission when automatic fuel is enabled. Raise station refuel
+  targets to ready mission needs; surface native-limit/unknown-geometry errors.
+  Preserve finite batches and journal recovery. Verify repeated fills/restarts.
+- [x] Expose component budgets and scoped aggregate demand/shortfall in `fuel`;
+  distinguish estimates from stock. Run focused checks, document and commit.
+
+### Task55: Runtime/native fuel forecast acceptance and integration
+
+- [x] Exercise an above-low worker whose queued mission requires additional fuel;
+  verify automatic stock acquisition/refill, refuel-before-dispatch and completed
+  physical work across restart in runtime tests and a native fixture.
+- [x] Run one final review and consolidated regression-backed fix pass. Complete
+  Lua/Python/release/diff gates, record permanent evidence, integrate/push and
+  continue all unfinished requirements.
+
+Review focus: budgets must not double-charge an in-progress overhead ascent;
+forecast matching must not multiply one queued job by the number of idle workers;
+station refill must not chase a target above native capacity; delayed telemetry
+must not release ownership; unknown route geometry must not imply zero fuel.
+Task53 covers route/geometry/telemetry, Task54 covers matching/capacity/ownership.

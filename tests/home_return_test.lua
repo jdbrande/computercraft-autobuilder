@@ -80,3 +80,10 @@ test('home retries full container without inferring a deposit and recovers a fai
   f.fail=false;f.w.turtle.dropDown=drop;f:boot(true);f:finish()
   eq(f.buffer['minecraft:stone'],5);eq(f.buffer['minecraft:dirt'],3);eq(f.drops,2)
 end)
+
+test('mixed cargo returns below a fuel chest through the station side approach across reboot',function()
+  local f=fixture();f.config.fuel={enabled=true};f.w.blocks['0,3,0']={name='minecraft:chest',state={}}
+  f.crash=true;f:boot();f.driver:step();assert(f.saved.task.homeCargo.intent);eq(f.drops,1)
+  f:boot(true);f:finish();eq(f.buffer['minecraft:stone'],5);eq(f.buffer['minecraft:dirt'],3)
+  eq(f.w.pose.x,0);eq(f.w.pose.y,2);eq(f.w.pose.z,0);eq(f.w.digs,0);assert(f.w.blocks['0,3,0'])
+end)

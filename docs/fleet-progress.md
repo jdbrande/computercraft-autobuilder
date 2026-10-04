@@ -1179,6 +1179,56 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   home cargo and1,846 finite fuel. Both computers are off and their eight test chunks
   are unloaded. See validation-0.25.0.md. Complete Lua gates remain running.
 
+- Started0.26 mission fuel planning in isolated `.worktrees/fuel-forecast`, based on
+  the0.25 native-evidence commit. The existing fuel-focused baseline passes. Design
+  and Tasks53–55 extend shared bounded-excursion budgets, validated telemetry,
+  proactive station targets and final dispatch admission. No0.26 implementation
+  is claimed yet.0.24 native and0.24/0.25 complete Lua gates continue independently.
+
+- Task53 shared role budgets and optional task-bound telemetry are implemented.
+  Construction retains its original maximum excursion arithmetic; transport, rescue,
+  home/station, farms, access work and bounded mining expose separate outward/work/
+  return/reserve components. Unknown geometry remains explicit. Focused arithmetic,
+  network, construction, fuel-service and automation runtime checks pass. The focused
+  construction supply/fuel runtime regression is running before the task commit.
+
+- Task54 now matches distinct queued missions to compatible idle workers, rechecks
+  concrete fuel budgets at final admission and raises managed station targets before
+  assignment. Red/green tests cover above-low shortage, native-limit refusal and a
+  full-tank repeated-refuel bug; queue tests cover a fuel change during coverage
+  observation and selecting a different ready worker. Role/network/coordination/
+  coverage checks pass. An actual-runtime distant verification refueled first,
+  survived controller reboot, completed correctly and conserved all four initial
+  coal items with one consumed. Broader fuel runtime checks are running.
+
+- The single final0.26 review found four Important forecast stalls: fixed miners lacked
+  advertised entry geometry, undersized native tanks masked capable alternatives,
+  non-dispatchable factory jobs masked ready movement, and exploration demand was
+  invisible before a funded trip could exist. Each reproduces red and now passes
+  with validated worker entry, tank-aware matching, existing readiness checks and
+  bounded planner fuel-refusal estimates. No second review will run.
+- Native0.26 confirmed100 fuel above low80 proactively increased to180 for a174-fuel
+  verification, with one correct block. Final home return then hit the station chest.
+  The actual-runtime extension failed the same way. Shared depot travel now reuses
+  the station side approach; empty and mixed-cargo reboot regressions pass without
+  digging or losing cargo. Final native recovery and complete gates remain pending.
+- Final review rulings: whole-project unknown-terrain optimization remains outside
+  the explicit bounded-excursion forecast; navigation still enforces actual reserves.
+  Full suites and native acceptance remain mandatory parent gates. Neither declined
+  item is treated as finished, and no external blocker exists.
+
+- A final mining departure check exposed a worker/controller target mismatch:
+  the worker could demand1,000 fuel after an apparently affordable assignment.
+  Validated telemetry now carries its departure target even for idle explorers;
+  initial and prospective budgets include it while active trips retain remaining
+  work budgets. Arithmetic, telemetry and prospective-demand regressions pass.
+  The superseded0.26 full run was stopped before restarting on this final source.
+
+- Native0.26 clean retest passed across controller restart: proactive refuel before
+  the174-fuel mission, one correct verified stone, automatic station-side home
+  return, empty cargo and114 finite fuel. Independent reads reconcile8 initial
+  coal as6 stored plus2 consumed. Final mining-target source rebooted idle.
+  Permanent evidence: validation-0.26.0.md; complete Lua gate remains running.
 - Final0.25 clean-source gate completed:802 Lua tests,18 Python tests, release
   verification and whitespace checks pass. Native acceptance is complete.
   Integration remains ordered behind the still-running0.24 native scaling trial.
@@ -1194,6 +1244,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Propagated0.24 physical-detour correction after the earlier802-test pass. The
   complete0.25 gate is restarting on the merged source before integration.
 
+- Propagated the shared physical-detour correction into0.26. Superseded the
+  incomplete final Lua run and restarted on the merged source before integration.
 - Final0.25.0 complete Lua gate passed804 tests, with18 Python tests and
   release/whitespace checks. Log: /tmp/fleet-025-final-full-v2.log. Ordered integration
   waits for0.24 native worker settlement; no feature gate is waived.
@@ -1223,3 +1275,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Accepted0.25 mining intelligence:804 Lua/18 Python, final review regressions,
   native hazard/yield/restart/initial-cargo checks and cleanup complete. Imported
   accepted0.24 evidence without changing tested implementation.
+
+- Accepted0.26 mission fuel forecasts:829 Lua/18 Python, release/diff checks,
+  single final review fixes, native above-low refuel/restart/home return and cleanup
+  complete. Accepted0.24/0.25 documentation merged with tested source unchanged.

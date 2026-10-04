@@ -101,6 +101,9 @@ end
 -- Persist the route stages: reservation waits must not restart an overhead ascent.
 function M.travel(s,task,nav,target,save,turtle,config)
   if not U.position(target) then return false,'depot/transport position is not configured' end
+  if config and config.fuel and config.fuel.enabled and U.position(config.depot) and U.distance(target,config.depot)==0 then
+    return M.stationTravel(s,task,nav,target,save,turtle,config)
+  end
   if not s.route then
     local pose=nav.pose
     if not pose or not pose.known or pose.pending or pose.uncertain then return false,'trusted position required for logistics' end
@@ -131,7 +134,11 @@ end
 -- enter horizontally; the ordinary overhead route would hit the chest.
 function M.stationTravel(s,task,nav,target,save,turtle,config)
   if not U.position(target) then return false,'fuel station position is missing' end
-  if U.distance(nav.pose,target)==0 then return true end
+  if not nav.pose or not nav.pose.known or nav.pose.pending or nav.pose.uncertain then return false,'trusted position required for station travel' end
+  if U.distance(nav.pose,target)==0 then
+    if target.heading then return nav:face(target.heading) end
+    return true
+  end
   if not s.stationApproach then
     for _,offset in ipairs({{-1,0},{1,0},{0,-1},{0,1}}) do
       local p={x=target.x+offset[1],y=target.y,z=target.z+offset[2]}; local protected=false

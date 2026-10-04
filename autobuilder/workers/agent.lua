@@ -20,11 +20,21 @@ function M.new(state,config,network,turtle,save,chunkProbe)
       and math.max(config.fuel.target,config.mining.fuelTarget,task.requiredFuel or 0) or nil
     local limit=turtle.getFuelLimit and turtle.getFuelLimit() or nil
     if limit=='unlimited' then limit=nil end
+    local current=turtle.getFuelLevel();local budget,budgetError
+    local mining=config.mining;local miningRoute
+    if mining and mining.enabled then
+      local entry=mining.entry or (task and task.exploration and task.exploration.entry)
+      if not entry and capabilities.explorationV1 then entry=(mining.exitRoute or {})[#(mining.exitRoute or {})] or config.depot end
+      if U.position(entry) then miningRoute={entry=U.copy(entry),fuelTarget=mining.fuelTarget} end
+    end
+    if task then budget,budgetError=require('autobuilder.resources.fuel_budget').mission(config,task,{fuel=current,position=p,depot=config.depot,miningRoute=miningRoute}) end
     return {cargo=cargo,controllerBoot=state.controllerBoot,poseRecovery=require('autobuilder.core.task_messages').poseReport(state.poseRecovery or state.poseReceipt),
+      fuelBudget=budget,fuelBudgetError=budgetError,
       chunkAnchor=chunkProbe and chunkProbe() or nil,fuelRequired=need,fuelLimit=limit,label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,
       position={known=p.known==true,x=p.x,y=p.y,z=p.z,heading=p.heading,source=p.source or 'unknown'},
-      fuel=turtle.getFuelLevel(),depot=U.copy(config.depot),inventory={used=used,slots=16},
+      fuel=current,depot=U.copy(config.depot),inventory={used=used,slots=16},
       miningResources=config.mining and config.mining.enabled and U.copy(config.mining.resources or {}) or nil,
+      miningRoute=miningRoute,
       miningArea=config.mining and config.mining.enabled and U.copy(config.mining.bounds) or nil,
       explorationHome=config.capabilities and config.capabilities.explorationV1 and {depot=U.copy(config.depot),exitRoute=U.copy(config.mining.exitRoute),protectedAreas=U.copy(config.restrictedAreas)} or nil,
       capabilities=capabilities,task=state.currentTask and tostring(state.currentTask.id)}

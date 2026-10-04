@@ -175,6 +175,8 @@ end
 function M.canAssign(state,c,j,w,counts,now,workers)
   if workers and workers~=state.workers then state=setmetatable({workers=workers},{__index=state}) end
   local role=M.role(j)
+  local fueled,why=require('autobuilder.resources.fuel_budget').admit(c,j,w)
+  if not fueled then return false,why end
   if not role or j.siteAccess or owner(j)==w.id then return true end
   if not idle(state,c or {},w,role) then return false,'worker is no longer idle or lacks fuel' end
   if not capable(w,role) or j.requiredCapability and not (w.telemetry.capabilities or {})[j.requiredCapability] then return false,'worker capability changed before assignment' end
