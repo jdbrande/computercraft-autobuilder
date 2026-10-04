@@ -219,6 +219,7 @@ function M.new(app,config,e,network,clock)
     function self:command() return false,'Enter mining commands on the controller' end
     function self:handle(sender,m)
       if sender~=config.controllerId then return false,'not configured controller' end
+      if s.inventoryRecovery then return false,'worker quarantined for inventory recovery' end
       if not config.mining.enabled and not (s.currentTask and s.currentTask.exploration) then return false,'mining disabled on worker' end
       local p=m.payload
       if m.type=='mine_assign' then
@@ -267,6 +268,7 @@ function M.new(app,config,e,network,clock)
     end
     function self:resumeFuelTask() return miner():resume() end
     function self:poseRecovered()
+      if s.inventoryRecovery then return true end
       if (config.mining.enabled or s.currentTask and s.currentTask.exploration) and s.currentTask and not s.currentTask.paused
         and (not s.currentTask.type or s.currentTask.type=='MINE') and s.currentTask.phase=='blocked'
         and (s.currentTask.poseBlocked or s.currentTask.error=='trusted position and heading required')
@@ -276,6 +278,7 @@ function M.new(app,config,e,network,clock)
       end
     end
     function self:step()
+      if s.inventoryRecovery then return true end
       if not s.currentTask or not config.mining.enabled and not s.currentTask.exploration or s.currentTask.phase=='completed' then return true end
       if not Materials.accepts(config.mining.resources,s.currentTask.item)
         or s.currentTask.miningResources~=nil and not Materials.sameResources(s.currentTask.miningResources,config.mining.resources) then

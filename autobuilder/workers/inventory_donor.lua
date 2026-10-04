@@ -2,10 +2,19 @@ local U=require('autobuilder.core.util')
 local F=require('autobuilder.factory.factory')
 local R=require('autobuilder.workers.resupply')
 local M={}
+function M.validInventory(items)
+  if type(items)~='table' then return false end
+  for slot,v in pairs(items) do
+    if not U.integer(slot) or slot<1 or slot>16 or type(v)~='table' or not U.shortString(v.name,128)
+      or not U.integer(v.count) or v.count<1 or v.count>1000000 or v.nbt~=nil and not U.shortString(v.nbt,128) then return false end
+    for key in pairs(v) do if key~='name' and key~='count' and key~='nbt' then return false end end
+  end
+  return true
+end
 local function journal(task)
   if not task then return false end
   if task.intent or task.digIntent or task.depositIntent or task.pendingMove or task.supplyRequest then return true end
-  for _,name in ipairs({'production','cargo','resupply','homeCargo','fuelRecovery'}) do
+  for _,name in ipairs({'production','cargo','resupply','homeCargo','fuelRecovery','recoveryCargo'}) do
     if task[name] and task[name].intent then return true end
   end
   return false
@@ -15,10 +24,7 @@ function M.new(app,e)
   local function save() return app:save() end
   local function snapshot()
     local out=R.snapshot(t)
-    for _,v in pairs(out) do
-      assert(U.shortString(v.name,128) and U.integer(v.count) and v.count>0 and v.count<=1000000
-        and (v.nbt==nil or U.shortString(v.nbt,128)),'invalid recovery inventory')
-    end
+    assert(M.validInventory(out),'invalid recovery inventory')
     return out
   end
   function self:active() return app.state.inventoryRecovery~=nil end
@@ -29,7 +35,7 @@ function M.new(app,e)
     local s=app.state;local old=s.inventoryRecovery
     if old then return F.equal(old.contract,contract),'inventory recovery contract changed' end
     local pose=s.position;local task=s.currentTask
-    if app.busy or s.fuelRecovery or s.poseRecovery or not pose or not pose.known or pose.pending or pose.uncertain
+    if app.busy or s.fuelRecovery or s.fuelResume or s.poseRecovery or next(s.pendingSupplyAcks or {}) or not pose or not pose.known or pose.pending or pose.uncertain
       or U.distance(pose,p.position)~=0 then return false,'inventory recovery requires a confirmed stationary donor' end
     if not task or task.id~=p.originalTask or task.phase~='blocked' or journal(task) then return false,'blocked task with reconciled physical journals required' end
     local before=snapshot()

@@ -1,7 +1,7 @@
 local U=require('autobuilder.core.util')
 local Types=require('autobuilder.core.task_messages').types
 local M={}
-local caps={RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',PREPARE_REGION='siteWorkV1',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
+local caps={RECOVER_CARGO='inventoryRecoveryV1',RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',PREPARE_REGION='siteWorkV1',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
 local function key(p) return p.x..','..p.y..','..p.z end
 local function intersects(a,b)
   if not a or not b then return false end
@@ -13,6 +13,9 @@ end
 local storageWorkers={HARVEST=true,FARM=true,TRANSPORT=true,REFUEL=true}
 local function factory(job) return job.type=='PROCESS' or job.type=='SMELT' or job.type=='CRAFT' end
 function M.workerBusy(state,owner,exceptId)
+  for _,r in pairs((state.automation or {}).inventoryRecoveries or {}) do
+    if r.owner==owner or r.status~='completed' and r.courier==owner and r.jobId~=exceptId then return true end
+  end
   if require('autobuilder.core.chunks').holdsAnchor(state,owner) then return true end
   for _,job in pairs(state.jobs or {}) do
     if job.id~=exceptId and job.workerId==owner and job.status~='completed' and not job.physicalComplete then return true end
@@ -90,6 +93,7 @@ end
 function M.canDispatch(state,j)
   local allowed=not (storageWorkers[j.type] and M.factoryPending(state))
   if j.returnManaged then allowed=j.returnReady==true end
+  if j.type=='RECOVER_CARGO' then allowed=j.recoveryReady==true end
   if j.type=='RESCUE' then allowed=j.rescueReady==true and not M.factoryActive(state) end
   if j.logistics then allowed=j.logisticsReady==true and not M.factoryActive(state) end
   if j.managedFuel then allowed=j.fuelReady==true and not M.factoryActive(state) end
@@ -225,6 +229,17 @@ function M.new(state,save,clock,id,chunks,config)
   function self:progress(owner,p)
     local j=s.jobs[p.jobId]
     if not j or j.workerId~=owner then return false,'task owner mismatch' end
+    if j.type=='RECOVER_CARGO' then
+      local r=p.recoveryReceipt;local old=j.recoveryReceipt
+      if not require('autobuilder.workers.inventory_courier').validReceipt(r) or r.sequence~=j.recoverySequence
+        or r.capacity>j.quantity or (p.progress or 0)~=r.delivered then return false,'invalid recovery custody receipt' end
+      local stages={source=1,receiving=2,home=3}
+      if r.stage~='home' and (r.pickedUp~=0 or r.delivered~=0) then return false,'delivery before custody receipt' end
+      if old and (stages[r.stage]<stages[old.stage] or old.stage~='source' and r.capacity~=old.capacity
+        or old.stage=='home' and r.pickedUp~=old.pickedUp or r.delivered<old.delivered) then return false,'changed recovery custody receipt' end
+      if p.phase=='completed' and (r.stage~='home' or r.delivered~=r.pickedUp) then return false,'incomplete recovered delivery' end
+      if (j.status=='completed' or j.workerFinished) and not require('autobuilder.factory.factory').equal(r,old) then return false,'changed completed custody receipt' end
+    end
     if j.status=='completed' or j.workerFinished then return true end
     local materials=p.report and p.report.materials
     if materials~=nil then
@@ -278,6 +293,7 @@ function M.new(state,save,clock,id,chunks,config)
     if (p.progress or 0)<j.progress then return false,'stale task progress' end
     if j.type=='RESCUE' and p.fuelDelivered~=nil and (p.fuelDelivered<(j.fuelDelivered or 0) or p.fuelDelivered>j.quantity) then return false,'invalid rescue delivery counter' end
     if j.type=='SURVEY_SITE' then j.siteReport=U.copy(p.siteReport) end
+    if j.type=='RECOVER_CARGO' then j.recoveryReceipt=U.copy(p.recoveryReceipt) end
     if j.returning then j.homeReceipt=U.copy(p.homeReceipt) end
     if j.logistics then j.transportReceipt=U.copy(p.transportReceipt) end
     if materials then j.materials=U.copy(materials) end
@@ -285,7 +301,7 @@ function M.new(state,save,clock,id,chunks,config)
     if j.type=='RESCUE' and p.fuelDelivered~=nil then j.fuelDelivered=p.fuelDelivered end
     j.missingCount=p.missingCount; j.supplyId=p.supplyId; j.report=U.copy(p.report)
     j.status=p.phase=='completed' and 'completed' or p.phase=='blocked' and 'blocked' or p.phase=='paused' and 'paused' or 'running'
-    if (j.privateStation or j.logistics or j.returning) and p.phase=='completed' then j.workerFinished=true; j.status='collecting' end
+    if (j.privateStation or j.logistics or j.returning or j.type=='RECOVER_CARGO') and p.phase=='completed' then j.workerFinished=true; j.status='collecting' end
     persist(); return true
   end
   function self:reserve(owner,jobId,from,target,workers,work)

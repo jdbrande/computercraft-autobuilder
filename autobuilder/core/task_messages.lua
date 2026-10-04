@@ -1,6 +1,6 @@
 local U=require('autobuilder.core.util')
 local M={}
-M.types={PROCESS=true,RESCUE=true,FUEL_STATION=true,CRAFT=true,SMELT=true,BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true,PREPARE_SITE=true,SURVEY_SITE=true,PREPARE_REGION=true,TRANSPORT=true,HARVEST=true,FARM=true,REFUEL=true,RETURN_HOME=true}
+M.types={RECOVER_CARGO=true,PROCESS=true,RESCUE=true,FUEL_STATION=true,CRAFT=true,SMELT=true,BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true,PREPARE_SITE=true,SURVEY_SITE=true,PREPARE_REGION=true,TRANSPORT=true,HARVEST=true,FARM=true,REFUEL=true,RETURN_HOME=true}
 local phases={setup=true,work=true,running=true,waiting=true,blocked=true,completed=true,paused=true,supply=true}
 local function bounded(value,depth,seen,budget)
   budget.n=budget.n+1; if budget.n>20000 or depth>12 then return false end
@@ -47,6 +47,7 @@ function M.validate(kind,p)
     if j.logistics~=nil and not require('autobuilder.storage.nodes').validContract(j) then return false,'invalid managed logistics contract' end
     if j.privateStation and (j.type~='CRAFT' or not require('autobuilder.factory.stations').valid(j.privateStation)
       or j.workerId~=j.privateStation.workerId or j.preferredWorker~=j.workerId) then return false,'invalid private crafting station' end
+    if j.type=='RECOVER_CARGO' and not require('autobuilder.workers.inventory_courier').valid(j) then return false,'invalid inventory recovery assignment' end
     if j.type=='RESCUE' and (not U.position(j.source) or not U.position(j.destination) or not U.position(j.home)
       or not U.integer(j.targetWorker) or j.targetWorker<0 or not U.integer(j.quantity) or j.quantity<1 or j.quantity>64) then return false,'invalid rescue assignment' end
     if j.managedFuel and (j.type~='REFUEL' or type(j.station)~='table' or not U.position(j.station.position)
@@ -81,7 +82,26 @@ function M.validate(kind,p)
       if not U.shortString(p.supplyId,160) or p.supplyId:sub(1,#p.jobId+8)~=p.jobId..':supply:' or not p.supplyId:sub(#p.jobId+9):match('^%d+$') then return false,'supply batch identity required' end
       if p.station~=nil and (kind~='task_supply' or not require('autobuilder.storage.supply').validStation(p.station)) then return false,'invalid supply station grant' end
     end
-    if kind=='task_fuel_freeze' then
+    if kind=='task_inventory_freeze' then
+      if not U.position(p.position) or not U.shortString(p.originalTask,100) then return false,'invalid inventory freeze' end
+    elseif kind=='task_inventory_grant' then
+      if not U.integer(p.sequence) or p.sequence<1 or p.sequence>4096 or not U.integer(p.slot) or p.slot<1 or p.slot>16
+        or not U.integer(p.count) or p.count<1 or p.count>64 or not U.integer(p.courier) or p.courier<0 then return false,'invalid inventory transfer grant' end
+    elseif kind=='task_inventory_ack' or kind=='task_inventory_received' then
+      if not U.integer(p.sequence) or p.sequence<1 or p.sequence>4096 or not U.integer(p.moved) or p.moved<0 or p.moved>64 then return false,'invalid inventory custody receipt' end
+    elseif kind=='task_inventory_status' then
+      if not U.position(p.position) or not U.shortString(p.originalTask,100) or not ({blocked=true,frozen=true,ready=true,sent=true})[p.phase]
+        or not U.integer(p.sequence) or p.sequence<0 or p.sequence>4096 or not U.integer(p.moved) or p.moved<0 or p.moved>64
+        or not require('autobuilder.workers.inventory_donor').validInventory(p.inventory)
+        or p.error~=nil and not U.shortString(p.error,512) then return false,'invalid inventory donor status' end
+      if p.transfer~=nil then
+        local g=p.transfer
+        if type(g)~='table' or not U.integer(g.sequence) or g.sequence~=p.sequence or not U.integer(g.slot) or g.slot<1 or g.slot>16
+          or not U.integer(g.count) or g.count<1 or g.count>64 or not U.integer(g.courier) or g.courier<0 or not U.shortString(g.item,128)
+          or g.nbt~=nil and not U.shortString(g.nbt,128) then return false,'invalid donor transfer record' end
+      end
+      if (p.phase=='ready' or p.phase=='sent') and not p.transfer then return false,'donor transfer record required' end
+    elseif kind=='task_fuel_freeze' then
       if not U.position(p.position) or not U.shortString(p.item,128) or not U.integer(p.quantity) or p.quantity<1 or p.quantity>64
         or not U.integer(p.fuelTarget) or p.fuelTarget<1 or p.fuelTarget>100000000 then return false,'invalid rescue freeze' end
     elseif kind=='task_fuel_consume' then
@@ -94,6 +114,7 @@ function M.validate(kind,p)
     elseif kind=='task_fuel_release' then
       -- Identity-only release; the worker verifies its durable consumed receipt.
     elseif kind=='task_progress' then
+      if p.recoveryReceipt~=nil and not require('autobuilder.workers.inventory_courier').validReceipt(p.recoveryReceipt) then return false,'invalid recovery custody progress' end
       if p.report~=nil and type(p.report)~='table' then return false,'invalid task report' end
       if p.report and p.report.materials~=nil and not require('autobuilder.core.reports').validMaterials(p.report.materials) then return false,'invalid material report' end
       if p.siteReport~=nil and not require('autobuilder.build.site_survey').validSummary(p.siteReport) then return false,'invalid site survey report' end

@@ -8,6 +8,17 @@ function M.valid(j)
     and (j.nbt==nil or U.shortString(j.nbt,128)) and U.integer(j.quantity) and j.quantity>=1 and j.quantity<=64
     and U.shortString(j.recoveryId,100) and U.integer(j.recoverySequence) and j.recoverySequence>=1 and j.recoverySequence<=4096
 end
+function M.receipt(task)
+  if task.type~='RECOVER_CARGO' then return nil end
+  local c=task.recoveryCargo or {}
+  return {sequence=task.recoverySequence,stage=c.stage or 'source',capacity=c.capacity or 0,pickedUp=c.pickedUp or 0,delivered=c.delivered or 0}
+end
+function M.validReceipt(r)
+  return type(r)=='table' and U.integer(r.sequence) and r.sequence>=1 and r.sequence<=4096
+    and ({source=true,receiving=true,home=true})[r.stage]==true and U.integer(r.capacity) and r.capacity>=0 and r.capacity<=64
+    and U.integer(r.pickedUp) and r.pickedUp>=0 and r.pickedUp<=r.capacity
+    and U.integer(r.delivered) and r.delivered>=0 and r.delivered<=r.pickedUp
+end
 function M.new(task,e,config,nav,save)
   assert(M.valid(task),'invalid inventory recovery courier contract')
   local self={task=task};local t=e.turtle;local fault

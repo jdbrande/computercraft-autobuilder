@@ -7,10 +7,11 @@ function M.new(app,config,e,network,clock)
   local production=require('autobuilder.core.production_service').new(app,config,e,queue)
   local fuel=require('autobuilder.core.fuel_service').new(app,config,e,queue,production,clock)
   local rescue=require('autobuilder.core.fuel_rescue_service').new(app,config,e,queue,production,network,clock)
+  local recovery=require('autobuilder.core.inventory_recovery_service').new(app,config,e,queue,production,network,clock)
   local projects=require('autobuilder.blueprint.projects').new(app,config,e,queue,production)
   local cathedral=require('autobuilder.blueprint.cathedral').new(app,config,e,projects)
   local infrastructure=require('autobuilder.core.infrastructure').new(app,config,e,queue)
-  local self={queue=queue,production=production,fuel=fuel,rescue=rescue,projects=projects,infrastructure=infrastructure,cathedral=cathedral}; local last=-math.huge
+  local self={recovery=recovery,queue=queue,production=production,fuel=fuel,rescue=rescue,projects=projects,infrastructure=infrastructure,cathedral=cathedral}; local last=-math.huge
   local function send(owner,kind,payload) return network:send(owner,kind,payload) end
   function self:restorePose(worker)
     local p=worker.telemetry and worker.telemetry.poseRecovery
@@ -38,6 +39,9 @@ function M.new(app,config,e,network,clock)
     elseif args[1]=='fuel' then app.state.view='fuel'; return true,fuel:describe()
     elseif args[1]=='worker' and args[2]=='return' then
       assert(#args==3,'Usage: worker return <id>');return true,production.returns:request(tonumber(args[3])).id
+    elseif args[1]=='worker' and args[2]=='recover' then
+      assert(#args==3,'Usage: worker recover <id>');return true,recovery:request(tonumber(args[3])).id
+    elseif args[1]=='recoveries' then return true,recovery:describe()
     elseif args[1]=='returns' then return true,production.returns:describe()
     elseif args[1]=='logistics' then app.state.view='logistics';return true,production.logistics:describe()
     elseif args[1]=='haul' then
@@ -80,6 +84,7 @@ function M.new(app,config,e,network,clock)
     if m.sequence<=math.max(worker.sequence or 0,worker.taskSequence or 0) then return false,'stale task packet' end
     worker.taskSequence=m.sequence
     local p=m.payload
+    if m.type=='task_inventory_status' then return recovery:handle(sender,p) end
     if m.type=='task_fuel_status' then return rescue:handle(sender,p) end
     local j=queue.state.jobs[p.jobId] or (app.state.jobs or {})[p.jobId]
     if j and not j.workerId and m.type=='task_progress' then queue:recoverOwner(sender,p,app.state.workers) end
@@ -88,7 +93,7 @@ function M.new(app,config,e,network,clock)
       if p.stockReceipt then local ok,err=production:acceptReceipt(j,p.stockReceipt); if not ok then return false,err end end
       local ok,err=queue:progress(sender,p); if not ok then return false,err end
       if p.phase~='paused' and p.phase~='blocked' then j.resumeRequested=nil end
-      if j.returning and j.workerFinished and j.status~='completed' then return true end
+      if (j.returning or j.type=='RECOVER_CARGO') and j.workerFinished and j.status~='completed' then return true end
       if j.status=='completed' or j.workerFinished then
         j.completedAt=j.completedAt or clock()
         j.blocks=nil; app:save(); return send(sender,'task_ack',{jobId=j.id})
@@ -133,7 +138,7 @@ function M.new(app,config,e,network,clock)
     local _,events=require('autobuilder.core.scaling').update(app.state,config,app.mining.storage.counts,clock(),function() return app:save() end)
     for _,event in ipairs(events) do app:report('INFO','Fleet role='..event.role..' target='..event.target..' active='..event.active..' reason='..event.reason) end
     if app.state.view=='fleet' then app.state.fleetLines=require('autobuilder.core.scaling').describe(app.state,config,app.mining.storage.counts,clock()) end
-    if config.automation.enabled then fuel:tick(); rescue:tick() end
+    if config.automation.enabled then fuel:tick(); rescue:tick();production:inventoryAction(function() recovery:tick() end) end
   end
   function self:tick()
     if not config.automation.enabled then return true end
@@ -214,6 +219,7 @@ function M.new(app,config,e,network,clock)
     return true
   end
   function self:step() if config.automation.enabled then
+    if production:inventoryAction(function() return recovery:step() end) then return true end
     if fuel:step() then return true end
     return production:step()
   end; return true end

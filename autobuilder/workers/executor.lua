@@ -8,7 +8,7 @@ local function homeReceipt(t)
   if t.returning then return {sequence=t.homeCargo and t.homeCargo.sequence or 0,deposited=U.copy(t.homeCargo and t.homeCargo.deposited or {})} end
 end
 local construction={BUILD=true,VERIFY=true,REPAIR=true,CLEAR=true,SURVEY_SITE=true,PREPARE_REGION=true}
-local modules={RETURN_HOME='autobuilder.workers.home',RESCUE='autobuilder.workers.fuel_courier',BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',SURVEY_SITE='autobuilder.build.site_survey',
+local modules={RECOVER_CARGO='autobuilder.workers.inventory_courier',RETURN_HOME='autobuilder.workers.home',RESCUE='autobuilder.workers.fuel_courier',BUILD='autobuilder.build.builder',VERIFY='autobuilder.build.verification',REPAIR='autobuilder.build.repair',CLEAR='autobuilder.build.repair',PREPARE_SITE='autobuilder.build.site',SURVEY_SITE='autobuilder.build.site_survey',
   PREPARE_REGION='autobuilder.build.site_work',
   CRAFT='autobuilder.factory.crafting',TRANSPORT='autobuilder.workers.courier',HARVEST='autobuilder.resources.logger',FARM='autobuilder.resources.farmer'}
 function M.new(app,config,e,network,clock)
@@ -63,6 +63,7 @@ function M.new(app,config,e,network,clock)
     return resumeTask()
   end
   function self:poseRecovered()
+    if s.inventoryRecovery then return true end
     local t=s.currentTask;local p=s.position
     if generic() and t.poseBlocked and not t.paused and config.automation.enabled
       and p.known and U.heading(p.heading) and not p.pending and not p.uncertain then
@@ -113,13 +114,28 @@ function M.new(app,config,e,network,clock)
     if r then send('task_position',{jobId=r.jobId,from=r.from,target=r.target}); s.motionReservation=nil; save() end
   end
   function self:handle(sender,m)
+    local inventoryControl=m.type=='task_inventory_freeze' or m.type=='task_inventory_grant' or m.type=='task_inventory_ack'
     local miningControl=(m.type=='task_pose_grant' or m.type=='task_pose_ack' or m.type=='task_grant') and miningEnabled()
-    if sender~=config.controllerId or not config.automation.enabled and not miningControl then return false,'automation controller mismatch or disabled' end
+    if sender~=config.controllerId or not config.automation.enabled and not miningControl and not inventoryControl then return false,'automation controller mismatch or disabled' end
     if m.boot<(s.controllerBoot or 0) then return false,'stale controller generation' end
     local previous=s.lastTaskControl
     if previous and (m.boot<previous.boot or (m.boot==previous.boot and m.sequence<=previous.sequence)) then return false,'stale task control' end
     s.lastTaskControl={boot=m.boot,sequence=m.sequence}; save()
     local p=m.payload; local t=s.currentTask
+    if inventoryControl then
+      local recovery=app.inventoryDonor;if not recovery then return false,'inventory recovery unavailable' end
+      local method=({task_inventory_freeze='freeze',task_inventory_grant='grant',task_inventory_ack='ack'})[m.type]
+      local ok,why=recovery[method](recovery,p);local status=recovery:status()
+      if not status and m.type=='task_inventory_freeze' then
+        status={jobId=p.jobId,position=U.copy(p.position),originalTask=p.originalTask,phase='blocked',sequence=0,moved=0,inventory={},error=tostring(why):sub(1,512)}
+      end
+      if status then
+        if status.error then status.error=tostring(status.error):sub(1,512) end
+        send('task_inventory_status',status)
+      end
+      return ok,why
+    end
+    if s.inventoryRecovery then return false,'worker quarantined for inventory recovery' end
     if m.type=='task_pose_grant' or m.type=='task_pose_ack' then return app.poseRecovery:handle(m.type,p) end
     if m.type=='task_fuel_freeze' or m.type=='task_fuel_consume' or m.type=='task_fuel_release' then
       local recovery=app.fuelRecovery; if not recovery then return false,'fuel recovery unavailable' end
@@ -136,7 +152,7 @@ function M.new(app,config,e,network,clock)
     end
     if m.type=='task_assign' then
       local j=p.job; local done=s.completedTasks[j.id]
-      if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report,transportReceipt=done.transportReceipt,homeReceipt=done.homeReceipt,siteReport=done.siteReport}) end
+      if done then return send('task_progress',{jobId=j.id,phase='completed',progress=done.progress or 0,report=done.report,transportReceipt=done.transportReceipt,homeReceipt=done.homeReceipt,recoveryReceipt=done.recoveryReceipt,siteReport=done.siteReport}) end
       if require('autobuilder.core.receipts').archived(s,'completedTasks',j.id) then return false,'Old acknowledged task was archived; restore the matching controller checkpoint' end
       local covered,why=require('autobuilder.core.chunks').workerAccept(config,s,j);if not covered then return false,why end
       if t and (t.siteSurvey or j.siteSurvey) then
@@ -147,6 +163,11 @@ function M.new(app,config,e,network,clock)
       if t and (t.siteWork or j.siteWork) then
         for _,field in ipairs({'siteWork','siteAccess','blocks','bounds','clearanceY'}) do
           if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed region preparation assignment' end
+        end
+      end
+      if t and (t.type=='RECOVER_CARGO' or j.type=='RECOVER_CARGO') then
+        for _,field in ipairs({'type','source','home','targetWorker','item','nbt','quantity','recoveryId','recoverySequence'}) do
+          if not require('autobuilder.factory.factory').equal(t[field],j[field]) then return false,'changed inventory recovery assignment' end
         end
       end
       if t and (t.returning or j.returning) then
@@ -162,8 +183,9 @@ function M.new(app,config,e,network,clock)
         end
       end
       if t then return t.id==j.id,'worker already has a task' end
+      if j.type=='RECOVER_CARGO' and not config.capabilities.courier then return false,'recovery requires courier capability' end
       if j.logistics and (not config.capabilities.logisticsV1 or not require('autobuilder.storage.nodes').validContract(j)) then return false,'invalid managed transport assignment' end
-      local cap=({RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',PREPARE_REGION='siteWorkV1',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
+      local cap=({RECOVER_CARGO='inventoryRecoveryV1',RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',PREPARE_REGION='siteWorkV1',HARVEST='logging',FARM='farming',TRANSPORT='courier'})[j.type]
       if j.siteAccess then cap='siteAccessV1' end
       if require('autobuilder.build.blockstates').requiresModern(j.blocks,j.siteSurvey) and not config.capabilities.placementV1 then return false,'worker lacks placementV1' end
       if require('autobuilder.build.blockstates').requiresMetadata(j.blocks) and not config.capabilities.metadataV1 then return false,'worker lacks metadataV1' end
@@ -174,8 +196,9 @@ function M.new(app,config,e,network,clock)
       s.status='setup'; self.engine=nil; save(); return true
     end
     if not t or t.id~=p.jobId then return false,'task ID mismatch' end
+    if m.type=='task_inventory_received' and t.type=='RECOVER_CARGO' then return engine():received(p) end
     if m.type=='task_ack' and t.phase=='completed' then
-      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report,t.type),transportReceipt=transportReceipt(t),homeReceipt=homeReceipt(t),siteReport=U.copy(t.siteReport)})
+      require('autobuilder.core.receipts').record(s,'completedTasks',t.id,{progress=tonumber(t.progress) or t.delivered or 0,report=Reports.compact(t.report,t.type),transportReceipt=transportReceipt(t),homeReceipt=homeReceipt(t),recoveryReceipt=require('autobuilder.workers.inventory_courier').receipt(t),siteReport=U.copy(t.siteReport)})
       s.currentTask=nil; self.engine=nil; s.status='idle'; save(); return true
     elseif m.type=='task_pause' then t.paused=true; save(); return true
     elseif m.type=='task_resume' then
@@ -197,6 +220,10 @@ function M.new(app,config,e,network,clock)
   end
   function self:tick()
     if clock()-lastSend<config.heartbeatInterval then return true end
+    if app.inventoryDonor and app.inventoryDonor:active() then
+      local status=app.inventoryDonor:status();if status.error then status.error=tostring(status.error):sub(1,512) end
+      send('task_inventory_status',status);lastSend=clock();return true
+    end
     recoverSupplyReceipt()
     if app.fuelRecovery and app.fuelRecovery:active() then
       local status=app.fuelRecovery:status(); if status.error then status.error=tostring(status.error):sub(1,512) end
@@ -212,12 +239,13 @@ function M.new(app,config,e,network,clock)
     if t.type=='CRAFT' and t.production and t.production.stockSequence then
       stockReceipt={sequence=t.production.stockSequence,withdrawn=U.copy(t.production.withdrawn or {}),delivered={[t.item]=t.production.delivered or 0}}
     end
-    send('task_progress',{siteReport=U.copy(t.siteReport),homeReceipt=homeReceipt(t),transportReceipt=transportReceipt(t),fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
+    send('task_progress',{recoveryReceipt=require('autobuilder.workers.inventory_courier').receipt(t),siteReport=U.copy(t.siteReport),homeReceipt=homeReceipt(t),transportReceipt=transportReceipt(t),fuelDelivered=t.type=='RESCUE' and t.fuelDelivered or nil,stockReceipt=stockReceipt,jobId=t.id,phase=phase,progress=tonumber(t.progress) or t.delivered or 0,error=err,
       missingItem=t.supplyRequest and t.supplyRequest.item or t.missingItem,
       missingCount=t.supplyRequest and t.supplyRequest.count or t.missingCount,supplyId=t.supplyRequest and t.supplyRequest.id,report=Reports.compact(t.report,t.type)})
     return true
   end
   function self:step()
+    if s.inventoryRecovery then return true end
     if not generic() then return true end
     recoverSupplyReceipt()
     local t=s.currentTask

@@ -42,3 +42,7 @@ test('inventory donor failed checkpoints prevent side effects and retain quarant
  f.app.fail=nil;assert(f.r:freeze(f.contract));assert(f.r:grant(f:grant(1,1,5)));f.app.fail=true
  assert(not f.r:step());eq(f.drops,0);assert(f.r:active())
 end)
+test('donor refuses unsettled supply acknowledgements and nested recovery cargo journals',function()
+ local f=fixture();f.app.state.pendingSupplyAcks={['mine:1:supply:1']='mine:1'};assert(not f.r:freeze(f.contract))
+ f=fixture();f.app.state.currentTask.recoveryCargo={intent={}};assert(not f.r:freeze(f.contract))
+end)

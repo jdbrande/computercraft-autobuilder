@@ -1608,3 +1608,22 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   independent world inventories agree. Both probes are shut down and their one
   temporary force-load ticket removed. Controller integration, quarantine controls,
   end-to-end recovery acceptance and complete milestone gates remain unfinished.
+
+### 0.35 reachable inventory recovery implementation
+
+- Implemented donor quarantine and exact stack/NBT snapshots, courier transfer and
+  deposit journals, validated custody messages, controller requests, durable private
+  buffer capacity, worker ownership and normal queue/fuel/chunk admission.
+- `worker recover <id>` explicitly classifies a blocked worker for cargo recovery;
+  `recoveries` reports progress. Offline timeout never authorizes collection. The
+  donor retains its original task and territory, and remains quarantined afterward.
+- Actual runtime simulation passes with a physical donor drop interrupted by reboot
+  of all three computers. Exact tagged cargo survives; the courier keeps its own
+  fuel stack. Plain recovered items reach central stock only after measured storage
+  delivery; tagged items remain in the private recovery buffer.
+- Partial transfers, wrong identity, changed receipts, unrelated inventory changes,
+  insufficient fuel, failed reservation checkpoints, pending supply acknowledgements
+  and collection restart have focused regression coverage. Ordinary runtime,
+  automation, fuel budget, managed logistics and capacity regressions pass.
+- Native adjacent-turtle feasibility probes passed; complete native acceptance,
+  final review and full release gates remain pending. No acceptance claim yet.
