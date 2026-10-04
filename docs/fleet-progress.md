@@ -1,21 +1,30 @@
 # Fleet requirements progress
 
 Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
-[autonomous mining plan](autonomous-mining-plan.md). Updated 2026-10-03.
+[autonomous mining plan](autonomous-mining-plan.md). Updated 2026-10-04.
 
 ## Current work
 
-- Accepted0.32 registered renewables:923 Lua/18 Python tests, release/diff checks,
-  final-source native carrot harvest/replant/restart/reserve acceptance and cleanup
-  passed. Permanent evidence: [0.32 validation](validation-0.32.0.md).
+- Accepted0.35 reachable inventory recovery:976 Lua/20 Python tests and final
+  release/diff checks passed. Two native trials verified exact plain/NBT cargo,
+  frozen donor ownership, restart, home refueling between trips and cleanup.
+  [Permanent evidence](validation-0.35.0.md).0.36 final gates and0.37 protection
+  implementation/native acceptance continue.
 
-- Active development:0.33 placement adapters completed its single review and
-  consolidated regression fixes; complete Lua and native mixed-project gates run.
- 0.34 empty-container metadata/cardinal sign adapters completed its single review;
-  consolidated regressions and native acceptance run.0.35 reachable inventory
-  recovery has a committed design and initial donor actor regressions in progress.
-  Candidate evidence lives in the corresponding `.worktrees` documentation until
-  ordered integration. No unfinished candidate is treated as accepted.
+- Accepted0.34 metadata/sign geometry:956 Lua/20 Python tests, release/diff checks
+  and native Sponge v3 nine-cell import/build/restart/verification passed.
+  [Permanent evidence](validation-0.34.0.md) distinguishes the clean repeat from
+  the assisted first trial.0.35–0.37 remain separate candidates.
+
+- Accepted0.33 deterministic placement:940 Lua/18 Python tests and final release/
+  diff checks passed. Native140-cell mixed adapters verified independently; ascent
+  and paired-checkpoint bugs are regression-covered. Its underside-access fixture
+  assistance remains explicit in [0.33 validation](validation-0.33.0.md).
+- Candidates0.34 metadata and0.35 inventory recovery have completed their single
+  reviews, focused corrections and native gates; final full gates continue.0.36
+  priorities passed native two-project acceptance and its review regressions;
+  final gate continues.0.37 inventory protection is under active implementation.
+  No unfinished candidate is treated as accepted.
 
 - Accepted0.30 enrollment:885 Lua/18 Python tests, release/diff checks and final-source
   native HTTP install/repair/profile refresh passed; fixture shut down and tickets
@@ -1764,3 +1773,35 @@ inventory contracts and offline ownership. Design and validation plan:
 `infrastructure-protection-design.md`. Remaining work after this includes traffic
 acceptance, structured events/operator commands, monitor dashboard, sustained
 load and final unassisted combined fleet acceptance.
+0.35 final-source native refueling passed — 2026-10-04: courier256 started at68fuel,
+completed its first pickup, automatically refueled at its registered home station
+while retaining the recovery, then completed the second pickup. The controller
+replenished three station coal from registered central stock. Independent data
+confirmed five central stone, unchanged tagged pickaxe,16station coal, empty idle
+courier home at228fuel, empty quarantined donor and intact obstruction. All recovery,
+fuel and collection jobs settled; computers254–256off and fourtickets removed.
+Fixture inventory names were corrected before the first trip. Final full gates are
+running on391db98; see the permanent0.35report and ignored native audit records.
+0.33 native placement completed — 2026-10-04: `mixed_adapters` reached built with
+140 correct cells. Independent observer 90 matched all 140 names/states; depot and
+supply were empty, all jobs completed and builder245 was idle home with 12,348 fuel.
+The rig was shut down and ten temporary tickets removed. The two-cell operator
+access cut is explicitly assisted evidence. Permanent candidate report is
+`validation-0.33.0.md`; final-source full Lua gate remains running.
+
+### 0.33 accepted — 2026-10-04
+
+Final source940 Lua/18 Python tests, generated release verification and clean diff
+passed. Permanent report records the native evidence and assistance limits.
+
+### 0.34 accepted — 2026-10-04
+
+Final-source956 Lua/20 Python tests and release/diff checks passed. The native
+container/sign project and final inventories were independently checked; fixture
+computers are off and temporary tickets removed.
+
+### 0.35 accepted — 2026-10-04
+
+Final-source976 Lua/20 Python tests, release/diff checks and both native trials
+passed. Donor quarantine, controlled courier refueling and exact inventory receipts
+retain their documented limits. No second review was performed.
