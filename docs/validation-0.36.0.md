@@ -1,7 +1,8 @@
-# 0.36.0 project priorities acceptance candidate
+# 0.36.0 project priorities acceptance
 
-Final implementation42b2a62. The repeated complete Lua gate is running; this
-candidate is not accepted until that gate and release checks pass.
+Accepted final implementation42b2a62:1,003 Lua tests and20 Python tests passed,
+along with final release-artifact and whitespace checks. Native acceptance and the
+single final review/consolidated corrections are complete.
 
 ## Automated evidence
 

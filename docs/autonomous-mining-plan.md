@@ -1369,26 +1369,26 @@ production request lineage, generic/mining queues, scaling worker preference,
 factory/processor new-claim ordering and supply selection. Add
 `tests/project_priorities_test.lua` and register it in `tests/run.lua`.
 
-- [ ] Add failing tests for default 50, integer bounds 0–100, durable priority
+- [x] Add failing tests for default 50, integer bounds 0–100, durable priority
   command rollback/reboot, and project lineage through production/acquisition work.
-- [ ] Implement `scheduling.priority(state, work)` and deterministic
+- [x] Implement `scheduling.priority(state, work)` and deterministic
   `scheduling.before(state, a, b)` using saved project/request relationships.
-- [ ] Add failing queue/service tests: priority 80 beats 50 for unclaimed scarce
+- [x] Add failing queue/service tests: priority 80 beats 50 for unclaimed scarce
   stock and idle workers, while already committed lower-priority work drains;
   paused/blocked high-priority work permits unrelated runnable work.
-- [ ] Apply the policy at existing admission/claim boundaries. Add nearest feasible
+- [x] Apply the policy at existing admission/claim boundaries. Add nearest feasible
   mission-budget worker ordering, preserving capability/fuel/chunk/protection and
   role limit checks, with regressions for distant/unfueled/unknown-pose workers.
-- [ ] Run focused tests, fix failures and commit the complete scheduling change.
+- [x] Run focused tests, fix failures and commit the complete scheduling change.
 
 ### Task 76: Concurrent project acceptance
 
-- [ ] Add an actual concurrent project simulation with shared scarce inputs,
+- [x] Add an actual concurrent project simulation with shared scarce inputs,
   priority change, controller/worker restart and exact final inventories/ownership.
-- [ ] Run useful native two-project acceptance and independently verify world
+- [x] Run useful native two-project acceptance and independently verify world
   blocks, ordering and final settlement. Document limitations without overstating
   throughput or natural-world coverage.
-- [ ] Complete one final read-only review and consolidated regression fixes;
+- [x] Complete one final read-only review and consolidated regression fixes;
   run full Lua/Python/release/diff gates and add the permanent acceptance report.
-- [ ] Integrate in milestone order, update progress and continue dashboard,
+- [x] Integrate in milestone order, update progress and continue dashboard,
   commands/logging, network load and final integrated fleet acceptance.
