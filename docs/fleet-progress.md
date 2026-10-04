@@ -1674,3 +1674,11 @@ collection without a journal, and expose the child error/task. Focused recovery
 and fuel tests pass; broader integration and final full gates remain pending.
 The earlier service-limit error was not a review; this is the one completed review,
 with no rereview. A native refueling retest is next.
+Native paired-placement checkpoint correction — 2026-10-04: bed recovery
+reused one inspection table under both `pairResults.recover` and `.existing`.
+CraftOS rejects repeated table references; the simulation fixture's deep-copy
+save silently removed the alias. The fixture now checks the original object
+graph before copying. Eight door/bed cases failed before the one-line independent
+copy and all advanced placement tests pass afterward. This is a new runtime bug,
+not a second branch review. The final full gate is superseded and will rerun on
+the corrected source; native recovery retains the original physical contract.
