@@ -56,6 +56,34 @@ class NativeSchematicTests(unittest.TestCase):
                 if not extra: self.assertEqual(expected['metadata']['blockEntities'][0]['kind'], 'empty_inventory')
                 else: self.assertTrue(expected['metadata']['issues'])
 
+    def test_empty_metadata_tag_kinds_trapped_identity_and_optional_data_match(self):
+        for version in (2, 3):
+            for case in ('trapped', 'items_array', 'pos_list', 'burn_int', 'absent_data', 'wrong_data'):
+                name = 'minecraft:trapped_chest' if case == 'trapped' else 'minecraft:furnace' if case == 'burn_int' else 'minecraft:chest'
+                pos_kind = 9 if case == 'pos_list' else 11
+                pos = (b'\x03' if pos_kind == 9 else b'') + struct.pack('>iiii', 3, 0, 0, 0)
+                data = tag(11, 'Items', struct.pack('>i', 0)) if case == 'items_array' else tag(9, 'Items', b'\x0a' + struct.pack('>i', 0))
+                if case == 'burn_int': data += tag(3, 'BurnTime', struct.pack('>i', 0))
+                fields = [tag(8, 'Id', string(name)), tag(pos_kind, 'Pos', pos)]
+                if case == 'wrong_data' and version == 3: fields.append(tag(8, 'Data', string('')))
+                elif case != 'absent_data': fields.append(tag(10, 'Data', data + b'\0') if version == 3 else data)
+                entities = tag(9, 'BlockEntities', b'\x0a' + struct.pack('>i', 1) + compound(fields))
+                state = '[facing=south,lit=false]' if name.endswith('furnace') else '[facing=south,type=single,waterlogged=false]'
+                raw = fixture(version, data=b'\0\0\0\0', palette=[(name + state, 0)], block_extra=[entities])
+                expected = converter.convert(raw); actual = native_value(self.decode(raw))
+                if actual['metadata']['issues'] == {}: actual['metadata']['issues'] = []
+                with self.subTest(version=version, case=case):
+                    self.assertEqual(actual, expected)
+                    rejected = case in ('items_array', 'pos_list', 'burn_int') or case == 'wrong_data' and version == 3
+                    self.assertEqual(bool(expected['metadata']['issues']), rejected)
+
+        for version in (2, 3):
+            fields = [tag(8, 'Id', string('minecraft:chest')), tag(11, 'Pos', struct.pack('>iiii', 3, 0, 0, 0))]
+            entities = tag(9, 'BlockEntities', b'\x0a' + struct.pack('>i', 1) + compound(fields))
+            raw = fixture(version, data=b'\0\0\0\0', palette=[('minecraft:trapped_chest[facing=south,type=single,waterlogged=false]', 0)], block_extra=[entities])
+            with self.assertRaises(ValueError): converter.convert(raw)
+            with self.assertRaises(LuaError): self.decode(raw)
+
     def test_both_reject_malformed_schematic_varints_and_palette_ids(self):
         for raw in (fixture(data=b'\2\1\1\0'),fixture(data=b'\x80\0\1\1\0'),fixture(data=b'\0'),
                     fixture(palette=[('stone',0),('dirt',0)]),fixture()[:-1]):

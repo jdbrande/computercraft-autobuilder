@@ -907,3 +907,20 @@ test('empty container metadata builds through ordinary preparation supply restar
  local p=c.state.automation.projects.containers;eq(p.phase,'needs_repair');eq(p.report.counts.wrong,1);eq(w.digs,0);eq(w.places,1)
  eq(contents[1].count,1)
 end)
+
+test('ordinary standing sign project retains existing grass through preparation and restart',function()
+ local bp={schema=1,size={x=1,y=1,z=1},palette={{name='minecraft:oak_sign',state={rotation='4',waterlogged='false'}}},runs={{id=1,count=1}},metadata={},requirements={}}
+ local w,ce,we,c,b,step,reboot=fixture({blueprint=bp,stock={[1]={name='minecraft:oak_sign',count=1}},site={minY=-1,maxY=10,margin=1}})
+ w.items={};w.blocks['2,-1,0']={name='minecraft:grass_block',state={snowy=false}}
+ local place=w.turtle.placeDown;w.turtle.placeDown=function(...)
+  local item=w.items[w.selected];local sign=item and item.name=='minecraft:oak_sign';local ok,why=place(...)
+  if ok and sign then eq(w.pose.heading,'east');w.blocks['2,0,0'].state={rotation=4,waterlogged=false} end;return ok,why
+ end
+ assert(c:command('build import /example.json sign'));assert(c:command('build auto sign'));local restarted=false
+ for _=1,2200 do
+  step();local p=c.state.automation.projects.sign
+  if not restarted and p.site and p.site.work then c,b=reboot();restarted=true end
+  if p.phase=='built' and not b.state.currentTask then break end
+ end
+ eq(c.state.automation.projects.sign.phase,'built');assert(restarted);eq(w.places,1);eq(w.digs,0);eq(w.blocks['2,-1,0'].name,'minecraft:grass_block')
+end)

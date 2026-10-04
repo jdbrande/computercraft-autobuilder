@@ -222,3 +222,9 @@ metadata. Only the normalized empty-inventory contract is retained; this does no
 promise byte-for-byte preservation of incidental furnace timing fields. JSON
 imports validate the same canonical contract. Containers require `metadataV1` so
 older builders cannot silently ignore inventory verification.
+
+Existing signs are protected from destructive repair because their text cannot be
+observed or restored. Standing signs accept the same finite stable support predicate
+as preparation, including retained grass blocks. Trapped-chest metadata uses the exact
+`minecraft:trapped_chest` entity ID. Both importers validate field tag kinds; optional
+Sponge v3 `Data` may be absent for default-empty containers.

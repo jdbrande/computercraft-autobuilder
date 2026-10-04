@@ -124,7 +124,7 @@ function M.new(task,e,config,nav,save,mode)
     if check.stage=='inspect' then
       local ok,err=nav:face(p.support.heading); if not ok then return false,err end
       local found,solid,why=inspect(p.support)
-      check.safe=found and (C.family(solid.name)=='cube' or C.family(solid.name)=='log') or false
+      check.safe=found and Site.support(solid.name) or false
       check.error=why or (not check.safe and 'required solid support face is missing or unsupported' or nil)
       check.stage=check.safe and (C.family(b.name)=='door' and 'sides' or C.family(b.name)=='bed' and 'pairFloor' or 'return') or 'return'; check.level=0; check.side=1; persist()
     end
@@ -141,7 +141,7 @@ function M.new(task,e,config,nav,save,mode)
     if check.stage=='pairFloor' then
       local ok,err=nav:goTo(p.pair);if not ok then return false,err end
       local found,solid,why=inspect({direction='down'})
-      check.safe=found and (C.family(solid.name)=='cube' or C.family(solid.name)=='log') or false
+      check.safe=found and Site.support(solid.name) or false
       check.error=why or (not check.safe and 'paired bed floor is missing or unsupported' or nil)
       check.stage='return';persist()
     end
@@ -388,7 +388,7 @@ function M.new(task,e,config,nav,save,mode)
       local classification=C.classify(actual.name,actual.state)
       local actualFamily=C.family(actual.name)
       local allowed=mode=='prepare' and Site.drops(actual,config)
-      if mode=='prepare' and not allowed or mode~='prepare' and ((config.protectedBlocks or {})[actual.name] or actualFamily=='door' or actualFamily=='bed' or C.inventory(actual.name) or (classification~='SUPPORTED' and classification~='PARTIALLY_SUPPORTED') or actual.name:find('computercraft:',1,true)) then
+      if mode=='prepare' and not allowed or mode~='prepare' and ((config.protectedBlocks or {})[actual.name] or actualFamily=='door' or actualFamily=='bed' or C.inventory(actual.name) or actualFamily=='sign' or actualFamily=='wall_sign' or (classification~='SUPPORTED' and classification~='PARTIALLY_SUPPORTED') or actual.name:find('computercraft:',1,true)) then
         return issue(b,'unsupported','refusing to dig protected or unsupported block: '..actual.name,actual)
       end
       if p.item and not slotFor(p.item) then return missing(p.item) end

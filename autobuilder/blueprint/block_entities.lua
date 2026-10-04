@@ -1,6 +1,6 @@
 local U=require('autobuilder.core.util')
 local M={}
-local supported={['minecraft:chest']=true,['minecraft:barrel']=true,['minecraft:furnace']=true,['minecraft:blast_furnace']=true,['minecraft:smoker']=true}
+local supported={['minecraft:chest']=true,['minecraft:trapped_chest']=true,['minecraft:barrel']=true,['minecraft:furnace']=true,['minecraft:blast_furnace']=true,['minecraft:smoker']=true}
 local function position(p,size)
  return U.position(p) and p.x>=0 and p.x<size.x and p.y>=0 and p.y<size.y and p.z>=0 and p.z<size.z
 end
@@ -27,8 +27,8 @@ function M.decode(node,size,version)
  local data=e
  if version==3 then
   for key in pairs(e) do if key~='Id' and key~='Pos' and key~='Data' then return nil,'unsupported block entity field '..key end end
-  if not e.Data or e.Data.kind~=10 then return nil,'invalid block entity Data' end
-  data=e.Data.value
+  if e.Data and e.Data.kind~=10 then return nil,'invalid block entity Data' end
+  data=e.Data and e.Data.value or {}
  end
  for key,v in pairs(data) do
   local header=version==2 and (key=='Id' or key=='Pos')
@@ -57,6 +57,6 @@ function M.inBlueprint(records,d)
  return cursor>#ordered
 end
 function M.matches(record,block)
- return block and (block.name==record.id or record.id=='minecraft:chest' and block.name=='minecraft:trapped_chest')
+ return block and block.name==record.id
 end
 return M

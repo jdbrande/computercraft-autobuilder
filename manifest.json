@@ -2,7 +2,7 @@
   "baseUrl": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main",
   "files": [
     {
-      "bytes": 3217,
+      "bytes": 3188,
       "path": "autobuilder/blueprint/block_entities.lua",
       "roles": [
         "controller",
@@ -12,7 +12,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "d1f09571c3d5d7ce3fda116c841084de8ad824ac1d401fbe6274002cbc20c232",
+      "sha256": "c92148b65c069889c77ac6062054b493494a1aa3991e27b89c068523a37f0ef8",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/blueprint/block_entities.lua",
       "version": "0.34.0"
     },
@@ -197,7 +197,7 @@
       "version": "0.34.0"
     },
     {
-      "bytes": 27337,
+      "bytes": 27316,
       "path": "autobuilder/build/builder.lua",
       "roles": [
         "controller",
@@ -207,7 +207,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "e4a87c7d1f903c67e805638cf7ba57c590183c77f11e9d8259e58dd3d7455eb1",
+      "sha256": "a3932f9db7178548c738c3d7f5f32ba5009312cc16acfdf19fe058182a726d48",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/build/builder.lua",
       "version": "0.34.0"
     },
