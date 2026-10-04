@@ -1875,3 +1875,12 @@ its existing bounds, preserving the placement-time physical-miner witness while
 parallel acquisition runs earlier. Its focused full-chain case passed unchanged
 assertions and exact final material accounting. Final full gates are restarting;
 0.36 is not yet accepted.
+
+### 0.39 traffic acceptance started
+
+The remaining traffic requirement needs mixed-role evidence in one physical world.
+The existing reservation and detour mechanisms remain the implementation basis;
+new intersection, roofed-corridor and offline-owner scenarios will identify any
+required corrections. See[traffic acceptance design](traffic-acceptance-design.md).
+0.36/0.37 final suites and0.38 review/native corrections remain active dependencies.
+Sustained fleet load and the final combined unassisted build remain unfinished.

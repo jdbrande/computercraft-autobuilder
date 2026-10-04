@@ -1433,3 +1433,22 @@ Spec: [operator observability](operator-observability-design.md).
   tests/release/diff gates, permanent report and ordered integration.
 - [ ] Continue mixed-role traffic, sustained load at shipped telemetry defaults
   and final unassisted combined-fleet acceptance.
+
+## Milestone0.39: shared traffic acceptance
+
+Design: [shared traffic acceptance](traffic-acceptance-design.md). Reuse current
+cell ownership and bounded detours; implement only evidence-backed corrections.
+
+### Task81: Mixed-role physical contention
+
+- [ ] Shared-world intersection across construction, courier, return and mining.
+- [ ] Roofed narrow passage: bounded completion or durable actionable blockage.
+- [ ] Offline/busy destination ownership, independent progress and reconnect.
+- [ ] Restart/failure regressions for any bugs these scenarios expose.
+
+### Task82: Native traffic and integration
+
+- [ ] Small native mixed-role rig with real shared travel cells and shipped rates.
+- [ ] Independent world/cargo inspection and force-load/worker cleanup.
+- [ ] One final review, consolidated fixes, full tests and release checks.
+- [ ] Permanent evidence, integrate/push, continue sustained fleet load acceptance.
