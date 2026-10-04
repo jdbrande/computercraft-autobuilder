@@ -197,7 +197,11 @@
       "version": "0.34.0"
     },
     {
+<<<<<<< HEAD
       "bytes": 27316,
+=======
+      "bytes": 26073,
+>>>>>>> milestone/0.33.0
       "path": "autobuilder/build/builder.lua",
       "roles": [
         "controller",
@@ -207,7 +211,11 @@
         "logger",
         "courier"
       ],
+<<<<<<< HEAD
       "sha256": "a3932f9db7178548c738c3d7f5f32ba5009312cc16acfdf19fe058182a726d48",
+=======
+      "sha256": "d125fb71aab5baf711de17bcda8c4d949f5451d195e22ce8b47e4d10c116b98a",
+>>>>>>> milestone/0.33.0
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/build/builder.lua",
       "version": "0.34.0"
     },

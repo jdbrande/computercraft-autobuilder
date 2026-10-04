@@ -1617,3 +1617,12 @@ including restart and reservation preservation; all focused logistics tests pass
 The fixture also required a two-cell underside access opening for its low ceiling
 button. That operator intervention is separate from the routing fix and will be
 recorded in acceptance. Final-source full gates and native completion follow.
+
+Native paired-placement checkpoint correction — 2026-10-04: bed recovery
+reused one inspection table under both `pairResults.recover` and `.existing`.
+CraftOS rejects repeated table references; the simulation fixture's deep-copy
+save silently removed the alias. The fixture now checks the original object
+graph before copying. Eight door/bed cases failed before the one-line independent
+copy and all advanced placement tests pass afterward. This is a new runtime bug,
+not a second branch review. The final full gate is superseded and will rerun on
+the corrected source; native recovery retains the original physical contract.
