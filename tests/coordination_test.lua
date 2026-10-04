@@ -77,6 +77,7 @@ local function runtime()
   local ce=environment(7,h); local we=environment(12,h)
   local C=require('tests.loaded_config'); local R=require('autobuilder.core.runtime')
   local cc=C.load({role='controller',storageInventories={'store'},furnaces={'furnace'},turtleFuelReserveItems={},
+    inventoryAreas={store={min={x=-10,y=64,z=0},max={x=-10,y=64,z=0}},stage={min={x=0,y=63,z=0},max={x=0,y=63,z=0}},furnace={min={x=-12,y=64,z=0},max={x=-12,y=64,z=0}}},
     supply={inventory='stage'},heartbeatInterval=1,registrationInterval=3,workerTimeout=8})
   local wc=C.load({role='worker',controllerId=7,initialPosition={x=0,y=64,z=0,heading='north'},depot={x=0,y=64,z=0},
     mining={enabled=true,entry={x=1,y=64,z=0},bounds={min={x=1,y=64,z=0},max={x=8,y=70,z=8}}},

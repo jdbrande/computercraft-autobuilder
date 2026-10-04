@@ -30,7 +30,7 @@ function M.new(state,config,network,turtle,save,chunkProbe,environment)
       if U.position(entry) then miningRoute={entry=U.copy(entry),fuelTarget=mining.fuelTarget} end
     end
     if task then budget,budgetError=require('autobuilder.resources.fuel_budget').mission(config,task,{fuel=current,position=p,depot=config.depot,miningRoute=miningRoute}) end
-    return {health=environment and health.observe(environment,software),cargo=cargo,controllerBoot=state.controllerBoot,poseRecovery=require('autobuilder.core.task_messages').poseReport(state.poseRecovery or state.poseReceipt),
+    return {craftingInventories=require('autobuilder.core.inventory_geometry').craftingNames(config),health=environment and health.observe(environment,software),cargo=cargo,controllerBoot=state.controllerBoot,poseRecovery=require('autobuilder.core.task_messages').poseReport(state.poseRecovery or state.poseReceipt),
       fuelBudget=budget,fuelBudgetError=budgetError,
       harvestPlanting=task and (task.type=='HARVEST' or task.type=='FARM') and (task.harvestedSite and 1 or 0) or nil,
       harvestDelivered=task and (task.type=='HARVEST' or task.type=='FARM') and not task.intent and (task.delivered or 0) or nil,

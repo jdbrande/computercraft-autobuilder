@@ -54,7 +54,25 @@ local function mergeNames(first,second,excluded)
   end end
   return result
 end
-function M.configure(e,overrides,config,ask)
+function M.locate(e,overrides,config,ask,state)
+  local chosen=require('autobuilder.config').overlay(config,overrides)
+  local map=U.copy(chosen.inventoryAreas or {})
+  local missing=require('autobuilder.core.inventory_geometry').missing(chosen,state)
+  if #missing>0 then e.print('Register physical inventory blocks (F3 Targeted Block). Include BOTH halves of double chests and every processor block.') end
+  for _,name in ipairs(missing) do
+    local bounds=ask(e,name..': x y z OR minX minY minZ maxX maxY maxZ; cancel',function(v)
+      if v:lower()=='cancel' then return false end
+      local nums={};for word in v:gmatch('%S+') do local n=tonumber(word);if not U.integer(n) then return nil,'Use integer block coordinates.' end;nums[#nums+1]=n end
+      if #nums~=3 and #nums~=6 then return nil,'Enter three coordinates for one block, or six for inclusive bounds.' end
+      local b={min={x=nums[1],y=nums[2],z=nums[3]},max={x=nums[4] or nums[1],y=nums[5] or nums[2],z=nums[6] or nums[3]}}
+      if not require('autobuilder.resources.exploration').box(b) then return nil,'Invalid or reversed inventory bounds.' end
+      return b
+    end)
+    if bounds==false then return nil end;map[name]=bounds
+  end
+  overrides.inventoryAreas=map;return true
+end
+function M.configure(e,overrides,config,ask,state)
   local list,found,wired,wireless=discover(e)
   assert(wired,'Connect a wired modem and networking cable to the stock, furnace and crafting chests first.')
   local supply=(overrides.supply or {}).inventory or config.supply.inventory
@@ -64,6 +82,12 @@ function M.configure(e,overrides,config,ask)
   local excluded={}; for _,name in ipairs(furnaces) do excluded[name]=true end
   if supply~='' then excluded[supply]=true end
   if config.role=='controller' then
+    for _,s in ipairs(config.craftingStations or {}) do for _,field in ipairs({'buffer','input','output'}) do excluded[s[field]]=true end end
+    for _,s in ipairs((config.processors or {}).machines or {}) do excluded[s.inventory]=true end
+    for _,s in ipairs(config.supplyStations or {}) do excluded[s.inventory]=true end
+    for _,s in ipairs((config.fuel or {}).stations or {}) do excluded[s.inventory]=true end
+    for _,n in ipairs((config.logistics or {}).nodes or {}) do for _,b in ipairs(n.buffers or {}) do excluded[b.inventory]=true end end
+    for _,w in pairs((state or {}).workers or {}) do for _,n in ipairs((w.telemetry or {}).craftingInventories or {}) do excluded[n]=true end end
     if station.input~='' then excluded[station.input]=true end
     if station.output~='' then excluded[station.output]=true end
     e.print('Factory furnaces: '..(#furnaces>0 and table.concat(furnaces,', ') or 'none detected; attach ordinary furnaces to the wired network.'))
@@ -74,8 +98,10 @@ function M.configure(e,overrides,config,ask)
       selected=ask(e,'Additional stock chest numbers/names, none, or cancel',function(v) return selectNames(stocks,v,true,false,true) end,'none')
       if selected==false then return nil end
     end
-    overrides.furnaces=furnaces
-    overrides.storageInventories=mergeNames(overrides.storageInventories or config.storageInventories,selected,excluded)
+    local staged=U.copy(overrides);staged.furnaces=furnaces
+    staged.storageInventories=mergeNames(overrides.storageInventories or config.storageInventories,selected,excluded)
+    if not M.locate(e,staged,config,ask,state) then return nil end
+    overrides.furnaces=staged.furnaces;overrides.storageInventories=staged.storageInventories;overrides.inventoryAreas=staged.inventoryAreas
     return true
   end
   local turtle=e.turtle

@@ -1392,3 +1392,22 @@ factory/processor new-claim ordering and supply selection. Add
   run full Lua/Python/release/diff gates and add the permanent acceptance report.
 - [ ] Integrate in milestone order, update progress and continue dashboard,
   commands/logging, network load and final integrated fleet acceptance.
+
+## Milestone0.37: registered inventory infrastructure geometry
+
+Spec: [inventory protection design](infrastructure-protection-design.md).
+
+### Task77: Durable spatial registration and migration
+
+- [ ] Add named inventory bounds, reuse existing endpoint identities, preserve
+  offline/held ownership, and block incomplete destructive admission/grants.
+- [ ] Collect missing bounds transactionally in controller/factory setup and
+  carry worker-local crafting endpoint names through bounded telemetry.
+
+### Task78: Protection acceptance
+
+- [ ] Cover migration, restart, yielded admission, factory contracts, double
+  chests, bounded exploration payloads and meaningful native protected inventory
+  overlap with independent progress.
+- [ ] Complete one final review/fix pass, full gates, report and integration;
+  continue operator observability, traffic and combined fleet acceptance.

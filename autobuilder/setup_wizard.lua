@@ -54,11 +54,12 @@ function M.inventories(e)
 end
 local idle=require('autobuilder.core.setup_state').idle
 local function persist(e,config,overrides,pose,original,preparation)
-  Config.load(overrides) -- Validate the entire merged configuration before writing.
+  local chosen=Config.load(overrides) -- Validate the entire merged configuration before writing.
   local raw='-- Saved by setup. Previous settings: '..config.dataDir..'/settings-before-setup.lua\nreturn '..e.textutils.serialize(overrides)..'\n'
   assert(load(raw,'@settings.lua','t',{}),'Settings serialization failed')
   assert(IO.read(e.fs,settingsPath)==original,'Settings changed during setup; retry')
   local store,state=idle(e,config,preparation)
+  if chosen.role=='controller' then require('autobuilder.core.inventory_geometry').initialize(U.copy(state or {}),chosen) end
   local backup=config.dataDir..'/settings-before-setup.lua'
   if not e.fs.exists(backup) then IO.write(e.fs,backup,original) end
   if pose then
@@ -380,7 +381,7 @@ function M.run(args,e,opts)
   if args[1] then assert((args[1]=='controller' or args[1]=='factory' or args[1]=='exploration')==(config.role=='controller'),'Setup role does not match this installation') end
   local factory=args[1]=='factory' or args[1]=='crafter'
   local preparation=args[1]=='factory'
-  idle(e,config,preparation)
+  local _,setupState=idle(e,config,preparation)
   e.print('Guided setup: answer each prompt and press Enter. Saving requires yes; Enter means no.')
   e.print('Checking wireless modem...')
   local network=require('autobuilder.core.network').new(e,config,e.os.getComputerID(),1)
@@ -415,11 +416,12 @@ function M.run(args,e,opts)
     e.print('Automatic fuel: '..profile.fuel.item..', low '..profile.fuel.low..', target '..profile.fuel.target)
     e.print('Depot remains '..describe(config.depot)..'. Saving does not move or refuel this turtle.')
   elseif factory then
-    if not require('autobuilder.factory_setup').configure(e,overrides,config,ask) then return cancel(e) end
+    if not require('autobuilder.factory_setup').configure(e,overrides,config,ask,setupState) then return cancel(e) end
   elseif args[1]=='exploration' then
     if not explorationController(e,overrides,config) then return cancel(e) end
   elseif config.role=='controller' then
     if not controller(e,overrides,config) then return cancel(e) end
+    if not require('autobuilder.factory_setup').locate(e,overrides,config,ask,setupState) then return cancel(e) end
   else
     if args[1]=='miner' then pose=miner(e,overrides,config,args[2]) else pose=worker(e,overrides,config) end
     if not pose then return cancel(e) end

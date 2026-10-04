@@ -64,6 +64,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
     return g
   end
   local function admission(job,w,workers,counts)
+    local located,why=require('autobuilder.core.protection').ready(state,config,job);if not located then return false,why end
     local healthy,healthError=require('autobuilder.workers.health').eligible(w.telemetry,job)
     if not healthy then return false,healthError end
     local t=w.telemetry

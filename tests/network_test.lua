@@ -162,3 +162,10 @@ test('network validates health before deduplication and strips unknown health cy
   h.left='unknown';local accepted=assert(n:accept(12,m,'test',2));assert(accepted.payload.health);eq(accepted.payload.health.extra,nil)
   eq(accepted.payload.health.software.status,'unmanaged')
 end)
+
+test('crafting inventory names are bounded validated before deduplication and copied into worker registration',function()
+ local n=net(7,1);local m=packet('register',1)
+ for _,names in ipairs({{'left'},{'same','same'},{[2]='sparse'},{'a','b','c','d'}}) do m.payload.craftingInventories=names;assert(not n:accept(12,m,'test',0)) end
+ m.payload.craftingInventories={'input','output'}
+ local accepted=assert(n:accept(12,m,'test',0));m.payload.craftingInventories[1]='changed';eq(accepted.payload.craftingInventories[1],'input')
+end)
