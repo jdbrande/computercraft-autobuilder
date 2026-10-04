@@ -1805,3 +1805,11 @@ computers are off and temporary tickets removed.
 Final-source976 Lua/20 Python tests, release/diff checks and both native trials
 passed. Donor quarantine, controlled courier refueling and exact inventory receipts
 retain their documented limits. No second review was performed.
+
+###0.37 final review correction
+
+The single final review found that512 explicit registrations plus an inferred
+container could save an oversized map and fail every subsequent startup. The
+effective map now uses the same validation before any checkpoint. A regression
+failed before the fix and verifies the512 boundary, unchanged-config restart,
+rejection without state mutation and corrected-config recovery.
