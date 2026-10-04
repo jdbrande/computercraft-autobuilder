@@ -27,3 +27,12 @@ test('monitor redraw is bounded paged and recovers from resize detach and reconn
  local disabled=require('autobuilder.ui.monitor').new({peripheral={wrap=function() error('disabled monitor touched hardware') end}},{name='',interval=1})
  assert(disabled:draw(lines,0))
 end)
+
+test('dashboard shows current reservation wait alongside the retained route failure',function()
+ local state={id=7,workers={},jobs={},automation={projects={},requests={},jobs={j={id='j',status='blocked',workerId=12,
+  error='movement reservation pending',lastRouteFailure='movement reservation pending: no bounded traffic detour',
+  trafficWait={since=90,target={x=1,y=2,z=0},reason='worker occupies destination',blocker=13,remedy='Inspect worker 13; restore its connection'}}}}}
+ local text=table.concat(require('autobuilder.ui.dashboard').lines(state,{},100,{}),'\n')
+ assert(text:find('worker occupies destination',1,true));assert(text:find('Inspect worker 13',1,true))
+ assert(text:find('Last route failure: movement reservation pending: no bounded traffic detour',1,true));assert(text:find('passing bay',1,true))
+end)

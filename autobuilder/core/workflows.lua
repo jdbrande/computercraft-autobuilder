@@ -1,6 +1,11 @@
 local U=require('autobuilder.core.util')
 local Types=require('autobuilder.core.task_messages').types
 local M={}
+function M.updateRouteFailure(job,progress)
+  if progress.phase=='blocked' and type(progress.error)=='string' and progress.error:find('^movement reservation pending:') then
+    job.lastRouteFailure=progress.error
+  elseif progress.phase~='blocked' or progress.error~='movement reservation pending' then job.lastRouteFailure=nil end
+end
 local caps={RECOVER_CARGO='inventoryRecoveryV1',RESCUE='courier',CRAFT='crafting',BUILD='building',VERIFY='building',REPAIR='building',CLEAR='building',PREPARE_SITE='sitePreparation',SURVEY_SITE='siteSurveyV1',PREPARE_REGION='siteWorkV1',TRANSPORT='courier',HARVEST='logging',FARM='farming',REFUEL='telemetry',RETURN_HOME='telemetry'}
 local function key(p) return p.x..','..p.y..','..p.z end
 local function intersects(a,b)
@@ -316,6 +321,7 @@ function M.new(state,save,clock,id,chunks,config,record)
     if j.logistics then j.transportReceipt=U.copy(p.transportReceipt) end
     if materials then j.materials=U.copy(materials) end
     local oldStatus,oldError=j.status,j.error
+    M.updateRouteFailure(j,p)
     j.progress=p.progress or 0; j.phase=p.phase; j.error=p.error; j.missingItem=p.missingItem
     if j.type=='RESCUE' and p.fuelDelivered~=nil then j.fuelDelivered=p.fuelDelivered end
     j.missingCount=p.missingCount; j.supplyId=p.supplyId; j.report=U.copy(p.report)

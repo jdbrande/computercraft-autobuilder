@@ -62,3 +62,17 @@ test('production-owned mining accepts its durable acquired-stock proof after sup
     else eq(j.status,'blocked');assert(j.childId,'unproved or manual stock shortfall disappeared') end
   end
 end)
+
+test('mining retains last detailed route failure through pending reports and clears it on progress',function()
+ local state={};local Q=require('autobuilder.core.jobs')
+ local q=Q.new(state,function() return true end,function() return 100 end,7)
+ local j=q:submit('minecraft:cobblestone',1,0)
+ assert(q:assign({['12']={id=12,online=true,telemetry={capabilities={mining=true},status='idle'}}}))
+ local reason='movement reservation pending: traffic detour limit reached'
+ assert(q:progress(12,{jobId=j.id,phase='blocked',delivered=0,held=0,error=reason},0))
+ assert(q:progress(12,{jobId=j.id,phase='blocked',delivered=0,held=0,error='movement reservation pending'},0))
+ eq(j.lastRouteFailure,reason)
+ state=U.copy(state);q=Q.new(state,function() return true end,function() return 101 end,7);j=state.jobs[j.id]
+ eq(j.lastRouteFailure,reason)
+ assert(q:progress(12,{jobId=j.id,phase='survey',delivered=0,held=0},0));eq(j.lastRouteFailure,nil);eq(j.error,nil)
+end)

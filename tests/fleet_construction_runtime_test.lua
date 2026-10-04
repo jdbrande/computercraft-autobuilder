@@ -5,18 +5,19 @@ local function fixture(options)
   options=options or {};local width=options.width or 10;local lastWorker=11+(options.workers or 2)
   local f=require('tests.managed_logistics_support').new()
   f.workerIds={};for id=12,lastWorker do f.workerIds[#f.workerIds+1]=id end
-  f.envs={};f.apps={};f.worlds={};f.configs={};f.blocks={};f.owners={};f.active={};f.grants={}
+  f.envs={};f.apps={};f.worlds={};f.configs={};f.blocks={};f.owners={};f.active={};f.grants={};f.moves={};f.denials={};f.holds={}
   f.inventories={stock={[1]={name='minecraft:stone',count=width+2}},home12={},home13={},supply12={},supply13={}}
   local homes={}
   for id=12,lastWorker do
-    homes[id]={x=(id-12)*18,y=2,z=-4,heading='north'}
+    homes[id]=U.copy((options.homes or {})[id] or {x=(id-12)*18,y=2,z=-4,heading='north'})
     f.inventories['home'..id]={};f.inventories['supply'..id]={}
   end
   local buffers,stations={},{}
   for id=12,lastWorker do
     buffers[#buffers+1]={inventory='home'..id,position=U.copy(homes[id])}
     stations[#stations+1]={workerId=id,inventory='supply'..id,position=U.copy(homes[id]),side='front'}
-    local h=homes[id];f.blocks[h.x..',1,-4']={name='minecraft:chest',state={}};f.blocks[h.x..',2,-5']={name='minecraft:chest',state={}}
+    local h=homes[id];f.blocks[h.x..','..(h.y-1)..','..h.z]={name='minecraft:chest',state={}}
+    f.blocks[h.x..','..h.y..','..(h.z-1)]={name='minecraft:chest',state={}}
   end
   for x=3,width+4 do for z=-1,1 do f.blocks[x..',-1,'..z]={name='minecraft:stone',state={}} end end
   for _,x in ipairs({4,width+3}) do
@@ -35,25 +36,33 @@ local function fixture(options)
     f.envs[id]=e;return e
   end
   local C=require('tests.loaded_config')
-  f.configs[7]=C.load({storageInventories={'stock'},turtleFuelReserveItems={},supplyStations=stations,
+  local controllerSettings={storageInventories={'stock'},turtleFuelReserveItems={},supplyStations=stations,
     supply={inventory='',batch=2},logistics={nodes={{id='base',inventory='stock',position={x=-4,y=1,z=-4},buffers=buffers}}},
     build={enabled=true,origin={x=4,y=0,z=0},regionSize=2},
-    scaling={roles={building={min=options.scaling and 0 or 2},clearing={min=options.scaling and 0 or 2}}}})
+    scaling={roles={building={min=options.scaling and 0 or 2},clearing={min=options.scaling and 0 or 2}}}}
+  if options.configure then options.configure(f,controllerSettings,homes) end
+  f.configs[7]=C.load(controllerSettings)
   f.apps[7]=Runtime.new(f.configs[7],env(7))
   for id=12,lastWorker do
     local w=require('tests.build_world').new();f.worlds[id]=w;w.blocks=f.blocks
-    w.pose=U.copy(homes[id]);w.pose.known=true;w.fuel=8000
+    w.pose=U.copy((options.starts or {})[id] or homes[id]);w.pose.known=true;w.fuel=8000
     local t=w.turtle;t.getFuelLevel=function() return w.fuel end;t.getFuelLimit=function() return 20000 end
     for _,action in ipairs({'forward','up','down'}) do local move=t[action];t[action]=function()
       if w.fuel==0 then return false,'out of fuel' end
-      local ok,why=move()
+      local from=options.traffic and U.copy(w.pose);local ok,why=move()
       if ok then
+        if options.traffic then
+          local task=assert(f.apps[id].state.currentTask);local key=require('autobuilder.core.pathfinding').key(w.pose)
+          local cell=assert(f.apps[7].state.automation.cells[key],'physical move without a controller reservation')
+          eq(cell.owner,id);eq(cell.jobId,task.id);f.moves[#f.moves+1]={worker=id,kind=task.type,from=from,to=U.copy(w.pose)}
+        end
         for other,ow in pairs(f.worlds) do if other~=id then assert(U.distance(ow.pose,w.pose)>0,'physical turtle collision') end end
         w.fuel=w.fuel-1
       end
       return ok,why
     end end
     t.getItemSpace=function(slot) return 64-t.getItemCount(slot) end
+    t.getSelectedSlot=function() return w.selected end
     local function transfer(from,to,slot,n,target)
       local item=from[slot];if not item then return false end
       for s=target or 1,target or 3 do
@@ -65,9 +74,16 @@ local function fixture(options)
       end
       return false
     end
-    t.dropDown=function(n)
-      assert(U.distance(w.pose,homes[id])==0,'debris dropped outside private home')
-      return transfer(w.items,f.inventories['home'..id],w.selected,n)
+    local function underfoot()
+      local name=(f.containers or {})[require('autobuilder.core.pathfinding').key(w.pose)]
+      if name then return f.inventories[name] end
+      assert(U.distance(w.pose,homes[id])==0,'cargo transferred outside a physical endpoint')
+      return f.inventories['home'..id]
+    end
+    t.dropDown=function(n) return transfer(w.items,underfoot(),w.selected,n or t.getItemCount(w.selected)) end
+    t.suckDown=function(n)
+      local inv=underfoot();local slot=next(inv);if not slot then return false end
+      return transfer(inv,w.items,slot,n or 64,w.selected)
     end
     t.suck=function(n)
       assert(U.distance(w.pose,homes[id])==0 and w.pose.heading=='north','supply pulled outside private endpoint')
@@ -76,8 +92,10 @@ local function fixture(options)
       if moved and f.crashPull then f.crashPull=nil;f.crashed=id;error('power lost after registered supply pull') end
       return moved
     end
-    f.configs[id]=C.load({role='worker',controllerId=7,automation={building=true},minimumFuelReserve=10,
-      depot=U.copy(homes[id]),initialPosition=U.copy(w.pose),supply={inventory='supply'..id,side='front'}})
+    local settings={role='worker',controllerId=7,automation={building=true},minimumFuelReserve=10,
+      depot=U.copy(homes[id]),initialPosition=U.copy(w.pose),supply={inventory='supply'..id,side='front'}}
+    for key,value in pairs((options.workerSettings or {})[id] or {}) do settings[key]=U.copy(value) end
+    f.configs[id]=C.load(settings)
     local e=env(id);e.turtle=t;f.apps[id]=Runtime.new(f.configs[id],e)
   end
   local ce=f.envs[7]
@@ -90,10 +108,15 @@ local function fixture(options)
     for _,id in ipairs(order) do
       local e=self.envs[id];local packets=e.packets;e.packets={}
       for _,p in ipairs(packets) do
-        if p.m.type=='task_supply' then
+        if options.traffic and (not self.enabled[id] and id~=7 or not self.enabled[p.to] and p.to~=7) then
+          -- An offline computer cannot receive or transmit queued packets.
+        elseif p.m.type=='task_supply' then
           eq(p.m.payload.station.inventory,'supply'..p.to);self.grants[p.to]=true
           if self.loseGrant then self.loseGrant=nil else self.apps[p.to]:receive(p.m.sender,p.m,p.protocol) end
-        else self.apps[p.to]:receive(p.m.sender,p.m,p.protocol) end
+        else
+          if options.traffic and p.m.type=='task_grant' and not p.m.payload.granted then self.denials[#self.denials+1]=U.copy(p.m.payload) end
+          self.apps[p.to]:receive(p.m.sender,p.m,p.protocol)
+        end
       end
     end
   end
@@ -118,7 +141,7 @@ local function fixture(options)
       if builders==2 then self.buildOverlapExercised=true;held=nil end
     end
     self.heldBuilder=held
-    for _,id in ipairs(self.workerIds) do if self.enabled[id] and id~=held then self.apps[id]:workStep() end end;self:pump()
+    for _,id in ipairs(self.workerIds) do if self.enabled[id] and id~=held and not self.holds[id] then self.apps[id]:workStep() end end;self:pump()
     local active={}
     for _,j in pairs(self.apps[7].state.automation.jobs) do
       if j.workerId then self.owners[j.type]=self.owners[j.type] or {};self.owners[j.type][j.workerId]=true end
@@ -290,4 +313,107 @@ test('concurrent project priorities survive handover reboot and exact shared-sto
  eq(F.count(f.inventories.stock,'minecraft:stone'),0);eq(next(f.inventories.home12),nil);eq(next(f.inventories.supply12),nil)
  eq(next(f.worlds[12].items),nil);eq(a.supply,nil);eq(f.apps[12].state.status,'idle')
  for _,j in pairs(a.jobs) do eq(j.status,'completed') end
+end)
+
+
+test('roofed one cell opposing corridor retains ownership and actionable blockage across restart',function()
+ local f=fixture({width=20,scaling=true,traffic=true,starts={
+  [12]={x=10,y=2,z=0,heading='east'},[13]={x=11,y=2,z=0,heading='west'}}})
+ assert(f.apps[7]:command('fleet limit building 2 4'))
+ for x=1,19 do for _,p in ipairs({{x=x,y=1,z=0},{x=x,y=3,z=0},{x=x,y=2,z=-1},{x=x,y=2,z=1}}) do
+  f.blocks[require('autobuilder.core.pathfinding').key(p)]={name='minecraft:stone',state={}}
+ end end
+ local before=U.copy(f.blocks);local ids={}
+ for id,x in pairs({[12]=20,[13]=0}) do
+  f.blocks[x..',0,0']={name='minecraft:stone',state={}}
+  local j=f.apps[7].automation.queue:submit('VERIFY',{preferredWorker=id,clearanceY=2,blocks={{x=x,y=0,z=0,name='minecraft:stone',state={}}}},{})
+  ids[id]=j.id
+ end
+ f.holds[12]=true;f.holds[13]=true
+ for _=1,30 do f:cycle();if f.apps[12].state.currentTask and f.apps[13].state.currentTask then break end end
+ f.holds={}
+ local witnessed=false
+ for _=1,300 do f:cycle()
+  for _,j in pairs(f.apps[7].state.automation.jobs) do if j.trafficWait and j.trafficWait.blocker then witnessed=true end end
+ end
+ assert(witnessed,'opposing workers did not contend for a physical cell')
+ for id,job in pairs(ids) do eq(f.apps[id].state.currentTask.id,job) end
+ f:reboot(7);f:reboot(12);f:reboot(13)
+ for _=1,100 do f:cycle() end
+ for id,job in pairs(ids) do
+  local j=f.apps[7].state.automation.jobs[job];eq(j.workerId,id);assert(j.status~='completed')
+  assert(j.trafficWait or j.lastRouteFailure,'corridor has no persisted explanation')
+  local text=table.concat(require('autobuilder.ui.dashboard').lines(f.apps[7].state,{},f.now,{},id),'\n')
+  assert(text:find('passing bay',1,true) or text:find('Inspect worker',1,true),'corridor remedy missing')
+  assert(text:find(job,1,true) and text:find('Position ',1,true),'affected task or known position missing')
+  eq(f.worlds[id].digs,0);eq(f.apps[id].state.currentTask.id,job)
+ end
+ for key,value in pairs(before) do assert(F.equal(value,f.blocks[key]),'corridor changed: '..key) end
+end)
+
+test('offline destination retains its physical owner while independent verification finishes and reconnect clears it',function()
+ local f=fixture({width=1,workers=3,scaling=true,traffic=true,starts={[13]={x=4,y=1,z=0,heading='north'}}})
+ assert(f.apps[7]:command('fleet limit building 2 4'))
+ for _=1,3 do f:cycle() end;f.enabled[13]=false
+ for _=1,40 do f:cycle() end;eq(f.apps[7].state.workers['13'].online,false)
+ f.blocks['4,0,0']={name='minecraft:stone',state={}};f.blocks['22,0,8']={name='minecraft:stone',state={}}
+ local q=f.apps[7].automation.queue
+ local blocked=q:submit('VERIFY',{preferredWorker=12,clearanceY=2,blocks={{x=4,y=0,z=0,name='minecraft:stone',state={}}}},{})
+ local free=q:submit('VERIFY',{preferredWorker=14,clearanceY=2,blocks={{x=22,y=0,z=8,name='minecraft:stone',state={}}}},{})
+ for _=1,350 do f:cycle();if free.status=='completed' and blocked.trafficWait then break end end
+ eq(free.status,'completed');eq(free.report.counts.correct,1);eq(blocked.workerId,12);assert(blocked.trafficWait)
+ eq(blocked.trafficWait.blocker,13);eq(f.worlds[13].pose.x,4);eq(f.worlds[13].pose.y,1)
+ f:reboot(7);for _=1,40 do f:cycle() end
+ blocked=f.apps[7].state.automation.jobs[blocked.id];eq(blocked.workerId,12);assert(blocked.status~='completed');eq(f.worlds[13].pose.x,4)
+ f.enabled[13]=true
+ for _=1,600 do f:cycle();if blocked.status=='completed' and not f.apps[13].state.currentTask and U.distance(f.worlds[13].pose,f.configs[13].depot)==0 then break end end
+ eq(blocked.status,'completed');eq(blocked.report.counts.correct,1);eq(U.distance(f.worlds[13].pose,f.configs[13].depot),0)
+ local returns=0;for _,r in pairs(f.apps[7].state.automation.returns) do if r.owner==13 then returns=returns+1 end end;eq(returns,1)
+ for _,id in ipairs(f.workerIds) do eq(f.worlds[id].digs,0) end
+end)
+
+
+test('four fleet roles share one physical intersection with granted motion and exact cargo',function()
+ local f=fixture({width=1,workers=4,scaling=true,traffic=true,
+  homes={[13]={x=10,y=2,z=4,heading='north'},[14]={x=4,y=2,z=10,heading='north'},[15]={x=10,y=4,z=18,heading='north'}},
+  starts={[12]={x=4,y=4,z=10,heading='east'},[14]={x=14,y=2,z=10,heading='west'}},
+  workerSettings={[13]={automation={building=false,courier=true}},[14]={automation={building=false}},
+   [15]={automation={building=false},mining={enabled=true,resources={'minecraft:cobblestone'},entry={x=10,y=4,z=16},
+    bounds={min={x=10,y=4,z=6},max={x=11,y=4,z=16}},fuelTarget=100}}},
+  configure=function(f,c,homes)
+   f.containers={['10,2,4']='pickup',['10,2,16']='delivery',['10,4,18']='home15'}
+   f.inventories.pickup={[1]={name='minecraft:dirt',count=1}};f.inventories.delivery={}
+   f.blocks['10,1,4']={name='minecraft:chest',state={}};f.blocks['10,1,16']={name='minecraft:chest',state={}}
+   f.blocks['10,4,17']=nil;f.blocks['11,4,6']={name='minecraft:cobblestone',state={}}
+   c.storageInventories={'stock','home15'};c.scaling.roles.mining={min=1};c.scaling.roles.hauling={min=1}
+   c.inventoryAreas={home15={min={x=10,y=3,z=18},max={x=10,y=3,z=18}},pickup={min={x=10,y=1,z=4},max={x=10,y=1,z=4}},delivery={min={x=10,y=1,z=16},max={x=10,y=1,z=16}}}
+   for i=#c.supplyStations,1,-1 do if c.supplyStations[i].workerId==15 then table.remove(c.supplyStations,i) end end
+   local buffers=c.logistics.nodes[1].buffers;for i=#buffers,1,-1 do if buffers[i].inventory=='home15' then table.remove(buffers,i) end end
+  end})
+ f.blocks['16,2,10']={name='minecraft:stone',state={}}
+ for _,id in ipairs(f.workerIds) do f.holds[id]=true end
+ for _=1,3 do f:cycle() end
+ local c=f.apps[7];local q=c.automation.queue
+ local home=c.automation.production.returns:request(14)
+ for _=1,30 do f:cycle();if f.apps[14].state.currentTask then break end end
+ assert(f.apps[14].state.currentTask and f.apps[14].state.currentTask.type=='RETURN_HOME')
+ local verify=q:submit('VERIFY',{preferredWorker=12,clearanceY=4,blocks={{x=16,y=2,z=10,name='minecraft:stone',state={}}}},{})
+ local haul=q:submit('TRANSPORT',{preferredWorker=13,item='minecraft:dirt',quantity=1,source={x=10,y=2,z=4},destination={x=10,y=2,z=16}},{})
+ local mine=assert(c.mining.jobs:submit('minecraft:cobblestone',1,0))
+ for _=1,40 do f:cycle();if verify.workerId and haul.workerId and mine.workerId then break end end
+ eq(verify.workerId,12);eq(haul.workerId,13);eq(mine.workerId,15);f.holds={}
+ for _=1,1600 do f:cycle();if verify.status=='completed' and haul.status=='completed' and home.status=='completed' and mine.status=='completed' then break end end
+ assert(verify.status=='completed' and haul.status=='completed' and home.status=='completed' and mine.status=='completed',f.envs[7].textutils.serialize({verify=verify,haul=haul,home=home,mine=mine}))
+ eq(verify.report.counts.correct,1);eq(F.count(f.inventories.delivery,'minecraft:dirt'),1);eq(next(f.inventories.pickup),nil)
+ eq(F.count(f.inventories.home15,'minecraft:cobblestone'),1);eq(f.worlds[15].digs,1);eq(U.distance(f.worlds[15].pose,f.configs[15].depot),0)
+ local roles={};for _,m in ipairs(f.moves) do if m.to.y==4 and math.abs(m.to.x-10)<=1 and math.abs(m.to.z-10)<=1 then roles[m.kind]=true end end
+ for _,kind in ipairs({'VERIFY','TRANSPORT','RETURN_HOME','MINE'}) do assert(roles[kind],kind..' did not physically traverse intersection') end
+ local contention=false
+ for _,d in ipairs(f.denials) do if d.target.y==4 and math.abs(d.target.x-10)<=2 and math.abs(d.target.z-10)<=2
+  and d.reason and (d.reason:find('worker',1,true) or d.reason:find('reservation',1,true)) then contention=true end end
+ assert(contention,'no cross-role intersection denial '..f.envs[7].textutils.serialize(f.denials))
+ for _=1,20 do f:cycle() end
+ for _,id in ipairs(f.workerIds) do assert(not f.apps[id].state.currentTask);assert(not next(f.worlds[id].items));assert(f.worlds[id].fuel>0) end
+ for id=12,14 do eq(f.worlds[id].digs,0) end
+ eq(f.blocks['10,1,4'].name,'minecraft:chest');eq(f.blocks['10,1,16'].name,'minecraft:chest');eq(f.blocks['16,2,10'].name,'minecraft:stone')
 end)

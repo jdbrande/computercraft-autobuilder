@@ -306,3 +306,18 @@ test('failed traffic diagnostic checkpoints roll back and never emit success eve
  local ok,why=pcall(q.reserve,q,12,j.id,{x=0,y=1,z=0},{x=1,y=1,z=0},{['13']={id=13,telemetry={position={known=true,x=1,y=1,z=0}}}})
  eq(ok,false);assert(tostring(why):find('disk failed',1,true));eq(j.trafficWait,nil);eq(events,0)
 end)
+
+test('blocked route diagnostics survive generic pending reports and restart until work resumes',function()
+ local state,_,q,workers=queues();workers['13']=nil
+ workers['12'].telemetry.position={known=true,x=10,y=2,z=0}
+ local j=q:submit('VERIFY',{blocks={block}},{}) ;eq(q:assign(workers).workerId,12)
+ local reason='movement reservation pending: no bounded traffic detour'
+ assert(q:progress(12,{jobId=j.id,phase='blocked',progress=0,error=reason}))
+ assert(q:progress(12,{jobId=j.id,phase='blocked',progress=0,error='movement reservation pending'}))
+ eq(j.lastRouteFailure,reason)
+ state=U.copy(state);state.id=7;state.workers=workers;q=Workflows.new(state,function() return true end,function() return 100 end,7);j=q.state.jobs[j.id]
+ eq(j.lastRouteFailure,reason)
+ local text=table.concat(require('autobuilder.ui.dashboard').lines(state,{},100,{},12),'\n')
+ assert(text:find('Last route failure: '..reason,1,true));assert(text:find('passing bay',1,true));assert(text:find('Position 10,2,0',1,true))
+ assert(q:progress(12,{jobId=j.id,phase='work',progress=0}));eq(j.lastRouteFailure,nil)
+end)

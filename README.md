@@ -1,4 +1,4 @@
-# Autobuilder 0.38.0
+# Autobuilder 0.39.0
 
 Development direction: [full fleet requirements](docs/fleet-requirements.md) and
 [milestone 1 autonomous exploration design](docs/autonomous-mining-design.md).

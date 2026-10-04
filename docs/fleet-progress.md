@@ -5,39 +5,22 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
-- Accepted0.37 infrastructure protection:1,015 Lua/20 Python tests, final release/
-  diff checks, one review/fix pass and native protected-inventory acceptance passed.
-  [Permanent evidence](validation-0.37.0.md).0.38–0.40 candidate gates continue.
-
-- Accepted0.36 priorities:1,003 Lua/20 Python tests, final release/diff checks,
-  the single final review and native two-project acceptance passed. The finite
-  supply handoff correction is included in the repeated full gate.
-  [Permanent evidence](validation-0.36.0.md). Continue0.37–0.40 candidate gates.
-
-- Accepted0.35 reachable inventory recovery:976 Lua/20 Python tests and final
-  release/diff checks passed. Two native trials verified exact plain/NBT cargo,
-  frozen donor ownership, restart, home refueling between trips and cleanup.
-  [Permanent evidence](validation-0.35.0.md).0.36 final gates and0.37 protection
-  implementation/native acceptance continue.
-
-- Accepted0.34 metadata/sign geometry:956 Lua/20 Python tests, release/diff checks
-  and native Sponge v3 nine-cell import/build/restart/verification passed.
-  [Permanent evidence](validation-0.34.0.md) distinguishes the clean repeat from
-  the assisted first trial.0.35–0.37 remain separate candidates.
-
-- Accepted0.33 deterministic placement:940 Lua/18 Python tests and final release/
-  diff checks passed. Native140-cell mixed adapters verified independently; ascent
-  and paired-checkpoint bugs are regression-covered. Its underside-access fixture
-  assistance remains explicit in [0.33 validation](validation-0.33.0.md).
-- Candidates0.34 metadata and0.35 inventory recovery have completed their single
-  reviews, focused corrections and native gates; final full gates continue.0.36
-  priorities passed native two-project acceptance and its review regressions;
-  final gate continues.0.37 inventory protection is under active implementation.
-  No unfinished candidate is treated as accepted.
-
-- Accepted0.30 enrollment:885 Lua/18 Python tests, release/diff checks and final-source
-  native HTTP install/repair/profile refresh passed; fixture shut down and tickets
-  removed. Permanent evidence: [0.30 validation](validation-0.30.0.md).
+- Accepted through0.39 (ordered push follows final checks): complete gates and native evidence for priorities,
+  inventory protection and observability, following the earlier fleet milestones.
+  [0.36](validation-0.36.0.md), [0.37](validation-0.37.0.md), [0.38](validation-0.38.0.md).
+-0.39 traffic native acceptance,1,039 Lua tests and23 Python tests passed.
+  Final-source evidence is in [the report](validation-0.39.0.md).
+-0.40 sustained16-worker acceptance is active. Native load exposed early backlog
+  scheduler ticks and empty claim scans; regressions and fixes are committed in
+  d14a330. The corrected controller is running with fresh complete gates. A host
+  sampling race with atomic checkpoint renames was corrected; its continuous
+  measured30-minute window restarted separately from the initial saturated run.
+-0.41 automatic underside workspace is under implementation in an isolated branch.
+  The intact-floor ceiling-attachment regression reproduces the remaining manual
+  access qualification. Final combined unassisted binary-schematic acceptance,
+  induced defect repair and exact final settlement remain required.
+- No external blocker is established. Continue gates, native trials, implementation
+  and ordered integration without stopping at milestone boundaries.
 
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
 - Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
@@ -97,38 +80,32 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 
 | Requirements | Current evidence | Remaining acceptance |
 | --- | --- | --- |
-| 1–2, 40, 43: complete fleet and hands-off pipeline | Small autonomous chain live-verified in 0.12.0 | Concurrent mixed-material large fleet, broader automatic recovery, safe final return |
-| 3: coordination, persistence, physical accounting, capabilities | Existing queues, journals and validated worker telemetry | Extend the same guarantees to all new providers/reservations |
-| 4: logical roles | Miners, builders, Crafty workers, furnace controller, managed farms and courier executor | More harvest/processor adapters, fleet-level logistics/rescue; optional scouting |
-| 5: automatic registration | Installer, discovery/setup sharing, reconnect and capabilities | Single fleet install flow, equipment/software negotiation, automatic eligibility |
-| 6: schematic analyzer | Native/desktop Sponge v2/v3 import, bounded gzip/NBT, transforms and supported-state classification | Supported block entities/fluids/redstone analysis, required tools and broader placement adapters |
-| 7: recursive dependency graph | Aggregated nodes, shared stock/surplus, operation edges, bounded expansion; 417 Lua tests | Accepted 0.13.0; preserve during later integration |
-| 8: provider registry | Deterministic candidates, availability/preferences, durable acquisition selection | Accepted 0.13.0; preserve during later integration |
-| 9: autonomous mining | Accepted 0.12.0 with four live explorers | Preserve during later pipeline integration |
-| 10: mining intelligence | Persistent bounded hazards, density, outcomes, retries and native acceptance0.25 | Accepted; preserve during integration |
-| 11: fuel management | Accepted0.15 fuel distribution/rescue and0.26 mission budgets/predictive forecasts, with native acceptance | Preserve during later integration |
-| 12: logistics network | Registered nodes, reserved parallel couriers, automatic targets/production and native restocking accepted0.19 | Continuous builder/fuel supply integration and broader physical network routing |
-| 13: storage abstraction | Durable count claims and physical/available/reserved/transit/expected/project views accepted in 0.14.0 | Native slot capacity and private station ownership accepted in0.16; managed courier integration accepted0.19 |
-| 14: continuous forecasting | Per-project physical/reserved/transit/provider forecasts and actual renewable delivery evidence accepted0.27 | Preserve accounting through later provider additions |
-| 15: parallel crafting | Two native private Crafty stations with input/output leases, finite batches and restart acceptance | Capacity-based batch sizing accepted0.21; cross-role pipeline integration remains |
-| 16: processing network | Furnace lanes accepted; registered multi-machine processing candidate0.31 passed native restart acceptance | Complete final Lua gate and ordered integration |
-| 17: renewables | Managed trees/crops/columns; registered definitions/reserves candidate0.32 passed native carrot acceptance | Complete final Lua gate and ordered integration |
-| 18: builder fleet | Owned regions, movement reservations and multiple native builders accepted0.24/0.28 | Larger integrated fleet acceptance |
-| 19–20: placement graph/adapters | Basic support, stairs/slabs/logs, doors, panes/fences, ladders/lanterns | Beds, signs, rails, buttons/redstone/plants and supported fluid/tile adapters; cross-region dependencies |
-| 21: builder supply | Bounded journaled batches and positive-cargo replenishment accepted0.27; streaming pipeline accepted0.28 | Preserve through later adapters |
-| 22–23: verification/repair | Physical comparison and bounded automatic repair/settlement accepted0.22 | Larger integrated defect acceptance |
-| 24: worker states | Durable task/fuel/pose recovery, hardware/software health accepted0.29 | Consolidated dashboard presentation |
-| 25: rescue | Native identity-checked fuel delivery, original-task recovery, offline ownership and journal preservation | Reachable inventory recovery and broader blocked-route recovery missions |
-| 26: offline owners | Ownership survives timeout/restart | Extend to new leases and configurable recovery commands |
-| 27: chunk loading | Strict bounded coverage, durable stationary chunky claims, native cross-chunk construction and offline-loader refusal | Accepted0.18; preserve during infrastructure/scaling work |
-| 28–29: protection/traffic | Protected projects/depots/routes, cell reservations | Global station/farm registration, larger fleet deadlock/routing checks |
-| 30–31: priorities/scheduling | Capabilities, dependencies and exclusive jobs | Priority/cost/fuel/chunk scheduling, dynamic roles and simultaneous projects |
-| 32–34: monitor, commands, logs | Terminal screens and role/project commands, rotating logs | Monitor fleet dashboard, consistent fleet/project/resource/recovery commands, structured significant events |
-| 35–37: messages, duplicates, checkpoints | Existing validation, exact receipts and physical-action journals | Apply and regression-test every new message and side effect |
-| 38–39: completion and failures | Verified projects and final inventory/logistics/worker settlement accepted0.22 | Broader bounded automatic retries and actionable project errors |
-| 41–42: dependency-ordered milestones | Exploration, dependency/provider graph and count ownership integrated | Implement remaining milestones using existing controller/executor boundaries |
-| 44: dynamic fleet scaling | Demand/cost/rate allocation, limits, idle reassignment and scale-down accepted0.24 with native ramp-up | Larger integrated fleet and message-load acceptance |
-| 45: automatic site preparation and leveling | Accepted0.23:748 Lua/18 Python tests, native terrain/fluids/support/access/containment; see validation-0.23.0.md | Preserve during scaling and later integrated acceptance |
+| 1–3, 40, 43: complete fleet | Separate native acquisition, production, building, recovery and settlement milestones | Combined unassisted mixed-material build, overlap, restarts, induced defect repair and exact final settlement |
+| 4: logical roles | Miners, builders, Crafty workers, registered processors, managed harvesters and couriers | Exercise these together; optional scouts are not a mandatory extra role |
+| 5, 24: registration and health | Accepted0.29 health/integrity and0.30 HTTP enrollment, repair/profile refresh | Preserve during integrated acceptance |
+| 6, 19–20: schematic/analyzer/adapters | Native Sponge v2/v3; accepted0.33 independently checked140 cells and0.34 empty-container/sign metadata | Preserve explicit unsupported classification; final build must provide underside access automatically |
+| 7–8: dependencies/providers | Accepted0.13 recursive graph and deterministic provider registry | Preserve physical accounting in combined acceptance |
+| 9–10: autonomous mining/intelligence | Accepted0.12 four explorers and0.25 bounded hazards/yields/retries | Preserve through large mixed fleet; staged loaded territory is not unrestricted natural-world proof |
+| 11: fuel | Accepted0.15 distribution/rescue and0.26 mission budgeting/forecasts | Integrated work must preserve fuel ownership and recovery limits |
+| 12–13: logistics/storage | Accepted0.14 claims,0.16 native slot capacity/private stations,0.19 reserved couriers and0.22 settlement | Shared-world traffic and sustained throughput acceptance |
+| 14, 21: forecasting/builder supply | Accepted0.27 physical/reserved/transit forecasts and early replenishment;0.28 streaming overlap |0.36 handoff regression's repeated full gate; final combined overlap |
+| 15: parallel crafting | Accepted0.16 native two-Crafty leases and0.21 capacity-based batches | Exercise private crafting with other fleet roles under sustained load |
+| 16–17: processing/renewables | Accepted0.31 registered multi-machine processing and0.32 renewable definitions/reserves with native evidence | Actual harvest, processing and crafting together; illustrative adapter lists are not universal support promises |
+| 18: builder fleet | Accepted0.24 multiple native builders/scaling and0.28 overlapping construction | Larger integrated fleet acceptance |
+| 22–23, 38: verification/repair/completion | Accepted0.22 settlement and0.23 bounded automatic repair tests | Induce a recoverable native defect, then verify repair and exact safe settlement |
+| 25–26: rescue/offline owners | Accepted fuel rescue and0.35 exact plain/NBT inventory recovery with quarantine, identity and restart | Preserve reachability limits and offline ownership;0.39 mixed-role recovery acceptance |
+| 27: chunk loading | Accepted0.18 strict coverage and native stationary chunky/cross-chunk checks | Preserve loader/ownership behavior during integration; ordinary turtles do not promise chunk loading |
+| 28: infrastructure protection |0.37 native furnace/private inventory protection and migration checks | Candidate full gate and ordered integration |
+| 29, 39: traffic and failure diagnostics | Shared reservations/detours;0.38 durable waits;0.39 physical intersection/corridor/offline-owner regressions |0.39 native/full gates, sustained fleet load and actionable diagnoses |
+| 30–31, 44: priorities and scaling | Accepted0.24 ramp-up/drain;0.36 native concurrent-project priority handover |0.36 full gate;16-worker sustained work with useful idle-worker recruitment and measured bottlenecks |
+| 32–34: monitor/commands/logs |0.38 implemented; native queued keyboard/script input, overflow/monitor recovery and parseable JSONL | Candidate complete gate; monitor dimensions remain automated evidence |
+| 35–37: protocol/duplicates/checkpoints | Validated assignments, exact duplicate-safe receipts and physical-action journals across all implemented roles | Preserve in sustained and combined restart acceptance |
+| 41–42: dependency order | Milestones integrated through0.35;0.36–0.39 isolated candidates | Finish their gates/integration, then sustained and combined acceptance |
+| 45: site preparation/workspace | Accepted0.23 terrain/fill/fluid/hidden-foundation support;0.33 retained a manual two-cell underside cut qualification | Final comparable underside/interior access without operator openings; correct implementation if it fails |
+
+The earlier native trials required increasing the computer disk quota from1 MB to
+8 MB. No later report proves the full fleet fits1 MB. Sustained acceptance records
+quota, checkpoint/history growth and supported limits explicitly.
 
 ## Evidence and discovered bugs
 
@@ -1885,6 +1862,14 @@ parallel acquisition runs earlier. Its focused full-chain case passed unchanged
 assertions and exact final material accounting. Final full gates are restarting;
 0.36 is not yet accepted.
 
+### 0.39 traffic acceptance started
+
+The remaining traffic requirement needs mixed-role evidence in one physical world.
+The existing reservation and detour mechanisms remain the implementation basis;
+new intersection, roofed-corridor and offline-owner scenarios will identify any
+required corrections. See[traffic acceptance design](traffic-acceptance-design.md).
+0.36/0.37 final suites and0.38 review/native corrections remain active dependencies.
+Sustained fleet load and the final combined unassisted build remain unfinished.
 ### 0.38 consolidated review corrections
 
 The single final review found four reproducible issues: overflow could replace an
@@ -1906,6 +1891,24 @@ and its missing depot setting; no finished materials were injected. The monitor
 warning defect above was also observed natively. Permanent acceptance remains
 pending final-source monitor/overflow checks and complete gates.
 
+### 0.39 shared physical traffic implementation
+
+Focused scenarios passed for a four-role intersection (VERIFY, TRANSPORT,
+RETURN_HOME, MINE), roofed opposing corridor, and offline destination owner with
+independent progress/reconnect. Successful moves require matching shared grants
+and distinct physical positions; cargo and protected blocks reconcile exactly.
+
+The corridor exposed an operator diagnostic gap: an actionable detour failure
+could be replaced by a generic pending report. Both job queues now preserve the
+last detailed route failure while blocked, without treating it as a current cell
+denial, and the dashboard shows a passing-bay/alternate-route remedy. Progress
+clears the historical explanation. Queue, restart and explorer checkpoint-rollback
+regressions passed. Routing/reservation lifetime semantics are unchanged.
+
+One final review, native traffic acceptance and full gates remain. Final combined
+acceptance must explicitly exercise automatic underside access and an induced
+recoverable construction defect, then reconcile/settle. Sustained acceptance also
+records disk/history growth and the supported ComputerCraft disk quota.
 ### 0.38 final-source native checks passed
 
 Final source7e8a092 survived native overflow during an actual yielding `resources`
@@ -1917,6 +1920,14 @@ workers settled, computers265–267 shut down and6 force-load tickets removed.
 [Candidate report](validation-0.38.0.md) records fixture corrections, metrics and
 the distinction between automated resize evidence and native monitor recovery.
 Complete gates remain active; the candidate is not yet accepted.
+
+-0.39 final-source native traffic passed: four-role intersection, controller restart,
+owned offline courier/reconnect and exact dirt/cobblestone receipts; then separate
+roofed corridor retained both owners and detailed remedies through restart with76
+boundary blocks intact. Explicit operator-opened side bays let both verifies drain.
+The rejected initial corridor startup is documented separately. Independent final
+world/cargo/OFF reads and15ticket cleanup passed.23 Python tests passed; full Lua
+remains active. [Permanent candidate evidence](validation-0.39.0.md).
 -0.36 accepted after the repeated clean-source gate passed1,003/1,003 Lua tests
   with20/20 Python tests and release/diff checks. No unintended tracked or untracked
   files were present; ignored native audit artifacts remain local.
@@ -1928,3 +1939,8 @@ to the tested source. Final release/diff checks passed and status was clean.
 -0.38 accepted: the final implementation passed1,032/1,032 Lua and23/23 Python
   tests. Final-source native input/monitor recovery, release generation/check and
   whitespace checks passed. Accepted0.37 documentation merged without source changes.
+
+-0.39 accepted after1,039/1,039 Lua tests,23/23 Python tests, unchanged-source
+  comparison against32e3cfc and final release/diff gates. Native mixed-role
+  intersections, explicit corridor blockage/bays, restart/offline ownership, exact
+  cargo/world checks and cleanup are permanently documented.
