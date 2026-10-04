@@ -1512,3 +1512,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   the fix and passes after, including rejected substrate, retained ownership and
   restart. The first native owner completed after operator restoration of the
   soil damaged by the old code; an untouched-plot final-source retest follows.
+-0.32 final-source native untouched-plot retest passed after controller/worker
+  restart: both crops replanted, both farmland blocks intact,7 carrots stored,
+ 2 retained planting carrots, farmer home/idle with1,942 fuel. Both requests/jobs
+  completed, computers241/242 shut down and4 force-load tickets removed. Permanent
+  candidate report validation-0.32.0.md distinguishes assisted pre-fix recovery
+  from the clean retest; final complete Lua/Python gates are running.
