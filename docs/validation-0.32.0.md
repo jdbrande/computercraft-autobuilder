@@ -1,7 +1,9 @@
-# 0.32.0 registered renewable providers validation
+# 0.32.0 registered renewable providers acceptance
 
-Candidate source: `a01825b`. The final complete Lua suite is running. This report
-records native and focused evidence without claiming the final release gate.
+Accepted0.32.0, final implementation `a01825b`: all923 Lua tests and all18 Python
+tests passed. Release generation/check and `git diff --check` passed. Accepted0.31
+documentation was merged with tested source, tests, tools and release artifacts
+unchanged. The complete fleet roadmap remains in progress.
 
 The existing renewable actor now consumes bounded data definitions for crops and
 base-preserving columns. Native wheat, carrots, potatoes and beetroot use their

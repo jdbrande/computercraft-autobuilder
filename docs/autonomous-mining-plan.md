@@ -1285,16 +1285,16 @@ in `.worktrees/renewable-providers` follows0.31; carry its final processor corre
 
 ### Task67: Registered renewable definitions and retained planting reserves
 
-- [ ] Extract bounded plant definitions, retain selected definitions in farm jobs,
+- [x] Extract bounded plant definitions, retain selected definitions in farm jobs,
   add common crops and registered column/crop support without a new scheduler.
-- [ ] Make seed/sapling retention explicit; correctly account seed-as-output crops
+- [x] Make seed/sapling retention explicit; correctly account seed-as-output crops
   and use selected geometry in mission fuel budgets.
-- [ ] Respect known worker health when choosing unowned acquisition providers,
+- [x] Respect known worker health when choosing unowned acquisition providers,
   preserving assigned/offline ownership and alternative-source fallback.
 
 ### Task68: Renewable acceptance
 
-- [ ] Add actual actor/provider/restart/conservation regressions and useful native
+- [x] Add actual actor/provider/restart/conservation regressions and useful native
   mature crop/replant/reserve/home acceptance, documenting external farm contracts.
-- [ ] Complete one final review/consolidated fixes, full Lua/Python/release gates,
+- [x] Complete one final review/consolidated fixes, full Lua/Python/release gates,
   permanent evidence and ordered integration; continue every remaining requirement.

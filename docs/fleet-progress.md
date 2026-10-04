@@ -5,16 +5,15 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
-- Accepted0.31 registered processors:905 Lua/18 Python tests, release/diff checks,
-  final-source parallel native processing/restart/conservation and cleanup passed.
-  Permanent evidence: [0.31 validation](validation-0.31.0.md).
+- Accepted0.32 registered renewables:923 Lua/18 Python tests, release/diff checks,
+  final-source native carrot harvest/replant/restart/reserve acceptance and cleanup
+  passed. Permanent evidence: [0.32 validation](validation-0.32.0.md).
 
-- Active development:0.31 registered processors completed its release gates.0.32 renewable
-  adapters passed final-source carrot/replant/reserve acceptance with both crops
-  and farmland independently checked; its complete Lua gate is running.0.33 paired/
-  attached/basic redstone placement is under its single final review; native probes
-  passed and mixed schematic analysis exposed a ceiling-support dependency cycle.
- 0.34 container/sign metadata design and native observation probes have started.
+- Active development:0.33 placement adapters completed its single review and
+  consolidated regression fixes; complete Lua and native mixed-project gates run.
+ 0.34 empty-container metadata/cardinal sign adapters completed its single review;
+  consolidated regressions and native acceptance run.0.35 reachable inventory
+  recovery has a committed design and initial donor actor regressions in progress.
   Candidate evidence lives in the corresponding `.worktrees` documentation until
   ordered integration. No unfinished candidate is treated as accepted.
 
@@ -1543,3 +1542,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Controller240 shut down and both temporary tickets removed;239 was shut down
   before the reset. Permanent candidate report records failed pre-fix evidence,
   final successful run, exact conservation and limits. Complete Lua gate remains.
+
+-0.32 accepted after all923 Lua/18 Python tests passed on final sourcea01825b,
+  with release/check/diff clean. Permanent acceptance report distinguishes assisted
+  pre-fix soil repair from the clean final-source untouched plot run. Accepted0.31
+  documentation merge did not change tested code/tests/tools/artifacts. Integrating
+  and pushing before continuing placement, metadata and inventory recovery work.
