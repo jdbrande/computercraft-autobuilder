@@ -367,3 +367,27 @@ test('anchor setup requires actual chunky hardware and saves a stationary role w
   eq(c.chunkLoading.anchor,true);eq(c.initialPosition.x,12);eq(c.mining.enabled,false);eq(c.automation.building,false)
   eq(w.turtle.calls,0);eq(w.turtle.fuel,100)
 end)
+
+test('fleet profile application uses idle setup persistence without moving refueling or overwriting local paths',function()
+ local e=env('worker',{});local p={role='worker',controllerId=1,initialPosition={x=12,y=64,z=-9,heading='east'},depot={x=12,y=64,z=-9},automation={building=true}}
+ local W=require('autobuilder.setup_wizard');assert(W.applyFleet(e,p));local c=settings(e)
+ eq(c.label,'Keep me');eq(c.minimumFuelReserve,123);eq(c.automation.building,true);eq(e.turtle.calls,0);eq(e.turtle.fuel,100)
+ local store=CP.new(e.fs,e.textutils,'/autobuilder/data/worker.state');local state=store:load();eq(state.position.heading,'east')
+ state.position.heading='west';assert(store:save(state));assert(W.applyFleet(e,p));eq(store:load().position.heading,'west')
+ state=store:load();state.currentTask={id='owned'};assert(store:save(state));local original=e.fs.files['/autobuilder/settings.lua']
+ eq(pcall(W.applyFleet,e,p),false);eq(e.fs.files['/autobuilder/settings.lua'],original);eq(store:load().currentTask.id,'owned')
+end)
+
+test('fleet partial profiles preserve nested local options and replace collections explicitly',function()
+ local e=env('worker',{});local localSettings=settings(e)
+ localSettings.supply={inventory='local:chest',side='down',batch=64};localSettings.gps={enabled=true,timeout=7,interval=42}
+ localSettings.automation={building=true,courier=true};localSettings.storageInventories={'old:a','old:b'}
+ localSettings.protectedBlocks={['minecraft:bedrock']=true,['minecraft:stone']=true}
+ e.fs.files['/autobuilder/settings.lua']='return '..e.textutils.serialize(localSettings)
+ assert(require('autobuilder.setup_wizard').applyFleet(e,{role='worker',controllerId=1,
+  initialPosition={x=12,y=64,z=-9,heading='east'},depot={x=12,y=64,z=-9},
+  supply={batch=16},gps={enabled=false},automation={building=false},storageInventories={'new:a'},protectedBlocks={}}))
+ local c=settings(e);eq(c.supply.inventory,'local:chest');eq(c.supply.side,'down');eq(c.supply.batch,16)
+ eq(c.gps.enabled,false);eq(c.gps.timeout,7);eq(c.gps.interval,42);eq(c.automation.building,false);eq(c.automation.courier,true)
+ eq(#c.storageInventories,1);eq(c.storageInventories[1],'new:a');eq(next(c.protectedBlocks),nil)
+end)

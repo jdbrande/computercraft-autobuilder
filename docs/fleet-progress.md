@@ -5,6 +5,10 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.30 enrollment:885 Lua/18 Python tests, release/diff checks and final-source
+  native HTTP install/repair/profile refresh passed; fixture shut down and tickets
+  removed. Permanent evidence: [0.30 validation](validation-0.30.0.md).
+
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
 - Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
 - Inventory ownership integrated and pushed at `e66daa5`.
@@ -1348,6 +1352,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   software reports unmanaged. This is integrity/hardware evidence, not installer
   workflow acceptance. Final review, complete gates and integration remain.
 
+- Started0.30 single-command enrollment design while0.29 final review runs. Reuse
+  the installer transaction and validated setup persistence. A controller-provided
+  worker ID/GPS berth profile supplies real station/pose configuration; discovery
+  cannot invent a heading or infrastructure. Unknown profiles retain telemetry
+  without enabling physical work. Implementation and acceptance remain pending.
 - The single final0.29 review identified four important integration bugs and one
   hardware-reporting issue. Consolidated red/green regressions cover unhealthy
   courier/private-crafter selection before staging, health changes during capacity
@@ -1359,6 +1368,16 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   actual private-crafting regression pass. Complete0.29 gates are starting; native
   integrity checks will be repeated on the final correction. No second review.
 
+- Task63 discovery/profile tests pass: nonce-bound bounded replies, explicit
+  controller selection, ambiguity refusal, ID/GPS berth matching, unmatched
+  telemetry-only enrollment and forbidden profile fields. Runtime supports the
+  opt-in enrollment protocol without requiring prior worker registration.
+- Task64 initial flow reuses the existing transactional installer and extracted
+  setup idle checks. Fresh enrollment applies a profile; repeats preserve settings;
+  explicit refresh preserves known saved heading. Active jobs block before HTTP,
+  failed profile application remains resumable, and release mismatch cannot enable
+  roles. Focused tests and18 Python packaging tests pass. Native HTTP enrollment,
+  final review and complete gates remain pending.
 - Final-source0.29 native health retest passed on `c482afa`, retaining777 fuel
   on both turtles and correct verified/modified/restored/unmanaged reports.
   Both computers are off and their force-load ticket removed. Python18 tests pass;
@@ -1425,6 +1444,20 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Accepted0.27 documentation merged without changing the tested source. Both
   native trials, overlap/restart proof and cleanup are permanently documented.
 
+-0.30 single final review found four Important issues; consolidated fixes preserve
+  source-copy worker settings/checkpoints, separate software release discovery from
+  enrollment GPS validation, reuse configuration object/collection merge semantics,
+  and fail closed on incomplete unpinned discovery. All four new regressions failed
+  before the changes and pass afterward; enrollment/setup/install/runtime focused
+  suites pass. Full gates and final-source native repair retest follow.
+
+-0.30 final-source native retest passed: real HTTP software repair preserved local
+  settings and checkpoint bytes; partial profile refresh retained supply inventory,
+  side and west heading, changed batch2→1 and consumed no fuel(1,188 unchanged).
+  Worker registered idle with verified0.30.0 software. Computers237/238 shut down
+  and all four temporary tickets removed with confirmed cleanup receipt. Permanent
+  candidate report validation-0.30.0.md records automated/native evidence and limits;
+  complete Lua gate is still running and acceptance is not yet claimed.
 - Accepted0.29 worker health:868 Lua/18 Python tests, release/diff checks, single
   final review fixes and final-source native hardware/integrity checks complete.
   Accepted0.28 merged with tested implementation unchanged; ordered integration

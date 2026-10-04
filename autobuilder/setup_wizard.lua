@@ -52,36 +52,7 @@ function M.inventories(e)
   end
   table.sort(found,function(a,b) return a.name<b.name end); return found
 end
-local function idle(e,config,preparation)
-  local store=Checkpoint.new(e.fs,e.textutils,config.dataDir..'/'..config.role..'.state')
-  local state,source=store:load()
-  assert(source=='primary' or source=='missing','Checkpoint recovery required before setup: '..source)
-  if state then
-    assert(state.schema==1 and state.id==e.os.getComputerID() and state.role==config.role
-      and U.integer(state.boot) and type(state.phase)=='string','Invalid or foreign checkpoint')
-    assert(not state.fuelRecovery and not state.fuelResume,'Finish fuel recovery before setup')
-    assert(not state.assignmentRecovery and not state.currentTask and not state.motionReservation
-      and not next(state.pendingSupplyAcks or {}),'Finish current jobs and acknowledgements before setup')
-    assert(not (state.firstBuild and state.firstBuild.autoStart),'Finish the requested first test before changing setup; pausing keeps its saved settings in use')
-    if config.role=='worker' then
-      assert(type(state.position)=='table' and type(state.position.known)=='boolean','Invalid saved position')
-      assert(not state.position.pending and not state.position.uncertain,'Recover uncertain movement with /autobuilder/pose.lua before setup')
-    end
-    local a=state.automation or {}
-    assert(not a.supply,'Finish the outstanding supply batch before setup')
-    for _,jobs in ipairs({state.jobs or {},a.jobs or {},preparation and {} or a.requests or {}}) do
-      for _,job in pairs(jobs) do
-        assert(job.type~='RESCUE' or job.rescueSettled,'Finish fuel recovery before setup')
-        assert(job.status=='completed','Finish queued or paused work before setup')
-      end
-    end
-    for _,project in pairs(a.projects or {}) do
-      assert(not ({building=true,verifying=true,repairing=true,clearing=true,preparing=not preparation})[project.phase],
-        'Finish the active project before setup')
-    end
-  end
-  return store,state
-end
+local idle=require('autobuilder.core.setup_state').idle
 local function persist(e,config,overrides,pose,original,preparation)
   Config.load(overrides) -- Validate the entire merged configuration before writing.
   local raw='-- Saved by setup. Previous settings: '..config.dataDir..'/settings-before-setup.lua\nreturn '..e.textutils.serialize(overrides)..'\n'
@@ -384,6 +355,18 @@ local function loadFuel(e)
     e.print('Settings saved, but more fuel is needed before working.')
     e.print('Put 16 coal/charcoal or 2 coal blocks in slot 15 (bottom row, third box), then run setup again to load it.')
   end
+end
+function M.applyFleet(e,value)
+ assert(not e.fs.exists('/.autobuilder-install/transaction'),'Recover installation before fleet configuration')
+ local original=IO.read(e.fs,settingsPath)
+ local overrides=assert(load(original,'@settings.lua','t',{}))();local config=Config.load(overrides)
+ assert(config.role=='worker','Fleet profile requires a worker')
+ local profile=require('autobuilder.core.enrollment').profile(value,config.controllerId)
+ local _,state=idle(e,config)
+ overrides=Config.overlay(overrides,profile)
+ local pose=not (state and state.position.known) and profile.initialPosition or nil
+ persist(e,config,overrides,pose,original)
+ return true
 end
 function M.run(args,e,opts)
   assert(#args==0 or (#args==1 and (args[1]=='chunks' or args[1]=='anchor' or args[1]=='fuel' or args[1]=='builder' or args[1]=='controller' or args[1]=='miner' or args[1]=='factory' or args[1]=='crafter' or args[1]=='exploration'))

@@ -23,7 +23,7 @@ local function validateState(s,role,id)
   end
 end
 function M.new(config,e)
-  if e.shell and e.shell.setAlias then e.shell.setAlias('setup','/autobuilder/setup.lua') end
+  if e.shell and e.shell.setAlias then e.shell.setAlias('setup','/autobuilder/setup.lua');e.shell.setAlias('fleet','/fleet.lua') end
   local id=e.os.getComputerID()
   assert(config.role~='worker' or e.turtle,'worker must run on a turtle')
   assert(config.role~='worker' or config.controllerId~=id,'worker cannot be its own controller')
@@ -65,6 +65,10 @@ function M.new(config,e)
       if recovery and recovery.granted and recovery.stage~='settled' then state.assignmentRecovery=true end
     end
     self.registry=require('autobuilder.workers.workers').new(state,config,function() return self:save() end)
+    if config.fleet.enabled then
+      local ok,release=pcall(require('autobuilder.core.enrollment').release,e)
+      if ok then self.fleetRelease=release else self:report('WARN','Fleet enrollment unavailable: '..tostring(release)) end
+    end
   else
     state.controllerId=config.controllerId
     if source:find('backup') then
@@ -161,6 +165,9 @@ function M.new(config,e)
     return true
   end
   function self:receive(sender,message,protocol)
+    if self.registry and protocol==require('autobuilder.install.discovery').protocol then
+      return require('autobuilder.core.enrollment').reply(e,config,self.fleetRelease,sender,message)
+    end
     if self.registry and protocol==config.protocol..'.setup' then
       return require('autobuilder.setup_share').reply(e,config,state.workers,sender,message)
     end
