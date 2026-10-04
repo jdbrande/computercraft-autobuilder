@@ -1813,3 +1813,18 @@ adds durable traffic waits, reliable queued operator input, correlated local scr
 commands, structured significant events and a native monitor dashboard using cached
 state. Design: `operator-observability-design.md`. No routing rewrite is assumed;
 contention/load acceptance remains a later gate.
+
+###0.38 input and traffic implementation
+
+Added bounded operator collection alongside network retention. Three regressions
+failed on the previous runtime and now pass: yielded keyboard/paste/script delivery,
+whole-line overflow including prior text, and oversized-command rejection. Queue
+execution still uses the real dispatcher; tests count actual invocations and
+verify ordinary scaling mutations. Local script results are correlated and bounded.
+
+Traffic waits persist their first timestamp, target, reason and blocking worker,
+survive restart/offline ownership, mark prolonged waits once, and clear on granted
+progress. Failed checkpoints roll back without emitting an event. Focused runtime
+and coordination suites pass. Three Python tests independently parse rotated JSONL,
+check escaped messages and whole-record byte bounds, and exercise disk errors.
+Structured event integration and monitor views remain current work.

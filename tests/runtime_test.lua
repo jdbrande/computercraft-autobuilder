@@ -247,3 +247,76 @@ test('runtime reports changing equipment without probing physical APIs or changi
   left=nil;t=w.agent:telemetry();eq(t.health.left,'none');eq(e.turtle.calls,before)
   eq(t.capabilities.telemetry,true)
 end)
+
+-- Broadcast through parallel's real filter semantics while an ordinary peripheral
+-- call is suspended. Keep runtime, dispatcher, storage and command handlers real.
+local function operatorLoop(events,before)
+ local R=require('autobuilder.core.runtime');local e=env(1);local timer=0;local blocked=false
+ e.os.startTimer=function() timer=timer+1;return timer end;e.os.cancelTimer=function() end
+ e.os.pullEvent=function(filter)
+  while true do local ev={coroutine.yield(filter)};if not filter or ev[1]==filter then return table.unpack(ev) end end
+ end
+ e.sleep=function() e.os.pullEvent('sleep') end
+ e.peripheral.call=function() if blocked then blocked=false;e.os.pullEvent('task_complete') end;return true end
+ local replies={};e.os.queueEvent=function(...) replies[#replies+1]={...} end
+ local app,commands;local original=R.new
+ R.new=function(...)
+  app=original(...);commands={};local command=app.command
+  app.command=function(self,line) commands[#commands+1]=line;return command(self,line) end
+  return app
+ end
+ e.parallel={waitForAny=function(...)
+  local threads,filters={},{}
+  for i,fn in ipairs({...}) do threads[i]=coroutine.create(fn);local ok,f=coroutine.resume(threads[i]);assert(ok,f);filters[i]=f end
+  local function broadcast(ev)
+   for i,co in ipairs(threads) do if not filters[i] or filters[i]==ev[1] then
+    local ok,f=coroutine.resume(co,table.unpack(ev));assert(ok,f);filters[i]=f;if coroutine.status(co)=='dead' then return true end
+   end end
+  end
+  if before then before(broadcast,app) end
+  blocked=true
+  broadcast({'rednet_message',2,{version=1,id='2:1:1',sender=2,boot=1,sequence=1,type='register',payload={label='Worker',status='idle',position={known=false},fuel=1000,inventory={used=0,slots=16},capabilities={telemetry=true}}},'autobuilder.v1'})
+  local yielding=false;for _,f in pairs(filters) do if f=='task_complete' then yielding=true end end;assert(yielding)
+  events(broadcast,app,commands,replies,function()
+   broadcast({'task_complete'})
+   for _=1,40 do e.now=e.now+.1;broadcast({'timer',timer}) end
+  end)
+  assert(broadcast({'char','q'}))
+ end}
+ local ok,result=pcall(R.run,cfg('controller'),e);R.new=original;assert(ok,result)
+ return app,commands,replies
+end
+
+test('yielding runtime retains keyboard paste and local commands once through the normal dispatcher',function()
+ local app,commands,replies=operatorLoop(function(send,app,commands,replies,release)
+  send({'paste','fleet limit mining 1 '});send({'char','9'});send({'key',14});send({'char','3'});send({'key',28})
+  send({'autobuilder_command','script:1','fleet limit mining 2 4'});release()
+  eq(#commands,2);eq(commands[1],'fleet limit mining 1 3');eq(commands[2],'fleet limit mining 2 4');eq(#replies,1);eq(replies[1][1],'autobuilder_command_result');eq(replies[1][2],'script:1');eq(replies[1][3],true)
+  send(replies[1]);eq(#commands,2);eq(#replies,1)
+  send({'paste','workers'});send({'key',28});eq(#commands,3);eq(commands[3],'workers')
+ end)
+ eq(require('autobuilder.core.scaling').limits(app.state,app.config,'mining').min,2)
+end)
+
+test('operator queue overflow discards a complete command and replies that discarded scripts were not executed',function()
+ operatorLoop(function(send,app,commands,replies,release)
+  send({'paste','fleet limit mining 1 3'})
+  send({'autobuilder_command','discarded:1','fleet limit mining 2 4'})
+  for _=1,140 do send({'char',' '}) end
+  send({'char','q'});send({'char','N'});send({'char','P'});send({'key',28});release()
+  eq(#commands,0);eq(app.page,0);eq(#replies,1);eq(replies[1][2],'discarded:1');eq(replies[1][3],false);assert(replies[1][4]:find('not executed',1,true))
+  send({'paste','fleet limit mining 0 2'});send({'key',28});eq(#commands,1)
+  eq(require('autobuilder.core.scaling').limits(app.state,app.config,'mining').max,2)
+ end,function(send) send({'paste','fleet limit mining 1 3'}) end)
+end)
+
+test('overlong terminal commands are rejected as a whole and local command IDs and results are bounded',function()
+ local e=env(1);local app=require('autobuilder.core.runtime').new(cfg('controller'),e);local replies={}
+ e.os.queueEvent=function(...) replies[#replies+1]={...} end
+ app:event('paste','fleet limit mining 1 3'..string.rep(' ',256));app:event('key',28)
+ eq((app.state.fleet or {}).limits,nil);assert(app.state.commandResult:find('discarded',1,true))
+ app:event('autobuilder_command','valid','fleet limit mining 1 3'..string.rep(' ',256));eq(replies[1][3],false)
+ app:event('autobuilder_command',{},'workers');eq(#replies,1)
+ app:event('paste','fleet limit mining 0 2');app:event('key',28)
+ eq(require('autobuilder.core.scaling').limits(app.state,app.config,'mining').max,2)
+end)

@@ -321,7 +321,7 @@ function M.new(state,save,clock,id,chunks,config)
     if (j.privateStation or j.logistics or j.returning or j.type=='RECOVER_CARGO') and p.phase=='completed' then j.workerFinished=true; j.status='collecting' end
     persist(); return true
   end
-  function self:reserve(owner,jobId,from,target,workers,work)
+  local function reserve(owner,jobId,from,target,workers,work)
     if state.assignmentRecovery then return false,'controller backup ownership reconciliation pending' end
     local j=s.jobs[jobId] or (state.jobs or {})[jobId]
     if not j or j.workerId~=owner or j.status=='completed' then return false,'reservation requires active task ownership' end
@@ -372,6 +372,33 @@ function M.new(state,save,clock,id,chunks,config)
     for k,cell in pairs(s.cells) do if cell.owner==owner and not keep[k] then s.cells[k]=nil end end
     local ok,why=pcall(persist);if not ok then s.cells=before;error(why,0) end
     return true
+  end
+  function self:reserve(owner,jobId,from,target,workers,work)
+    local granted,reason,blocker=reserve(owner,jobId,from,target,workers,work)
+    local j=s.jobs[jobId] or (state.jobs or {})[jobId]
+    if j and j.workerId==owner and j.status~='completed' then
+      local old=j.trafficWait;local nextWait;local kind
+      if not granted then
+        local same=old and U.distance(old.target,target)==0 and old.work==not not work
+          and old.reason==reason and old.blocker==blocker
+        if same then
+          if not old.prolonged and clock()-old.since>=30 then
+            nextWait=U.copy(old);nextWait.prolonged=true;kind='traffic_prolonged'
+          end
+        else
+          nextWait={since=clock(),target=U.copy(target),work=not not work,reason=reason,blocker=blocker}
+          nextWait.remedy=blocker and ('Inspect worker '..blocker..'; restore its connection and settle its task before retrying. Ownership retained.')
+            or ('Inspect '..jobId..' at '..key(target)..': '..tostring(reason)..'. Correct the route or configuration, then resume; protected cells stay intact.')
+          kind='traffic_wait'
+        end
+      elseif old then kind='traffic_clear' end
+      if kind then
+        j.trafficWait=nextWait
+        local ok,why=pcall(persist);if not ok then j.trafficWait=old;error(why,0) end
+        if self.onTrafficChange then self.onTrafficChange(kind,j) end
+      end
+    end
+    return granted,reason,blocker
   end
   local function poseCommit(j,change)
     local prior,cells=U.copy(j.poseRecovery),U.copy(s.cells)

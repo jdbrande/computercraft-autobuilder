@@ -2,6 +2,12 @@ local U=require('autobuilder.core.util')
 local Checkpoint=require('autobuilder.core.checkpoint')
 local Network=require('autobuilder.core.network')
 local M={}
+local operatorEvents={char=true,key=true,paste=true,autobuilder_command=true}
+local function commandReply(e,id,ok,result)
+  if U.shortString(id,64) and e.os.queueEvent then
+    e.os.queueEvent('autobuilder_command_result',id,not not ok,tostring(result or (ok and 'OK' or 'failed')):sub(1,1024))
+  end
+end
 local function validateState(s,role,id)
   assert(type(s)=='table' and s.schema==1,'unsupported application checkpoint schema')
   assert(s.id==id and s.role==role,'checkpoint belongs to a different computer or role')
@@ -298,13 +304,26 @@ function M.new(config,e)
   function self:event(name,a,b,c)
     if self.quitRequested and not self.busy then self:save(); return false end
     if name=='rednet_message' then self:receive(a,b,c)
+    elseif name=='autobuilder_command' then
+      if U.shortString(a,64) then
+        if type(b)~='string' or #b>256 or b:find('[%c]') then commandReply(e,a,false,'Invalid command; not executed')
+        else local ok,result=self:command(b);commandReply(e,a,ok,result) end
+      end
+    elseif name=='autobuilder_input_discard' then
+      self.input='';self.inputDiscarded=true;state.commandResult='Input overflow: command discarded. Press Enter, then retype.'
+    elseif name=='key' and a==((e.keys or {}).enter or 28) then
+      if self.inputDiscarded then self.inputDiscarded=nil;state.commandResult='Command discarded; ready for a new command.'
+      else self:command(self.input) end
+      self.input=''
+    elseif self.inputDiscarded and (name=='char' or name=='paste' or name=='key') then return true
     elseif name=='char' and (a=='q' or a=='Q') and self.input=='' then
       if self.busy then self.quitRequested=true; return true end
       self:save(); return false
     elseif name=='char' and a=='N' and self.input=='' then self.page=self.page+1
     elseif name=='char' and a=='P' and self.input=='' then self.page=self.page-1
-    elseif name=='char' or name=='paste' then self.input=(self.input..a:gsub('[%c]','')):sub(1,256)
-    elseif name=='key' and a==((e.keys or {}).enter or 28) then self:command(self.input); self.input=''
+    elseif name=='char' or name=='paste' then
+      local input=self.input..a:gsub('[%c]','')
+      if #input>256 then self:event('autobuilder_input_discard') else self.input=input end
     elseif name=='key' and a==((e.keys or {}).backspace or 14) then self.input=self.input:sub(1,-2)
     elseif name=='peripheral' or name=='peripheral_detach' then self:tick() end
     return true
@@ -314,13 +333,46 @@ end
 function M.run(config,e)
   e=e or _G
   local app=M.new(config,e)
-  local inbox={}; local dropped=0
-  local function collectNetwork()
+  local inbox,operators={},{};local dropped=0;local discardInput=false
+  app.io={networkDropped=0,operatorDropped=0}
+  local function collectEvents()
     while true do
-      local _,sender,message,protocol=e.os.pullEvent('rednet_message')
-      if #inbox<128 then inbox[#inbox+1]={sender,message,protocol}
-      else dropped=dropped+1 end
+      local name,a,b,c=e.os.pullEvent()
+      if name=='rednet_message' then
+        if #inbox<128 then inbox[#inbox+1]={a,b,c}
+        else dropped=dropped+1;app.io.networkDropped=app.io.networkDropped+1 end
+      elseif operatorEvents[name] then
+        if name=='autobuilder_command' and (not U.shortString(a,64) or type(b)~='string' or #b>256 or b:find('[%c]')) then
+          commandReply(e,a,false,'Invalid command; not executed')
+        else
+          if #operators>=128 then
+            for _,event in ipairs(operators) do if event[1]=='autobuilder_command' then
+              commandReply(e,event[2],false,'Input queue overflow; command not executed')
+            end end
+            app.io.operatorDropped=app.io.operatorDropped+#operators
+            operators={{'autobuilder_input_discard'}};discardInput=true
+          end
+          if discardInput then
+            app.io.operatorDropped=app.io.operatorDropped+1
+            if name=='autobuilder_command' then commandReply(e,a,false,'Input queue overflow; command not executed')
+            elseif name=='key' and a==((e.keys or {}).enter or 28) then
+              operators[#operators+1]={name,a};discardInput=false
+            end
+          else operators[#operators+1]={name,a,b,c} end
+        end
+      end
+      app.io.networkPending=#inbox;app.io.operatorPending=#operators
     end
+  end
+  local function drainOperators()
+    local started=e.os.epoch('utc')
+    for _=1,math.min(16,#operators) do
+      local event=table.remove(operators,1)
+      if not app:event(table.unpack(event)) then return false end
+      if e.os.epoch('utc')-started>=250 then break end
+    end
+    app.io.operatorPending=#operators
+    return true
   end
   local function drainNetwork()
     -- Only the main coroutine mutates controller/worker state. The collector
@@ -332,20 +384,22 @@ function M.run(config,e)
       local p=table.remove(inbox,1);app:receive(p[1],p[2],p[3])
       if e.os.epoch('utc')-started>=250 then break end
     end
+    app.io.networkPending=#inbox
     if dropped>0 then
       app:report('WARN','Network inbox overflow: '..dropped..' packets dropped; durable protocols will retry')
       dropped=0
     end
   end
   local function main()
-    app:tick(); drainNetwork(); app:draw()
+    app:tick(); drainNetwork(); if not drainOperators() then return end; app:draw()
     local nextTick=e.os.epoch('utc')/1000+1
-    local timer=e.os.startTimer(#inbox>0 and 0.05 or 1)
+    local timer=e.os.startTimer((#inbox>0 or #operators>0) and 0.05 or 1)
     while true do
       local name,a,b,c=e.os.pullEvent()
       if name=='timer' and a==timer then
         app:tick(); nextTick=e.os.epoch('utc')/1000+1
-      elseif name~='rednet_message' and not app:event(name,a,b,c) then return end
+      elseif name~='rednet_message' and not operatorEvents[name] and not app:event(name,a,b,c) then return end
+      if not drainOperators() then return end
       drainNetwork()
       if app.quitRequested and not app.busy then app:save(); return end
       -- CraftOS peripheral calls can yield with a task_complete filter and
@@ -357,7 +411,7 @@ function M.run(config,e)
         app:tick(); nextTick=e.os.epoch('utc')/1000+1
       end
       if e.os.cancelTimer then e.os.cancelTimer(timer) end
-      timer=e.os.startTimer(#inbox>0 and 0.05 or math.max(0.05,nextTick-e.os.epoch('utc')/1000))
+      timer=e.os.startTimer((#inbox>0 or #operators>0) and 0.05 or math.max(0.05,nextTick-e.os.epoch('utc')/1000))
       app:draw()
     end
   end
@@ -376,7 +430,7 @@ function M.run(config,e)
     while true do app:workStep(); e.sleep(0.1) end
   end
   -- Start the collector first so an idle main loop can drain the same event.
-  local ok,err=pcall(e.parallel.waitForAny,collectNetwork,main,gpsLoop,actionLoop)
+  local ok,err=pcall(e.parallel.waitForAny,collectEvents,main,gpsLoop,actionLoop)
   if not ok then
     app:report('ERROR','Runtime stopped: '..tostring(err))
     app:save()
