@@ -96,3 +96,18 @@ test('crafter announces wired endpoint names and retains missing-location protec
  I.initialize(s,c);local ok,why=P.ready(s,c,{type='BUILD'});eq(ok,false);assert(why:find('remote_input',1,true))
  c.inventoryAreas.remote_input=cell(70);c.inventoryAreas.remote_output=cell(72);I.initialize(s,c);assert(P.ready(s,c,{type='BUILD'}))
 end)
+
+test('derived inventory registration respects the checkpoint limit before saving and survives restart',function()
+ local I=require('autobuilder.core.inventory_geometry');local c,s=fixture()
+ c.inventoryAreas={};c.storageInventories={};c.furnaces={};c.craftingStation={}
+ for i=1,511 do c.inventoryAreas['chest_'..i]=cell(i*2) end
+ c.fuel.stations={{inventory='fuel',position={x=-10,y=1,z=0}}}
+ I.initialize(s,c);local before=U.copy(s.inventoryGeometry)
+ I.initialize(s,c);assert(require('autobuilder.factory.factory').equal(before,s.inventoryGeometry))
+ c.inventoryAreas.chest_512=cell(1024)
+ local ok,why=pcall(I.initialize,s,c);eq(ok,false);assert(tostring(why):find('maximum512',1,true))
+ assert(require('autobuilder.factory.factory').equal(before,s.inventoryGeometry))
+ local fresh={};eq(pcall(I.initialize,fresh,c),false);eq(fresh.inventoryGeometry,nil)
+ c.inventoryAreas.chest_512=nil;I.initialize(s,c)
+ assert(require('autobuilder.factory.factory').equal(before,s.inventoryGeometry))
+end)

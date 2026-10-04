@@ -522,7 +522,7 @@
       "version": "0.37.0"
     },
     {
-      "bytes": 8191,
+      "bytes": 8273,
       "path": "autobuilder/core/inventory_geometry.lua",
       "roles": [
         "controller",
@@ -532,7 +532,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "df4558bc2ae67661884a972d4b1b375628aeebf040121b6a71f6bbf24fdf9310",
+      "sha256": "5d389e12809605e08583922bbb65ba8c5d4bd8413d5de352a723e648f877b4a8",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/inventory_geometry.lua",
       "version": "0.37.0"
     },

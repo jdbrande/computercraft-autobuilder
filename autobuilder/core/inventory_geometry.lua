@@ -98,6 +98,7 @@ local function inspect(config,state)
     for _,n in ipairs(t.craftingInventories or {}) do need(n) end
   end
   if next(a.cells or {}) then busy=true end
+  M.validate(areas) -- Derived registrations must obey the same checkpoint limit.
   local missing={};for n in pairs(required) do if not areas[n] then missing[#missing+1]=n end end;table.sort(missing)
   return {areas=areas,missing=missing,error=#missing>0 and ('Register inventoryAreas for '..table.concat(missing,', ')..' on the controller; run setup factory.') or nil},busy
 end

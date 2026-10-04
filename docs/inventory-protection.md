@@ -43,3 +43,7 @@ At most512 named inventory bounds are accepted. Contained protection boxes are
 compacted without weakening protection. A mining mission requiring more than128
 boxes reports the existing explicit planning limit. Consolidate nearby physical
 infrastructure into a truthful larger registered/restricted volume.
+
+The512-inventory limit includes both explicit boxes and inferred logistics,
+supply and fuel containers. Setup/startup rejects an oversized effective map
+before changing its checkpoint; remove unnecessary registrations and retry.
