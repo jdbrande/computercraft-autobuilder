@@ -1,5 +1,6 @@
 local U=require('autobuilder.core.util')
 local Q=require('autobuilder.core.workflows')
+local Scheduling=require('autobuilder.core.scheduling')
 local M={roles={'mining','hauling','crafting','clearing','building'}}
 local roles={MINE='mining',HARVEST='mining',FARM='mining',TRANSPORT='hauling',CRAFT='crafting',
   SURVEY_SITE='clearing',PREPARE_SITE='clearing',PREPARE_REGION='clearing',CLEAR='clearing',BUILD='building',VERIFY='building',REPAIR='building'}
@@ -150,27 +151,30 @@ function M.priority(view,j)
   return math.max(0,r.desired-r.active)/math.max(1,r.desired)+(6-rank[role])/1000
 end
 local function competing(state,c,role,w,counts)
+  local best
+  local function consider(j) best=math.max(best or 0,Scheduling.urgent(j) and 101 or Scheduling.priority(state,j)) end
   local function matches(j)
     if M.role(j)~=role or owner(j) or j.status~='queued' or not ready(state,j) or j.preparationError or j.coverageError
       or j.preferredWorker and j.preferredWorker~=w.id or j.requiredCapability and not (w.telemetry.capabilities or {})[j.requiredCapability] then return false end
-    if not Q.canDispatch(state,j) or not require('autobuilder.workers.health').eligible(w.telemetry,j) then return false end
+    if not Q.canDispatch(state,j) or not require('autobuilder.workers.health').eligible(w.telemetry,j)
+      or not require('autobuilder.resources.fuel_budget').admit(c,j,w) then return false end
     if not require('autobuilder.core.protection').canOwn(state,j,w.id) then return false end
     return true
   end
-  for _,j in pairs((state.automation or {}).jobs or {}) do if matches(j) then return true end end
+  for _,j in pairs((state.automation or {}).jobs or {}) do if matches(j) then consider(j) end end
   if role=='mining' and not Q.factoryPending(state) then
     local caps=w.telemetry.capabilities or {}
     for _,j in pairs(state.jobs or {}) do
-      if matches(j) and caps.mining and require('autobuilder.resources.materials').accepts(w.telemetry.miningResources,j.item) then return true end
+      if matches(j) and caps.mining and require('autobuilder.resources.materials').accepts(w.telemetry.miningResources,j.item) then consider(j) end
     end
     if caps.explorationV1 and require('autobuilder.workers.health').eligible(w.telemetry,{type='MINE'}) and require('autobuilder.resources.exploration').home(w.telemetry.explorationHome) and not (state.exploration or {}).paused then
       for _,g in pairs((state.exploration or {}).groups or {}) do
         if g.status=='running' and not g.paused and g.target>((counts or {})[g.item] or 0)
-          and require('autobuilder.resources.materials').accepts(w.telemetry.miningResources,g.item) then return true end
+          and require('autobuilder.resources.materials').accepts(w.telemetry.miningResources,g.item) then consider(g) end
       end
     end
   end
-  return false
+  return best
 end
 function M.canAssign(state,c,j,w,counts,now,workers)
   if workers and workers~=state.workers then state=setmetatable({workers=workers},{__index=state}) end
@@ -182,16 +186,27 @@ function M.canAssign(state,c,j,w,counts,now,workers)
   if not capable(w,role) or j.requiredCapability and not (w.telemetry.capabilities or {})[j.requiredCapability] then return false,'worker capability changed before assignment' end
   local view=M.snapshot(state,c,counts,now);local r=view[role]
   if r.active>=r.desired then return false,role..' allocation '..r.active..'/'..r.desired end
-  local priority=M.priority(view,j)
+  local priority=M.priority(view,j);local projectPriority=Scheduling.priority(state,j)
   for _,other in ipairs(M.roles) do
-    if other~=role and capable(w,other) and view[other].active<view[other].desired
-      and M.priority(view,{type=({mining='MINE',hauling='TRANSPORT',crafting='CRAFT',clearing='PREPARE_REGION',building='BUILD'})[other]})>priority
-      and competing(state,c,other,w,counts) then return false,'idle worker needed for '..other..' bottleneck' end
+    if other~=role and capable(w,other) and view[other].active<view[other].desired then
+      local contender=competing(state,c,other,w,counts)
+      local bottleneck=M.priority(view,{type=({mining='MINE',hauling='TRANSPORT',crafting='CRAFT',clearing='PREPARE_REGION',building='BUILD'})[other]})
+      if contender and (contender>projectPriority or contender==projectPriority and bottleneck>priority) then
+        return false,'idle worker needed for '..other..' project priority or bottleneck'
+      end
+    end
   end
   return true
 end
 function M.preference(state,c,j,w)
   local n=0;for _,role in ipairs(M.roles) do if capable(w,role) then n=n+1 end end
+  if c then
+    local budget=require('autobuilder.resources.fuel_budget').mission(c,j,w.telemetry)
+    -- Mission cost dominates the bounded role count; specialization breaks ties.
+    -- Unknown geometry sorts after the budget's 100,000,000 upper bound while
+    -- retaining specialization among equally unknown routes.
+    return (budget and budget.required or 100000001)*(#M.roles+1)+n
+  end
   return n
 end
 function M.window(state,c,role)

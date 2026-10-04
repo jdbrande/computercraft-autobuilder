@@ -5,6 +5,11 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.36 priorities:1,003 Lua/20 Python tests, final release/diff checks,
+  the single final review and native two-project acceptance passed. The finite
+  supply handoff correction is included in the repeated full gate.
+  [Permanent evidence](validation-0.36.0.md). Continue0.37–0.40 candidate gates.
+
 - Accepted0.35 reachable inventory recovery:976 Lua/20 Python tests and final
   release/diff checks passed. Two native trials verified exact plain/NBT cargo,
   frozen donor ownership, restart, home refueling between trips and cleanup.
@@ -1637,6 +1642,13 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Native adjacent-turtle feasibility probes passed; complete native acceptance,
   final review and full release gates remain pending. No acceptance claim yet.
 
+### 0.36 scheduling design started
+
+The next incomplete dependency is project priority and travel-aware scheduling
+(requirements 30–31). Design selects durable 0–100 project priorities, shared ordering
+at existing new-work/stock boundaries, and conservative travel/fuel worker ranking.
+Committed lower-priority work keeps its contracts and owners. Native inline execution
+will follow Tasks 75–76; 0.35 review/native acceptance and 0.33/0.34 gates continue.
 ###0.34 final-source native acceptance completed
 
 - Clean native gzip Sponge v3 import placed/verified9 cells, including3 empty
@@ -1672,6 +1684,33 @@ recorded in acceptance. Final-source full gates and native completion follow.
   no findings or verdict. This is recorded as pending, not a completed review.
   Independent remaining implementation and final test gates continue.
 
+### Requirements audit — 2026-10-04
+
+The read-only audit identifies the remaining work after candidate milestones
+0.33–0.36: register physical factory infrastructure in global protection; prove
+bounded mixed-role traffic progress or actionable durable failures; finish a
+coherent scriptable operator interface and structured significant-event logs;
+add the ComputerCraft monitor dashboard; measure sustained native fleet load and
+operator input; and run one integrated unassisted mixed-material acceptance.
+The final gate must include automatic workspace access: the manually opened
+underside access in the 0.33 fixture is assisted evidence only.
+
+Existing safe stops satisfy the blocked-return requirement; blind excavation
+rescue is not required. Unsupported fluids, arbitrary NBT, sign text and populated
+containers remain explicit adapter limits where the requirements allow unsupported
+blocks/metadata. Fluid site preparation has separate accepted evidence. Exact
+example command verbs and a mandatory one-second heartbeat are not requirements.
+The historical coverage table will be reconciled with accepted evidence at the
+final gate; candidate work is not marked accepted early.
+
+0.36 implementation in progress: persisted project priority and task/request
+lineage now order ordinary dispatch, unclaimed stock, project expansion, supply
+offers, exploration demand and material/fuel forecasts. Mission budget precedes
+role specialization for worker choice, and cross-role arbitration respects project
+priority. Focused priority/scaling/production/coordination checks pass. Concurrent
+factory request advancement is still under development: it must not duplicate
+furnace ownership or strand ungranted batches after competing inputs are consumed.
+This branch is not accepted or integrated.
 0.35 final review and consolidated corrections — 2026-10-04: the successful
 review identified courier deposit-journal replay missing from the executor,
 refueling blocked by the recovery-wide courier reservation, collection waiting
@@ -1692,6 +1731,43 @@ copy and all advanced placement tests pass afterward. This is a new runtime bug,
 not a second branch review. The final full gate is superseded and will rerun on
 the corrected source; native recovery retains the original physical contract.
 
+0.36 scheduling implementation and focused acceptance — 2026-10-04: new work
+follows persisted project priority through requests, acquisition, stock, supply,
+preparation and construction. Mission cost chooses among otherwise eligible
+workers; unknown routes still preserve specialization ties. Recovery/return/access
+obligations retain precedence. Manufacturing admission preserves held batches,
+retires only empty losing preferences and replans missing inputs so a factory job
+cannot block its own replacement miners. Scheduling generations do not consume
+the external-output-loss retry budget.
+
+Focused services, furnace/private crafting runtimes, mining ordering and command
+restart tests pass. A real controller/builder two-project simulation changes
+priority while beta owns a survey, reboots both, finishes that contract, assigns
+alpha next, then constructs/verifies both projects using exactly four shared stone
+and settles all jobs/inventories. Native two-project acceptance, the single final
+review, full gates and ordered integration remain pending.
+
+### 0.36 review corrections and native acceptance — 2026-10-04
+
+The single final review found three priority gaps. Its consolidated correction
+checks actual idle/unowned crafter availability before new admission or stock
+claims, resolves shared mining priority and pause state across active consumers,
+and advances completed operation metadata before offering factory admission to a
+lower request. Regression tests reproduce unavailable/busy/lost crafters, real
+project pause/resume and controller restart with shared mining, and a
+SMELT-to-CRAFT priority handoff. Existing committed owners remain unchanged.
+Focused production, private factory runtime, exploration, coordination, scaling,
+and processing suites pass. Final whole-suite checks are pending.
+
+Native controller 257 and builder 258 completed two simultaneously active
+projects from exactly four shared stone. Beta (80) owned the first survey; alpha
+was raised from20 to100 while beta was safely paused. Both computers restarted;
+beta retained that task and alpha received the next project assignment. Both
+projects reached built with2 correct blocks, all jobs completed, no supply lease,
+and the builder empty at home with3518 of its initial4000 fuel. Independent world
+inspection confirmed all four blocks and empty stock/depot/supply inventories.
+Evidence is under ignored `dist/live-project-priorities/`. This is a finite
+supplied-stock scheduling trial, not raw-material acquisition or scale acceptance.
 0.35 final-source native refueling passed — 2026-10-04: courier256 started at68fuel,
 completed its first pickup, automatically refueled at its registered home station
 while retaining the recovery, then completed the second pickup. The controller
@@ -1724,3 +1800,27 @@ computers are off and temporary tickets removed.
 Final-source976 Lua/20 Python tests, release/diff checks and both native trials
 passed. Donor quarantine, controlled courier refueling and exact inventory receipts
 retain their documented limits. No second review was performed.
+
+### 0.36 final-gate correction — finite supply handoff
+
+The first full candidate run passed997/998 Lua tests; its streaming overlap case
+failed. Concurrent request advancement could admit another factory operation in
+the same tick that a builder's finite supply request completed, leaving no supply
+handoff opportunity. An online unpaused consumer now gets one checkpointed offer
+opportunity per batch/completed-request pair before fresh equal/lower-priority
+manufacturing. Existing physical ownership drains unchanged. Actionable station
+failures consume the opportunity; transient ownership and inventory gates do not.
+Empty factory preferences retire before they can block the handoff.
+
+Regressions cover normal runtime staging, an obstructed station, restart before
+handoff, checkpoint rollback, newer demand, unavailable consumers, priority,
+committed work and empty preferences. Production and logistics suites passed.
+The overlap fixture also moves its second coal ore four blocks farther away within
+its existing bounds, preserving the placement-time physical-miner witness while
+parallel acquisition runs earlier. Its focused full-chain case passed unchanged
+assertions and exact final material accounting. Final full gates are restarting;
+0.36 is not yet accepted.
+
+-0.36 accepted after the repeated clean-source gate passed1,003/1,003 Lua tests
+  with20/20 Python tests and release/diff checks. No unintended tracked or untracked
+  files were present; ignored native audit artifacts remain local.

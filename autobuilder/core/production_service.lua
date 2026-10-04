@@ -3,6 +3,7 @@ local Coordination=require('autobuilder.core.workflows')
 local Materials=require('autobuilder.resources.materials')
 local Providers=require('autobuilder.resources.providers')
 local M={}
+local Scheduling=require('autobuilder.core.scheduling')
 function M.new(app,config,e,queue)
   local s=queue.state; s.requestSequence=s.requestSequence or 0
   local self={machines={},laneCursor=0}; local save=function() return app:save() end
@@ -18,7 +19,7 @@ function M.new(app,config,e,queue)
     local project=options.projectName and assert(s.projects[options.projectName],'Preparation project missing')
     for _,r in pairs(s.requests) do if key and r.key==key and r.status~='completed' then return r end end
     s.requestSequence=s.requestSequence+1
-    local r={id='request:'..s.requestSequence,key=key,requirements=U.copy(requirements),status='queued',operation=1,mines={},harvests={},stockOnly=options.stockOnly==true}
+    local r={id='request:'..s.requestSequence,key=key,project=options.projectName,requirements=U.copy(requirements),status='queued',operation=1,mines={},harvests={},stockOnly=options.stockOnly==true}
     s.requests[r.id]=r
     local previous
     if project then
@@ -81,9 +82,30 @@ function M.new(app,config,e,queue)
     end
     return {withdrawn=withdrawn,delivered={[job.item]=p.delivered or 0},sequence=p.stockSequence}
   end
-  local function syncClaims(allowGrant)
+  local function craftAvailable(job)
+    if app.state.workers==nil then return true end -- legacy embedding without a registry
+    for _,w in pairs(app.state.workers) do
+      local t=w.telemetry;local caps=t and t.capabilities or {}
+      if w.online and t and (t.status==nil or t.status=='idle') and not t.task and caps.crafting
+        and (not job.preferredWorker or job.preferredWorker==w.id)
+        and (not job.privateStation or caps.isolatedCraftingV1)
+        and not Coordination.workerBusy(app.state,w.id,job.id)
+        and require('autobuilder.workers.health').eligible(t,job)
+        and require('autobuilder.resources.fuel_budget').admit(config,job,w) then return true end
+    end
+    return false
+  end
+  local function craftOperationAvailable(r)
+    if r.jobId then return craftAvailable(assert(s.jobs[r.jobId])) end
+    if #(config.craftingStations or {})==0 then return craftAvailable({type='CRAFT'}) end
+    for _,station in ipairs(config.craftingStations) do
+      if craftAvailable({type='CRAFT',preferredWorker=station.workerId,privateStation=station}) then return true end
+    end
+    return false
+  end
+  local function syncClaims(allowGrant,eligible)
     local jobs={}; for _,j in pairs(s.jobs) do if j.stockInputs and not j.cancelled then jobs[#jobs+1]=j end end
-    table.sort(jobs,function(a,b) return a.id<b.id end)
+    table.sort(jobs,function(a,b) return Scheduling.before(app.state,a,b) end)
     for _,j in ipairs(jobs) do
       local lease=self.ledger.state.leases[j.id]
       if lease and lease.status=='held' then
@@ -103,19 +125,19 @@ function M.new(app,config,e,queue)
       end
     end
     if allowGrant==false then return end
-    for _,j in ipairs(jobs) do if j.status~='completed' and j.type~='PROCESS' and not j.logistics and not j.privateStation and not j.returnManaged and not self.ledger.state.leases[j.id] then
+    for _,j in ipairs(jobs) do if (not eligible or eligible[j.id]) and j.status~='completed' and not j.paused and j.type~='PROCESS' and not j.logistics and not j.privateStation and not j.returnManaged and not self.ledger.state.leases[j.id] and (j.type~='CRAFT' or craftAvailable(j)) then
       local lease,why=self.ledger:reserve(j.id,j.stockInputs,j.stockOutputs,
         app.mining.storage.valid and app.mining.storage.counts or nil,{protected=j.type=='FUEL_STATION' and {} or config.turtleFuelReserveItems})
       if j.stockError~=why then j.stockError=why; save() end
     end end
   end
-  function self:syncClaims(allowGrant)
+  function self:syncClaims(allowGrant,eligible)
     if allowGrant==false then return syncClaims(false) end
     if self.working or self.reading then return end
     -- Peripheral list calls yield in CraftOS. Keep the action coroutine out of
     -- the complete observation/grant interval, and always observe anew here.
     self.reading=true
-    local ok,result=pcall(function() app.mining:refresh(); return syncClaims(true) end)
+    local ok,result=pcall(function() app.mining:refresh(); return syncClaims(true,eligible) end)
     self.reading=false
     if not ok then error(result,0) end
     return result
@@ -227,6 +249,8 @@ function M.new(app,config,e,queue)
         r.mines[item]=job.id; save()
       end
       local job=app.state.jobs[r.mines[item]]
+      local linked=job;local seen={}
+      while linked and not seen[linked.id] do seen[linked.id]=true;Scheduling.pauseSharedMine(app.state,linked);linked=linked.childId and app.state.jobs[linked.childId] end
       material.jobId=job.id; material.workerId=job.workerId; material.status=job.status
       if job.status=='blocked' then return blocked(material,job.error or 'Mining job blocked: '..item) end
       if not hasWorker('mining',item) then return blocked(material,'No online mining worker eligible for '..item) end
@@ -237,7 +261,7 @@ function M.new(app,config,e,queue)
     if farm then
       local prior=r.harvests[item] and s.jobs[r.harvests[item]]
       if not prior or prior.status=='completed' then
-        local job=queue:submit(kind,{item=item,quantity=target-count,farm=U.copy(farm)},{},r.id..':'..item..':'..(prior and prior.id or 'first'))
+        local job=queue:submit(kind,{item=item,quantity=target-count,farm=U.copy(farm),productionRequest=r.id},{},r.id..':'..item..':'..(prior and prior.id or 'first'))
         r.harvests[item]=job.id; save()
       end
       local job=s.jobs[r.harvests[item]]
@@ -255,18 +279,141 @@ function M.new(app,config,e,queue)
     table.sort(errors); table.sort(waiting)
     return table.concat(#errors>0 and errors or waiting,'; ')
   end
-  function self:tick()
-    if self.working then return end
-    local active
-    for _,r in pairs(s.requests) do if r.status=='running' or r.status=='blocked' then active=r; break end end
-    if not active then
-      local list={}; for _,r in pairs(s.requests) do if r.status=='queued' then list[#list+1]=r end end
-      table.sort(list,function(a,b) return tonumber(a.id:match('%d+'))<tonumber(b.id:match('%d+')) end); active=list[1]
+  local factoryTypes={CRAFT=true,SMELT=true,PROCESS=true}
+  function self:supplyRequest(job)
+    local completed
+    local key='supply:'..job.id..':'..job.missingItem
+    for _,r in pairs(s.requests) do if r.key==key then
+      if r.status~='completed' then return r.id end
+      if not completed or tonumber(r.id:match('(%d+)$'))>tonumber(completed:match('(%d+)$')) then completed=r.id end
+    end end
+    return nil,completed
+  end
+  function self:attemptedSupply(job)
+    local pending,completed=self:supplyRequest(job)
+    if pending or not completed then return end
+    local old=job.supplyHandoffAttempted
+    if old and old.batch==job.supplyId and old.request==completed then return end
+    require('autobuilder.factory.factory').commit(job,save,function()
+      job.supplyHandoffAttempted={batch=job.supplyId,request=completed}
+    end)
+  end
+  local function awaitingSupply(r)
+    if ((config.supply or {}).inventory or '')=='' and #(config.supplyStations or {})==0 then return end
+    for _,j in pairs(s.jobs) do
+      local w=(app.state.workers or {})[tostring(j.workerId)]
+      if j.workerId and w and w.online and j.status~='completed' and not j.workerFinished and not j.paused
+        and j.type~='CRAFT' and j.supplyId and j.missingItem and not (s.completedSupplyBatches or {})[j.supplyId]
+        and Scheduling.priority(app.state,j)>=Scheduling.priority(app.state,r) then
+        local pending,completed=self:supplyRequest(j);local old=j.supplyHandoffAttempted
+        if not pending and completed and not (old and old.batch==j.supplyId and old.request==completed)
+          and self.ledger:view(j.missingItem,app.mining.storage.counts).available>(config.turtleFuelReserveItems[j.missingItem] or 0) then return j end
+      end
     end
-    if not active or active.paused then self:refresh(); self:syncClaims(); return end
-    local r=active; local ok,err=self:refresh()
-    if not ok then r.status='blocked'; r.error=err; return end
-    self:syncClaims()
+  end
+  local factoryAdmission
+  local function requestOf(j)
+    return j.productionRequest or j.key and j.key:match('^(request:%d+):op:')
+  end
+  local function committed(j)
+    if j.workerId or j.privateReady or j.production or j.factoryFlow then return true end
+    for _,ledger in ipairs({app.state.inventoryLedger or {},app.state.capacityLedger or {}}) do
+      local lease=(ledger.leases or {})[j.id];if lease and lease.status=='held' then return true end
+    end
+    for _,w in pairs(app.state.workers or {}) do if w.telemetry and w.telemetry.task==j.id then return true end end
+    return false
+  end
+  local function replan(r,reason,draining)
+    local records={{value=r,before=U.copy(r)}}
+    for _,j in pairs(s.jobs) do if factoryTypes[j.type] and requestOf(j)==r.id and j.status~='completed' and (not draining or not committed(j)) then
+      assert(not committed(j),'cannot replan committed manufacturing work')
+      records[#records+1]={value=j,before=U.copy(j)}
+    end end
+    for i=2,#records do local j=records[i].value;j.cancelled=true;j.status='completed';j.error=nil;j.retiredReason=reason end
+    if draining then r.factoryYield=reason;r.error=reason
+    else
+      r.plan=nil;r.targets=nil;r.materials=nil;r.acquired=nil;r.jobId=nil;r.jobIds=nil;r.privateCraft=nil;r.operation=1;r.factoryYield=nil
+      r.replans=(r.replans or 0)+1;r.priorityReplans=(r.priorityReplans or 0)+1;r.status='queued';r.error=reason
+      for item,id in pairs(r.acquisitions or {}) do
+        local group=((app.state.exploration or {}).groups or {})[id]
+        if not group or group.status=='completed' then r.acquisitions[item]=nil end
+      end
+    end
+    local called,ok,why=pcall(save)
+    if not called or not ok then
+      for _,record in ipairs(records) do
+        for k in pairs(record.value) do record.value[k]=nil end
+        for k,v in pairs(record.before) do record.value[k]=v end
+      end
+      error(called and why or ok,0)
+    end
+  end
+  local function admitFactory(r,op)
+    local own=false
+    for _,j in pairs(s.jobs) do if factoryTypes[j.type] and j.status~='completed' and committed(j) then
+      if requestOf(j)~=r.id then
+        local other=s.requests[requestOf(j)]
+        if other and not other.factoryYield and Scheduling.before(app.state,r,other) then
+          replan(other,'Draining committed batches for priority request '..r.id,true)
+        end
+        return false,'waiting for committed factory operation '..j.id
+      end
+      own=true
+    end end
+    if factoryAdmission and factoryAdmission~=r.id then return false,'waiting for priority factory request '..factoryAdmission end
+    if own then factoryAdmission=r.id;return true end
+    local completed=0
+    for _,j in pairs(s.jobs) do
+      local generation=j.productionGeneration or j.key and tonumber(j.key:match(':replan:(%d+)')) or 0
+      if requestOf(j)==r.id and not j.cancelled and j.status=='completed' and generation==(r.replans or 0)
+        and (j.productionOperation==r.operation or j.id==r.jobId) then completed=completed+(j.batches or 0) end
+    end
+    local remaining=math.max(0,op.batches-completed)
+    if remaining==0 then return true end
+    local handoff=awaitingSupply(r)
+    if handoff then
+      local why='waiting for finite supply handoff '..handoff.supplyId
+      if r.jobId or r.jobIds or r.privateCraft then replan(r,why) end
+      return false,why
+    end
+    if op.type=='CRAFT' and not craftOperationAvailable(r) then
+      local why='No available crafting-capable worker for '..op.item
+      if r.jobId or r.privateCraft then replan(r,why) end
+      return false,why
+    end
+    if op.type=='SMELT' and #(config.furnaces or {})==0 then return false,'No configured furnaces for '..op.item end
+    local inputs={};for item,n in pairs(op.inputs) do inputs[item]=n*remaining/op.batches end
+    if op.type=='SMELT' then
+      local fuel=config.smeltingFuelItem or 'minecraft:coal';local amount=0
+      for index,lane in ipairs(op.lanes or {{batches=remaining}}) do
+        local j=r.jobIds and s.jobs[r.jobIds[index]]
+        if not j or j.status~='completed' then amount=amount+math.ceil(lane.batches/require('autobuilder.factory.fuel').capacity(fuel)) end
+      end
+      inputs[fuel]=(inputs[fuel] or 0)+amount
+    end
+    for item,n in pairs(inputs) do
+      local available=self.ledger:view(item,app.mining.storage.counts).available-(config.turtleFuelReserveItems[item] or 0)
+      if n>available then
+        replan(r,'Replanning uncommitted manufacturing: insufficient unreserved '..item)
+        return false,r.error
+      end
+    end
+    -- Retire only empty preferences. Committed input, machinery and workers were
+    -- checked above and always drain under their original immutable contracts.
+    local losing={}
+    for _,j in pairs(s.jobs) do if factoryTypes[j.type] and j.status~='completed' and requestOf(j)~=r.id then
+      local other=requestOf(j);if other and s.requests[other] then losing[other]=true end
+    end end
+    for id in pairs(losing) do replan(s.requests[id],'Yielded uncommitted factory preference to '..r.id) end
+    factoryAdmission=r.id;return true
+  end
+  local function advanceRequest(r)
+    if r.factoryYield then
+      for _,j in pairs(s.jobs) do if factoryTypes[j.type] and requestOf(j)==r.id and j.status~='completed' and committed(j) then
+        r.error=r.factoryYield;save();return
+      end end
+      replan(r,r.factoryYield)
+    end
     if r.stockOnly then
       -- The beginner test is supplied by the user. It must not queue mining,
       -- crafting, or a global fuel-stock replenishment as a side effect.
@@ -302,6 +449,8 @@ function M.new(app,config,e,queue)
     end
     local op=r.plan.operations[r.operation]
     if op then
+      local admitted,why=admitFactory(r,op)
+      if not admitted then r.error=why;save();return end
       -- Finish/recover an existing supply batch before reserving factory storage.
       -- Otherwise a pre-grant supply journal could never finish once offers are
       -- gated by a newly queued factory operation.
@@ -343,7 +492,7 @@ function M.new(app,config,e,queue)
               inputs[fuel]=(inputs[fuel] or 0)+math.ceil(lane.batches/require('autobuilder.factory.fuel').capacity(fuel))
               local job=queue:submit('SMELT',{item=op.item,quantity=lane.batches,batches=lane.batches,
                 stockInputs=inputs,stockOutputs={[op.item]=lane.batches},
-                furnaceLane=lane.furnaceLane,productionRequest=r.id,productionOperation=r.operation},{},r.id..':op:'..r.operation..':lane:'..index..(r.replans and ':replan:'..r.replans or ''))
+                furnaceLane=lane.furnaceLane,productionRequest=r.id,productionOperation=r.operation,productionGeneration=r.replans or 0},{},r.id..':op:'..r.operation..':lane:'..index..(r.replans and ':replan:'..r.replans or ''))
               r.jobIds[index]=job.id; save()
             end
           end
@@ -366,7 +515,7 @@ function M.new(app,config,e,queue)
         end
         r.status='running'; r.error=nil
         if not job then
-          job=queue:submit(op.type,{item=op.item,quantity=op.quantity,batches=op.batches,
+          job=queue:submit(op.type,{item=op.item,quantity=op.quantity,batches=op.batches,productionRequest=r.id,productionOperation=r.operation,productionGeneration=r.replans or 0,
             stockInputs=U.copy(op.inputs),stockOutputs={[op.item]=op.quantity}},{},r.id..':op:'..r.operation..(r.replans and ':replan:'..r.replans or ''))
           r.jobId=job.id; save()
         elseif job.status=='completed' then r.operation=r.operation+1; r.jobId=nil; r.error=nil; save()
@@ -376,12 +525,37 @@ function M.new(app,config,e,queue)
       for item,n in pairs(r.plan.requirements or r.requirements) do
         if (app.mining.storage:getCount(item) or 0)<n then
           r.replans=(r.replans or 0)+1
-          if r.replans>3 then r.status='blocked'; r.error='Finished items were consumed externally; pause competing consumers and retry request'; save(); return end
+          if r.replans-(r.priorityReplans or 0)>3 then r.status='blocked'; r.error='Finished items were consumed externally; pause competing consumers and retry request'; save(); return end
           r.plan=nil; r.acquired=nil; r.operation=1; r.jobId=nil; r.jobIds=nil; r.status='running'; save(); return
         end
       end
       r.status='completed'; r.error=nil; save()
     end
+  end
+  function self:tick()
+    if self.working then return end
+    factoryAdmission=nil
+    local existing={};for id in pairs(s.jobs) do existing[id]=true end
+    local requests={}
+    for _,r in pairs(s.requests) do if r.status~='completed' and not r.paused then requests[#requests+1]=r end end
+    table.sort(requests,function(a,b) return Scheduling.before(app.state,a,b) end)
+    local ok,err=self:refresh()
+    if not ok then
+      for _,r in ipairs(requests) do r.status='blocked';r.error=err end
+      return
+    end
+    self:syncClaims(false)
+    -- Advance each independent request against one observed stock snapshot.
+    -- Existing physical jobs drain in their ordinary action/worker loops.
+    for _,r in ipairs(requests) do
+      -- Finish metadata-only boundaries before lower priorities can take a claim.
+      for _=1,#(r.plan and r.plan.operations or {})+1 do
+        local plan,operation=r.plan,r.operation
+        advanceRequest(r)
+        if r.status=='completed' or r.plan~=plan or r.operation==operation then break end
+      end
+    end
+    self:syncClaims(true,existing)
   end
   function self:describe(item)
     assert(U.shortString(item,128),'Usage: resource <namespaced-item>')

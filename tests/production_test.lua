@@ -266,12 +266,14 @@ test('production waits for configured farms and discovers newly configured farms
   eq(material.error,nil)
 end)
 test('production recovers after furnaces and crafting workers become available',function()
-  local app,p,q,config=productionFixture({[1]={name=mc('cobblestone'),count=4},[2]={name=mc('coal'),count=1}})
+  local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=4},[2]={name=mc('coal'),count=1}})
   config.furnaces={}; local r=p:request({[mc('stone_bricks')]=4}); p:tick()
   assert(r.error:find('No configured furnaces',1,true),tostring(r.error)); eq(next(q.state.jobs),nil)
   config.furnaces={'furnace'}; p:tick(); assert(r.jobIds)
-  local job=q.state.jobs[r.jobIds[1]]; eq(job.furnaceLane,'furnace'); job.status='completed'; p:tick(); p:tick()
-  assert(r.error:find('No online crafting',1,true),tostring(r.error)); eq(r.jobId,nil)
+  local job=q.state.jobs[r.jobIds[1]]; eq(job.furnaceLane,'furnace')
+  for _=1,30 do p:tick();p:step();h:smelt() end
+  eq(job.status,'completed')
+  assert(r.error:find('No available crafting',1,true),tostring(r.error)); eq(r.jobId,nil)
   app.state.workers['9']={id=9,online=true,telemetry={capabilities={crafting=true}}}; p:tick()
   eq(q.state.jobs[r.jobId].type,'CRAFT'); eq(r.error,nil); eq(r.status,'running')
 end)
@@ -332,7 +334,7 @@ test('material progress keeps live stock counts after acquisition while factory 
   local r=p:request({[mc('stone')]=4}); p:tick()
   h.inventories.store[2]={name=mc('cobblestone'),count=4}; p:tick()
   eq(r.materials[mc('cobblestone')].status,'ready')
-  h.inventories.store[2].count=2; p:tick()
+  p:syncClaims();h.limit=2;p:step();p:tick()
   eq(r.materials[mc('cobblestone')].count,2)
   eq(r.materials[mc('cobblestone')].status,'ready'); assert(r.acquired)
 end)
@@ -535,4 +537,143 @@ test('unowned farm switches capability contracts durably while preserving existi
    else eq(r.harvests[item],id);eq(old.cancelled,nil) end
   end
  end
+end)
+
+test('priority manufacturing admits one request bank and retires only losing unclaimed preferences',function()
+ local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=8},[2]={name=mc('coal'),count=2}})
+ q.state.projects.low={name='low',priority=20};q.state.projects.high={name='high',priority=80}
+ local low=p:request({[mc('stone')]=4},'project:low',{projectName='low'});p:tick()
+ local old=q.state.jobs[low.jobIds[1]];assert(old);eq(old.workerId,nil)
+ local high=p:request({[mc('stone')]=8},'project:high',{projectName='high'});p:tick()
+ eq(old.cancelled,true);eq(old.status,'completed')
+ assert(high.jobIds and #high.jobIds>0);eq(low.jobIds,nil)
+ for _,j in pairs(q.state.jobs) do if j.status~='completed' then eq(j.productionRequest,high.id) end end
+ p:step();assert(not tostring(high.error):find('duplicate ownership',1,true))
+end)
+test('priority handover preserves held factory inputs and chooses the next uncommitted batch',function()
+ local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=12},[2]={name=mc('coal'),count=3}})
+ q.state.projects.low={name='low',priority=20};q.state.projects.high={name='high',priority=80}
+ local low=p:request({[mc('stone')]=4},'project:low',{projectName='low'});p:tick();p:syncClaims()
+ local owned=q.state.jobs[low.jobIds[1]];assert(p.ledger.state.leases[owned.id]);local original=U.copy(owned)
+ local high=p:request({[mc('stone')]=8},'project:high',{projectName='high'});p:tick()
+ eq(high.jobIds,nil);eq(owned.cancelled,nil);eq(owned.quantity,original.quantity);eq(p.ledger.state.leases[owned.id].status,'held')
+ for _=1,100 do p:step();h:smelt();p:tick() end
+ assert(high.status=='completed',high.error);eq(low.status,'completed')
+end)
+
+test('uncommitted factory input loss replans acquisition instead of leaving a mining barrier',function()
+ local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=4},[2]={name=mc('coal'),count=1}})
+ local r=p:request({[mc('stone')]=4});p:tick();local old=q.state.jobs[r.jobIds[1]]
+ h.inventories.store[1]=nil;p:tick();eq(old.cancelled,true);eq(old.status,'completed');eq(r.plan,nil)
+ app.state.workers['2']=miningWorker(2,mc('cobblestone'),20);p:tick()
+ assert(r.mines[mc('cobblestone')]);eq(require('autobuilder.core.workflows').factoryPending(app.state),false)
+ h.inventories.store[1]={name=mc('cobblestone'),count=4}
+ for _=1,60 do p:tick();p:step();h:smelt() end;eq(r.status,'completed')
+end)
+test('failed unclaimed factory retirement restores live records and retry survives reboot',function()
+ local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=8},[2]={name=mc('coal'),count=2}})
+ q.state.projects.low={name='low',priority=20};q.state.projects.high={name='high',priority=80}
+ local low=p:request({[mc('stone')]=4},'project:low',{projectName='low'});p:tick();local old=q.state.jobs[low.jobIds[1]]
+ local high=p:request({[mc('stone')]=8},'project:high',{projectName='high'});local save=app.save
+ function app:save() if old.cancelled then return false,'disk full' end;return save(self) end
+ assert(not pcall(p.tick,p));eq(old.cancelled,nil);eq(old.status,'queued');assert(low.jobIds);assert(q.state.jobs[old.id]==old)
+ app.save=save;p:tick();eq(old.cancelled,true);assert(high.jobIds)
+ app.state=U.copy(app.saved);q=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,function() return app.now end,1)
+ p=require('autobuilder.core.production_service').new(app,config,h,q)
+ for _=1,80 do p:tick();p:step();h:smelt() end
+ eq(q.state.requests[high.id].status,'completed');eq(q.state.requests[low.id].status,'completed')
+ eq(require('autobuilder.factory.factory').count(h.inventories.store,mc('stone')),8)
+end)
+
+test('unavailable high priority crafting leaves feasible furnace admission and claims free',function()
+ for _,mode in ipairs({'blocked','busy','lost'}) do
+  local app,p,q,config,h=productionFixture({[1]={name=mc('stone'),count=4},[2]={name=mc('cobblestone'),count=8},[3]={name=mc('coal'),count=2}})
+  q.state.projects.low={name='low',priority=20};q.state.projects.high={name='high',priority=80}
+  local w={id=9,online=true,telemetry={status='idle',capabilities={crafting=true}}};app.state.workers['9']=w
+  local low=p:request({[mc('stone')]=8},'project:low',{projectName='low'});p:tick()
+  local high=p:request({[mc('stone_bricks')]=4},'project:high',{projectName='high'})
+  if mode=='lost' then p:tick();assert(high.jobId) end
+  w.telemetry.status=mode=='blocked' and 'blocked' or 'idle';w.telemetry.task=mode~='blocked' and 'unrelated' or nil
+  for _=1,80 do p:tick();p:step();h:smelt() end
+  eq(low.status,'completed');assert(h.calls>0);eq(high.status=='completed',false)
+  for _,j in pairs(q.state.jobs) do if j.productionRequest==high.id then eq(p.ledger.state.leases[j.id],nil) end end
+  w.telemetry.status='idle';w.telemetry.task=nil;p:tick();p:syncClaims();assert(high.jobId)
+  eq(p.ledger.state.leases[high.jobId].status,'held')
+ end
+end)
+test('priority operation transition admits ready next craft before lower new smelting',function()
+ local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=8},[2]={name=mc('coal'),count=2}})
+ app.state.workers['9']={id=9,online=true,telemetry={status='idle',capabilities={crafting=true}}}
+ q.state.projects.low={name='low',priority=20};q.state.projects.high={name='high',priority=80}
+ local high=p:request({[mc('stone_bricks')]=4},'project:high',{projectName='high'});p:tick();p:syncClaims()
+ local first=q.state.jobs[high.jobIds[1]]
+ local low=p:request({[mc('stone')]=8},'project:low',{projectName='low'})
+ for _=1,80 do p:step();h:smelt();if first.status=='completed' then break end end
+ eq(first.status,'completed');p:tick();p:syncClaims()
+ eq(high.operation,2);local craft=assert(q.state.jobs[high.jobId]);eq(craft.type,'CRAFT');eq(p.ledger.state.leases[craft.id].status,'held')
+ for _,j in pairs(q.state.jobs) do if j.productionRequest==low.id and j.status~='completed' then error('lower request admitted before ready high craft') end end
+end)
+test('shared mining follows highest active consumer and survives original project pause and reboot',function()
+ local app,p,q,config,h=productionFixture();local S=require('autobuilder.core.scheduling')
+ for name,priority in pairs({low=20,medium=50,high=80}) do q.state.projects[name]={name=name,priority=priority,jobs={}} end
+ local low=p:request({[mc('raw_iron')]=4},'project:low',{projectName='low'});p:tick();local id=low.mines[mc('raw_iron')]
+ local projects=require('autobuilder.blueprint.projects').new(app,config,h,q,p)
+ projects:command({'build','pause','low'});eq(app.state.jobs[id].paused,true)
+ local medium=p:request({[mc('cobblestone')]=4},'project:medium',{projectName='medium'})
+ local high=p:request({[mc('raw_iron')]=4},'project:high',{projectName='high'});p:tick()
+ eq(high.mines[mc('raw_iron')],id);eq(S.priority(app.state,app.state.jobs[id]),80);eq(app.state.jobs[id].paused,false)
+ app.state=U.copy(app.saved);q=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,function() return 0 end,1)
+ app.mining=require('autobuilder.core.mining_service').new(app,config,h,{send=function() return true end},function() return 0 end)
+ p=require('autobuilder.core.production_service').new(app,config,h,q)
+ local w=miningWorker(2,mc('raw_iron'),40);w.telemetry.miningResources={mc('raw_iron'),mc('cobblestone')};app.state.workers['2']=w
+ eq(app.mining.jobs:assign(app.state.workers,{}).id,id)
+ local j=app.state.jobs[id];local area=U.copy(j.miningArea)
+ projects=require('autobuilder.blueprint.projects').new(app,config,h,q,p)
+ projects:command({'build','resume','low'});projects:command({'build','pause','high'})
+ eq(j.paused,false);eq(S.priority(app.state,j),20);eq(j.workerId,2);eq(j.miningArea.min.x,area.min.x)
+ projects:command({'build','pause','low'});eq(j.paused,true);eq(j.workerId,2)
+end)
+
+local function handoffFixture()
+ local app,p,q,c,h=productionFixture({[1]={name=mc('glass'),count=1},[2]={name=mc('cobblestone'),count=4},[3]={name=mc('coal'),count=1}})
+ c.supply={inventory='stage',side='down',batch=1};c.supplyStations={}
+ local j={id='task:1:90',type='BUILD',status='blocked',workerId=2,missingItem=mc('glass'),missingCount=1,supplyId='batch:1'};q.state.jobs[j.id]=j
+ app.state.workers['2']={id=2,online=true,telemetry={task=j.id,status='blocked'}}
+ local ready=p:request({[mc('glass')]=1},'supply:'..j.id..':'..mc('glass'))
+ local nextRequest=p:request({[mc('stone')]=4})
+ return app,p,q,c,h,j,ready,nextRequest
+end
+test('completed finite supply gets a durable handoff before the next empty factory admission',function()
+ local app,p,q,c,h,j,ready,later=handoffFixture();p:tick()
+ eq(ready.status,'completed');eq(later.jobIds,nil);assert(require('autobuilder.core.workflows').canOfferSupply(app.state,j))
+ app.state=U.copy(app.saved);q=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,function() return app.now end,1)
+ p=require('autobuilder.core.production_service').new(app,c,h,q);j=q.state.jobs[j.id];later=q.state.requests[later.id]
+ p:tick();eq(later.jobIds,nil)
+ p:attemptedSupply(j);eq(app.saved.automation.jobs[j.id].supplyHandoffAttempted.request,ready.id)
+ p:tick();assert(later.jobIds,'failed station offer must not indefinitely block manufacturing')
+end)
+test('finite supply handoff ignores unavailable consumers and preserves committed manufacturing',function()
+ for _,mode in ipairs({'offline','paused','newer-request','lower-priority','committed'}) do
+  local app,p,q,c,h,j,ready,later=handoffFixture()
+  if mode=='offline' then app.state.workers['2'].online=false
+  elseif mode=='paused' then j.paused=true
+  elseif mode=='lower-priority' then q.state.projects.low={name='low',priority=20};j.project='low'
+  elseif mode=='newer-request' then ready.status='completed';p:request({[mc('glass')]=2},ready.key)
+  else j.paused=true;p:tick();p:syncClaims();j.paused=nil;assert(later.jobIds);assert(p.ledger.state.leases[later.jobIds[1]]) end
+  p:tick();assert(later.jobIds,mode..' incorrectly blocked manufacturing')
+ end
+end)
+test('finite supply handoff marker rolls back and a new completed request gets another opportunity',function()
+ local app,p,q,c,h,j,ready,later=handoffFixture();p:tick()
+ local save=app.save;app.save=function() return false,'disk full' end
+ assert(not pcall(p.attemptedSupply,p,j));eq(j.supplyHandoffAttempted,nil);app.save=save
+ p:attemptedSupply(j);local r=p:request({[mc('glass')]=1},ready.key);r.status='completed';app:save();p:tick()
+ eq(r.status,'completed');eq(later.jobIds,nil)
+ p:attemptedSupply(j);p:tick();assert(later.jobIds)
+end)
+test('finite supply handoff retires an empty factory preference before it becomes a barrier',function()
+ local app,p,q,c,h,j,ready,later=handoffFixture();j.paused=true;p:tick();local old=q.state.jobs[later.jobIds[1]]
+ eq(p.ledger.state.leases[old.id],nil);j.paused=nil;p:tick()
+ eq(old.cancelled,true);eq(later.jobIds,nil);assert(require('autobuilder.core.workflows').canOfferSupply(app.state,j))
+ p:attemptedSupply(j);p:tick();assert(later.jobIds);assert(later.jobIds[1]~=old.id)
 end)

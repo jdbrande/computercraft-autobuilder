@@ -187,6 +187,7 @@ function M.new(app,config,e,queue,production)
   local function settle(p,work,requests)
     local why=preparationPending(p) and 'Waiting for site preparation and access restoration' or nil;local active={}
     if app.chunks then app.chunks:reconcile() end
+    for rid in pairs(requests) do if s.requests[rid] then s.requests[rid].paused=paused end end
     for rid in pairs(requests) do
       local r=s.requests[rid]
       if r and r.status~='completed' then why=why or 'Waiting for production '..rid end
@@ -250,6 +251,7 @@ function M.new(app,config,e,queue,production)
       if j and j.status~='completed' then j.paused=paused;if not paused then j.resumeRequested=true end end
     end
     local _,requests=linked(p)
+    for rid in pairs(requests) do if s.requests[rid] then s.requests[rid].paused=paused end end
     for rid in pairs(requests) do
       local r=s.requests[rid]
       if r then
@@ -259,7 +261,7 @@ function M.new(app,config,e,queue,production)
           local j=(app.state.jobs or {})[id];local seen={}
           -- Assigned miners return safely; pause prevents claiming a new tunnel.
           while j and not seen[j.id] do
-            seen[j.id]=true;j.paused=paused;j=j.childId and app.state.jobs[j.childId]
+            seen[j.id]=true;require('autobuilder.core.scheduling').pauseSharedMine(app.state,j);j=j.childId and app.state.jobs[j.childId]
           end
         end
         for _,j in pairs(s.jobs) do
@@ -309,16 +311,26 @@ function M.new(app,config,e,queue,production)
     if action=='forecast' then
       self:forecast(p.name);app.state.view='forecast';save();return true,table.concat(app.state.forecastLines,'; ')
     end
-    if action=='status' then return true,p.name..': '..p.phase..' '..(p.completed or 0)..'/'..(p.total or 0)..' positions'..(p.error and '; '..p.error or '') end
+    if action=='priority' then
+      assert(#args==4,'Usage: build priority <name> <0..100>')
+      local n=require('autobuilder.core.scheduling').set(app.state,p.name,tonumber(args[4]),save)
+      return true,p.name..' priority='..n
+    end
+    if action=='status' then return true,p.name..' priority='..(p.priority or 50)..': '..p.phase..' '..(p.completed or 0)..'/'..(p.total or 0)..' positions'..(p.error and '; '..p.error or '') end
     if action=='pause' then
       p.paused=true
       pauseProduction(p,true)
-      for _,j in pairs(linked(p)) do if j.status~='completed' then j.paused=true end end
+      for _,j in pairs(linked(p)) do if j.status~='completed' then
+        if j.type=='MINE' and not j.exploration then require('autobuilder.core.scheduling').pauseSharedMine(app.state,j) else j.paused=true end
+      end end
       save(); return true,'Paused '..p.name
     elseif action=='resume' then
       p.paused=false
       pauseProduction(p,false)
-      for _,j in pairs(linked(p)) do j.paused=false;j.resumeRequested=true end
+      for _,j in pairs(linked(p)) do
+        if j.type=='MINE' and not j.exploration then require('autobuilder.core.scheduling').pauseSharedMine(app.state,j) else j.paused=false end
+        j.resumeRequested=true
+      end
       save(); return true,'Resuming '..p.name
     end
     if action=='survey' or action=='level' then
@@ -390,7 +402,7 @@ function M.new(app,config,e,queue,production)
       p.autoStart=nil
       save(); return true,p.phase..' '..p.name
     end
-    return false,'build import|analyze|materials|forecast|survey|level|auto|prepare|start|status|pause|resume|verify|repair|clear [name]'
+    return false,'build import|analyze|materials|forecast|survey|level|auto|prepare|start|status|priority|pause|resume|verify|repair|clear [name]'
   end
   function self:tick()
     if s.retiredBlueprints and #s.retiredBlueprints>0 then
@@ -400,7 +412,9 @@ function M.new(app,config,e,queue,production)
       for _,path in ipairs(s.retiredBlueprints) do if e.fs.exists(path) then e.fs.delete(path) end end
       s.retiredBlueprints=nil; save()
     end
-    for _,p in pairs(s.projects) do
+    local projects={};for _,p in pairs(s.projects) do projects[#projects+1]=p end
+    table.sort(projects,function(a,b) return require('autobuilder.core.scheduling').before(app.state,a,b) end)
+    for _,p in ipairs(projects) do
       local work,requests=linked(p);actors(p,work)
       if p.site and (p.site.status=='surveying' or p.phase=='surveying') then siteService:tick(p,sitePlan(p)) end
       if p.levelAfterSurvey and not p.paused and p.site and p.site.completed==sitePlan(p).regionCount and not next(p.site.active) then

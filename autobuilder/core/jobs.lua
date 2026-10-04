@@ -106,7 +106,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
     if not config or not (config.exploration or {}).enabled or exploration.paused or Coordination.factoryPending(state) or not counts then return end
     local attempts=0
     local groups={}; for _,g in pairs(exploration.groups) do if not g.paused and g.status~='completed' then groups[#groups+1]=g end end
-    table.sort(groups,function(a,b) return a.id<b.id end)
+    table.sort(groups,function(a,b) return require('autobuilder.core.scheduling').before(state,a,b) end)
     local ids={}; for _,w in pairs(workers) do ids[#ids+1]=w.id end
     table.sort(ids,function(a,b)
       local Scaling=require('autobuilder.core.scaling')
@@ -136,7 +136,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
           local wid=ids[wi]
           local w=workers[tostring(wid)]; local t=w.telemetry; local home=t and t.explorationHome
           if w.online and t and t.capabilities and t.capabilities.explorationV1 and E.home(home) and Materials.accepts(t.miningResources,g.item) then
-            local allocated,allocationError=admission({type='MINE'},w,workers,counts)
+            local allocated,allocationError=admission({type='MINE',exploration={groupId=g.id}},w,workers,counts)
             if not allocated then reason=allocationError;waiting=true
             elseif t.fuel~='unlimited' and t.fuel<2*#home.exitRoute+config.minimumFuelReserve+config.mining.returnMargin+2 then
               reason='insufficient round-trip fuel for worker '..wid
@@ -227,6 +227,8 @@ function M.new(state,save,clock,controllerId,config,chunks)
     return false
   end
   local function order(a,b)
+    local P=require('autobuilder.core.scheduling');local pa,pb=P.priority(state,a),P.priority(state,b)
+    if pa~=pb then return pa>pb end
     if a.priority~=b.priority then return a.priority>b.priority end
     return a.id<b.id
   end

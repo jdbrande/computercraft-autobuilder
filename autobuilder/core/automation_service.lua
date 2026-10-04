@@ -166,7 +166,9 @@ function M.new(app,config,e,network,clock)
     production:syncClaims()
     if clock()-last<config.heartbeatInterval then return true end
     last=clock()
-    for _,j in pairs(queue.state.jobs) do
+    local jobs={};for _,j in pairs(queue.state.jobs) do jobs[#jobs+1]=j end
+    table.sort(jobs,function(a,b) return require('autobuilder.core.scheduling').before(app.state,a,b) end)
+    for _,j in ipairs(jobs) do
       if j.workerId and j.status~='completed' and not j.workerFinished then
         if j.paused then send(j.workerId,'task_pause',{jobId=j.id})
         elseif j.status=='paused' or j.resumeRequested then send(j.workerId,'task_resume',{jobId=j.id}) end
@@ -175,16 +177,14 @@ function M.new(app,config,e,network,clock)
           self.supply=self.supply or require('autobuilder.storage.supply').new(queue.state,config,e,function() return app:save() end)
           local n,err,needsStock
           local staged=queue.state.supply
-          local pendingProduction
-          local supplyKey='supply:'..j.id..':'..j.missingItem
-          for _,request in pairs(queue.state.requests) do
-            if request.key==supplyKey and request.status~='completed' then pendingProduction=request.id;break end
-          end
+          local pendingProduction=production:supplyRequest(j)
+          local attempted=false
           local station=require('autobuilder.storage.supply').station(config,j.workerId)
           local worker=app.state.workers[tostring(j.workerId)];local t=worker and worker.telemetry
           if station.workerId and (not t or not (t.capabilities or {}).supplyStationV1 or not U.position(t.depot)
             or U.distance(t.depot,station.position)~=0 or station.side=='front' and t.depot.heading~=station.position.heading) then
             err='registered supply station requires a matching worker depot and supplyStationV1'
+            attempted=not pendingProduction
           elseif pendingProduction and not (staged and staged.jobId==j.supplyId and staged.owner==j.workerId and staged.offered) then
             -- Deposits can arrive before their acquisition group returns. Spending
             -- them now reopens the same stock target and mines a replacement.
@@ -194,7 +194,13 @@ function M.new(app,config,e,network,clock)
             -- must be able to drain staging and release the production barrier.
             if staged and staged.jobId==j.supplyId and staged.owner==j.workerId and staged.offered and not staged.intent then n=staged.amount
             else err='supply waits for the active factory operation' end
-          else n,err,needsStock=self.supply:offer(j.supplyId,j.workerId,j.missingItem,math.min(config.supply.batch,j.missingCount or config.supply.batch)) end
+          elseif production.working or production.reading then err='supply waits for the inventory operation'
+          elseif staged and (staged.jobId~=j.supplyId or staged.owner~=j.workerId) then err='supply chest is owned by another request'
+          else
+            n,err,needsStock=self.supply:offer(j.supplyId,j.workerId,j.missingItem,math.min(config.supply.batch,j.missingCount or config.supply.batch))
+            attempted=true
+          end
+          if attempted then production:attemptedSupply(j) end
           if n and n>0 then send(j.workerId,'task_supply',{jobId=j.id,supplyId=j.supplyId,item=j.missingItem,count=n,station=station.workerId and station or nil})
           else
             j.supplyError=err

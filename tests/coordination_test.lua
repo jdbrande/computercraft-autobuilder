@@ -267,3 +267,13 @@ test('health admission is rechecked after yielding coverage without leaking new 
     eq(q:assign(workers),nil);eq(j.workerId,nil)
   end
 end)
+test('builder supply follows project priority while an offered batch keeps its owner',function()
+ local f=runtime();local a=f.c.state.automation;local q=f.c.automation.queue
+ a.projects.low={name='low',priority=20};a.projects.high={name='high',priority=80}
+ local low=q:submit('BUILD',{project='low',blocks={block}},{})
+ local high=q:submit('BUILD',{project='high',blocks={{x=20,y=0,z=0,name=mc('stone'),state={}}}},{})
+ for _,pair in ipairs({{low,12},{high,13}}) do local j=pair[1];j.workerId=pair[2];j.status='blocked';j.missingItem=mc('stone');j.missingCount=4;j.supplyId=j.id..':supply:1' end
+ f.c:tick();eq(a.supply.owner,13);eq(a.supply.amount,4);eq(f.h.inventories.stage[1].count,4)
+ local moved=f.h.transfers;a.projects.low.priority=100;f.ce.now=f.ce.now+2;f.c:tick()
+ eq(a.supply.owner,13);eq(f.h.transfers,moved);eq(low.status,'blocked');assert(low.supplyError)
+end)
