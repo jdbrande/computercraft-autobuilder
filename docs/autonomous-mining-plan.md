@@ -1411,3 +1411,25 @@ Spec: [inventory protection design](infrastructure-protection-design.md).
   overlap with independent progress.
 - [x] Complete one final review/fix pass, full gates, report and integration;
   continue operator observability, traffic and combined fleet acceptance.
+
+
+## Milestone 0.38: operator observability
+
+Spec: [operator observability](operator-observability-design.md).
+
+### Task 79: Input, diagnostics, events and monitor
+
+- [x] Retain yielded operator events, correlate local command results and reject
+  overflowing whole lines; keep command execution in the main coroutine.
+- [x] Persist actionable traffic waits without changing cell ownership.
+- [x] Add post-checkpoint structured events, whole-record rotation and nonthrowing
+  logging failures; keep draft factory ledger claims silent.
+- [x] Add cached read-only dashboards, monitor paging/reconnection and command aliases.
+
+### Task 80: Operator acceptance and integration
+
+- [x] Run native monitor/input/logging acceptance during useful inventory traffic.
+- [x] Complete one whole-branch review and consolidated regression fixes, full
+  tests/release/diff gates, permanent report and ordered integration.
+- [ ] Continue mixed-role traffic, sustained load at shipped telemetry defaults
+  and final unassisted combined-fleet acceptance.

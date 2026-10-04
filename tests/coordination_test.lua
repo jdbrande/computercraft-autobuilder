@@ -278,3 +278,31 @@ test('builder supply follows project priority while an offered batch keeps its o
  local moved=f.h.transfers;a.projects.low.priority=100;f.ce.now=f.ce.now+2;f.c:tick()
  eq(a.supply.owner,13);eq(f.h.transfers,moved);eq(low.status,'blocked');assert(low.supplyError)
 end)
+
+test('traffic diagnostics retain first wait across retries restart and offline owners then clear on progress',function()
+ local U=require('autobuilder.core.util');local W=require('autobuilder.core.workflows')
+ local now,saves=10,0;local state={jobs={},workers={}}
+ local c=require('tests.loaded_config').load({});local function save() saves=saves+1;return true end
+ local q=W.new(state,save,function() return now end,7,nil,c)
+ local j=q:submit('VERIFY',{blocks={{x=1,y=0,z=0,name='minecraft:stone',state={}}}});j.workerId=12;j.status='running'
+ local from={x=0,y=1,z=0};local target={x=1,y=1,z=0}
+ local workers={['13']={id=13,online=false,telemetry={position={known=true,x=1,y=1,z=0}}}}
+ local events={};q.onTrafficChange=function(kind,job) events[#events+1]={kind=kind,wait=U.copy(job.trafficWait)} end
+ eq(q:reserve(12,j.id,from,target,workers),false)
+ eq(j.trafficWait.since,10);eq(j.trafficWait.blocker,13);eq(j.trafficWait.target.x,1);assert(j.trafficWait.remedy:find('13',1,true))
+ local saved=saves;now=20;eq(q:reserve(12,j.id,from,target,workers),false);eq(saves,saved);eq(#events,1)
+ state=U.copy(state);q=W.new(state,save,function() return now end,7,nil,c);j=q.state.jobs[j.id];q.onTrafficChange=function(kind) events[#events+1]={kind=kind} end
+ now=41;eq(q:reserve(12,j.id,from,target,workers),false);eq(j.trafficWait.since,10);eq(j.trafficWait.prolonged,true);eq(#events,2)
+ eq(workers['13'].online,false);eq(j.workerId,12)
+ now=45;eq(q:reserve(12,j.id,from,target,workers),false);eq(#events,2)
+ assert(q:reserve(12,j.id,from,{x=0,y=1,z=1},workers));eq(j.trafficWait,nil);eq(#events,3);eq(events[3].kind,'traffic_clear')
+end)
+
+test('failed traffic diagnostic checkpoints roll back and never emit success events',function()
+ local qstate={jobs={},workers={}};local fail=false;local events=0
+ local q=require('autobuilder.core.workflows').new(qstate,function() if fail then error('disk failed') end;return true end,function() return 10 end,7,nil,require('tests.loaded_config').load({}))
+ local j=q:submit('VERIFY',{blocks={{x=1,y=0,z=0,name='minecraft:stone',state={}}}});j.workerId=12;j.status='running'
+ q.onTrafficChange=function() events=events+1 end;fail=true
+ local ok,why=pcall(q.reserve,q,12,j.id,{x=0,y=1,z=0},{x=1,y=1,z=0},{['13']={id=13,telemetry={position={known=true,x=1,y=1,z=0}}}})
+ eq(ok,false);assert(tostring(why):find('disk failed',1,true));eq(j.trafficWait,nil);eq(events,0)
+end)

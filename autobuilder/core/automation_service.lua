@@ -3,7 +3,9 @@ local Coordination=require('autobuilder.core.workflows')
 local M={}
 function M.new(app,config,e,network,clock)
   if config.role=='worker' then return require('autobuilder.workers.executor').new(app,config,e,network,clock) end
-  local queue=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,app.state.id,app.chunks,config)
+  local function record(kind,fields) if app.record then return app:record(kind,fields) end end
+  local queue=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,clock,app.state.id,app.chunks,config,record)
+  queue.onTrafficChange=function(kind,j) record(kind,{job=j.id,worker=j.workerId,project=j.project,wait=U.copy(j.trafficWait)}) end
   local production=require('autobuilder.core.production_service').new(app,config,e,queue)
   local fuel=require('autobuilder.core.fuel_service').new(app,config,e,queue,production,clock)
   local rescue=require('autobuilder.core.fuel_rescue_service').new(app,config,e,queue,production,network,clock)
@@ -136,7 +138,7 @@ function M.new(app,config,e,network,clock)
       for _,j in pairs(jobs) do require('autobuilder.core.scaling').record(app.state,j,function() return app:save() end,clock()) end
     end
     local _,events=require('autobuilder.core.scaling').update(app.state,config,app.mining.storage.counts,clock(),function() return app:save() end)
-    for _,event in ipairs(events) do app:report('INFO','Fleet role='..event.role..' target='..event.target..' active='..event.active..' reason='..event.reason) end
+    for _,event in ipairs(events) do record('role_allocation',event) end
     if app.state.view=='fleet' then app.state.fleetLines=require('autobuilder.core.scaling').describe(app.state,config,app.mining.storage.counts,clock()) end
     if config.automation.enabled then fuel:tick(); rescue:tick();production:inventoryAction(function() recovery:tick() end) end
   end

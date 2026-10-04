@@ -1815,6 +1815,28 @@ Final-source976 Lua/20 Python tests, release/diff checks and both native trials
 passed. Donor quarantine, controlled courier refueling and exact inventory receipts
 retain their documented limits. No second review was performed.
 
+### 0.38 started — operator observability
+
+The0.37 geometry review/native gates continue. The next independent implementation
+adds durable traffic waits, reliable queued operator input, correlated local script
+commands, structured significant events and a native monitor dashboard using cached
+state. Design: `operator-observability-design.md`. No routing rewrite is assumed;
+contention/load acceptance remains a later gate.
+
+###0.38 input and traffic implementation
+
+Added bounded operator collection alongside network retention. Three regressions
+failed on the previous runtime and now pass: yielded keyboard/paste/script delivery,
+whole-line overflow including prior text, and oversized-command rejection. Queue
+execution still uses the real dispatcher; tests count actual invocations and
+verify ordinary scaling mutations. Local script results are correlated and bounded.
+
+Traffic waits persist their first timestamp, target, reason and blocking worker,
+survive restart/offline ownership, mark prolonged waits once, and clear on granted
+progress. Failed checkpoints roll back without emitting an event. Focused runtime
+and coordination suites pass. Three Python tests independently parse rotated JSONL,
+check escaped messages and whole-record byte bounds, and exercise disk errors.
+Structured event integration and monitor views remain current work.
 ###0.37 final review correction
 
 The single final review found that512 explicit registrations plus an inferred
@@ -1832,6 +1854,17 @@ both casings and all seven sentinel inventories. Five computers are off and six
 temporary tickets removed. Protected work intentionally remains paused/owned;
 its traffic wait is not reported as fleet drain. Permanent candidate evidence is
 in [0.37 validation](validation-0.37.0.md). Final-source full Lua gate continues.
+
+### 0.38 monitor and event integration
+
+Added optional native monitor paging, bounded redraw and reconnect handling, a
+shared cached dashboard and fleet/project/storage aliases. Rendering does not
+query inventory APIs or analyze blueprints; display rows stay outside checkpoints.
+Structured event hooks follow successful domain saves and suppress duplicates.
+Logging failures cannot unwind committed inventory; explicit regressions cover
+that boundary and failed production checkpoints.23 Python tests pass, including
+independent JSON parsing, bounds and rotation. Focused Lua integration passes;
+native acceptance, final review and full gates remain pending.
 ### 0.36 final-gate correction — finite supply handoff
 
 The first full candidate run passed997/998 Lua tests; its streaming overlap case
@@ -1852,6 +1885,38 @@ parallel acquisition runs earlier. Its focused full-chain case passed unchanged
 assertions and exact final material accounting. Final full gates are restarting;
 0.36 is not yet accepted.
 
+### 0.38 consolidated review corrections
+
+The single final review found four reproducible issues: overflow could replace an
+operator queue while its drain handler yielded and cause `unpack(nil)`; throttled
+monitor draws could clear a real disconnect warning; a quick identical monitor
+replacement could retain the previous display signature and remain blank; and
+retired streamed production requests retained event-projection snapshots.
+
+Each regression failed before correction. Drains now check the live queue, monitor
+results persist through throttling and attachment events invalidate rendering, and
+production ticks prune retired request projections. Runtime/dashboard/production
+focused suites passed. Full gates and final-source native checks are in progress.
+
+The first native observation build verified three blocks, parsed148 structured
+events and exercised keyboard/script input during real peripheral waits, paging,
+controller restart and deliberate input overflow. Fixture corrections supplied the
+actual CraftOS Enter code257 (rather than28), the Crafty's accessible wired modem
+and its missing depot setting; no finished materials were injected. The monitor
+warning defect above was also observed natively. Permanent acceptance remains
+pending final-source monitor/overflow checks and complete gates.
+
+### 0.38 final-source native checks passed
+
+Final source7e8a092 survived native overflow during an actual yielding `resources`
+command: one successful running reply, two explicit queued-command rejections,
+no network drops and no residual backlog. Fresh keyboard/script input recovered.
+Monitor disconnect errors persisted; reconnect and rapid identical replacement
+repainted. The3/3 build and exact surplus were independently inspected, both
+workers settled, computers265–267 shut down and6 force-load tickets removed.
+[Candidate report](validation-0.38.0.md) records fixture corrections, metrics and
+the distinction between automated resize evidence and native monitor recovery.
+Complete gates remain active; the candidate is not yet accepted.
 -0.36 accepted after the repeated clean-source gate passed1,003/1,003 Lua tests
   with20/20 Python tests and release/diff checks. No unintended tracked or untracked
   files were present; ignored native audit artifacts remain local.
@@ -1859,3 +1924,7 @@ assertions and exact final material accounting. Final full gates are restarting;
 -0.37 final full gate passed1,015/1,015 Lua tests and20/20 Python tests. Merging
 accepted0.36 documentation changed no implementation/test/release files relative
 to the tested source. Final release/diff checks passed and status was clean.
+
+-0.38 accepted: the final implementation passed1,032/1,032 Lua and23/23 Python
+  tests. Final-source native input/monitor recovery, release generation/check and
+  whitespace checks passed. Accepted0.37 documentation merged without source changes.

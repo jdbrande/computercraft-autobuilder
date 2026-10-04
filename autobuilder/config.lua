@@ -7,6 +7,7 @@ M.defaults={
   checkpointInterval=5, gps={enabled=true,timeout=2,interval=30},
   dataDir='/autobuilder/data', logDir='/autobuilder/logs',
   log={level='INFO',maxBytes=65536,backups=3},
+  monitor={name='',scale=0.5,interval=1},
   minimumFuelReserve=100, movementRetries=2, maxTravelDistance=1024,
   inventoryAreas={}, restrictedAreas={}, locations={}, capabilities={telemetry=true},
   maxWorkers=128, dedupLimit=512, dedupTTL=120,
@@ -71,6 +72,7 @@ function M.load(overrides)
   assert(type(c.gps.enabled)=='boolean' and U.finite(c.gps.timeout) and c.gps.timeout>0 and U.finite(c.gps.interval) and c.gps.interval>0,'invalid GPS config')
   for _,k in ipairs({'dataDir','logDir'}) do assert(type(c[k])=='string' and c[k]:sub(1,1)=='/',k..' must be absolute') end
   assert(({DEBUG=true,INFO=true,WARN=true,ERROR=true})[c.log.level],'invalid log level')
+  assert(type(c.monitor.name)=='string' and #c.monitor.name<=128 and U.finite(c.monitor.scale) and c.monitor.scale>=0.5 and c.monitor.scale<=5 and c.monitor.scale*2%1==0 and U.finite(c.monitor.interval) and c.monitor.interval>=1 and c.monitor.interval<=60,'invalid monitor settings')
   assert(U.integer(c.log.maxBytes) and c.log.maxBytes>=40 and U.integer(c.log.backups) and c.log.backups>=1 and c.log.backups<=10,'invalid log limits')
   for _,k in ipairs({'depot','initialPosition'}) do
     if c[k] then assert(U.position(c[k]),'invalid '..k); assert(not c[k].heading or U.heading(c[k].heading),'invalid heading') end

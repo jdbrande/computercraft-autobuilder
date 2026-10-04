@@ -12,6 +12,7 @@ local M={}
 function M.new(app,config,e,network,clock)
   local s=app.state; local self={}; local lastSend=-math.huge; local lastStorage=-math.huge
   local function save() return app:save() end
+  local function record(kind,fields) if app.record then return app:record(kind,fields) end end
   local function send(to,kind,payload)
     local ok,err=network:send(to,kind,payload)
     if not ok then app:report('WARN',err) end
@@ -19,7 +20,7 @@ function M.new(app,config,e,network,clock)
   end
   if s.role=='controller' then
     self.storage=require('autobuilder.storage.storage').new(e.peripheral,config.storageInventories)
-    self.jobs=require('autobuilder.core.jobs').new(s,save,clock,s.id,config,app.chunks)
+    self.jobs=require('autobuilder.core.jobs').new(s,save,clock,s.id,config,app.chunks,record)
     if (config.exploration or {}).enabled then
       local gridChanged=s.exploration.gridBase and not same(s.exploration.gridBase,config.exploration.base)
       local settingsChanged=s.exploration.settingsRevision~=nil and s.exploration.settingsRevision~=(config.exploration.revision or 0)
@@ -35,8 +36,13 @@ function M.new(app,config,e,network,clock)
       if s.exploration.bounds then config.exploration.bounds=U.copy(s.exploration.bounds); assert(E.validate(config.exploration)) end
     end
     function self:refresh()
+      local prior=s.resourceCounts or {};local priorError=s.storageError
       local ok,err=self.storage:refresh(); s.storageError=err
       if ok then s.resourceCounts=U.copy(self.storage.counts) else s.resourceCounts={} end
+      if ok then
+        local names={};for item in pairs(prior) do names[item]=true end;for item in pairs(s.resourceCounts) do names[item]=true end
+        for item in pairs(names) do local count=s.resourceCounts[item] or 0;if priorError or count~=(prior[item] or 0) then record('stock_observed',{item=item,count=count}) end end
+      elseif err~=priorError then record('storage_unavailable',{error=err}) end
       lastStorage=clock(); return ok,err
     end
     function self:command(line)

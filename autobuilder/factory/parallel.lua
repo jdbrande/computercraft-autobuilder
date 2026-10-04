@@ -3,6 +3,7 @@ local F=require('autobuilder.factory.factory')
 local Q=require('autobuilder.core.workflows')
 local M={}
 function M.new(app,config,e,queue,production)
+  local function record(kind,fields) if app.record then return app:record(kind,fields) end end
   local save=function() return app:save() end
   local capacity=require('autobuilder.storage.capacity').new(app.state,save)
   local self={capacity=capacity,cursor=0}
@@ -176,6 +177,7 @@ function M.new(app,config,e,queue,production)
       capacity.state.leases[job.id]=nil;production.ledger.state.leases[job.id]=stock
       for k in pairs(job) do job[k]=nil end;for k,v in pairs(before) do job[k]=v end;error(why,0)
     end
+    record('stock_claim',{lease=job.id,job=job.id,worker=job.preferredWorker,kind='CRAFT'})
     return lease
   end
   local function advance(job)
@@ -192,6 +194,7 @@ function M.new(app,config,e,queue,production)
       if delivered==job.quantity then
         capacity:release(job.id)
         F.commit(job,save,function() job.status='completed'; job.error=nil; job.factoryCompletedAt=now() end)
+        record('task_state',{job=job.id,worker=job.workerId,kind='CRAFT',status='completed',item=job.item,count=job.quantity})
         return 'complete'
       end
       local lease=assert(capacity.state.leases[job.id],'missing craft capacity claim')
@@ -250,12 +253,15 @@ function M.new(app,config,e,queue,production)
       local pending=flow and (flow.stage.intent or flow.collect.intent)
       local allowed,reason=Q.factoryCanRun(app.state,job,true)
       if pending or allowed then
+        local oldStatus,oldError=job.status,job.error
         local status,why=F.protect(function() return advance(job) end)
-        if status=='blocked' then job.error=why; job.status='blocked'; assert(save()) end
+        if status=='blocked' then job.error=why; job.status='blocked'; assert(save())
+          if oldStatus~=job.status or oldError~=why then record('task_state',{job=job.id,kind='CRAFT',status=job.status,error=why}) end
+        end
         production:syncClaims(false)
         flow=job.factoryFlow
         return status~='blocked' or flow and (flow.stage.intent or flow.collect.intent)~=nil
-      elseif job.error~=reason then job.error=reason; assert(save()) end
+      elseif job.error~=reason then job.error=reason; assert(save());record('task_state',{job=job.id,kind='CRAFT',status=job.status,error=reason}) end
     end
     -- A waiting private batch must not starve the existing shared owner whose
     -- completion will make that batch eligible.

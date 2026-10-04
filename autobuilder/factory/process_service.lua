@@ -5,6 +5,7 @@ local Registry=require('autobuilder.factory.processors')
 local M={}
 function M.new(app,config,e,queue,production)
  local save=function() return app:save() end
+ local function record(kind,fields) if app.record then return app:record(kind,fields) end end
  local capacity=require('autobuilder.storage.capacity').new(app.state,save)
  local self={cursor=0}
  function self:schedule(r,op)
@@ -52,15 +53,19 @@ function M.new(app,config,e,queue,production)
    capacity.state.leases[j.id]=nil;production.ledger.state.leases[j.id]=stock
    for k in pairs(j) do j[k]=nil end;for k,v in pairs(before) do j[k]=v end;error(err,0)
   end
+  record('stock_claim',{lease=j.id,job=j.id,machine=j.machineId})
  end
  local function execute(j,reconcile)
+  local oldStatus,oldError=j.status,j.error
   local status,why=F.protect(function()
    if reconcile then return F.reconcileTransfer(j.production,e,save) end
    claim(j);local allowed,reason=Q.factoryCanRun(app.state,j);assert(allowed,reason)
    return require('autobuilder.factory.processing').new(j,e,config,save,capacity):step()
   end)
   j.status=status=='complete' and 'completed' or status=='blocked' and 'blocked' or 'running';j.error=why
-  assert(save());production:syncClaims(false);return status~='blocked' or j.production and j.production.intent~=nil
+  assert(save())
+  if oldStatus~=j.status or oldError~=j.error then record('task_state',{job=j.id,kind=j.type,status=j.status,error=j.error,item=j.item,machine=j.machineId}) end
+  production:syncClaims(false);return status~='blocked' or j.production and j.production.intent~=nil
  end
  function self:step()
   local jobs={}

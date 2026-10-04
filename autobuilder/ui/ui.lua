@@ -3,7 +3,7 @@ local function position(p)
   if not p or not p.known then return 'position unknown' end
   return string.format('%d,%d,%d %s %s',p.x,p.y,p.z,p.heading or '?',p.source or 'local')
 end
-function M.draw(term,state,agent,page,input)
+function M.draw(term,state,agent,page,input,dashboardLines,monitorError)
   local width,height=term.getSize(); local lines={}
   local function line(s) lines[#lines+1]=tostring(s) end
   line('AUTOBUILDER | '..state.role..' '..state.id)
@@ -25,9 +25,9 @@ function M.draw(term,state,agent,page,input)
     local perPage=math.max(1,height-10); local pages=math.max(1,math.ceil(#details/perPage)); page=(page or 0)%pages
     for i=page*perPage+1,math.min(#details,(page+1)*perPage) do line(details[i]) end
     if pages>1 then line('Help '..(page+1)..'/'..pages..' - Shift N: next page') end
-  elseif state.view=='chunks' or state.role=='controller' and (state.view=='fuel' or state.view=='factory' or state.view=='logistics' or state.view=='fleet' or state.view=='forecast') then
+  elseif state.view=='chunks' or state.role=='controller' and (state.view=='fuel' or state.view=='factory' or state.view=='logistics' or state.view=='fleet' or state.view=='forecast' or state.view=='dashboard') then
     local details={}
-    for _,text in ipairs(state[state.view..'Lines'] or {'Type '..state.view..' to refresh status.'}) do
+    for _,text in ipairs((state.view=='dashboard' and dashboardLines or state[state.view..'Lines']) or {'Type '..state.view..' to refresh status.'}) do
       while #text>width do details[#details+1]=text:sub(1,width); text=text:sub(width+1) end
       details[#details+1]=text
     end
@@ -170,7 +170,7 @@ function M.draw(term,state,agent,page,input)
   end
   term.clear()
   for y=1,math.min(#lines,math.max(1,height-3)) do term.setCursorPos(1,y); term.write(lines[y]:sub(1,width)) end
-  local footer={state.commandResult or 'Type help for instructions.','Q: shell | Shift N/P: pages | Enter: run','> '..(input or '')}
+  local footer={monitorError and ('Monitor: '..monitorError) or state.commandResult or 'Type help for instructions.','Q: shell | Shift N/P: pages | Enter: run','> '..(input or '')}
   for i=1,3 do if height-3+i>=1 then term.setCursorPos(1,height-3+i); term.write(footer[i]:sub(1,width)) end end
 end
 return M

@@ -11,7 +11,8 @@ local function quantities(values)
   end
   return out
 end
-function M.new(state,save)
+function M.new(state,save,record)
+  record=record or function() end
   assert(type(state)=='table' and type(save)=='function','inventory state and persistence required')
   state.inventoryLedger=state.inventoryLedger or {leases={}}
   local s=state.inventoryLedger; assert(type(s.leases)=='table','invalid inventory ledger')
@@ -58,7 +59,7 @@ function M.new(state,save)
     end
     local lease={id=id,inputs=inputs,outputs=outputs,project=options.project,status='held',
       withdrawn={},delivered={},transit={},sequence=0}
-    commit(id,lease); return U.copy(lease)
+    commit(id,lease);record('stock_claim',{lease=id,project=lease.project}); return U.copy(lease)
   end
   function self:receipt(id,withdrawn,delivered,transit,sequence)
     local old=assert(s.leases[id],'unknown inventory claim')
@@ -78,20 +79,24 @@ function M.new(state,save)
     for item,n in pairs(old.withdrawn) do assert((withdrawn[item] or 0)>=n,'inventory withdrawal regressed') end
     for item,n in pairs(old.delivered) do assert((delivered[item] or 0)>=n,'inventory delivery regressed') end
     local lease=U.copy(old); lease.withdrawn=withdrawn; lease.delivered=delivered; lease.transit=transit; lease.sequence=sequence
-    commit(id,lease); return true
+    commit(id,lease)
+    for item,n in pairs(delivered) do local delta=n-(old.delivered[item] or 0);if delta>0 then
+      record('delivery',{lease=id,project=lease.project,item=item,count=delta,total=n,sequence=sequence,destination='managed_inventory'})
+    end end
+    return true
   end
   function self:release(id)
     local old=assert(s.leases[id],'unknown inventory claim')
     if old.status=='released' then return true end
     assert(old.status=='held' and not next(old.transit),'inventory transit still owned')
     for item,n in pairs(old.outputs) do assert((old.delivered[item] or 0)==n,'inventory output not delivered') end
-    local lease=U.copy(old); lease.status='released'; commit(id,lease); return true
+    local lease=U.copy(old); lease.status='released'; commit(id,lease);record('stock_release',{lease=id,project=lease.project}); return true
   end
   function self:cancel(id)
     local old=assert(s.leases[id],'unknown inventory claim')
     if old.status=='cancelled' then return true end
     assert(old.status=='held' and not next(old.withdrawn) and not next(old.delivered) and not next(old.transit),'cannot cancel started inventory claim')
-    local lease=U.copy(old); lease.status='cancelled'; commit(id,lease); return true
+    local lease=U.copy(old); lease.status='cancelled'; commit(id,lease);record('stock_cancel',{lease=id,project=lease.project}); return true
   end
   return self
 end

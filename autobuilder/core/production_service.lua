@@ -7,7 +7,17 @@ local Scheduling=require('autobuilder.core.scheduling')
 function M.new(app,config,e,queue)
   local s=queue.state; s.requestSequence=s.requestSequence or 0
   local self={machines={},laneCursor=0}; local save=function() return app:save() end
-  self.ledger=require('autobuilder.storage.ledger').new(app.state,save)
+  local function record(kind,fields)
+    if fields.lease then
+      local j=s.jobs[fields.lease]
+      if j then
+        fields.job=j.id;fields.worker=j.workerId;fields.project=j.project;fields.request=j.productionRequest
+        if kind=='delivery' then fields.destination=j.logistics and j.logistics.destination.inventory or 'shared_stock' end
+      end
+    end
+    if app.record then return app:record(kind,fields) end
+  end
+  self.ledger=require('autobuilder.storage.ledger').new(app.state,save,record)
   self.processors=require('autobuilder.factory.process_service').new(app,config,e,queue,self)
   self.parallel=require('autobuilder.factory.parallel').new(app,config,e,queue,self)
   self.logistics=require('autobuilder.core.logistics_service').new(app,config,e,queue,self)
@@ -34,6 +44,8 @@ function M.new(app,config,e,queue)
       s.requests[r.id]=nil; s.requestSequence=s.requestSequence-1
       error(called and (err or 'Failed to save resource request') or ok,0)
     end
+    record('production_request',{request=r.id,project=r.project})
+    for item,n in pairs(requirements) do record('requirement',{request=r.id,project=r.project,item=item,count=n}) end
     return r
   end
   function self:refresh()
@@ -407,10 +419,35 @@ function M.new(app,config,e,queue)
     for id in pairs(losing) do replan(s.requests[id],'Yielded uncommitted factory preference to '..r.id) end
     factoryAdmission=r.id;return true
   end
+  local reported={}
+  local function projection(r)
+    local value={status=r.status,error=r.error,operation=r.operation,materials={}}
+    for item,m in pairs(r.materials or {}) do
+      value.materials[item]={status=m.status,error=m.error,provider=m.provider,target=m.target,count=m.count}
+    end
+    return value
+  end
+  for id,r in pairs(s.requests) do reported[id]=projection(r) end
+  local function reportRequest(r)
+    local value=projection(r);local old=reported[r.id]
+    if not require('autobuilder.factory.factory').equal(old,value) then
+      if not old or old.status~=r.status or old.error~=r.error or old.operation~=r.operation then
+        record('production_state',{request=r.id,project=r.project,status=r.status,error=r.error,operation=r.operation})
+      end
+      for item,m in pairs(value.materials) do
+        if not old or not require('autobuilder.factory.factory').equal((old.materials or {})[item],m) then
+          record('shortage',{request=r.id,project=r.project,item=item,status=m.status,error=m.error,provider=m.provider,required=m.target,observed=m.count})
+        end
+      end
+      for item in pairs(old and old.materials or {}) do if not value.materials[item] then record('shortage_resolved',{request=r.id,project=r.project,item=item}) end end
+      reported[r.id]=value
+    end
+  end
+  local function saveRequest(r) local ok,why=save();assert(ok,why);reportRequest(r) end
   local function advanceRequest(r)
     if r.factoryYield then
       for _,j in pairs(s.jobs) do if factoryTypes[j.type] and requestOf(j)==r.id and j.status~='completed' and committed(j) then
-        r.error=r.factoryYield;save();return
+        r.error=r.factoryYield;saveRequest(r);return
       end end
       replan(r,r.factoryYield)
     end
@@ -425,20 +462,20 @@ function M.new(app,config,e,queue)
           ready=false; blocked(material,'Put '..(need-have)..' more '..item:gsub('^.-:',''):gsub('_',' ')..' in the stock chest.')
         else material.status='ready' end
       end
-      if not ready then r.status='blocked'; r.error=acquisitionSummary(r); save(); return end
-      r.status='completed'; r.error=nil; save(); return
+      if not ready then r.status='blocked'; r.error=acquisitionSummary(r); saveRequest(r); return end
+      r.status='completed'; r.error=nil; saveRequest(r); return
     end
     if not r.plan then
       local plan=require('autobuilder.blueprint.planner').expand(r.requirements,app.mining.storage.counts,config)
       r.plan=plan; r.targets={}; r.materials={}
       for item,n in pairs(plan.missing) do r.targets[item]=(app.mining.storage.counts[item] or 0)+n end
-      r.status='running'; save()
+      r.status='running'; saveRequest(r)
     end
     if not r.acquired then
       local ready=true
       for item,target in pairs(r.targets) do if not acquire(r,item,target) then ready=false end end
-      if not ready then r.status='blocked'; r.error=acquisitionSummary(r); save(); return end
-      r.acquired=true; r.status='running'; r.error=nil; save()
+      if not ready then r.status='blocked'; r.error=acquisitionSummary(r); saveRequest(r); return end
+      r.acquired=true; r.status='running'; r.error=nil; saveRequest(r)
     end
     -- Ready records describe completed acquisition, even as the factory spends
     -- those inputs. Continue showing their live counts without mining them again.
@@ -450,18 +487,18 @@ function M.new(app,config,e,queue)
     local op=r.plan.operations[r.operation]
     if op then
       local admitted,why=admitFactory(r,op)
-      if not admitted then r.error=why;save();return end
+      if not admitted then r.error=why;saveRequest(r);return end
       -- Finish/recover an existing supply batch before reserving factory storage.
       -- Otherwise a pre-grant supply journal could never finish once offers are
       -- gated by a newly queued factory operation.
       if not r.jobId and not r.jobIds and s.supply then
-        r.error='waiting for outstanding supply batch '..tostring(s.supply.jobId); save(); return
+        r.error='waiting for outstanding supply batch '..tostring(s.supply.jobId); saveRequest(r); return
       end
       if op.type=='PROCESS' then
-        self.processors:schedule(r,op)
+        self.processors:schedule(r,op);reportRequest(r)
       elseif op.type=='SMELT' then
         if not r.jobIds and not r.jobId and #(config.furnaces or {})==0 then
-          r.status='blocked'; r.error='No configured furnaces for '..op.item; save(); return
+          r.status='blocked'; r.error='No configured furnaces for '..op.item; saveRequest(r); return
         end
         -- A request may have been planned before its first furnace was configured.
         if not r.jobIds and not r.jobId and op.lanes then
@@ -480,7 +517,7 @@ function M.new(app,config,e,queue)
             op.lanes=op.lanes or {{batches=op.batches,furnaceLane=config.furnaces[1]}}
             r.jobIds={}
           end
-          save()
+          saveRequest(r)
         end
         local lanes=op.lanes or {{batches=op.batches}}
         if not r.jobId then
@@ -493,7 +530,7 @@ function M.new(app,config,e,queue)
               local job=queue:submit('SMELT',{item=op.item,quantity=lane.batches,batches=lane.batches,
                 stockInputs=inputs,stockOutputs={[op.item]=lane.batches},
                 furnaceLane=lane.furnaceLane,productionRequest=r.id,productionOperation=r.operation,productionGeneration=r.replans or 0},{},r.id..':op:'..r.operation..':lane:'..index..(r.replans and ':replan:'..r.replans or ''))
-              r.jobIds[index]=job.id; save()
+              r.jobIds[index]=job.id; saveRequest(r)
             end
           end
         end
@@ -504,36 +541,37 @@ function M.new(app,config,e,queue)
           if job.stockError then blocked=job.stockError
           elseif job.status=='blocked' then blocked=job.error or 'furnace lane blocked' end
         end
-        if complete then r.operation=r.operation+1; r.jobId=nil; r.jobIds=nil; r.status='running'; r.error=nil; save()
-        elseif blocked then r.status='blocked'; r.error=blocked; save() end
+        if complete then r.operation=r.operation+1; r.jobId=nil; r.jobIds=nil; r.status='running'; r.error=nil; saveRequest(r)
+        elseif blocked then r.status='blocked'; r.error=blocked; saveRequest(r) end
       elseif op.type=='CRAFT' and (r.privateCraft or self.parallel:owns(r) or not r.jobId and #(config.craftingStations or {})>0) then
-        self.parallel:schedule(r,op)
+        self.parallel:schedule(r,op);reportRequest(r)
       else
         local job=r.jobId and s.jobs[r.jobId]
         if op.type=='CRAFT' and (not job or job.status~='completed') and not hasWorker('crafting') then
-          r.status='blocked'; r.error='No online crafting-capable worker for '..op.item; save(); return
+          r.status='blocked'; r.error='No online crafting-capable worker for '..op.item; saveRequest(r); return
         end
         r.status='running'; r.error=nil
         if not job then
           job=queue:submit(op.type,{item=op.item,quantity=op.quantity,batches=op.batches,productionRequest=r.id,productionOperation=r.operation,productionGeneration=r.replans or 0,
             stockInputs=U.copy(op.inputs),stockOutputs={[op.item]=op.quantity}},{},r.id..':op:'..r.operation..(r.replans and ':replan:'..r.replans or ''))
-          r.jobId=job.id; save()
-        elseif job.status=='completed' then r.operation=r.operation+1; r.jobId=nil; r.error=nil; save()
-        elseif job.stockError or job.status=='blocked' then r.status='blocked'; r.error=job.stockError or job.error; save() end
+          r.jobId=job.id; saveRequest(r)
+        elseif job.status=='completed' then r.operation=r.operation+1; r.jobId=nil; r.error=nil; saveRequest(r)
+        elseif job.stockError or job.status=='blocked' then r.status='blocked'; r.error=job.stockError or job.error; saveRequest(r) end
       end
     else
       for item,n in pairs(r.plan.requirements or r.requirements) do
         if (app.mining.storage:getCount(item) or 0)<n then
           r.replans=(r.replans or 0)+1
-          if r.replans-(r.priorityReplans or 0)>3 then r.status='blocked'; r.error='Finished items were consumed externally; pause competing consumers and retry request'; save(); return end
-          r.plan=nil; r.acquired=nil; r.operation=1; r.jobId=nil; r.jobIds=nil; r.status='running'; save(); return
+          if r.replans-(r.priorityReplans or 0)>3 then r.status='blocked'; r.error='Finished items were consumed externally; pause competing consumers and retry request'; saveRequest(r); return end
+          r.plan=nil; r.acquired=nil; r.operation=1; r.jobId=nil; r.jobIds=nil; r.status='running'; saveRequest(r); return
         end
       end
-      r.status='completed'; r.error=nil; save()
+      r.status='completed'; r.error=nil; saveRequest(r)
     end
   end
   function self:tick()
     if self.working then return end
+    for id in pairs(reported) do if not s.requests[id] then reported[id]=nil end end
     factoryAdmission=nil
     local existing={};for id in pairs(s.jobs) do existing[id]=true end
     local requests={}
@@ -541,7 +579,18 @@ function M.new(app,config,e,queue)
     table.sort(requests,function(a,b) return Scheduling.before(app.state,a,b) end)
     local ok,err=self:refresh()
     if not ok then
-      for _,r in ipairs(requests) do r.status='blocked';r.error=err end
+      local changed={}
+      for _,r in ipairs(requests) do if r.status~='blocked' or r.error~=err then
+        changed[#changed+1]={r=r,status=r.status,error=r.error};r.status='blocked';r.error=err
+      end end
+      if #changed>0 then
+        local called,saved,why=pcall(save)
+        if not called or not saved then
+          for _,old in ipairs(changed) do old.r.status=old.status;old.r.error=old.error end
+          error(called and why or saved,0)
+        end
+        for _,old in ipairs(changed) do reportRequest(old.r) end
+      end
       return
     end
     self:syncClaims(false)
@@ -595,9 +644,12 @@ function M.new(app,config,e,queue)
     if not machine or machine.task~=job then
       machine=require('autobuilder.factory.smelting').new(job,e,config,save); self.machines[job.id]=machine
     end
+    local oldStatus,oldError=job.status,job.error
     local status,err=machine:step()
     job.status=status=='complete' and 'completed' or status=='blocked' and 'blocked' or 'running'
-    job.error=err; save(); self:syncClaims(false); return true
+    job.error=err; save()
+    if oldStatus~=job.status or oldError~=job.error then record('task_state',{job=job.id,kind=job.type,status=job.status,error=job.error,item=job.item,machine=job.furnaceLane}) end
+    self:syncClaims(false); return true
   end
   local function step()
     for id in pairs(self.machines) do if not s.jobs[id] then self.machines[id]=nil end end

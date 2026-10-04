@@ -6,6 +6,7 @@ local M={}
 function M.new(app,config,e,queue,production)
   local s=queue.state;s.hauls=s.hauls or {};s.haulSequence=s.haulSequence or 0
   local save=function() return app:save() end
+  local function record(kind,fields) if app.record then return app:record(kind,fields) end end
   local capacity=require('autobuilder.storage.capacity').new(app.state,save)
   s.logisticsProduction=s.logisticsProduction or {};s.logisticsStatus=s.logisticsStatus or {}
   local self={capacity=capacity,cursor=0}
@@ -151,6 +152,7 @@ function M.new(app,config,e,queue,production)
       if before then for k in pairs(job) do job[k]=nil end;for k,v in pairs(before) do job[k]=v end end
       error(lease,0)
     end
+    record('stock_claim',{lease=job.id,job=job.id,worker=job.preferredWorker,kind='TRANSPORT'})
     return lease
   end
   local function exact(inv,item,n)
@@ -189,7 +191,8 @@ function M.new(app,config,e,queue,production)
       exact(F.list(e,c.drop.inventory),job.item,job.quantity-delivered)
       if delivered==job.quantity then
         capacity:release(job.id)
-        F.commit(job,save,function() job.status='completed';job.error=nil end);return 'complete'
+        F.commit(job,save,function() job.status='completed';job.error=nil end)
+        record('task_state',{job=job.id,worker=job.workerId,kind='TRANSPORT',status='completed',item=job.item,count=job.quantity});return 'complete'
       end
       local lease=assert(capacity.state.leases[job.id]);assert(lease.status=='held')
       return transfer(job,flow.collect,c.drop.inventory,c.destination.inventory,lease.nodes[c.destination.inventory].allocations,delivered,false)
