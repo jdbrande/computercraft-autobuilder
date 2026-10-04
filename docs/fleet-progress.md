@@ -1484,3 +1484,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   final review fixes and final-source native hardware/integrity checks complete.
   Accepted0.28 merged with tested implementation unchanged; ordered integration
   proceeds while enrollment and processor milestones continue independently.
+
+-0.31 final-source native acceptance passed on controller240: two real blast
+  furnaces produced10+10 iron across controller restart and a smoker produced2
+  cooked beef. Independent world reads match20 iron/2 beef/16 remaining coal from
+  20 raw iron/2 raw beef/22 initial coal. All three machines empty, three jobs and
+  two requests completed, all stock/capacity leases released, no mining jobs.
+  Controller240 shut down and both temporary tickets removed;239 was shut down
+  before the reset. Permanent candidate report records failed pre-fix evidence,
+  final successful run, exact conservation and limits. Complete Lua gate remains.
