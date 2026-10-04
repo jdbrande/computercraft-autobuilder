@@ -1024,13 +1024,13 @@ operator docs and progress ledger.
 
 ### Task49: Native scaling acceptance and integration
 
-- [ ] Run a loaded mixed-material terrain/build fixture large enough for several
+- [x] Run a loaded mixed-material terrain/build fixture large enough for several
   miners, clearers and builders to join automatically. Start with one worker and
   register additional eligible workers while the project runs; do not assign jobs
   manually. Record role targets, actual ownership, throughput and bottlenecks.
-- [ ] Independently inspect final structure, ground and inventory; reconcile workers,
+- [x] Independently inspect final structure, ground and inventory; reconcile workers,
   finite fuel, production, cargo and leases. Retain setup/restart/cleanup evidence.
-- [ ] Perform one final whole-branch review and one consolidated regression-backed
+- [x] Perform one final whole-branch review and one consolidated regression-backed
   fix pass. Run complete Lua/Python/release/diff gates, update progress and permanent
   acceptance documentation, integrate/push, then continue every remaining requirement.
 
