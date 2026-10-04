@@ -1923,3 +1923,14 @@ One final review, native traffic acceptance and full gates remain. Final combine
 acceptance must explicitly exercise automatic underside access and an induced
 recoverable construction defect, then reconcile/settle. Sustained acceptance also
 records disk/history growth and the supported ComputerCraft disk quota.
+### 0.38 final-source native checks passed
+
+Final source7e8a092 survived native overflow during an actual yielding `resources`
+command: one successful running reply, two explicit queued-command rejections,
+no network drops and no residual backlog. Fresh keyboard/script input recovered.
+Monitor disconnect errors persisted; reconnect and rapid identical replacement
+repainted. The3/3 build and exact surplus were independently inspected, both
+workers settled, computers265–267 shut down and6 force-load tickets removed.
+[Candidate report](validation-0.38.0.md) records fixture corrections, metrics and
+the distinction between automated resize evidence and native monitor recovery.
+Complete gates remain active; the candidate is not yet accepted.
