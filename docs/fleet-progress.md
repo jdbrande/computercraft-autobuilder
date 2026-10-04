@@ -1594,3 +1594,10 @@ graph before copying. Eight door/bed cases failed before the one-line independen
 copy and all advanced placement tests pass afterward. This is a new runtime bug,
 not a second branch review. The final full gate is superseded and will rerun on
 the corrected source; native recovery retains the original physical contract.
+
+0.33 native placement completed — 2026-10-04: `mixed_adapters` reached built with
+140 correct cells. Independent observer 90 matched all 140 names/states; depot and
+supply were empty, all jobs completed and builder245 was idle home with 12,348 fuel.
+The rig was shut down and ten temporary tickets removed. The two-cell operator
+access cut is explicitly assisted evidence. Permanent candidate report is
+`validation-0.33.0.md`; final-source full Lua gate remains running.
