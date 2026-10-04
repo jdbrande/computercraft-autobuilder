@@ -5,9 +5,11 @@ local Checkpoint=require('autobuilder.core.checkpoint')
 local E=require('autobuilder.resources.exploration')
 local Access=require('autobuilder.build.site_access')
 local M={}
-function M.new(app,config,e,queue,production)
+function M.new(app,config,e,queue,production,reportProject)
+  reportProject=reportProject or function() end
   local self={};local s=queue.state
   local function save() return app:save() end
+  local function commit(p,change) F.commit(p,save,change);reportProject(p) end
   local function contract(plan,region,height)
     local job=plan:survey(region,1,64)
     job.clearanceY=height;job.bounds.max.y=height
@@ -63,7 +65,7 @@ function M.new(app,config,e,queue,production)
         protection.max[axis]=math.max(protection.max[axis],p.protectedBounds.max[axis])
       end
     end
-    F.commit(p,save,function()
+    commit(p,function()
       p.generation=p.generation+1
       p.site={identity=plan.identity,generation=p.generation,projectRun=p.run or 0,cursor=1,completed=0,blocked=0,active={},status='surveying',
         columnCount=plan.columnCount,regionCount=plan.regionCount,estimatedCells=plan.columnCount*(plan.bounds.max.y-plan.bounds.min.y+1)}
@@ -83,7 +85,7 @@ function M.new(app,config,e,queue,production)
           assert(store(p,plan,a.region):save(record))
         end
         local blocked=false;for _,o in ipairs(record.report.observations) do if o.status=='blocked' then blocked=true end end
-        F.commit(p,save,function()
+        commit(p,function()
           if blocked and a.clearanceY<plan.maxY then
             site.active[key]={region=a.region,attempt=a.attempt+1,clearanceY=math.min(plan.maxY,a.clearanceY+8)}
           else
@@ -99,7 +101,7 @@ function M.new(app,config,e,queue,production)
     end
     local active=0;for _ in pairs(site.active) do active=active+1 end
     if active<require('autobuilder.core.scaling').window(app.state,config,'clearing') and site.cursor<=plan.regionCount then
-      F.commit(p,save,function()
+      commit(p,function()
         local region=site.cursor;site.active[tostring(region)]={region=region,attempt=1,clearanceY=plan.bounds.max.y};site.cursor=region+1
       end)
     end
@@ -107,14 +109,14 @@ function M.new(app,config,e,queue,production)
       local payload=contract(plan,a.region,a.clearanceY)
       local expanded=U.copy(p.protectedBounds);expanded.max.y=math.max(expanded.max.y,a.clearanceY)
       if E.conflicts(app.state,expanded) then p.error='Higher survey access overlaps an owned mining route';assert(save());return end
-      if expanded.max.y~=p.protectedBounds.max.y then F.commit(p,save,function() p.protectedBounds=expanded end) end
+      if expanded.max.y~=p.protectedBounds.max.y then commit(p,function() p.protectedBounds=expanded end) end
       payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
       local j=queue:submit('SURVEY_SITE',payload,{},p.name..':site:'..site.generation..':'..a.region..':'..a.attempt)
-      F.commit(p,save,function() a.jobId=j.id end)
+      commit(p,function() a.jobId=j.id end)
       return
     end end
     if site.cursor>plan.regionCount and not next(site.active) then
-      F.commit(p,save,function()
+      commit(p,function()
         site.status=site.blocked>0 and 'survey_blocked' or 'surveyed'
         if p.phase=='surveying' then p.phase=site.status end
         p.error=site.blocked>0 and (site.blocked..' site regions remain inaccessible; inspect saved region observations') or nil
@@ -135,7 +137,7 @@ function M.new(app,config,e,queue,production)
     assert(production,'preparation requires production and cargo return services')
     assert(p.site and p.site.identity==plan.identity and p.site.completed==plan.regionCount and not next(p.site.active),'survey all site regions first')
     assert(not p.site.work,'site preparation already started')
-    F.commit(p,save,function()
+    commit(p,function()
       p.site.work={cursor=1,completed=0,blocked=0,preparedCount=0,active={},status='working'};p.returnRequests=p.returnRequests or {};p.phase='preparing_site';p.error=nil
     end)
   end
@@ -156,7 +158,7 @@ function M.new(app,config,e,queue,production)
       local record,why=self:evidence(p,plan,region)
       if not record or p.site.work.status=='completed' and (not record.preparation or record.preparation.status=='working') then
         local w=p.site.work
-        F.commit(p,save,function()
+        commit(p,function()
           if not w.rechecking then
             w.cursor=1;w.completed=0;w.blocked=0;w.preparedCount=0;w.firstDefect=nil;w.fluidBlocked=0;w.rechecking=true
             for _,a in pairs(w.active) do a.countInAudit=false end
@@ -188,7 +190,7 @@ function M.new(app,config,e,queue,production)
         if next(t.cargo.items) then
           if not r then
             r=production.returns:request(j.workerId,'project:'..p.name..':site:'..j.id)
-            F.commit(p,save,function() p.returnRequests['site:'..j.id]=r.id end)
+            commit(p,function() p.returnRequests['site:'..j.id]=r.id end)
           end
           a.error='Waiting for preparation debris return '..r.id;return false
         end
@@ -206,7 +208,7 @@ function M.new(app,config,e,queue,production)
     end end
     for _,j in pairs(owners) do if not cargoSettled(p,j,a) then return false end end
     if not a.recovery then
-      F.commit(p,save,function()
+      commit(p,function()
         a.recoveries=epoch+1;a.recovery={attempt=1,clearanceY=p.protectedBounds.max.y}
       end);return true
     end
@@ -214,18 +216,18 @@ function M.new(app,config,e,queue,production)
     if not j then
       local payload=contract(plan,a.region,recovery.clearanceY);payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
       j=queue:submit('SURVEY_SITE',payload,{},p.name..':site:'..p.site.generation..':'..a.region..':resurvey:'..a.recoveries..':'..recovery.attempt)
-      F.commit(p,save,function() recovery.jobId=j.id end);return true
+      commit(p,function() recovery.jobId=j.id end);return true
     end
     if j.status~='completed' then a.error='Re-surveying missing evidence with '..j.id;return false end
     if not j.siteReport then
-      F.commit(p,save,function() recovery.attempt=recovery.attempt+1;recovery.jobId=nil end);return true
+      commit(p,function() recovery.attempt=recovery.attempt+1;recovery.jobId=nil end);return true
     end
     assert(Survey.validReport(j,j.siteReport,true),'recovery survey lacks valid observations')
     local blocked=false;for _,o in ipairs(j.siteReport.observations) do if o.status=='blocked' then blocked=true end end
     if blocked and recovery.clearanceY<plan.maxY then
       local expanded=U.copy(p.protectedBounds);expanded.max.y=math.min(plan.maxY,recovery.clearanceY+8)
       if E.conflicts(app.state,expanded) then a.error='Higher recovery survey overlaps owned mining territory';return false end
-      F.commit(p,save,function()
+      commit(p,function()
         p.protectedBounds=expanded;recovery.clearanceY=expanded.max.y;recovery.attempt=recovery.attempt+1;recovery.jobId=nil
       end);j.siteReport=nil;j.siteSurvey.columns=nil;assert(save());return true
     end
@@ -240,7 +242,7 @@ function M.new(app,config,e,queue,production)
       record.preparation=Access.recover(plan,a.region,j.clearanceY,orphanJobs,fillMaterial(1),a.recoveries)
     end
     local cp=store(p,plan,a.region);assert(cp:save(record));assert(cp:save(record))
-    F.commit(p,save,function() a.recovery=nil;a.fluidRetry=nil;a.error=nil end)
+    commit(p,function() a.recovery=nil;a.fluidRetry=nil;a.error=nil end)
     j.siteReport=nil;j.siteSurvey.columns=nil
     for _,old in pairs(s.jobs) do if old.key and old.key:sub(1,#prefix)==prefix and not old.siteAccess then old.blocks=nil;old.report=nil end end
     assert(save());return true
@@ -251,27 +253,27 @@ function M.new(app,config,e,queue,production)
     local cp=store(p,plan,a.region)
     if a.fluidRetry then
       if a.recovery and record.recovery and record.recovery>=(a.recoveries or 0) then
-        F.commit(p,save,function() a.recovery=nil;a.fluidRetry=nil;a.error=nil end);return true
+        commit(p,function() a.recovery=nil;a.fluidRetry=nil;a.error=nil end);return true
       end
       return recoverEvidence(p,plan,a)
     end
     if p.site.work.containmentRecheck and record.preparation and record.preparation.status=='blocked'
       and record.preparation.fluids and not record.containmentRechecked then
-      F.commit(p,save,function() a.fluidRetry=true;a.fluidRechecked=true;a.containmentRechecked=true;a.preparationRetries=0 end);return true
+      commit(p,function() a.fluidRetry=true;a.fluidRechecked=true;a.containmentRechecked=true;a.preparationRetries=0 end);return true
     end
     if p.site.work.fluidRecheck and record.preparation and record.preparation.status=='blocked'
       and record.preparation.fluids and not record.fluidRechecked then
-      F.commit(p,save,function() a.fluidRetry=true;a.fluidRechecked=true;a.preparationRetries=0 end);return true
+      commit(p,function() a.fluidRetry=true;a.fluidRechecked=true;a.preparationRetries=0 end);return true
     end
     if record.retryPending then
       if (a.preparationRetries or 0)<record.preparationRetries then
-        F.commit(p,save,function() a.preparationRetries=record.preparationRetries end);return true
+        commit(p,function() a.preparationRetries=record.preparationRetries end);return true
       end
       return recoverEvidence(p,plan,a,record)
     end
     -- Region evidence can commit before its older root acknowledges the survey.
     if a.recovery and record.recovery and record.recovery>=(a.recoveries or 0) then
-      F.commit(p,save,function() a.recovery=nil;a.error=nil end);return true
+      commit(p,function() a.recovery=nil;a.error=nil end);return true
     end
     if not record.preparation then
       record.preparation={status='working',stage='clear',cursor=1,sequence=1,epoch=record.recovery or 0,defects={},failed=0}
@@ -305,11 +307,11 @@ function M.new(app,config,e,queue,production)
         local old=s.jobs[id];if old then old.blocks=nil;old.report=nil;old.siteAccess=nil end
       end
       assert(save());work.accessRetired=nil;assert(cp:save(record))
-      if p.site.accessLease and p.site.accessLease.region==a.region then F.commit(p,save,function() p.site.accessLease=nil end) end
+      if p.site.accessLease and p.site.accessLease.region==a.region then commit(p,function() p.site.accessLease=nil end) end
       return true
     end
     if p.site.accessLease and p.site.accessLease.region==a.region and not work.access and not (work.accessPending and #work.accessPending>0) then
-      F.commit(p,save,function() p.site.accessLease=nil end);return true
+      commit(p,function() p.site.accessLease=nil end);return true
     end
     if work.status=='blocked' and work.access then
       a.error='Foundation access restoration requires recovery; region remains owned';return false
@@ -319,7 +321,7 @@ function M.new(app,config,e,queue,production)
       -- stops advancing this region. Older unfinished backups still reconcile
       -- through readyFor when restored against a completed root.
       assert(cp:save(record))
-      F.commit(p,save,function()
+      commit(p,function()
         if a.countInAudit~=false then
           p.site.work.completed=p.site.work.completed+1;p.site.work.blocked=p.site.work.blocked+(work.status=='blocked' and 1 or 0)
           p.site.work.preparedCount=(p.site.work.preparedCount or 0)+(work.status=='prepared' and 1 or 0)
@@ -368,7 +370,7 @@ function M.new(app,config,e,queue,production)
       if lease and lease.region~=a.region then a.error='Waiting for another foundation access owner';return false end
       if not lease then
         local route=work.access and work.access.route or assert(plan:access(a.region,work.accessPending[1],record.clearanceY))
-        F.commit(p,save,function() p.site.accessLease={region=a.region,target=U.copy(route.target),bounds=U.copy(route.bounds or plan:region(a.region).bounds)} end)
+        commit(p,function() p.site.accessLease={region=a.region,target=U.copy(route.target),bounds=U.copy(route.bounds or plan:region(a.region).bounds)} end)
         return true
       end
       for _,other in pairs(s.jobs) do if other.workerId and other.status~='completed' and other.bounds and E.overlaps(lease.bounds,other.bounds) then
@@ -427,7 +429,7 @@ function M.new(app,config,e,queue,production)
       assert(j.report and j.report.counts,'retaining barrier lacks physical receipt')
       local waiting={}
       if j.siteWork.stage~='verify' and not cargoSettled(p,j,waiting) then p.error=waiting.error;assert(save());return end
-      F.commit(p,save,function()
+      commit(p,function()
         for status,n in pairs(j.report.counts) do if status~='correct' then b.failed=b.failed+n end end
         collectDefects(b,j.report)
         b.lastJob=j.id;b.jobId=nil;b.sequence=b.sequence+1
@@ -436,7 +438,7 @@ function M.new(app,config,e,queue,production)
       end);return
     end
     if b.cursor==0 then
-      F.commit(p,save,function()
+      commit(p,function()
         if b.stage=='fill' then b.stage='verify';b.cursor=1;b.failed=0;b.defects={};b.omitted=nil
         else
           b.status=b.failed==0 and 'verified' or 'blocked'
@@ -449,7 +451,7 @@ function M.new(app,config,e,queue,production)
     local payload,nextCursor=plan:barrier(b.height,b.cursor,8,b.fill,b.stage=='verify',1)
     payload.project=p.name;payload.projectRun=p.run or 0;payload.preferredWorker=p.preferredWorker
     local j=queue:submit('PREPARE_REGION',payload,{},p.name..':site:'..p.site.generation..':barrier:'..b.sequence)
-    F.commit(p,save,function() b.jobId=j.id;b.nextCursor=nextCursor end)
+    commit(p,function() b.jobId=j.id;b.nextCursor=nextCursor end)
   end
   function self:workTick(p,plan)
     assert(p.site and p.site.identity==plan.identity and p.site.work,'preparation geometry missing or changed')
@@ -460,13 +462,13 @@ function M.new(app,config,e,queue,production)
       for _,a in pairs(work.active) do
         local record=self:evidence(p,plan,a.region);local access=record and record.preparation and record.preparation.access
         if access then
-          F.commit(p,save,function() p.site.accessLease={region=a.region,target=U.copy(access.route.target),bounds=U.copy(access.route.bounds or plan:region(a.region).bounds)} end)
+          commit(p,function() p.site.accessLease={region=a.region,target=U.copy(access.route.target),bounds=U.copy(access.route.bounds or plan:region(a.region).bounds)} end)
           return
         end
       end
     end
     if work.cursor<=plan.regionCount and (active<require('autobuilder.core.scaling').window(app.state,config,'clearing') or work.active[tostring(work.cursor)]) then
-      F.commit(p,save,function()
+      commit(p,function()
         local key=tostring(work.cursor);work.active[key]=work.active[key] or {region=work.cursor};work.active[key].countInAudit=true;work.cursor=work.cursor+1
       end)
     end
@@ -478,7 +480,7 @@ function M.new(app,config,e,queue,production)
       -- exhausted its retries. Reconsider wet failures once after all owners
       -- drain, using the same bounded census and fresh-survey recovery path.
       if work.needsFluidRecheck and not work.fluidRecheck then
-        F.commit(p,save,function()
+        commit(p,function()
           work.fluidRecheck=true;work.fluidFirstDefect=U.copy(work.firstDefect)
           work.cursor=1;work.completed=0;work.blocked=0;work.preparedCount=0;work.firstDefect=nil;work.fluidBlocked=0
         end);return
@@ -487,12 +489,12 @@ function M.new(app,config,e,queue,production)
         local payload,_,required=plan:barrier(p.protectedBounds.max.y,1,1,'minecraft:cobblestone',false,1)
         if E.conflicts(app.state,payload.bounds) then p.error='Retaining barrier overlaps owned mining territory; waiting for return';assert(save());return end
         local fill=fillMaterial(required)
-        F.commit(p,save,function()
+        commit(p,function()
           p.protectedBounds=U.copy(payload.bounds)
           p.site.barrier={status='working',stage='fill',cursor=1,sequence=1,height=payload.clearanceY,fill=fill,failed=0,defects={}}
         end);return
       end
-      F.commit(p,save,function()
+      commit(p,function()
         work.status='completed';work.rechecking=nil
         if p.phase=='preparing_site' then p.phase=work.blocked==0 and 'site_ready' or 'site_blocked' end
         p.error=work.blocked>0 and (work.blocked..' preparation regions have unresolved defects') or nil

@@ -122,7 +122,8 @@ function M.poseCells(origin)
   end
   return cells
 end
-function M.new(state,save,clock,id,chunks,config)
+function M.new(state,save,clock,id,chunks,config,record)
+  record=record or function() end
   state.automation=state.automation or {jobs={},sequence=0,requests={},projects={},cells={}}
   local s=state.automation; s.cells=s.cells or {}; local self={state=s}
   local function persist() local ok,err=save(); assert(ok,err) end
@@ -209,7 +210,7 @@ function M.new(state,save,clock,id,chunks,config)
             elseif chunks then lease,why=chunks:reserve(j,workers[tostring(wid)],true,self.preparationReady,admit,clock()) else lease={status='disabled'} end
             j.coverageError=why
             if lease then
-              if lease.status~='disabled' then return j end
+              if lease.status~='disabled' then record('assignment',{job=j.id,worker=j.workerId,project=j.project,kind=j.type});return j end
               admission,reason=require('autobuilder.core.protection').canOwn(state,j,wid)
               if admission and j.requiresSite then
                 admission,reason=false,'preparation verifier is unavailable'
@@ -221,7 +222,7 @@ function M.new(state,save,clock,id,chunks,config)
                 j.workerId=wid;j.status='assigned';j.assignedAt=clock()
                 local ok,err=pcall(persist)
                 if not ok then j.workerId=before.workerId;j.status=before.status;j.assignedAt=before.assignedAt;error(err,0) end
-                return j
+                record('assignment',{job=j.id,worker=j.workerId,project=j.project,kind=j.type});return j
               end
               j.coverageError=reason
             end
@@ -314,12 +315,15 @@ function M.new(state,save,clock,id,chunks,config)
     if j.returning then j.homeReceipt=U.copy(p.homeReceipt) end
     if j.logistics then j.transportReceipt=U.copy(p.transportReceipt) end
     if materials then j.materials=U.copy(materials) end
+    local oldStatus,oldError=j.status,j.error
     j.progress=p.progress or 0; j.phase=p.phase; j.error=p.error; j.missingItem=p.missingItem
     if j.type=='RESCUE' and p.fuelDelivered~=nil then j.fuelDelivered=p.fuelDelivered end
     j.missingCount=p.missingCount; j.supplyId=p.supplyId; j.report=U.copy(p.report)
     j.status=p.phase=='completed' and 'completed' or p.phase=='blocked' and 'blocked' or p.phase=='paused' and 'paused' or 'running'
     if (j.privateStation or j.logistics or j.returning or j.type=='RECOVER_CARGO') and p.phase=='completed' then j.workerFinished=true; j.status='collecting' end
-    persist(); return true
+    persist()
+    if oldStatus~=j.status or oldError~=j.error then record('task_state',{job=j.id,worker=j.workerId,project=j.project,kind=j.type,status=j.status,error=j.error}) end
+    return true
   end
   local function reserve(owner,jobId,from,target,workers,work)
     if state.assignmentRecovery then return false,'controller backup ownership reconciliation pending' end
@@ -467,7 +471,7 @@ function M.new(state,save,clock,id,chunks,config)
     for _,other in pairs(s.jobs) do
       if other.workerId and other.status~='completed' and (other.workerId==owner or intersects(j.bounds,other.bounds)) then return false,'conflicting recovered ownership' end
     end
-    j.workerId=owner; j.status='assigned'; persist(); return true
+    j.workerId=owner; j.status='assigned'; persist();record('ownership_recovered',{job=j.id,worker=owner,project=j.project,kind=j.type}); return true
   end
   function self:position(owner,jobId,from,target)
     local j=s.jobs[jobId] or (state.jobs or {})[jobId]

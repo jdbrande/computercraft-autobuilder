@@ -29,5 +29,32 @@ the wait. Offline workers keep their cell and task ownership; diagnostics never
 release those reservations. Inspect the named worker or route and settle the
 underlying condition before resuming work.
 
-Structured-event hooks, shared dashboard projection and native monitor acceptance
-remain under implementation. No0.38 release acceptance is claimed yet.
+Configure a controller monitor with `monitor={name='monitor_0',scale=0.5,interval=1}`
+in settings. The wired name or side must resolve to a native monitor. Tap to advance
+pages. The optional monitor redraws at most once per configured interval and only
+when its rendered page changes; resizing/disconnection/reconnection leave work
+running. Its errors appear in the terminal footer. `dashboard` uses the same cached
+projection in the terminal. Stock marked unknown is not shown as zero. Material
+forecasts are estimates, not inventory claims; verification counts refer to the
+verification phase. Display rows are not added to durable checkpoints.
+
+Aliases include `fleet workers`, `fleet worker <id>`, `project list`,
+`project status|pause|resume <name>` and `storage status`. Existing build, fleet
+limits, resources, logistics, exploration and recovery commands remain available.
+
+Significant events go to `<logDir>/<role>.events.jsonl`, with the existing byte and
+rotation limits. Records include event/time/computer/runtime boot and relevant
+project/request/job/worker/lease/receipt IDs. They cover committed assignment,
+ownership recovery, task/project/production transitions, requirements, shortages,
+receipts and stock claims; worker availability, observed stock, diagnostics and
+changed role allocations are also recorded. Repeated heartbeats, resends and
+unchanged retries are omitted. Whole JSON records are never truncated. Oversized
+records or write failures are reported without undoing a domain checkpoint.
+
+Receipts identify their destination. A mining-depot receipt, managed inventory
+receipt and later stock observation are different evidence of the same physical
+pipeline; do not add them together as newly created items. A crash between a
+checkpoint and its log append can omit an event. Logs are diagnostic evidence,
+not a transactional ledger or exactly-once replay stream.
+
+Candidate0.38 native acceptance and final gates are still pending.

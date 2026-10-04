@@ -3,7 +3,8 @@ local Materials=require('autobuilder.resources.materials')
 local Coordination=require('autobuilder.core.workflows')
 local E=require('autobuilder.resources.exploration')
 local M={}
-function M.new(state,save,clock,controllerId,config,chunks)
+function M.new(state,save,clock,controllerId,config,chunks,record)
+  record=record or function() end
   state.jobs=state.jobs or {}; state.jobSequence=state.jobSequence or 0
   local self={state=state}
   local function persist() local ok,err=save(); assert(ok,err) end
@@ -183,7 +184,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
                       local saved,why=pcall(persist)
                       if not saved then state.jobs[j.id]=nil;table.remove(g.tripIds);g.status=oldStatus;g.error=oldError;error(why) end
                     end
-                    return j
+                    record('assignment',{job=j.id,worker=j.workerId,kind='MINE',item=j.item,sector=j.exploration.sectorId,request=j.consumer});return j
                   end
                 end
                 reason=why; if why and why:find('owned') then waiting=true end
@@ -284,7 +285,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
                   job.workerId=nil;job.status=oldStatus;job.assignedAt=oldTime;job.miningArea=oldArea;job.miningResources=oldResources;error(err,0)
                 end
               end
-              return job
+              record('assignment',{job=job.id,worker=job.workerId,kind='MINE',item=job.item,request=job.consumer});return job
             end
           end
         end
@@ -317,13 +318,18 @@ function M.new(state,save,clock,controllerId,config,chunks)
     local area=miningArea(t); if area==false then return false,'ownership recovery has invalid mining bounds' end
     local blocked,why=conflict(workerId,area); if blocked then return false,why end
     j.workerId=workerId; j.miningArea=U.copy(area); j.miningResources=U.copy(t.miningResources); j.quantity=p.assignedQuantity; j.status='assigned'
-    persist(); return true
+    persist();record('ownership_recovered',{job=j.id,worker=j.workerId,kind='MINE',item=j.item}); return true
   end
   function self:progress(workerId,p,stock)
     local j=state.jobs[p.jobId]
     if not j or j.workerId~=workerId then return false,'job owner mismatch' end
     if j.status=='completed' or j.physicalComplete then return true end
     if p.delivered<j.progress.delivered then return false,'stale progress' end
+    local oldDelivered,oldStatus,oldError=j.progress.delivered,j.status,j.error
+    local function report()
+      if p.delivered>oldDelivered then record('delivery',{job=j.id,worker=j.workerId,item=j.item,count=p.delivered-oldDelivered,total=p.delivered,destination='mining_depot'}) end
+      if oldStatus~=j.status or oldError~=j.error then record('task_state',{job=j.id,worker=j.workerId,kind='MINE',status=j.status,error=j.error}) end
+    end
     if j.exploration then
       if not E.report(p.exploration,j.exploration) or p.exploration.cursor>193 or p.delivered<0 then return false,'invalid exploration result' end
       local initial=p.exploration.initialDelivered or 0
@@ -346,7 +352,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
         for k in pairs(group) do group[k]=nil end;for k,v in pairs(priorGroup) do group[k]=v end
         error(why,0)
       end
-      return true
+      report();return true
     end
     j.progress={delivered=p.delivered,held=p.held,phase=p.phase}
     if p.phase=='completed' then
@@ -364,7 +370,7 @@ function M.new(state,save,clock,controllerId,config,chunks)
     elseif p.phase=='blocked' then j.status='blocked'; j.error=p.error or 'worker blocked'
     else j.status='running'; j.error=nil end
     if j.physicalComplete then j.physicalCompletedAt=j.physicalCompletedAt or clock() end
-    persist(); return true
+    persist();report();return true
   end
   function self:replan(id,stock)
     local j=state.jobs[id]

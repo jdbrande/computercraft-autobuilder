@@ -320,3 +320,62 @@ test('overlong terminal commands are rejected as a whole and local command IDs a
  app:event('paste','fleet limit mining 0 2');app:event('key',28)
  eq(require('autobuilder.core.scaling').limits(app.state,app.config,'mining').max,2)
 end)
+
+test('dashboard aliases use cached views and monitor failures never stop controller commands',function()
+ local e=env(7);local c=cfg('controller');c.monitor={name='monitor_0',scale=.5,interval=1}
+ local detached=true;local writes=0
+ e.peripheral.wrap=function() if detached then return nil end;return {getSize=function() return 30,10 end,setTextScale=function() end,clear=function() end,setCursorPos=function() end,write=function() writes=writes+1 end} end
+ local app=require('autobuilder.core.runtime').new(c,e)
+ assert(app:command('fleet workers'));eq(app.state.view,'workers')
+ assert(app:command('project list'));assert(app:command('dashboard'))
+ e.peripheral.call=function() error('drawing queried a physical inventory') end
+ app:draw();assert(app.monitorError);eq(app.state.view,'dashboard')
+ detached=false;e.now=e.now+1;app:draw();eq(app.monitorError,nil);assert(writes>0)
+ local before=writes;app:draw();eq(writes,before)
+ local p=app.monitor.page;assert(app:event('monitor_touch','monitor_0',1,1));eq(app.monitor.page,p+1)
+ assert(not app:command('fleet worker 99'));assert(not app:command('project status missing'))
+end)
+
+test('structured log disk failure cannot unwind a successful stock checkpoint',function()
+ local e=env(7);e.textutils.serializeJSON=e.textutils.serialize
+ local app=require('autobuilder.core.runtime').new(cfg('controller'),e)
+ e.fs.fault.open='/autobuilder/logs/controller.events.jsonl'
+ local l=app.automation.production.ledger
+ assert(l:reserve('test-stock',{stone=1},{stone=1},{stone=1}))
+ eq(l.state.leases['test-stock'].status,'held');assert(app.state.eventLogError:find('disk full',1,true))
+ local saved=require('autobuilder.core.checkpoint').new(e.fs,e.textutils,'/autobuilder/data/controller.state'):load()
+ eq(saved.inventoryLedger.leases['test-stock'].status,'held')
+ e.fs.fault.open=nil;assert(l:receipt('test-stock',{stone=1},{stone=1},{},1));eq(app.state.eventLogError,nil)
+end)
+
+test('production failure events require a committed transition and omit unchanged retries',function()
+ local e=env(7);local app=require('autobuilder.core.runtime').new(cfg('controller'),e);local events={}
+ app.record=function(self,kind,fields) events[#events+1]={kind=kind,fields=fields};return true end
+ local production=app.automation.production;local r=production:request({['minecraft:stone']=2},'test-event')
+ eq(events[1].kind,'production_request');eq(events[2].kind,'requirement')
+ local function states() local n=0;for _,event in ipairs(events) do if event.kind=='production_state' then n=n+1 end end;return n end
+ local save=app.save;app.save=function() return false,'disk failed' end
+ assert(not pcall(production.tick,production));eq(states(),0);eq(r.status,'queued')
+ app.save=save;production:tick();eq(states(),1);eq(r.status,'blocked')
+ production:tick();eq(states(),1)
+end)
+
+test('project events follow imported analyzed priority and pause checkpoints without status-query noise',function()
+ local e=env(7);e.textutils.unserializeJSON=e.textutils.unserialize;e.textutils.serializeJSON=e.textutils.serialize
+ e.fs.files['/event.json']=e.textutils.serialize({schema=1,size={x=1,y=1,z=1},palette={{name='minecraft:stone',state={}}},runs={{id=1,count=1}},metadata={},requirements={['minecraft:stone']=1}})
+ local app=require('autobuilder.core.runtime').new(cfg('controller'),e);local events={}
+ app.record=function(self,kind,fields)
+  if kind=='project_state' then
+   local saved=require('autobuilder.core.checkpoint').new(e.fs,e.textutils,'/autobuilder/data/controller.state'):load()
+   eq(saved.automation.projects[fields.project].phase,fields.phase);events[#events+1]=fields
+  end
+  return true
+ end
+ assert(app:command('build import /event.json event'));eq(events[1].phase,'imported')
+ assert(app:command('build analyze event'));eq(events[2].phase,'analyzed')
+ assert(app:command('build priority event 80'));eq(events[3].priority,80)
+ assert(app:command('project pause event'));eq(events[4].paused,true)
+ assert(app:command('project pause event'));eq(#events,4)
+ assert(app:command('project resume event'));eq(events[5].paused,false)
+ assert(app:command('project status event'));eq(#events,5)
+end)

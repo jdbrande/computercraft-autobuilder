@@ -6,8 +6,26 @@ local E=require('autobuilder.resources.exploration')
 local M={}
 function M.new(app,config,e,queue,production)
   local s=queue.state; local cache,sites={},{}; local self={}
-  local siteService=require('autobuilder.build.site_service').new(app,config,e,queue,production)
-  local function save() return app:save() end
+  local reported={}
+  local function projection(p)
+    return {phase=p.phase,paused=p.paused==true,priority=p.priority or 50,error=p.error,site=p.site and p.site.status,
+      hasRequirements=p.requirements~=nil}
+  end
+  for name,p in pairs(s.projects) do reported[name]=projection(p) end
+  local function reportProject(p)
+    local value=projection(p);local old=reported[p.name]
+    if not require('autobuilder.factory.factory').equal(old,value) then
+      if app.record then
+        app:record('project_state',{project=p.name,phase=p.phase,paused=p.paused==true,priority=p.priority or 50,error=p.error,site=value.site})
+        if value.hasRequirements and not (old and old.hasRequirements) then
+          for item,n in pairs(p.requirements) do app:record('requirement',{project=p.name,item=item,count=n}) end
+        end
+      end
+      reported[p.name]=value
+    end
+  end
+  local siteService=require('autobuilder.build.site_service').new(app,config,e,queue,production,reportProject)
+  local function save(p) local ok,why=app:save();if ok and p then reportProject(p) end;return ok,why end
   local function project(name)
     local p=s.projects[name or s.currentProject]; assert(p,'Unknown project; use build import <file.schem|file.json> [name]'); return p
   end
@@ -29,7 +47,7 @@ function M.new(app,config,e,queue,production)
       p.levelAfterSurvey=true;p.siteRequired=true;siteService:start(p,plan)
     end
     assert(p.site.identity==plan.identity,'site geometry changed; finish owned work before importing a new project')
-    p.levelAfterSurvey=not p.site.work or nil;p.siteRequired=true;assert(save());return plan
+    p.levelAfterSurvey=not p.site.work or nil;p.siteRequired=true;assert(save(p));return plan
   end
   queue.preparationReady=function(j)
     local p=s.projects[j.project]
@@ -149,16 +167,21 @@ function M.new(app,config,e,queue,production)
     end
     return work,requests
   end
+  function self:cachedForecasts(unknown)
+    local scopes={}
+    for _,candidate in pairs(s.projects) do if candidate.requirements then
+      scopes[#scopes+1]={project=candidate,work=linked(candidate)}
+    end end
+    local stock=app.mining.storage
+    return require('autobuilder.resources.material_forecast').build(app.state,not unknown and stock.valid and stock.counts or nil,scopes)
+  end
   function self:forecast(name)
     local p=s.projects[name or s.currentProject]
     if not p then app.state.forecastLines={'No selected project; use build forecast <name>.'};return nil end
     if not p.requirements then p.requirements=U.copy(analysis(p,true).requirements) end
-    local ok,why=production:refresh();local scopes={}
-    for _,candidate in pairs(s.projects) do if candidate.requirements then
-      scopes[#scopes+1]={project=candidate,work=linked(candidate)}
-    end end
+    local ok,why=production:refresh()
     local F=require('autobuilder.resources.material_forecast')
-    local f=F.build(app.state,ok and app.mining.storage.counts or nil,scopes)[p.name]
+    local f=self:cachedForecasts(not ok)[p.name]
     app.state.forecastLines=F.describe(f)
     if not ok then app.state.forecastLines[#app.state.forecastLines+1]='Inventory unavailable: '..tostring(why) end
     return f
@@ -171,7 +194,7 @@ function M.new(app,config,e,queue,production)
       local after=j.completedAt or j.created or 0
       if after>a.after then a.after=after;a.settled=nil;changed=true end
     end end
-    if changed then assert(save()) end
+    if changed then assert(save(p)) end
   end
   local function startRun(p,productionLinked)
     p.run=p.run and p.run+1 or (p.phase=='built' or p.phase=='verified') and 1 or 0;p.actors={};p.returnRequests={};p.settlement=nil;p.includeProduction=productionLinked
@@ -210,7 +233,7 @@ function M.new(app,config,e,queue,production)
       local request=p.returnRequests[id] and s.returns[p.returnRequests[id]]
       if request and request.status=='completed' and request.owner==tonumber(id)
         and U.finite(request.settledAt) and request.settledAt>a.after then
-        a.settled={at=request.settledAt,returnRequest=request.id};assert(save())
+        a.settled={at=request.settledAt,returnRequest=request.id};assert(save(p))
       elseif not w or not w.online or not t or not w.lastSeen or w.lastSeen<=a.after then
         why=why or 'Waiting for fresh acknowledgement from worker '..id
       elseif active[id] then why=why or 'Waiting for project worker '..id
@@ -223,15 +246,15 @@ function M.new(app,config,e,queue,production)
           and not newTask.physicalComplete and not work[newTask.id] and not newTask.returnManaged
         if not next(cargo.items) and reassigned and (not request or request.status=='completed'
           or production.returns:releaseToTask(request.id,newTask.id)) then
-          a.settled={at=w.lastSeen,reassigned=newTask.id};assert(save())
+          a.settled={at=w.lastSeen,reassigned=newTask.id};assert(save(p))
         elseif not t.task and t.status=='idle' and t.position and t.position.known and U.heading(t.position.heading)
           and U.position(t.depot) and U.distance(t.position,t.depot)==0 and not next(cargo.items)
           and not require('autobuilder.core.workflows').workerBusy(app.state,w.id) then
-          a.settled={at=w.lastSeen,home=U.copy(t.depot)};assert(save())
+          a.settled={at=w.lastSeen,home=U.copy(t.depot)};assert(save(p))
         else
           if not request then
             request=production.returns:request(w.id,'project:'..p.name..':run:'..(p.run or 0)..':worker:'..id..':after:'..a.after)
-            p.returnRequests[id]=request.id;assert(save())
+            p.returnRequests[id]=request.id;assert(save(p))
           end
           why=why or 'Worker '..id..' return: '..(request.error or request.status)
         end
@@ -241,8 +264,8 @@ function M.new(app,config,e,queue,production)
       local r=s.returns[rid]
       if not r or r.status~='completed' then why=why or 'Waiting for home return '..rid end
     end
-    if why then p.error=why;assert(save());return end
-    p.phase=p.settlement.target;p.settlement.completedAt=e.os and e.os.epoch and e.os.epoch('utc')/1000 or 0;p.error=nil;assert(save())
+    if why then p.error=why;assert(save(p));return end
+    p.phase=p.settlement.target;p.settlement.completedAt=e.os and e.os.epoch and e.os.epoch('utc')/1000 or 0;p.error=nil;assert(save(p))
   end
   local function pauseProduction(p,paused)
     for _,rid in pairs(p.returnRequests or {}) do
@@ -305,16 +328,16 @@ function M.new(app,config,e,queue,production)
       else IO.write(e.fs,path..'.tmp',raw); e.fs.move(path..'.tmp',path) end
       local transform=importTransform and require('autobuilder.config').load({build=importTransform}).build or config.build
       local p={protectedBounds=protection,name=title,path=path,hash=Hash.digest(raw),sourceHash=Hash.digest(snapshot),phase='imported',transform=U.copy(transform),jobs={},regionJobs={},generation=0}
-      s.projects[title]=p; s.currentProject=title; save(); return true,'Imported '..title
+      s.projects[title]=p; s.currentProject=title; save(p); return true,'Imported '..title
     end
     local p=project(name); s.currentProject=p.name
     if action=='forecast' then
-      self:forecast(p.name);app.state.view='forecast';save();return true,table.concat(app.state.forecastLines,'; ')
+      self:forecast(p.name);app.state.view='forecast';save(p);return true,table.concat(app.state.forecastLines,'; ')
     end
     if action=='priority' then
       assert(#args==4,'Usage: build priority <name> <0..100>')
       local n=require('autobuilder.core.scheduling').set(app.state,p.name,tonumber(args[4]),save)
-      return true,p.name..' priority='..n
+      reportProject(p);return true,p.name..' priority='..n
     end
     if action=='status' then return true,p.name..' priority='..(p.priority or 50)..': '..p.phase..' '..(p.completed or 0)..'/'..(p.total or 0)..' positions'..(p.error and '; '..p.error or '') end
     if action=='pause' then
@@ -323,7 +346,7 @@ function M.new(app,config,e,queue,production)
       for _,j in pairs(linked(p)) do if j.status~='completed' then
         if j.type=='MINE' and not j.exploration then require('autobuilder.core.scheduling').pauseSharedMine(app.state,j) else j.paused=true end
       end end
-      save(); return true,'Paused '..p.name
+      save(p); return true,'Paused '..p.name
     elseif action=='resume' then
       p.paused=false
       pauseProduction(p,false)
@@ -331,7 +354,7 @@ function M.new(app,config,e,queue,production)
         if j.type=='MINE' and not j.exploration then require('autobuilder.core.scheduling').pauseSharedMine(app.state,j) else j.paused=false end
         j.resumeRequested=true
       end
-      save(); return true,'Resuming '..p.name
+      save(p); return true,'Resuming '..p.name
     end
     if action=='survey' or action=='level' then
       assert(config.build.enabled,'Set build.enabled=true and configure the build origin first')
@@ -342,7 +365,7 @@ function M.new(app,config,e,queue,production)
         siteService:startWork(p,sitePlan(p,true));return true,'Preparing site '..p.name
       end
       siteService:start(p,sitePlan(p,true))
-      if action=='level' then p.levelAfterSurvey=true;assert(save()) end
+      if action=='level' then p.levelAfterSurvey=true;assert(save(p)) end
       return true,'Surveying '..p.name
     end
     local a=analysis(p,true); p.total=p.mode=='VERIFY' and a.volume or p.mode=='CLEAR' and a.airCount or #a.blocks; p.volume=a.volume; p.airCells=a.airCount; p.issues=a.issues; p.requirements=U.copy(a.requirements)
@@ -353,7 +376,7 @@ function M.new(app,config,e,queue,production)
       p.analysis.estimatedMovement=#a.blocks*4; p.analysis.estimatedFuel=#a.blocks*4+config.minimumFuelReserve
       p.analysis.placementFamilies=U.copy(a.placementFamilies);p.analysis.placementStrategies=U.copy(a.placementStrategies)
       p.analysis.partialStrategies=a.partial; p.phase=p.phase=='imported' and 'analyzed' or p.phase
-      app.state.view='project'; save()
+      app.state.view='project'; save(p)
       return true,p.name..': '..#a.blocks..' blocks, '..#a.regions..' regions, '..#a.issues..' unsupported entries; materials saved in project analysis'
     end
     assert(#a.issues==0,'Unsupported palette or entity data; inspect build analyze before unattended work')
@@ -376,7 +399,7 @@ function M.new(app,config,e,queue,production)
       -- Persist the run's acquisition policy before site setup can checkpoint.
       if action=='auto' then p.autoStart=true;ensureSite(p) end
       if action=='auto' and p.site.status=='surveying' then p.phase='surveying' end
-      save();return true,message
+      save(p);return true,message
     elseif action=='start' or action=='verify' or action=='repair' or action=='clear' then
       assert(config.build.enabled,'Set build.enabled=true and configure the build origin first')
       assert(p.phase~='settling','Project still owns worker or inventory settlement; wait for completion')
@@ -393,14 +416,14 @@ function M.new(app,config,e,queue,production)
       if action=='start' or action=='repair' then
         if action=='repair' and p.autoStart~='repair' then p.repairAttempts=nil;p.repairHistory=nil end
         ensureSite(p,action=='repair' and p.autoStart~='repair')
-        if not p.site.work or (p.site.work.preparedCount or 0)==0 then p.autoStart=action;assert(save());return true,'Waiting for verified site regions' end
+        if not p.site.work or (p.site.work.preparedCount or 0)==0 then p.autoStart=action;assert(save(p));return true,'Waiting for verified site regions' end
       end
       local mode=action=='start' and (config.clearSite and 'REPAIR' or 'BUILD') or action=='verify' and 'VERIFY' or action=='clear' and 'CLEAR' or 'REPAIR'
       p.nextMode=nil; p.afterBuild=nil; p.paused=false
       if config.clearSite and a.airCount>0 and (action=='start' or action=='repair') then p.nextMode=mode; mode='CLEAR' end
       beginPhase(p,mode,a)
       p.autoStart=nil
-      save(); return true,p.phase..' '..p.name
+      save(p); return true,p.phase..' '..p.name
     end
     return false,'build import|analyze|materials|forecast|survey|level|auto|prepare|start|status|priority|pause|resume|verify|repair|clear [name]'
   end
@@ -418,16 +441,16 @@ function M.new(app,config,e,queue,production)
       local work,requests=linked(p);actors(p,work)
       if p.site and (p.site.status=='surveying' or p.phase=='surveying') then siteService:tick(p,sitePlan(p)) end
       if p.levelAfterSurvey and not p.paused and p.site and p.site.completed==sitePlan(p).regionCount and not next(p.site.active) then
-        siteService:startWork(p,sitePlan(p));p.levelAfterSurvey=nil;assert(save())
+        siteService:startWork(p,sitePlan(p));p.levelAfterSurvey=nil;assert(save(p))
       end
       if p.site and p.site.work then siteService:workTick(p,sitePlan(p)) end
       if p.phase=='settling' and not p.paused then settle(p,work,requests) end
-      if p.phase=='preparing' and p.requestId and s.requests[p.requestId].status=='completed' then p.phase='ready'; save() end
+      if p.phase=='preparing' and p.requestId and s.requests[p.requestId].status=='completed' then p.phase='ready'; save(p) end
       if p.autoStart and not p.paused then
         local r=p.requestId and s.requests[p.requestId]
         if (p.streaming or p.autoStart=='repair' or p.preparedEmpty or r and r.status=='completed') and p.site and p.site.work and (p.site.work.preparedCount or 0)>0 then
           local ok,err=pcall(self.command,self,{'build',p.autoStart=='repair' and 'repair' or 'start',p.name})
-          if not ok then p.error=tostring(err);save() else p.error=nil end
+          if not ok then p.error=tostring(err);save(p) else p.error=nil end
         end
       end
       if not p.paused and (p.phase=='building' or p.phase=='verifying' or p.phase=='repairing' or p.phase=='clearing') then
@@ -450,7 +473,7 @@ function M.new(app,config,e,queue,production)
                 else p.report.omittedEntries=p.report.omittedEntries+1 end
               end
             end
-            j.reportCollected=true; j.report=nil; j.blocks=nil; save()
+            j.reportCollected=true; j.report=nil; j.blocks=nil; save(p)
           end
         end
         p.completed=done
@@ -471,7 +494,7 @@ function M.new(app,config,e,queue,production)
               end
             end
           end
-          save()
+          save(p)
         elseif active==0 and p.issuedCount==#regions then
           if p.nextMode then
             local mode=p.nextMode; p.nextMode=nil; beginPhase(p,mode,a)
@@ -492,7 +515,7 @@ function M.new(app,config,e,queue,production)
               else p.error=afterBuild and 'Defects remain after 3 automatic repair rounds; inspect build status before retrying' or 'Verification found unresolved defects' end
             else p.settlement={target=afterBuild and 'built' or 'verified'};p.phase='settling' end
           end
-          save()
+          save(p)
         end
       end
     end
@@ -542,6 +565,7 @@ function M.new(app,config,e,queue,production)
     -- Commit the stream cursor and removal in the same checkpoint. Never leave
     -- a cursor pointing to a deleted project if the computer stops here.
     if advance then advance() else save() end
+    reported[name]=nil;if app.record then app:record('project_retired',{project=name}) end
     return true
   end
   return self

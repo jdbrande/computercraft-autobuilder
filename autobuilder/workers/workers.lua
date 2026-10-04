@@ -1,6 +1,7 @@
 local U=require('autobuilder.core.util')
 local M={}
-function M.new(state,config,save)
+function M.new(state,config,save,record)
+  record=record or function() end
   state.workers=state.workers or {}
   for _,w in pairs(state.workers) do w.online=false end
   local self={state=state}
@@ -15,16 +16,21 @@ function M.new(state,config,save)
     end
     state.workers[key]={id=m.sender,boot=m.boot,sequence=m.sequence,
       online=true,lastSeen=now,telemetry=U.copy(m.payload)}
-    local ok,err=save()
-    if not ok then state.workers[key]=old; return false,err end
+    local called,ok,err=pcall(save)
+    if not called or not ok then state.workers[key]=old;return false,called and err or ok end
+    if not old or not old.online or old.boot~=m.boot then record('worker_online',{worker=m.sender,boot=m.boot,status=m.payload.status}) end
     return true
   end
   function self:expire(now)
-    local changed=false
+    local changed={}
     for _,w in pairs(state.workers) do
-      if w.online and now-w.lastSeen>(config.workerTimeout or 30) then w.online=false; changed=true end
+      if w.online and now-w.lastSeen>(config.workerTimeout or 30) then w.online=false;changed[#changed+1]=w end
     end
-    if changed then return save() end
+    if #changed>0 then
+      local called,ok,err=pcall(save)
+      if not called or not ok then for _,w in ipairs(changed) do w.online=true end;return false,called and err or ok end
+      for _,w in ipairs(changed) do record('worker_offline',{worker=w.id,lastSeen=w.lastSeen}) end
+    end
     return true
   end
   return self

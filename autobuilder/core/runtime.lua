@@ -2,7 +2,7 @@ local U=require('autobuilder.core.util')
 local Checkpoint=require('autobuilder.core.checkpoint')
 local Network=require('autobuilder.core.network')
 local M={}
-local operatorEvents={char=true,key=true,paste=true,autobuilder_command=true}
+local operatorEvents={char=true,key=true,paste=true,autobuilder_command=true,monitor_touch=true}
 local function commandReply(e,id,ok,result)
   if U.shortString(id,64) and e.os.queueEvent then
     e.os.queueEvent('autobuilder_command_result',id,not not ok,tostring(result or (ok and 'OK' or 'failed')):sub(1,1024))
@@ -54,6 +54,7 @@ function M.new(config,e)
   state.boot=math.max(state.boot+1,math.floor(clock()*1000))
   local self={state=state,config=config,page=0,motionVersion=0,busy=false,input=''}
   local log=require('autobuilder.core.log').new(e.fs,config.logDir..'/'..config.role..'.log',config.log,clock)
+  local events=require('autobuilder.core.log').new(e.fs,config.logDir..'/'..config.role..'.events.jsonl',config.log,clock,e.textutils)
   local network=Network.new(e,config,id,state.boot)
   local lastSave=clock()
   function self:save()
@@ -61,8 +62,22 @@ function M.new(config,e)
     local ok,err=store:save(state); assert(ok,err)
     lastSave=clock(); return true
   end
+  function self:record(kind,fields)
+    -- A log failure must never roll back a successful domain checkpoint in RAM.
+    local called,ok,why=pcall(function()
+      local value=U.copy(fields or {});value.computer=id;value.runtimeBoot=state.boot;value.controller=config.role=='controller' and id or config.controllerId
+      return events:event(kind,value)
+    end)
+    state.eventLogError=not called and tostring(ok) or not ok and tostring(why) or nil
+    return called and ok, state.eventLogError
+  end
+  local function record(kind,fields) return self:record(kind,fields) end
   function self:report(level,message)
-    if level=='ERROR' or level=='WARN' then state.lastError=message end
+    local previous=state.lastError
+    if level=='ERROR' or level=='WARN' then
+      state.lastError=message
+      if previous~=message then self:record('diagnostic',{severity=level,message=tostring(message):sub(1,1024)}) end
+    end
     local ok,err=log:write(level,message); assert(ok,err)
   end
   self.chunks=require('autobuilder.core.chunks').new(state,config,function() return self:save() end)
@@ -72,7 +87,7 @@ function M.new(config,e)
       local recovery=worker.telemetry and worker.telemetry.poseRecovery
       if recovery and recovery.granted and recovery.stage~='settled' then state.assignmentRecovery=true end
     end
-    self.registry=require('autobuilder.workers.workers').new(state,config,function() return self:save() end)
+    self.registry=require('autobuilder.workers.workers').new(state,config,function() return self:save() end,record)
     if config.fleet.enabled then
       local ok,release=pcall(require('autobuilder.core.enrollment').release,e)
       if ok then self.fleetRelease=release else self:report('WARN','Fleet enrollment unavailable: '..tostring(release)) end
@@ -274,8 +289,19 @@ function M.new(config,e)
     return result,err
   end
   function self:command(line)
+    self.dashboardAt=nil
     line=line:match('^%s*(.-)%s*$')
+    line=({['fleet workers']='workers',['storage status']='resources'})[line] or line
+    line=line:gsub('^project%s+','build ')
+
     local called,ok,result=pcall(function()
+      if config.role=='controller' and (line=='dashboard' or line=='build list' or line:match('^fleet worker ')) then
+        local id=line:match('^fleet worker (%d+)$')
+        if line:match('^fleet worker ') then assert(id and state.workers[tostring(tonumber(id))],'Unknown worker') end
+        state.dashboardWorker=id and tonumber(id) or nil;state.view='dashboard'
+        local lines=require('autobuilder.ui.dashboard').lines(state,self.automation.projects:cachedForecasts(),clock(),self.io,state.dashboardWorker)
+        return true,table.concat(lines,'; ')
+      end
       if line=='chunks' then
         if self.agent then state.telemetry=self.agent:telemetry() end
         state.view='chunks';return true,self.chunks:describe()
@@ -300,10 +326,21 @@ function M.new(config,e)
     state.commandResult=tostring(result or (ok and 'OK' or 'failed'))
     return ok,result
   end
-  function self:draw() require('autobuilder.ui.ui').draw(e.term,state,self.agent,self.page,self.input) end
+  self.monitor=require('autobuilder.ui.monitor').new(e,config.monitor)
+  function self:draw()
+    if config.role=='controller' and (state.view=='dashboard' or config.monitor.name~='') then
+      if not self.dashboardAt or clock()-self.dashboardAt>=1 then
+        self.dashboardLines=require('autobuilder.ui.dashboard').lines(state,self.automation.projects:cachedForecasts(),clock(),self.io,state.dashboardWorker)
+        self.dashboardAt=clock()
+      end
+      local ok,why=self.monitor:draw(self.dashboardLines,clock());self.monitorError=not ok and why or nil
+    end
+    require('autobuilder.ui.ui').draw(e.term,state,self.agent,self.page,self.input,self.dashboardLines,self.monitorError)
+  end
   function self:event(name,a,b,c)
     if self.quitRequested and not self.busy then self:save(); return false end
     if name=='rednet_message' then self:receive(a,b,c)
+    elseif name=='monitor_touch' and a==config.monitor.name then self.monitor:touch()
     elseif name=='autobuilder_command' then
       if U.shortString(a,64) then
         if type(b)~='string' or #b>256 or b:find('[%c]') then commandReply(e,a,false,'Invalid command; not executed')

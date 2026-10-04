@@ -1845,3 +1845,14 @@ both casings and all seven sentinel inventories. Five computers are off and six
 temporary tickets removed. Protected work intentionally remains paused/owned;
 its traffic wait is not reported as fleet drain. Permanent candidate evidence is
 in [0.37 validation](validation-0.37.0.md). Final-source full Lua gate continues.
+
+### 0.38 monitor and event integration
+
+Added optional native monitor paging, bounded redraw and reconnect handling, a
+shared cached dashboard and fleet/project/storage aliases. Rendering does not
+query inventory APIs or analyze blueprints; display rows stay outside checkpoints.
+Structured event hooks follow successful domain saves and suppress duplicates.
+Logging failures cannot unwind committed inventory; explicit regressions cover
+that boundary and failed production checkpoints.23 Python tests pass, including
+independent JSON parsing, bounds and rotation. Focused Lua integration passes;
+native acceptance, final review and full gates remain pending.
