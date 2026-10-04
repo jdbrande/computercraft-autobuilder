@@ -1083,7 +1083,7 @@ prior delivery and hazard costs; `E.plan` consumes bounded known route obstacles
 
 - [x] Run staged loaded hazard/alternative-resource native acquisition with finite fuel;
   verify automatic useful selection, observed diagnostics and actual deposited stock.
-- [ ] Add regressions for discovered bugs, preserve cleanup/restart evidence and update
+- [x] Add regressions for discovered bugs, preserve cleanup/restart evidence and update
   permanent acceptance/progress documentation. Run one final review/fix pass and the
   complete Lua/Python/release/diff checks, integrate/push and continue all remaining work.
 

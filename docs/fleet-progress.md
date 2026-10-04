@@ -1219,3 +1219,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 
 - Integrated accepted0.24 dynamic scaling on main. Source/test/release artifacts
   match the fully tested milestone; integration only reconciles progress documents.
+
+- Accepted0.25 mining intelligence:804 Lua/18 Python, final review regressions,
+  native hazard/yield/restart/initial-cargo checks and cleanup complete. Imported
+  accepted0.24 evidence without changing tested implementation.
