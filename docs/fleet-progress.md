@@ -1454,3 +1454,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Final0.28 full gate passed853 Lua tests,18 Python tests and release/diff checks.
   Accepted0.27 documentation merged without changing the tested source. Both
   native trials, overlap/restart proof and cleanup are permanently documented.
+
+- Started0.31 registered processing design while enrollment receives its final
+  review. PROCESS operations will reuse dependency, reservation and physical
+  transfer accounting for inventory-exposed machines, with explicit slot recipes,
+  item fuel, capacity and processing-time estimates. Non-automatable hardware is
+  reported unsupported. Implementation and acceptance remain pending.
