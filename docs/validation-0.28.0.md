@@ -1,9 +1,11 @@
 # Continuous production and construction candidate validation
 
-Candidate0.28.0, implementation `b7f3f87`. Native acceptance is complete; the
-complete Lua gate is still running. The full fleet roadmap remains unfinished.
+Accepted0.28.0, implementation `b7f3f87`. Native acceptance and complete release
+gates passed. The full fleet roadmap remains unfinished.
 
 ## Automated evidence
+
+-853 Lua tests passed on the final implementation.
 
 -18 Python tests pass. Release generation/verification and whitespace checks pass.
 - Actual controller, miners, furnace, crafter and two builders demonstrate a

@@ -60,8 +60,10 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   tests and finite-fuel native proactive-refill acceptance.
 - Material forecasts/early supply0.27 accepted:846 Lua/18 Python tests, two
   native replacement-acquisition trials including controller/builder reboot.
-- Continuous pipeline0.28 final gate/native retest,0.29 health review corrections,
-  and0.30 single-command enrollment implementation are in progress.
+- Continuous pipeline0.28 accepted:853 Lua/18 Python tests and native overlapping
+  placement/acquisition through controller/builder restart and final conservation.
+- Worker health0.29 final gate and0.30 single-command enrollment implementation
+  and native HTTP installation acceptance are in progress.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -1400,3 +1402,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   and stock/supply/mining ownership drained. Seven computers shut down and twenty
   force-load tickets removed. Full Lua gate remains; permanent candidate report
   records the first-run limitation and stronger retest evidence separately.
+
+- Final0.28 full gate passed853 Lua tests,18 Python tests and release/diff checks.
+  Accepted0.27 documentation merged without changing the tested source. Both
+  native trials, overlap/restart proof and cleanup are permanently documented.

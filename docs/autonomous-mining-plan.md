@@ -1199,17 +1199,17 @@ integration and do not pause for routine milestone approvals.
 
 ### Task59: Automatic run admission through existing supply ownership
 
-- [ ] Add failing controller cases for empty-stock automatic region creation,
+- [x] Add failing controller cases for empty-stock automatic region creation,
   explicit prepare/start, saved legacy owned requests and pause/reboot.
-- [ ] Persist per-run automatic streaming mode, begin only verified preparation
+- [x] Persist per-run automatic streaming mode, begin only verified preparation
   regions and reuse finite supply-production requests; never rewrite active claims.
-- [ ] Preserve actor/request linkage and final settlement across generation changes.
+- [x] Preserve actor/request linkage and final settlement across generation changes.
   Run focused project, supply and production tests; document behavior and commit.
 
 ### Task60: Full pipeline and release acceptance
 
-- [ ] Add actual miner/factory/multiple-builder overlap regression with finite stock,
+- [x] Add actual miner/factory/multiple-builder overlap regression with finite stock,
   partial transfer and restart, measured item conservation and final drain.
-- [ ] Run native acceptance where useful, one final review and consolidated fixes,
+- [x] Run native acceptance where useful, one final review and consolidated fixes,
   full Lua/Python/release/diff checks. Update permanent evidence and progress,
   integrate/push in dependency order, then continue every remaining requirement.
