@@ -1391,3 +1391,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Final0.27 gate passed846 Lua tests and18 Python tests, with release/diff checks.
   Accepted0.26 documentation merged without changing tested implementation files.
   Permanent0.27 report includes both completed native trials and confirmed cleanup.
+
+- Native0.28 completed both runs. First empty-stock construction finished but did
+  not capture overlap. The second consumed its two measured surplus bricks while
+  acquiring new glass ingredients; brick placement overlapped an away sand miner,
+  then controller/builders rebooted and all7 positions verified. All60 independent
+  final world checks passed, all workers returned empty, three requests completed,
+  and stock/supply/mining ownership drained. Seven computers shut down and twenty
+  force-load tickets removed. Full Lua gate remains; permanent candidate report
+  records the first-run limitation and stronger retest evidence separately.
