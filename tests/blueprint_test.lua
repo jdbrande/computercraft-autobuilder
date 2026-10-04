@@ -58,3 +58,15 @@ test('blueprint refuses cyclic metadata and cyclic placement support',function()
   local blocks={{x=0,y=0,z=0,name='minecraft:wall_torch',state={facing='west'}},{x=1,y=0,z=0,name='minecraft:wall_torch',state={facing='east'}}}
   assert(not pcall(B.regions,blocks,1))
 end)
+
+test('bed foot depends on both floors before generating a cross-region head',function()
+ local blocks={{x=0,y=1,z=0,name='minecraft:red_bed',state={part='foot',facing='east',occupied='false'}},
+  {x=1,y=1,z=0,name='minecraft:red_bed',state={part='head',facing='east',occupied='false'}},
+  {x=0,y=0,z=0,name='minecraft:stone',state={}},{x=1,y=0,z=0,name='minecraft:stone',state={}}}
+ local order={};for _,region in ipairs(require('autobuilder.blueprint.blueprint').regions(blocks,1)) do
+  for _,b in ipairs(region.blocks) do
+   if b.state.part=='foot' then assert(order['0,0'] and order['1,0'],'both floors must precede foot') end
+   order[b.x..','..b.y]=true
+  end
+ end
+end)

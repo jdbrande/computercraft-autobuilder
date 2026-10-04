@@ -6,6 +6,7 @@ local function short(v,n) return v~=nil and tostring(v):gsub('[%c]',' '):sub(1,n
 function M.materialItem(block)
   if not block or type(block.name)~='string' then return nil end
   if block.name:match('_door$') and (block.state or {}).half=='upper' then return nil end
+  if block.name:match('_bed$') and (block.state or {}).part=='head' then return nil end
   return require('autobuilder.build.blockstates').item(block)
 end
 function M.validMaterials(values)

@@ -33,8 +33,24 @@ local function fixture(blocks)
         state={half='lower',facing=w.pose.heading,hinge='left',open=false,powered=false}
         local top=U.copy(state); top.half='upper'; w.blocks[key(upper)]={name=name,state=top}
         if w.badPair then w.blocks[key(upper)]=nil end
+      elseif name:match('_bed$') then
+        local v=vectors[w.pose.heading];local head={x=p.x+v[1],y=p.y,z=p.z+v[2]}
+        if w.blocks[key(head)] or key(w.pose)==key(head) then return false,'bed head occupied' end
+        for _,at in ipairs({p,head}) do if not w.blocks[key({x=at.x,y=at.y-1,z=at.z})] then return false,'bed floor missing' end end
+        state={part='foot',facing=w.pose.heading,occupied=false};local top=U.copy(state);top.part='head'
+        if not w.badPair then w.blocks[key(head)]={name=name,state=top} end
       elseif name:match('_slab$') then state={type=suffix=='Down' and 'bottom' or 'top',waterlogged=false}
       elseif connected(name) then state={north=false,east=false,south=false,west=false,waterlogged=false}
+      elseif name:match('_button$') or name=='minecraft:lever' then
+        state={face=suffix=='Down' and 'floor' or suffix=='Up' and 'ceiling' or 'wall',facing=suffix=='' and order[(index[w.pose.heading]+1)%4+1] or w.pose.heading,powered=w.powered or false}
+      elseif name:match('rail$') then state={shape=(w.pose.heading=='east' or w.pose.heading=='west') and 'east_west' or 'north_south',waterlogged=false};if name~='minecraft:rail' then state.powered=false end
+      elseif name=='minecraft:repeater' then state={facing=order[(index[w.pose.heading]+1)%4+1],delay=1,locked=false,powered=w.powered or false}
+      elseif name=='minecraft:comparator' then state={facing=order[(index[w.pose.heading]+1)%4+1],mode='compare',powered=w.powered or false}
+      elseif name=='minecraft:redstone' then name='minecraft:redstone_wire';state={north='side',east='side',south='side',west='side',power=0}
+      elseif name=='minecraft:redstone_torch' then state={lit=true};if suffix=='' then name='minecraft:redstone_wall_torch';state.facing=order[(index[w.pose.heading]+1)%4+1] end
+      elseif name=='minecraft:wheat_seeds' then
+        local soil=w.blocks[key({x=p.x,y=p.y-1,z=p.z})];if not soil or soil.name~='minecraft:farmland' then return false,'cannot plant here' end
+        name='minecraft:wheat';state={age=0}
       elseif name=='minecraft:lantern' or name=='minecraft:soul_lantern' then state={hanging=suffix=='Up',waterlogged=false}
       elseif name=='minecraft:ladder' then state={facing=order[(index[w.pose.heading]+1)%4+1],waterlogged=false}
       end
@@ -207,4 +223,82 @@ test('paired placement power loss invalidates pre-placement inspection cache und
     task=saved(); ex=new(task)
   end
   eq(task.phase,'completed'); assert(sawCrash); eq(w.places,1); eq(w.items[1].count,1); eq(task.progress,2)
+end)
+
+local function bed(facing)
+ local v=({north={0,-1},east={1,0},south={0,1},west={-1,0}})[facing]
+ return block('red_bed',{part='foot',facing=facing,occupied='false'}),block('red_bed',{part='head',facing=facing,occupied='false'},3+v[1],1,v[2])
+end
+test('paired beds consume one item verify both cells and recover placement once',function()
+ for _,facing in ipairs({'north','east','south','west'}) do for _,crash in ipairs({false,true}) do
+  local foot,head=bed(facing);local w,task,new,saved=fixture({foot,head});w.items[1]={name=foot.name,count=2};w.crash=crash
+  w.blocks['3,0,0']={name='minecraft:stone',state={}};w.blocks[head.x..',0,'..head.z]={name='minecraft:stone',state={}}
+  run(new());if crash then task=saved();assert(task.intent);task.phase='work';run(new(task)) end
+  eq(task.phase,'completed');eq(task.progress,2);eq(w.places,1);eq(w.items[1].count,1)
+  eq(require('autobuilder.core.reports').materials(task.report)[foot.name],1)
+ end end
+end)
+test('beds require both floors empty paired space and matching blueprint halves',function()
+ for _,failure in ipairs({'floor','occupied','mismatch','protected','pair'}) do
+  local foot,head=bed('east');local w,task,new=fixture({foot,head});w.items[1]={name=foot.name,count=1};w.blocks['3,0,0']={name='minecraft:stone',state={}}
+  if failure~='floor' then w.blocks['4,0,0']={name='minecraft:stone',state={}} end
+  if failure=='occupied' then w.blocks['4,1,0']={name='minecraft:stone',state={}} end
+  if failure=='mismatch' then head.state.facing='west' end
+  w.badPair=failure=='pair'
+  local config={minimumFuelReserve=0};if failure=='protected' then config.restrictedAreas={{min={x=4,y=1,z=0},max={x=4,y=1,z=0}}} end
+  run(new(nil,config));eq(task.phase,'blocked');eq(task.progress,0);eq(w.places,failure=='pair' and 1 or 0)
+ end
+end)
+test('bed inspections resume across per-cell reservations and reboot',function()
+ local foot,head=bed('north');local w,task,new,saved=fixture({foot,head});w.items[1]={name=foot.name,count=1}
+ w.blocks['3,0,0']={name='minecraft:stone',state={}};w.blocks['3,0,-1']={name='minecraft:stone',state={}}
+ task=gatedRun(w,task,new,saved,true);eq(task.phase,'completed');eq(w.places,1);eq(task.progress,2)
+end)
+
+test('native basic adapter states have deterministic plans and strict unsupported variants',function()
+ local C=require('autobuilder.build.blockstates');local P=require('autobuilder.build.placement')
+ for _,case in ipairs({
+  {'stone_button',{face='floor',facing='east',powered='false'},'down','east'},
+  {'lever',{face='wall',facing='west',powered='false'},'forward','east'},
+  {'oak_button',{face='ceiling',facing='south',powered='false'},'up','south'},
+  {'rail',{shape='east_west',waterlogged='false'},'down','east'},
+  {'powered_rail',{shape='north_south',powered='false',waterlogged='false'},'down','north'},
+  {'repeater',{facing='east',delay='1',locked='false',powered='false'},'down','west'},
+  {'comparator',{facing='west',mode='compare',powered='false'},'down','east'},
+  {'redstone_torch',{lit='true'},'down','north'},
+  {'redstone_wall_torch',{lit='true',facing='east'},'forward','west'},
+  {'redstone_wire',{power='0',north='side',east='side',south='side',west='side'},'down','north'},
+  {'wheat',{age='0'},'down','north'},{'dandelion',{},'down','north'},{'oak_sapling',{stage='0'},'down','north'},
+ }) do local b=block(case[1],case[2]);local plan=assert(P.plan(b),case[1]);eq(plan.direction,case[3]);eq(plan.heading,case[4]) end
+ for _,case in ipairs({{'rail',{shape='ascending_east'}},{'lever',{face='wall',facing='west',powered='true'}},
+  {'repeater',{facing='east',delay='2',locked='false',powered='false'}},{'comparator',{facing='east',mode='subtract',powered='false'}},
+  {'wheat',{age='7'}},{'redstone_wire',{power='1'}},{'redstone_torch',{lit='false'}}}) do eq(C.classify('minecraft:'..case[1],case[2]),'UNSUPPORTED') end
+ eq(C.item(block('wheat',{age='0'})),'minecraft:wheat_seeds');eq(C.item(block('redstone_wire',{})),'minecraft:redstone')
+end)
+
+test('basic native adapters execute support journals and final verification across reboot',function()
+ for _,case in ipairs({
+  {block('stone_button',{face='floor',facing='east',powered='false'}),'3,0,0'},
+  {block('lever',{face='wall',facing='west',powered='false'}),'4,1,0'},
+  {block('oak_button',{face='ceiling',facing='south',powered='false'}),'3,2,0'},
+  {block('rail',{shape='east_west',waterlogged='false'}),'3,0,0'},
+  {block('repeater',{facing='east',delay='1',locked='false',powered='false'}),'3,0,0'},
+  {block('comparator',{facing='west',mode='compare',powered='false'}),'3,0,0'},
+  {block('redstone_wall_torch',{facing='east',lit='true'}),'2,1,0'},
+  {block('redstone_wire',{power='0',north='side',east='side',south='side',west='side'}),'3,0,0'},
+ }) do
+  local w,task,new,saved=fixture({case[1]});w.items[1]={name=require('autobuilder.build.blockstates').item(case[1]),count=1};w.blocks[case[2]]={name='minecraft:stone',state={}}
+  task=gatedRun(w,task,new,saved,true);eq(task.phase,'completed');eq(task.report.counts.correct,1);eq(w.places,1)
+ end
+end)
+test('plant placement relies on native substrate checks without occupying crop soil',function()
+ for _,soil in ipairs({'minecraft:farmland','minecraft:dirt'}) do
+  local b=block('wheat',{age='0'});local w,task,new=fixture({b});w.items[1]={name='minecraft:wheat_seeds',count=1};w.blocks['3,0,0']={name=soil,state={}}
+  run(new());eq(task.phase,soil=='minecraft:farmland' and 'completed' or 'blocked');eq(w.places,soil=='minecraft:farmland' and 1 or 0)
+ end
+end)
+test('redstone final verification rejects actual powered state after successful placement',function()
+ local b=block('repeater',{facing='north',delay='1',locked='false',powered='false'})
+ local w,task,new=fixture({b});w.powered=true;w.items[1]={name=b.name,count=1};w.blocks['3,0,0']={name='minecraft:stone',state={}}
+ run(new());eq(task.phase,'blocked');eq(task.progress,0);eq(w.places,1)
 end)

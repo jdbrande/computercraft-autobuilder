@@ -3,7 +3,7 @@ local T=require('autobuilder.blueprint.transforms')
 local Cooperate=require('autobuilder.core.cooperate')
 local M={}
 local air={['minecraft:air']=true,['minecraft:cave_air']=true,['minecraft:void_air']=true}
-local aliases={['minecraft:wall_torch']='minecraft:torch',['minecraft:redstone_wall_torch']='minecraft:redstone_torch',['minecraft:soul_wall_torch']='minecraft:soul_torch',['minecraft:redstone_wire']='minecraft:redstone'}
+local aliases={['minecraft:wall_torch']='minecraft:torch',['minecraft:redstone_wall_torch']='minecraft:redstone_torch',['minecraft:soul_wall_torch']='minecraft:soul_torch',['minecraft:redstone_wire']='minecraft:redstone',['minecraft:wheat']='minecraft:wheat_seeds',['minecraft:carrots']='minecraft:carrot',['minecraft:potatoes']='minecraft:potato',['minecraft:beetroots']='minecraft:beetroot_seeds'}
 function M.blocks(data,origin,rotation,mirrorX,mirrorZ)
   local valid,err=S.validate(data); assert(valid,err)
   origin=origin or {x=0,y=0,z=0}
@@ -128,6 +128,9 @@ function M.regions(blocks,size)
       local below=cells[key(b.x,b.y-1,b.z)]
       if below then node.deps[below]=nil end
       depend(node,b.x,b.y+1,b.z)
+    end
+    if b.name:match('_bed$') and state.part=='foot' and vectors[state.facing] then
+      local v=vectors[state.facing];depend(node,b.x+v.x,b.y-1,b.z+v.z)
     end
     if b.name:match('_bed$') and state.part=='head' and vectors[state.facing] then
       local v=vectors[state.facing]; depend(node,b.x-v.x,b.y,b.z-v.z)

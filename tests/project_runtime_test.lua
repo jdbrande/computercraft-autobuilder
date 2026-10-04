@@ -845,3 +845,10 @@ test('automatic streaming bootstrap survives interruption at its first site chec
   for _=1,1500 do step();if c.state.automation.projects.bootstrap.phase=='built' and not b.state.currentTask then break end end
   eq(c.state.automation.projects.bootstrap.phase,'built');eq(w.places,2)
 end)
+
+test('analysis reports placement families and rejects incomplete paired schematic footprints',function()
+ local bp={schema=1,size={x=1,y=1,z=1},palette={{name='minecraft:red_bed',state={part='foot',facing='east',occupied='false'}}},runs={{id=1,count=1}},metadata={},requirements={}}
+ local w,ce,we,c=fixture({blueprint=bp});assert(c:command('build import /example.json bed'));assert(c:command('build analyze bed'))
+ local p=c.state.automation.projects.bed;eq(p.analysis.placementFamilies.paired,1);assert(#p.issues>0);eq(p.issues[1].status,'UNSUPPORTED')
+ local ok=c:command('build prepare bed');eq(ok,false);eq(w.places,0)
+end)

@@ -1500,3 +1500,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   deterministic rail/redstone states and simple plants, with explicit analyzer
   feature/tool diagnostics. Renewable0.32 remains in final review/native acceptance;
   enrollment/processor complete gates continue without source changes.
+
+-0.33 implements bed pair journals/accounting/support order, finite attached and
+  basic redstone/rail strategies, native seedling placement, final neighborhood
+  verification and analyzer family/paired-footprint checks. Focused actor tests
+  cover per-cell grants and restart, missing paired floors, protected cells,
+  contradictory halves and powered-state rejection. Native probes confirm floor,
+  wall and ceiling facings, both rail axes, bed orientation, wire connections,
+  opposite repeater/comparator facing and farmland seed placement. Full project
+  acceptance, single final review and release gates remain pending.
