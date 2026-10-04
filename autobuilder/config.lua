@@ -13,6 +13,7 @@ M.defaults={
   chunkLoading={enabled=true,anchor=false,areas={}},
   scaling=require('autobuilder.core.scaling').defaults,
   storageInventories={}, providerPreferences={}, fuel=require('autobuilder.resources.fuel').defaults,
+  processors={machines={},recipes={}},
   furnaces={}, smeltingFuelItem='minecraft:coal', smeltingWaitSteps=600, turtleFuelReserveItems={['minecraft:coal']=64},
   craftingStation={buffer='',input='',output='',inputSide='up',outputSide='down'},
   craftingStations={},craftingBatchSize=2,
@@ -41,7 +42,7 @@ local function merge(dst,src,schema)
     assert(schema[k]~=nil or k=='controllerId' or k=='initialPosition' or k=='depot' or k=='label' or k=='entry' or k=='bounds' or k=='x' or k=='y' or k=='z' or k=='min' or k=='max', 'Unknown config key: '..tostring(k))
     if type(v)=='table' and type(dst[k])=='table' then
       -- These maps/lists are user-defined rather than schema objects.
-      if k=='profiles' or k=='nodes' or k=='areas' or k=='values' or k=='returns' or k=='stations' or k=='providerPreferences' or k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
+      if k=='machines' or k=='recipes' or k=='profiles' or k=='nodes' or k=='areas' or k=='values' or k=='returns' or k=='stations' or k=='providerPreferences' or k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
         or k=='craftingStations' or k=='supplyStations' or k=='furnaces' or k=='turtleFuelReserveItems' or k=='treeFarms' or k=='farms' or k=='depotExpansion' then dst[k]=U.copy(v)
       else merge(dst[k],v,schema[k]) end
     else dst[k]=U.copy(v) end
@@ -130,6 +131,7 @@ function M.load(overrides)
   assert(({front=true,up=true,down=true})[c.supply.side] and U.integer(c.supply.batch) and c.supply.batch>=1 and c.supply.batch<=64,'invalid supply station')
   assert(type(c.supply.inventory)=='string','supply inventory must be a wired peripheral name')
   require('autobuilder.storage.supply').validate(c)
+  require('autobuilder.factory.processors').validate(c)
   for _,name in ipairs(c.furnaces) do assert(U.shortString(name,128),'invalid furnace peripheral') end
   for item,n in pairs(c.turtleFuelReserveItems) do assert(U.shortString(item,128) and U.integer(n) and n>=0,'invalid reserved fuel') end
   assert(U.shortString(c.smeltingFuelItem,128),'invalid smelting fuel item')

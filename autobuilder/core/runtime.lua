@@ -38,6 +38,7 @@ function M.new(config,e)
   end
   validateState(state,config.role,id)
   if config.role=='controller' then
+    require('autobuilder.factory.processors').validateSaved(config,state)
     require('autobuilder.factory.stations').validateSaved(config,state)
     require('autobuilder.storage.nodes').validateSaved(config,state)
     require('autobuilder.storage.supply').validateSaved(config,state.automation or {})

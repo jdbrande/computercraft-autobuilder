@@ -34,3 +34,14 @@ capacity-limited batches, partial transfers, interruption after side effects, pa
 recovery, missing power/output, changed configuration and final item conservation.
 One final review/consolidated fixes, full gates and permanent evidence precede
 integration, then renewable provider/reserve coverage continues.
+
+Implementation refinement: keep a finite job's stock claim, but stream one complete
+recipe batch at a time through the exclusively owned machine. Before loading each
+batch, reserve only that batch's destination capacity; release that tranche only
+after measured output delivery. This avoids assuming an unseen output stack limit
+or requiring an entire64-batch job to fit simultaneously in output storage. The
+machine lease remains held between tranches. Observed surplus item fuel receives
+its own destination-capacity tranche and measured `fuelReturned` journal counter.
+It is not promised output and does not alter the stock lease's exact product-output
+contract: withdrawn fuel remains gross withdrawal, while physically returned fuel
+reappears in the next ordinary stock observation. Never infer residual burn as fuel.

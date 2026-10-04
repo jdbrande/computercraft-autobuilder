@@ -1466,3 +1466,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   and fail closed on incomplete unpinned discovery. All four new regressions failed
   before the changes and pass afterward; enrollment/setup/install/runtime focused
   suites pass. Full gates and final-source native repair retest follow.
+
+-0.31 registered processors now have bounded recipe/machine schemas, PROCESS
+  provider and dependency/fuel planning, balanced finite jobs, private machine
+  claims, per-batch destination capacity, exact measured transfers and unused-fuel
+  return. Initial regressions pass for concurrent multi-input machines, partial
+  transfers, power-loss/paused reconciliation, unavailable power, changed owned
+  recipes, release crashes, failed claims, disconnects and contamination. Native
+  controller239 with two blast furnaces and a smoker is prepared; acceptance,
+  final review and full gates remain pending.

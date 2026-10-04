@@ -58,7 +58,7 @@ function M.build(state,stock,scopes)
           for item,n in pairs(lease.transit or {}) do if f.items[item] then f.items[item].inTransit=f.items[item].inTransit+n end end
         end
         local item=j.item;local row=item and f.items[item]
-        local kind=j.type=='CRAFT' and 'crafting' or j.type=='SMELT' and 'processing'
+        local kind=j.type=='CRAFT' and 'crafting' or (j.type=='SMELT' or j.type=='PROCESS') and 'processing'
           or (j.type=='HARVEST' or j.type=='FARM') and 'harvesting' or (not j.type or j.type=='MINE') and 'mining'
         local w=j.workerId and (state.workers or {})[tostring(j.workerId)]
         local t=w and w.online and w.telemetry
