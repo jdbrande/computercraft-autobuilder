@@ -126,7 +126,8 @@ function M.new(app,config,e,queue)
     for _,worker in pairs(app.state.workers) do
       local t=worker.telemetry
       if worker.online and t and t.capabilities and t.capabilities[capability]
-        and not (capability=='mining' and t.capabilities.explorationV1) then
+        and not (capability=='mining' and t.capabilities.explorationV1)
+        and require('autobuilder.workers.health').eligible(t,{type=({logging='HARVEST',farming='FARM',crafting='CRAFT',mining='MINE',explorationV1='MINE'})[capability]}) then
         if not item or Materials.accepts(t.miningResources,item) then return true end
       end
     end

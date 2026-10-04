@@ -32,8 +32,8 @@ function M.candidates(item,config)
     local explore=(config.exploration or {}).enabled
     add(explore and 'exploration' or 'mining',explore and 'explorationV1' or 'mining')
   end
-  for index,farm in ipairs(config.treeFarms or {}) do if farm.item==item then add('tree_farm','logging',{index=index,farm=U.copy(farm)}) end end
-  for index,farm in ipairs(config.farms or {}) do if farm.item==item then add('farm','farming',{index=index,farm=U.copy(farm)}) end end
+  for index,farm in ipairs(config.treeFarms or {}) do if farm.item==item then add('tree_farm','logging',{index=index,farm=require('autobuilder.resources.renewables').freeze(farm,config)}) end end
+  for index,farm in ipairs(config.farms or {}) do if farm.item==item then add('farm','farming',{index=index,farm=require('autobuilder.resources.renewables').freeze(farm,config)}) end end
   return out
 end
 local function available(p,config,context)
@@ -44,7 +44,8 @@ local function available(p,config,context)
   for _,w in pairs(context.workers) do
     local t=w.telemetry
     if w.online and t and t.capabilities and t.capabilities[p.capability]
-      and not (p.type=='mining' and t.capabilities.explorationV1) then
+      and not (p.type=='mining' and t.capabilities.explorationV1)
+      and require('autobuilder.workers.health').eligible(t,{type=({tree_farm='HARVEST',farm='FARM',crafting='CRAFT',mining='MINE',exploration='MINE'})[p.type]}) then
       if (p.type~='mining' and p.type~='exploration') or Materials.accepts(t.miningResources,p.item) then return true end
     end
   end
