@@ -5,6 +5,11 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.36 priorities:1,003 Lua/20 Python tests, final release/diff checks,
+  the single final review and native two-project acceptance passed. The finite
+  supply handoff correction is included in the repeated full gate.
+  [Permanent evidence](validation-0.36.0.md). Continue0.37–0.40 candidate gates.
+
 - Accepted0.35 reachable inventory recovery:976 Lua/20 Python tests and final
   release/diff checks passed. Two native trials verified exact plain/NBT cargo,
   frozen donor ownership, restart, home refueling between trips and cleanup.
@@ -1842,3 +1847,7 @@ its existing bounds, preserving the placement-time physical-miner witness while
 parallel acquisition runs earlier. Its focused full-chain case passed unchanged
 assertions and exact final material accounting. Final full gates are restarting;
 0.36 is not yet accepted.
+
+-0.36 accepted after the repeated clean-source gate passed1,003/1,003 Lua tests
+  with20/20 Python tests and release/diff checks. No unintended tracked or untracked
+  files were present; ignored native audit artifacts remain local.
