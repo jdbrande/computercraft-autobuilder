@@ -63,9 +63,11 @@ function M.farmTarget(job,target)
   if type(farm)~='table' or type(farm.sites)~='table' or #farm.sites<1 or #farm.sites>64 then return false end
   local height=farm.maxHeight or 8
   if not U.integer(height) or height<2 or height>32 then return false end
-  local tree=job.type=='HARVEST' and ({oak=true,birch=true,spruce=true})[farm.kind]
-  local column=job.type=='FARM' and ({bamboo=true,cactus=true,sugar_cane=true})[farm.kind]
-  if not tree and not column and not (job.type=='FARM' and farm.kind=='wheat') then return false end
+  local ok,spec=pcall(require('autobuilder.resources.renewables').forFarm,farm,{})
+  if not ok or not spec then return false end
+  local tree=job.type=='HARVEST' and spec.mode=='tree'
+  local column=job.type=='FARM' and spec.mode=='column'
+  if not tree and not column and not (job.type=='FARM' and spec.mode=='crop') then return false end
   for _,p in ipairs(farm.sites) do
     if U.position(p) and target.x==p.x and target.z==p.z and target.y>=p.y+(column and 1 or 0)
       and target.y<=p.y+((tree or column) and height-1 or 0) then return true end
@@ -109,8 +111,12 @@ function M.canModify(state,config,job,target)
   local owned=E.box(bounds) and P.inside(target,bounds)
   local purpose={owner=job.workerId}
   if job.type=='FARM' or job.type=='HARVEST' then
-    for _,farm in ipairs(job.type=='FARM' and config.farms or config.treeFarms) do
-      if require('autobuilder.factory.factory').equal(farm,job.farm) then purpose.farm=farm;break end
+    -- Adapter definitions belong to the durable task; registered territory must
+    -- still match exactly, even after a registry edit or controller restart.
+    local saved=U.copy(job.farm);if type(saved)=='table' then saved.adapter=nil end
+    for _,farm in ipairs((job.type=='FARM' and config.farms or config.treeFarms) or {}) do
+      local registered=U.copy(farm);registered.adapter=nil
+      if require('autobuilder.factory.factory').equal(registered,saved) then purpose.farm=farm;break end
     end
     owned=purpose.farm and M.farmTarget(job,target)
   elseif job.type=='PREPARE_SITE' then

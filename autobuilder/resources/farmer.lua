@@ -240,7 +240,9 @@ function M.new(task,e,config,nav,save,treeMode)
     if task.stage=='plant' then
       if present then return block('planting target changed before planting','ambiguous') end
       local slot,before=slotFor(spec.seed); if not slot then return missing() end
-      if task.plantSoilSite~=task.site then
+      -- A solid turtle in the empty crop cell converts farmland to dirt. Native
+      -- seed placement validates farmland without occupying or changing it.
+      if spec.tree and task.plantSoilSite~=task.site then
         -- Save the observation before the ascent: its movement grant may arrive
         -- on a later tick or after reboot. Repeating the descent would consume
         -- that grant and prevent replanting indefinitely.
@@ -264,7 +266,7 @@ function M.new(task,e,config,nav,save,treeMode)
       else task.cursor=task.cursor-1 end
       return persist()
     end
-    if b.name==spec.seed or (b.name==spec.block and not spec.column and not spec.tree and tonumber((b.state or {}).age)~=spec.age) then nextSite(); return persist() end
+    if (spec.tree and b.name==spec.seed) or (b.name==spec.block and not spec.column and not spec.tree and tonumber((b.state or {}).age)~=spec.age) then nextSite(); return persist() end
     if b.name~=spec.block and b.name~=spec.leaves then return block('foreign block in managed column: '..b.name,'unsupported') end
     if (config.protectedBlocks or {})[b.name] then return block('protected farm block: '..b.name,'protected') end
     if spec.tree and b.name==spec.block and (b.state or {}).axis~='y' then return block('nonvertical tree log is unsupported','unsupported') end

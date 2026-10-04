@@ -150,7 +150,9 @@ test('renewable delivery telemetry is task bound bounded and retained by network
   p.payload.task='harvest';p.payload.harvestDelivered=2;assert(N.validate(12,p))
   for _,bad in ipairs({-1,1.5,100000001,'2',false}) do p.payload.harvestDelivered=bad;assert(not N.validate(12,p)) end
   p.payload.harvestDelivered=2;p.payload.task=nil;assert(not N.validate(12,p))
-  p.payload.task='harvest';local n=net(7,1);local m=assert(n:accept(12,p,'test',100));eq(m.payload.harvestDelivered,2)
+  p.payload.task='harvest';p.payload.harvestPlanting=1
+  for _,bad in ipairs({-1,2,0.5,'1',false}) do p.payload.harvestPlanting=bad;assert(not N.validate(12,p)) end
+  p.payload.harvestPlanting=1;local n=net(7,1);local m=assert(n:accept(12,p,'test',100));eq(m.payload.harvestDelivered,2);eq(m.payload.harvestPlanting,1)
 end)
 
 test('network validates health before deduplication and strips unknown health cycles',function()

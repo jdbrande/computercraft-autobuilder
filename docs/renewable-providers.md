@@ -56,3 +56,8 @@ items already collected by that infrastructure; they do not implement turtle
 shearing, mob handling or arbitrary machine activation. Avoid independent writers
 to an inventory while its transfer journal owns it. Processing inventories use the
 [registered processor contract](processing-network.md).
+
+Crop replanting stays above the crop cell. Native seed placement validates the
+farmland; occupying the crop cell with a solid turtle would turn farmland to dirt.
+A rejected planting retains the owned task and cargo for repair/resume. Tree
+replanting continues to inspect its supported soil.

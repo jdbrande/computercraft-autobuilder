@@ -46,3 +46,17 @@ test('new renewable contracts require a matching updated role while legacy plots
  local workers={['12']={id=12,online=true,telemetry={status='idle',capabilities={farming=true}}}}
  eq(q:assign(workers),nil);workers['12'].telemetry.capabilities.registeredFarmingV1=true;eq(q:assign(workers).id,job.id)
 end)
+
+test('replanting health gates provider selection and assignment but not columns or recovery',function()
+ local H=require('autobuilder.workers.health')
+ local t={status='idle',capabilities={registeredFarmingV1=true},health={placing=false,movement=true,digging=true,left='minecraft:diamond_pickaxe',right='unknown',software={status='unmanaged'}}}
+ local farm={kind='carrot',sites={{x=30,y=1,z=0}},item='minecraft:carrot'}
+ local workers={['12']={id=12,online=true,telemetry=t}}
+ local p=require('autobuilder.resources.providers').select(farm.item,{farms={farm}},{workers=workers})
+ eq(p.available,false)
+ local q=require('autobuilder.core.workflows').new({},function() return true end,function() return 1 end,7)
+ local j=q:submit('FARM',{item=farm.item,quantity=1,farm=farm})
+ eq(q:assign(workers),nil);eq(H.eligible(t,{type='RETURN_HOME'}),true)
+ eq(H.eligible(t,{type='FARM',farm={kind='bamboo'}}),true)
+ t.health.placing=true;eq(q:assign(workers).id,j.id)
+end)

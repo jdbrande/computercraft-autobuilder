@@ -518,3 +518,21 @@ test('satisfied acquisition does not retire demand shared with another unfinishe
  local other=p:request({[item]=8});other.mines[item]=id
  h.inventories.store[1]={name=item,count=4};p:tick();eq(app.state.jobs[id].status,'queued');eq(app.state.jobs[id].cancelled,nil)
 end)
+
+test('unowned farm switches capability contracts durably while preserving existing owners',function()
+ for _,mode in ipairs({'switch','save-failure','assigned','offline','journal'}) do
+  local app,p,q,c=productionFixture();local item=mc('wheat')
+  c.farms={{kind='custom',item=item,sites={{x=20,y=0,z=0}}},{kind='wheat',item=item,sites={{x=25,y=0,z=0}}}}
+  c.farmAdapters={custom={mode='crop',block='test:crop',item=item,seed='test:seed',age=4}}
+  local modern={capabilities={registeredFarmingV1=true},health={placing=true,movement=true,digging=true,left='unknown',right='unknown',software={status='unmanaged'}}}
+  app.state.workers['3']={id=3,online=true,telemetry=modern}
+  local r=p:request({[item]=4});p:tick();local id=r.harvests[item];local old=q.state.jobs[id];assert(old)
+  modern.health.software.status='modified';app.state.workers['4']={id=4,online=true,telemetry={capabilities={farming=true}}}
+  if mode=='assigned' then old.workerId=3 elseif mode=='offline' then modern.task=id;app.state.workers['3'].online=false elseif mode=='journal' then old.intent={kind='dig'} end
+  if mode=='save-failure' then function app:save() return false,'disk full' end;eq(pcall(p.tick,p),false);eq(r.harvests[item],id);eq(old.status,'queued')
+  else p:tick()
+   if mode=='switch' then eq(old.cancelled,true);assert(r.harvests[item]~=id);eq(q.state.jobs[r.harvests[item]].farm.kind,'wheat')
+   else eq(r.harvests[item],id);eq(old.cancelled,nil) end
+  end
+ end
+end)

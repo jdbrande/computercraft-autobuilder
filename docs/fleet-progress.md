@@ -1509,3 +1509,26 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   wall and ceiling facings, both rail axes, bed orientation, wire connections,
   opposite repeater/comparator facing and farmland seed placement. Full project
   acceptance, single final review and release gates remain pending.
+-0.32 single final review reproduced five issues: frozen adapters rejected by
+  controller protection, same-identifier crop maturity skipped, unowned farm
+  fallback stuck on the old capability contract, missing replant placement health
+  admission, and pending planting cargo overstated in forecasts. Consolidated
+  corrections preserve configured territory and durable adapters, reuse guarded
+  acquisition retirement, check actual replant contracts, and carry one bounded
+  planting obligation through telemetry. Regressions include real provider/queue
+  mutation grants, overlapping owners, registry changes/reboots, retirement save
+  failure and owned/offline/journal preservation. Native initial carrot task was
+  blocked before any digging; its retained owner is resumed with these fixes.
+-0.32 native acceptance then exposed a physical soil bug: descending into an
+  empty crop cell for soil inspection converts farmland to dirt under the solid
+  turtle. Crop replanting now relies on native seed-placement substrate validation
+  from above; tree soil checks remain. A world-faithful regression fails before
+  the fix and passes after, including rejected substrate, retained ownership and
+  restart. The first native owner completed after operator restoration of the
+  soil damaged by the old code; an untouched-plot final-source retest follows.
+-0.32 final-source native untouched-plot retest passed after controller/worker
+  restart: both crops replanted, both farmland blocks intact,7 carrots stored,
+ 2 retained planting carrots, farmer home/idle with1,942 fuel. Both requests/jobs
+  completed, computers241/242 shut down and4 force-load tickets removed. Permanent
+  candidate report validation-0.32.0.md distinguishes assisted pre-fix recovery
+  from the clean retest; final complete Lua/Python gates are running.
