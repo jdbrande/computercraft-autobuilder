@@ -1,6 +1,6 @@
 # 0.24.0 dynamic fleet scaling validation
 
-Status: final complete test gate and native48-block acceptance still running.
+Status: final complete test gate passed; native48-block worker settlement remains.
 Current implementation: `cebe08e`. This report does not claim release acceptance.
 
 ## Automated evidence
@@ -8,8 +8,8 @@ Current implementation: `cebe08e`. This report does not claim release acceptance
 Focused allocation, admission, limits, metrics, protocol, traffic and home-return
 checks pass. Actual controller/worker runtime scenarios cover late registration,
 shared mining demand, multiple clearing/building owners, slow/private supplies,
-controller restart and idle drain. Python18, release verification and whitespace
-checks passed on the preceding candidate; final source checks remain pending.
+controller restart and idle drain. The final clean-source gate passed788 Lua tests and18 Python tests. Release
+verification and whitespace checks pass on the final implementation.
 
 The complete gate on `da9c0a0` failed1/786 tests: a48-block construction scenario
 stalled with46 correct blocks. Its retained job showed a builder physically blocked

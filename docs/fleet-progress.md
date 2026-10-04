@@ -1097,3 +1097,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Source code/ownership/physical cargo were unchanged. Audit settings and logs are
   in dist/live-scaling/default-network-timing/. High-rate overload remains a known
   limitation for later large-fleet performance acceptance; do not claim it solved.
+
+- Final0.24.0 complete Lua gate passed788 tests, with18 Python tests and
+  release/whitespace checks. Log: /tmp/fleet-024-final-full-v5.log. Ordered integration
+  waits for0.24 native worker settlement; no feature gate is waived.
