@@ -22,5 +22,9 @@ hardware using real turtle/peripheral APIs, with777 fuel before and after. A
 fixture-generated receipt verified managed files, detected an intentional edit,
 and verified after restoration. The unmanaged fixture reported unmanaged. These
 are integrity observations, not acceptance of installation over HTTP. Computers
-were shut down and their one force-load ticket removed. Final-source native retest
-and complete test totals will be recorded before acceptance.
+were shut down and their one force-load ticket removed. The same native checks
+passed on final correction `c482afa`: both remained at777 fuel, the managed fixture
+verified/detected the edit/restored, and the source copy remained unmanaged. Cleanup
+was independently repeated and confirmed. Evidence is under ignored
+`dist/live-fleet-health/` and `retest/`. All18 Python tests pass; the full Lua gate
+is still running.
