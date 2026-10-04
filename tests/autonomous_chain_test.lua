@@ -354,6 +354,8 @@ end)
 
 test('automatic pipeline overlaps finite production with multiple prepared-region builders across restart',function()
   local f=fixture({parallelBuilders=true,finiteFuel=true});local c=f.controller.runtime
+  -- The later coal trip spans real placement work despite parallel acquisition.
+  local coal=f.actors[23].world.blocks;coal['67,0,0']=coal['63,0,0'];coal['63,0,0']=nil
   assert(c:command('build import /chain.json pipeline'))
   -- Make both independent regions eligible before measuring production overlap.
   -- Ordinary automatic terrain admission is covered by the other runtime cases.
