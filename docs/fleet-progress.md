@@ -1286,3 +1286,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   (3 material blocks plus4 required air), with exact material counts and idle drain.
   This replaces the withdrawn cumulative-placement claim. No second review is
   planned; complete release gates and native acceptance remain.
+
+- Started0.29 health prerequisite design in `.worktrees/fleet-onboarding`: read-only
+  equipment/peripheral evidence, managed installation integrity, bounded registration
+  and new-work eligibility. Existing configured roles remain opt-in; owned work is
+  retained. Source-copy fixtures must report unmanaged, not verified. The subsequent
+  single-command onboarding flow remains required and is not declared complete.
