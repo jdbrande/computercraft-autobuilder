@@ -1496,7 +1496,7 @@
       "version": "0.39.0"
     },
     {
-      "bytes": 4415,
+      "bytes": 4411,
       "path": "autobuilder/ui/dashboard.lua",
       "roles": [
         "controller",
@@ -1506,7 +1506,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "ae8dcc8dca65511858aa8524478b7839d65adf8c4039fdbd044c4bb7dbf6a504",
+      "sha256": "61a8c270cb49f49f6cef7dd6deabbd929c18df23b65403420c5f99d932a38d23",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/ui/dashboard.lua",
       "version": "0.39.0"
     },

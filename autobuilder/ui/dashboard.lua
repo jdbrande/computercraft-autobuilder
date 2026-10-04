@@ -56,10 +56,10 @@ function M.lines(state,forecasts,now,io,workerId)
     add(w.reason or 'reservation pending');add(w.remedy)
    elseif j.error or j.stockError or j.coverageError then
     add(id..': '..(j.error or j.stockError or j.coverageError))
-    if j.lastRouteFailure then
-     add('Last route failure: '..j.lastRouteFailure)
-     add('Inspect the corridor; provide a passing bay or clear alternate route, then resume. Ownership retained.')
-    end
+   end
+   if j.lastRouteFailure then
+    add('Last route failure: '..j.lastRouteFailure)
+    add('Inspect the corridor; provide a passing bay or clear alternate route, then resume. Ownership retained.')
    end
   end
  end
