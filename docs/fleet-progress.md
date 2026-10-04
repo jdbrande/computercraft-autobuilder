@@ -1475,3 +1475,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   recipes, release crashes, failed claims, disconnects and contamination. Native
   controller239 with two blast furnaces and a smoker is prepared; acceptance,
   final review and full gates remain pending.
+
+- Started0.32 in isolated `.worktrees/renewable-providers`: extend the existing
+  renewable actor through registered plant definitions, explicit planting reserves,
+  seed-as-output accounting and health-aware acquisition choices. Processor0.31
+  remains under its single final review/native acceptance; earlier gates continue.
