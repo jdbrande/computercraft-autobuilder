@@ -384,3 +384,19 @@ test('native barrel probe limits vertical placement and preserves horizontal loo
   run(new());eq(task.phase,'completed');eq(w.blocks['3,1,0'].state.facing,facing)
  end
 end)
+
+test('repair preserves unobservable sign text for air stone and orientation replacements',function()
+ for _,name in ipairs({'oak_sign','oak_wall_sign'}) do for _,desired in ipairs({'air','stone','orientation'}) do
+  local state=name=='oak_sign' and {rotation='0',waterlogged='false'} or {facing='north',waterlogged='false'}
+  local actual=block(name,state);local wanted=block(desired=='orientation' and name or desired,U.copy(state))
+  if desired=='orientation' then if name=='oak_sign' then wanted.state.rotation='4' else wanted.state.facing='east' end else wanted.state={} end
+  local w,task,new=fixture({wanted});w.blocks['3,1,0']=actual;w.items[1]={name='minecraft:stone',count=1};w.items[2]={name='minecraft:oak_sign',count=1}
+  for _,suffix in ipairs({'','Up','Down'}) do w.t['dig'..suffix]=function() w.lostText=true;return false end end
+  run(new(nil,nil,'repair'));eq(task.phase,'blocked');eq(w.lostText,nil);assert(task.error:find('refusing',1,true),task.error)
+ end end
+end)
+test('standing signs accept stable retained grass as native support',function()
+ local b=block('oak_sign',{rotation='0',waterlogged='false'});local w,task,new=fixture({b})
+ w.blocks['3,0,0']={name='minecraft:grass_block',state={snowy=false}};w.items[1]={name=b.name,count=1}
+ run(new());eq(task.phase,'completed');eq(w.places,1);eq(w.blocks['3,0,0'].name,'minecraft:grass_block')
+end)

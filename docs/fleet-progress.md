@@ -1583,3 +1583,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   runtime test builds through preparation/supply/restart and reports subsequently
   added contents without removing them. Native controller247/builder248 rig prepared;
   final review and complete gates remain before acceptance.
+-0.34 single final review found unsafe destructive sign repair, grass support
+  rejection, the trapped-chest entity ID omission, Python/NBT tag-kind divergence,
+  and omitted optional v3 Data rejection. Consolidated corrections preserve existing
+  unreadable sign text, reuse finite stable support, match exact entity identities,
+  retain immediate compound tag kinds in Python, and accept absent default-empty
+  v3 data. Red/green binary parity and actual sign-over-grass project regressions
+  cover all findings. No rereview is planned; final full gates/native acceptance follow.

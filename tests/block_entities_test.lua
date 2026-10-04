@@ -26,3 +26,13 @@ test('metadata refuses unverifiable signs and active furnace payloads without dr
  assert(M.decode(e,size,3));e.value.Data.value.BurnTime.value=1;eq(M.decode(e,size,3),nil)
  local record={x=1,y=0,z=2,id='minecraft:chest',kind='empty_inventory',extra=true};eq(M.valid({record},size),false)
 end)
+
+test('trapped chest metadata uses its own identity and omitted v3 Data is default empty',function()
+ local M=require('autobuilder.blueprint.block_entities');local size={x=3,y=2,z=3}
+ for _,v in ipairs({2,3}) do
+  local e=entity(v);e.value.Id.value='minecraft:trapped_chest';local r=assert(M.decode(e,size,v));assert(M.valid({r},size))
+  assert(M.matches(r,{name='minecraft:trapped_chest'}));assert(not M.matches(r,{name='minecraft:chest'}))
+  r.id='minecraft:chest';assert(not M.matches(r,{name='minecraft:trapped_chest'}))
+ end
+ local e=entity(3);e.value.Data=nil;assert(M.decode(e,size,3));e.value.Data=node(8,'');eq(M.decode(e,size,3),nil)
+end)
