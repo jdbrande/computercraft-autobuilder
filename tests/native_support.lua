@@ -13,6 +13,7 @@ function M.fixture(options)
   for _,p in ipairs(o.palette or {{'minecraft:air',0},{'minecraft:oak_log[axis=x]',1}}) do palette[#palette+1]=M.tag(3,p[1],M.uint(p[2],4)) end
   local data=o.data or '\0\1\1\0'
   local blocks=M.tag(10,'Palette',M.compound(palette))..M.tag(7,v==3 and 'Data' or 'BlockData',M.uint(#data,4)..data)
+  for _,extra in ipairs(o.blockExtra or {}) do blocks=blocks..extra end
   local fields={M.tag(o.versionKind or 3,'Version',M.uint(v,o.versionKind==2 and 2 or 4)),M.tag(3,'DataVersion',M.uint(3700,4)),
     M.tag(o.widthKind or 2,'Width',M.uint(o.width or 2,o.widthKind==3 and 4 or 2)),M.tag(2,'Height',M.uint(o.height or 1,2)),M.tag(2,'Length',M.uint(o.length or 2,2))}
   fields[#fields+1]=v==3 and M.tag(10,'Blocks',blocks..'\0') or blocks

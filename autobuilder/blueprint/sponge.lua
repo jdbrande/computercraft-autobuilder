@@ -64,17 +64,24 @@ function M.decode(raw)
   assert(shift==0 and count==volume,'truncated block data or volume mismatch')
   local offset={0,0,0}
   if root.Offset then offset=field(root,'Offset',11); assert(#offset==3,'invalid schematic Offset') end
-  local issues={}
+  local issues,blockEntities={},{}
   for _,spec in ipairs({{root,'Entities','entities'},{container,'BlockEntities','block entities'}}) do
     if spec[1][spec[2]] then
       local _,node=field(spec[1],spec[2],9)
       assert(node.count==0 or node.element==10,'invalid '..spec[2]..' list')
-      if node.count>0 then issues[#issues+1]='Unsupported '..spec[3]..': '..node.count..'; entity/NBT data is not restored' end
+      if spec[2]=='BlockEntities' then
+        assert(node.count<=4096,'block entity limit exceeded')
+        for _,entry in ipairs(node.value) do
+          local record,why=require('autobuilder.blueprint.block_entities').decode(entry,size,version)
+          if record then blockEntities[#blockEntities+1]=record
+          else issues[#issues+1]='Unsupported block entities: '..why end
+        end
+      elseif node.count>0 then issues[#issues+1]='Unsupported '..spec[3]..': '..node.count..'; entity/NBT data is not restored' end
     end
   end
   if root.Biomes or root.BiomeData then issues[#issues+1]='Unsupported biomes: biome data is not restored' end
   local result={schema=1,size=size,palette=entries,runs=runs,requirements={},metadata={sourceVersion=version,dataVersion=dataVersion,
-    offset={x=offset[1],y=offset[2],z=offset[3]},issues=issues}}
+    offset={x=offset[1],y=offset[2],z=offset[3]},issues=issues,blockEntities=#blockEntities>0 and blockEntities or nil}}
   local valid,why=S.validate(result); assert(valid,why)
   result.requirements=require('autobuilder.blueprint.blueprint').quantities(result)
   return result

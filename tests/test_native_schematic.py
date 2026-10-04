@@ -5,7 +5,7 @@ from pathlib import Path
 import struct
 import unittest
 from lupa.lua52 import LuaRuntime, LuaError, lua_type
-from test_schem_converter import fixture, tag
+from test_schem_converter import fixture, tag, string, compound
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('schem_converter', ROOT/'tools/schem_converter.py')
@@ -41,6 +41,20 @@ class NativeSchematicTests(unittest.TestCase):
                             actual=native_value(self.decode(source)); expected=converter.convert(source)
                             if actual['metadata']['issues']=={}: actual['metadata']['issues']=[]
                             self.assertEqual(actual,expected)
+
+    def test_empty_block_entity_contract_matches_native_in_both_formats(self):
+        for version in (2, 3):
+            for extra in (b'', tag(8, 'LootTable', string('minecraft:chests/simple_dungeon'))):
+                data = tag(9, 'Items', b'\x0a' + struct.pack('>i', 0)) + extra
+                fields = [tag(8, 'Id', string('minecraft:chest')), tag(11, 'Pos', struct.pack('>iiii', 3, 0, 0, 0)),
+                          tag(10, 'Data', data + b'\0') if version == 3 else data]
+                entities = tag(9, 'BlockEntities', b'\x0a' + struct.pack('>i', 1) + compound(fields))
+                raw = fixture(version, data=b'\0\0\0\0', palette=[('minecraft:chest[facing=north,type=single,waterlogged=false]', 0)], block_extra=[entities])
+                expected = converter.convert(raw); actual = native_value(self.decode(raw))
+                if actual['metadata']['issues'] == {}: actual['metadata']['issues'] = []
+                self.assertEqual(actual, expected)
+                if not extra: self.assertEqual(expected['metadata']['blockEntities'][0]['kind'], 'empty_inventory')
+                else: self.assertTrue(expected['metadata']['issues'])
 
     def test_both_reject_malformed_schematic_varints_and_palette_ids(self):
         for raw in (fixture(data=b'\2\1\1\0'),fixture(data=b'\x80\0\1\1\0'),fixture(data=b'\0'),

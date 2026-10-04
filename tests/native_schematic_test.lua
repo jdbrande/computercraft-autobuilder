@@ -72,3 +72,17 @@ test('native NBT preserves numeric tag kinds and exact opaque unused numeric byt
   eq(root.kind,10); eq(root.value.byte.value,-1); eq(root.value.short.value,-2); eq(root.value.int.value,-3)
   eq(root.value.long.value,('x'):rep(8)); eq(root.value.float.value,('y'):rep(4)); eq(root.value.longs.count,1)
 end)
+
+test('native block entities preserve empty inventory contracts and reject nonempty or mismatched data',function()
+ for _,version in ipairs({2,3}) do for _,bad in ipairs({false,true}) do
+  local fields={S.tag(8,'Id',S.string('minecraft:chest')),S.tag(11,'Pos',S.uint(3,4)..S.uint(0,4)..S.uint(0,4)..S.uint(0,4))}
+  local items=S.tag(9,'Items','\10'..S.uint(0,4))
+  if bad then items=items..S.tag(8,'LootTable',S.string('minecraft:chests/simple_dungeon')) end
+  fields[#fields+1]=version==3 and S.tag(10,'Data',items..'\0') or items
+  local entities=S.tag(9,'BlockEntities','\10'..S.uint(1,4)..S.compound(fields))
+  local bp=require('autobuilder.blueprint.sponge').decode(S.fixture({version=version,palette={{'minecraft:chest[facing=north,type=single,waterlogged=false]',0}},data='\0\0\0\0',blockExtra={entities}}))
+  if bad then assert(#bp.metadata.issues>0) else
+   eq(#bp.metadata.issues,0);eq(bp.metadata.blockEntities[1].kind,'empty_inventory');eq(bp.metadata.blockEntities[1].x,0)
+  end
+ end end
+end)
