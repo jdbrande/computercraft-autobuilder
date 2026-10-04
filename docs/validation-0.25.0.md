@@ -1,7 +1,7 @@
 # 0.25.0 mining intelligence validation
 
-Status: native acceptance passed; final gate rerun follows the shared navigation correction.
-Implementation candidate: `b369e3e`, based on the ongoing 0.24 scaling branch.
+Status: accepted. Final source `5abdf70` passes804 Lua tests,18 Python tests,
+release/whitespace checks and native intelligent-exploration acceptance.
 
 ## Automated evidence
 
@@ -12,7 +12,8 @@ restarts. The single final review and consolidated fix pass are complete.
 The final Python suite passed all 18 tests; release and whitespace checks passed.
 The complete Lua suite passed all **802 tests** on `b369e3e`
 (`/tmp/fleet-025-final-full.log`). The later0.24 physical-detour correction
-is now merged; its complete gate is restarting before integration.
+is merged; the final complete gate passed804 tests on `5abdf70`
+(`/tmp/fleet-025-final-full-v2.log`).
 
 Review regressions reproduce and correct three errors: transient turtles recorded
 as permanent hazards, long clear returns evicting unresolved hazards, and cargo
@@ -80,3 +81,8 @@ is retained ahead of clear travel; a bounded cache can still evict older negativ
 when all 64 entries are negative. Operators can inspect and explicitly retry an
 unowned changed sector. The native trial covers staged loaded inspection terrain;
 scanner learning is simulation-tested, not claimed as native acceptance here.
+
+Final gate after the shared physical-detour correction:804 Lua tests and18 Python
+tests pass on5abdf70. Release generation/check and whitespace verification pass.
+Accepted0.24 evidence is merged; implementation/test/release files remain identical
+to the final tested source.
