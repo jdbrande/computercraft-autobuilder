@@ -1138,7 +1138,7 @@ its concrete task budget; station target uses the same requirement.
 - [x] Exercise an above-low worker whose queued mission requires additional fuel;
   verify automatic stock acquisition/refill, refuel-before-dispatch and completed
   physical work across restart in runtime tests and a native fixture.
-- [ ] Run one final review and consolidated regression-backed fix pass. Complete
+- [x] Run one final review and consolidated regression-backed fix pass. Complete
   Lua/Python/release/diff gates, record permanent evidence, integrate/push and
   continue all unfinished requirements.
 

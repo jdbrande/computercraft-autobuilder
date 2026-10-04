@@ -1275,3 +1275,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Accepted0.25 mining intelligence:804 Lua/18 Python, final review regressions,
   native hazard/yield/restart/initial-cargo checks and cleanup complete. Imported
   accepted0.24 evidence without changing tested implementation.
+
+- Accepted0.26 mission fuel forecasts:829 Lua/18 Python, release/diff checks,
+  single final review fixes, native above-low refuel/restart/home return and cleanup
+  complete. Accepted0.24/0.25 documentation merged with tested source unchanged.

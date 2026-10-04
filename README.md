@@ -1,4 +1,4 @@
-# Autobuilder 0.25.0
+# Autobuilder 0.26.0
 
 Development direction: [full fleet requirements](docs/fleet-requirements.md) and
 [milestone 1 autonomous exploration design](docs/autonomous-mining-design.md).
@@ -452,3 +452,5 @@ Interrupted movement: [GPS pose recovery](docs/pose-recovery.md) and [0.20 accep
 Dynamic scaling0.24 acceptance: [48-block native trial and release evidence](docs/validation-0.24.0.md).
 
 Mining intelligence0.25 acceptance: [persistent exploration evidence and native results](docs/validation-0.25.0.md).
+
+Mission fuel forecasts0.26 acceptance: [budgets, proactive refueling and native evidence](docs/validation-0.26.0.md).
