@@ -1265,15 +1265,15 @@ in `.worktrees/processing-network` follows0.30; propagate final enrollment fixes
 
 ### Task65: Registered process recipes and dependency/fuel planning
 
-- [ ] Add bounded machine/recipe configuration and PROCESS provider/planner tests.
-- [ ] Preserve legacy furnace/craft recipes; split registered process work across
+- [x] Add bounded machine/recipe configuration and PROCESS provider/planner tests.
+- [x] Preserve legacy furnace/craft recipes; split registered process work across
   compatible machines with explicit item fuel and expected processing time.
 
 ### Task66: Durable machine execution and acceptance
 
-- [ ] Reuse stock/capacity claims and transfer reconciliation for finite processor
+- [x] Reuse stock/capacity claims and transfer reconciliation for finite processor
   batches, output collection, unused fuel return and restart/paused recovery.
-- [ ] Test actual controller execution, multi-input simulations and useful native
+- [x] Test actual controller execution, multi-input simulations and useful native
   blast-furnace/smoker processing with exact conservation and final cleanup.
-- [ ] Complete one final review/consolidated fixes, full gates and documentation;
+- [x] Complete one final review/consolidated fixes, full gates and documentation;
   integrate in dependency order and continue renewable/provider requirements.

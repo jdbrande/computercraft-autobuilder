@@ -5,8 +5,11 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
-- Active development:0.31 registered processors passed native two-blast-furnace/
-  smoker restart acceptance; its complete Lua gate is running.0.32 renewable
+- Accepted0.31 registered processors:905 Lua/18 Python tests, release/diff checks,
+  final-source parallel native processing/restart/conservation and cleanup passed.
+  Permanent evidence: [0.31 validation](validation-0.31.0.md).
+
+- Active development:0.31 registered processors completed its release gates.0.32 renewable
   adapters passed final-source carrot/replant/reserve acceptance with both crops
   and farmland independently checked; its complete Lua gate is running.0.33 paired/
   attached/basic redstone placement is under its single final review; native probes

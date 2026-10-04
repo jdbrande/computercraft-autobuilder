@@ -1,9 +1,10 @@
-# Registered processor candidate validation
+# 0.31.0 registered processing acceptance
 
-Candidate0.31.0, final implementation `677ea67`. Full Lua gate is running; the
-fleet roadmap remains unfinished. Focused processor/planner/production/coordination/
-forecast tests pass, all18 Python tests pass, release generation/check and diff
-checks pass. Accepted0.29 and candidate0.30 evidence merged with source unchanged.
+Accepted0.31.0, final implementation `677ea67`. The complete Lua suite passed
+all905 tests and Python passed all18 tests. Release generation/check and
+`git diff --check` passed. Accepted0.30 and current progress documentation were
+merged with tested source, tests, tools and release artifacts unchanged. The full
+fleet roadmap remains unfinished.
 
 ## Automated and review evidence
 
