@@ -119,11 +119,24 @@ function M.new(task,e,config,nav,save,mode)
       check.stage='inspect'; persist()
     end
     if check.stage=='inspect' then
+      if p.isolate then check.safe=true;check.stage='neighbors';check.side=1;persist() end
+    end
+    if check.stage=='inspect' then
       local ok,err=nav:face(p.support.heading); if not ok then return false,err end
       local found,solid,why=inspect(p.support)
       check.safe=found and (C.family(solid.name)=='cube' or C.family(solid.name)=='log') or false
       check.error=why or (not check.safe and 'required solid support face is missing or unsupported' or nil)
       check.stage=check.safe and (C.family(b.name)=='door' and 'sides' or C.family(b.name)=='bed' and 'pairFloor' or 'return') or 'return'; check.level=0; check.side=1; persist()
+    end
+    if check.stage=='neighbors' then
+      local headings={'north','east','south','west'}
+      while check.side<=4 do
+        local ok,err=nav:face(headings[check.side]);if not ok then return false,err end
+        local found,actual,why=inspect({direction='forward'})
+        if why or found and C.family(actual.name)=='chest' then check.safe=false;check.error=why or 'adjacent chest prevents isolated placement';break end
+        check.side=check.side+1;persist()
+      end
+      check.stage='return';persist()
     end
     if check.stage=='pairFloor' then
       local ok,err=nav:goTo(p.pair);if not ok then return false,err end
@@ -160,7 +173,7 @@ function M.new(task,e,config,nav,save,mode)
     task.pairCheck=nil; task.pairResults=nil
     task.siteApproach=nil;task.siteApproachIndex=nil
   end
-  local function matchesBlock(b,found,actual)
+  local function matchesBlock(b,found,actual,p)
     if mode=='prepare' and found then
       if b.retain and P.compare(b.retain,found,actual) then return true end
       if b.substrate then return actual.name==b.substrate,'required plant substrate is missing' end
@@ -168,7 +181,15 @@ function M.new(task,e,config,nav,save,mode)
     end
     local family=C.family(b.name)
     local defer=mode~='verify' and not task.recheck and C.connected(family)
-    return P.compare(b,found,actual,defer)
+    local matches,why=P.compare(b,found,actual,defer)
+    if matches and C.inventory(b.name) then
+      local side=p.direction=='down' and 'bottom' or p.direction=='up' and 'top' or 'front'
+      if not e.peripheral or type(e.peripheral.call)~='function' then return false,'inventory observation unavailable' end
+      local ok,items=pcall(e.peripheral.call,side,'list')
+      if not ok or type(items)~='table' then return false,'inventory observation failed' end
+      if next(items)~=nil then return false,'expected empty inventory' end
+    end
+    return matches,why
   end
   local function inventory()
     if mode=='prepare' then return require('autobuilder.workers.resupply').snapshot(t) end
@@ -184,7 +205,7 @@ function M.new(task,e,config,nav,save,mode)
     return true
   end
   local function slotFor(item)
-    for s=1,16 do local i=t.getItemDetail(s); if not reserved[s] and i and i.name==item and i.count>0 and (mode~='prepare' or not i.nbt) then return s,i.count end end
+    for s=1,16 do local i=t.getItemDetail(s); if not reserved[s] and i and i.name==item and i.count>0 and (mode~='prepare' or not i.nbt) and (not C.inventory(item) or not i.nbt) then return s,i.count end end
   end
   local function missing(item)
     task.missingItem=item; task.missingCount=1; return blocked('missing inventory: '..item,'missing_inventory')
@@ -233,7 +254,7 @@ function M.new(task,e,config,nav,save,mode)
       end
       local item=t.getItemDetail(i.slot)
       if item and item.name~=i.item then return false,'placement inventory changed during recovery' end
-      local count=item and item.count or 0; local matches=matchesBlock(b,found,actual)
+      local count=item and item.count or 0; local matches=matchesBlock(b,found,actual,p)
       if p.pair then
         local paired,other,why=pairInspection(b,p,'recover'); if why then return false,why end
         task.pairResults.existing=task.pairResults.recover
@@ -343,7 +364,7 @@ function M.new(task,e,config,nav,save,mode)
     if mode=='prepare' and task.siteWork.stage=='seal' and (not found or not Site.fluid(actual.name)) then
       return record(b,'correct',nil,actual)
     end
-    local matches,reason=matchesBlock(b,found,actual)
+    local matches,reason=matchesBlock(b,found,actual,p)
     if matches then
       if p.pair then
         local paired,other,why=pairInspection(b,p)
@@ -367,7 +388,7 @@ function M.new(task,e,config,nav,save,mode)
       local classification=C.classify(actual.name,actual.state)
       local actualFamily=C.family(actual.name)
       local allowed=mode=='prepare' and Site.drops(actual,config)
-      if mode=='prepare' and not allowed or mode~='prepare' and ((config.protectedBlocks or {})[actual.name] or actualFamily=='door' or actualFamily=='bed' or (classification~='SUPPORTED' and classification~='PARTIALLY_SUPPORTED') or actual.name:find('computercraft:',1,true)) then
+      if mode=='prepare' and not allowed or mode~='prepare' and ((config.protectedBlocks or {})[actual.name] or actualFamily=='door' or actualFamily=='bed' or C.inventory(actual.name) or (classification~='SUPPORTED' and classification~='PARTIALLY_SUPPORTED') or actual.name:find('computercraft:',1,true)) then
         return issue(b,'unsupported','refusing to dig protected or unsupported block: '..actual.name,actual)
       end
       if p.item and not slotFor(p.item) then return missing(p.item) end
@@ -408,7 +429,7 @@ function M.new(task,e,config,nav,save,mode)
     end
     local slot,before=slotFor(p.item); if not slot then return missing(p.item) end
     if (task.attempts['place:'..task.index] or 0)>=3 then return blocked('placement attempt limit reached','attempt_limit') end
-    if p.support then
+    if p.support or p.isolate then
       ok,err=supportInspection(b,p); if not ok then return blocked(err,'inaccessible') end
       found,actual,inspectError=inspect(p)
       if inspectError or found then return blocked(inspectError or 'target changed during support inspection','wrong') end
@@ -432,7 +453,7 @@ function M.new(task,e,config,nav,save,mode)
     found,actual,inspectError=inspect(p)
     if inspectError then return blocked(inspectError,'inaccessible') end
     ok,err=recover(b,p,found,actual); if not ok then return blocked(err,'ambiguous') end
-    matches,reason=matchesBlock(b,found,actual)
+    matches,reason=matchesBlock(b,found,actual,p)
     if matches then return record(b,'correct',nil,actual) end
     if replaceFluid and found and Site.fluid(actual.name) then
       if task.attempts['place:'..task.index]<3 then return persist() end

@@ -37,6 +37,11 @@ function M.family(name)
   if woods[n:match('^(.-)_fence$')] or n=='nether_brick_fence' then return 'fence' end
   if n=='lantern' or n=='soul_lantern' then return 'lantern' end
   if n=='ladder' then return 'ladder' end
+  if n=='chest' or n=='trapped_chest' then return 'chest' end
+  if n=='barrel' then return 'barrel' end
+  if n=='furnace' or n=='blast_furnace' or n=='smoker' then return 'furnace' end
+  if woods[n:match('^(.-)_wall_sign$')] then return 'wall_sign' end
+  if woods[n:match('^(.-)_sign$')] then return 'sign' end
   if colors[n:match('^(.-)_bed$')] then return 'bed' end
   if n=='lever' or n=='stone_button' or n=='polished_blackstone_button' or woods[n:match('^(.-)_button$')] then return 'control' end
   if n=='rail' or n=='powered_rail' or n=='detector_rail' or n=='activator_rail' then return 'rail' end
@@ -70,7 +75,11 @@ function M.classify(name,state)
   elseif family=='door' then allowed={half=true,facing=true,hinge=true,open=true,powered=true}
   elseif family=='pane' or family=='fence' then allowed={north=true,east=true,south=true,west=true,waterlogged=true}
   elseif family=='lantern' then allowed={hanging=true,waterlogged=true}
-  elseif family=='ladder' then allowed={facing=true,waterlogged=true} end
+  elseif family=='ladder' or family=='wall_sign' then allowed={facing=true,waterlogged=true}
+  elseif family=='sign' then allowed={rotation=true,waterlogged=true}
+  elseif family=='chest' then allowed={facing=true,type=true,waterlogged=true}
+  elseif family=='barrel' then allowed={facing=true,open=true}
+  elseif family=='furnace' then allowed={facing=true,lit=true} end
   local why=unknown(state,allowed); if why then return 'UNSUPPORTED',why end
   if family=='cube' or family=='air' then return 'SUPPORTED' end
   if family=='gravity' then return 'PARTIALLY_SUPPORTED','requires a solid supporting block below' end
@@ -96,6 +105,15 @@ function M.classify(name,state)
     return 'PARTIALLY_SUPPORTED','requires paired empty space, solid floor and isolated hinge sides; upper half is inspection-only'
   end
   local facing=({north=true,east=true,south=true,west=true})[state.facing]
+  if family=='chest' or family=='furnace' or family=='barrel' then
+    local orientation=facing or family=='barrel' and state.facing=='up'
+    if not orientation or family=='chest' and (not dry(state) or state.type~='single') or family=='furnace' and tostring(state.lit)~='false' or family=='barrel' and tostring(state.open)~='false' then return 'UNSUPPORTED','only dry single closed empty containers and unlit furnaces are supported' end
+    return 'PARTIALLY_SUPPORTED','requires adjacent inventory observation; chests require isolation from neighboring chests'
+  end
+  if family=='sign' or family=='wall_sign' then
+    if not dry(state) or family=='wall_sign' and not facing or family=='sign' and not ({['0']=true,['4']=true,['8']=true,['12']=true})[tostring(state.rotation)] then return 'UNSUPPORTED','only dry cardinal standing or wall sign geometry is supported' end
+    return 'PARTIALLY_SUPPORTED','geometry only; sign text metadata cannot be read back by ordinary turtle hardware'
+  end
   if family=='control' then
     if not facing or not ({floor=true,wall=true,ceiling=true})[state.face] or tostring(state.powered)~='false' then return 'UNSUPPORTED','controls require explicit face/facing and unpowered state' end
     return 'PARTIALLY_SUPPORTED','requires solid attachment face and final unpowered verification'
@@ -145,6 +163,15 @@ function M.classify(name,state)
   end
   return 'UNSUPPORTED','no deterministic placement strategy for this block or state'
 end
+function M.inventory(name)
+  local f=M.family(name);return f=='chest' or f=='barrel' or f=='furnace'
+end
+function M.requiresMetadata(blocks)
+  for _,b in ipairs(blocks or {}) do
+    for _,v in ipairs({b,b.retain}) do local f=M.family(v.name);if M.inventory(v.name) or f=='sign' or f=='wall_sign' then return true end end
+  end
+  return false
+end
 function M.requiresModern(blocks,survey)
   for _,column in ipairs(survey and survey.columns or {}) do if column.substrateY then return true end end
   for _,b in ipairs(blocks or {}) do
@@ -156,6 +183,8 @@ function M.requiresModern(blocks,survey)
 end
 function M.category(name)
   local f=M.family(name)
+  if M.inventory(name) then return 'containers' end
+  if f=='sign' or f=='wall_sign' then return 'signs' end
   if f=='door' or f=='bed' then return 'paired' end
   if name=='minecraft:water' or name=='minecraft:lava' then return 'fluids' end
   if f=='control' or f=='wire' or f=='repeater' or f=='comparator' or f=='redstone_torch' or f=='redstone_wall_torch' then return 'redstone' end
@@ -168,6 +197,7 @@ function M.connected(family)
 end
 function M.item(block)
   if M.isAir(block.name) then return nil end
+  if M.family(block.name)=='wall_sign' then return block.name:gsub('_wall_sign$','_sign') end
   return ({['minecraft:wall_torch']='minecraft:torch',['minecraft:soul_wall_torch']='minecraft:soul_torch',['minecraft:redstone_wall_torch']='minecraft:redstone_torch',['minecraft:redstone_wire']='minecraft:redstone',['minecraft:wheat']='minecraft:wheat_seeds',['minecraft:carrots']='minecraft:carrot',['minecraft:potatoes']='minecraft:potato',['minecraft:beetroots']='minecraft:beetroot_seeds'})[block.name] or block.name
 end
 return M

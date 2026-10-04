@@ -1572,3 +1572,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Controller240 shut down and both temporary tickets removed;239 was shut down
   before the reset. Permanent candidate report records failed pre-fix evidence,
   final successful run, exact conservation and limits. Complete Lua gate remains.
+-0.34 now normalizes bounded empty-container metadata in native Sponge v2/v3 and
+  Python import, with parity regressions and explicit unsupported payload issues.
+  Container actors observe inventory contents during placement/restart/final verify,
+  refuse destructive repairs and tagged items, and reserve isolated chest neighbors.
+  Cardinal sign geometry uses native-observed rotations; sign text remains unsupported
+  because ordinary native hardware exposes no read-back API. Barrel native probes
+  corrected horizontal look direction and excluded downward facing. Focused actor,
+  ownership, binary import and full19-test Python checks pass. The actual project
+  runtime test builds through preparation/supply/restart and reports subsequently
+  added contents without removing them. Native controller247/builder248 rig prepared;
+  final review and complete gates remain before acceptance.

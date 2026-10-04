@@ -196,3 +196,29 @@ unobserved; preparation then inspects it from a side or beneath using the existi
 access recovery path. Farmland is never classified as a general solid support and
 missing soil is not replaced with fill. This supports supplied farmland without
 claiming automatic creation of farmland.
+
+## Empty containers and sign geometry
+
+Single dry chests (including trapped chests), closed barrels facing up or horizontally,
+ and unlit furnaces/blast furnaces/smokers have finite placement adapters. Every
+container credit, restart reconciliation and final verification reads its adjacent
+inventory through the real peripheral API. Missing readers and nonempty contents
+are defects, never assumed empty. Placement uses untagged inventory items. Chests
+require no neighboring chest; their task footprint includes the four horizontal
+neighbors. Automatic repair refuses to destroy existing containers, preserving
+contents even when a different block is requested.
+
+Standing signs support cardinal rotations0/4/8/12; wall signs support horizontal
+facings and consume ordinary sign items. This is geometry support only. Native
+ordinary turtles cannot read back sign text in the installed environment, so sign
+block-entity payloads remain explicit import/analyzer issues. Successful placement
+is not evidence that text or arbitrary NBT was restored.
+
+Native Sponge v2/v3 import and the Python converter normalize up to4,096 empty
+container records into `metadata.blockEntities`, retaining bounded coordinates and
+matching palette identities. Nonempty items, loot tables, names, locks, active
+furnace state, recipes/experience and unknown fields are rejected as unsupported
+metadata. Only the normalized empty-inventory contract is retained; this does not
+promise byte-for-byte preservation of incidental furnace timing fields. JSON
+imports validate the same canonical contract. Containers require `metadataV1` so
+older builders cannot silently ignore inventory verification.

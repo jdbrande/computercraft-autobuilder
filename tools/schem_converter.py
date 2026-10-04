@@ -110,6 +110,8 @@ def consumption(block):
     if name in AIR or (name.endswith('_door') and state.get('half') == 'upper') or (name.endswith('_bed') and state.get('part') == 'head'):
         return name, 0
     aliases = {'minecraft:wall_torch':'minecraft:torch', 'minecraft:redstone_wall_torch':'minecraft:redstone_torch', 'minecraft:soul_wall_torch':'minecraft:soul_torch', 'minecraft:redstone_wire':'minecraft:redstone', 'minecraft:wheat':'minecraft:wheat_seeds', 'minecraft:carrots':'minecraft:carrot', 'minecraft:potatoes':'minecraft:potato', 'minecraft:beetroots':'minecraft:beetroot_seeds'}
+    if re.fullmatch(r'minecraft:(oak|spruce|birch|jungle|acacia|dark_oak|mangrove|cherry|bamboo|crimson|warped)_wall_sign', name):
+        name = name.replace('_wall_sign', '_sign')
     return aliases.get(name, name), 2 if name.endswith('_slab') and state.get('type') == 'double' else 1
 
 

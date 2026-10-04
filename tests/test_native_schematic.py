@@ -31,7 +31,7 @@ class NativeSchematicTests(unittest.TestCase):
         entities = tag(9,'Entities',b'\x0a'+struct.pack('>i',1)+b'\0')
         offset = tag(11,'Offset',struct.pack('>iiii',3,-4,7,9))
         palettes = [None, [('stone_slab[type=double]',0),('minecraft:oak_door[half=upper]',1)],
-                    [('minecraft:wall_torch[facing=east]',0),('minecraft:oak_log[axis=x]',1)]]
+                    [('minecraft:oak_wall_sign[facing=east,waterlogged=false]',0),('minecraft:oak_log[axis=x]',1)]]
         for version in (2,3):
             for palette in palettes:
                 for extra in ((),(offset,entities)):
