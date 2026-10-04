@@ -1732,3 +1732,25 @@ priority while beta owns a survey, reboots both, finishes that contract, assigns
 alpha next, then constructs/verifies both projects using exactly four shared stone
 and settles all jobs/inventories. Native two-project acceptance, the single final
 review, full gates and ordered integration remain pending.
+
+### 0.36 review corrections and native acceptance — 2026-10-04
+
+The single final review found three priority gaps. Its consolidated correction
+checks actual idle/unowned crafter availability before new admission or stock
+claims, resolves shared mining priority and pause state across active consumers,
+and advances completed operation metadata before offering factory admission to a
+lower request. Regression tests reproduce unavailable/busy/lost crafters, real
+project pause/resume and controller restart with shared mining, and a
+SMELT-to-CRAFT priority handoff. Existing committed owners remain unchanged.
+Focused production, private factory runtime, exploration, coordination, scaling,
+and processing suites pass. Final whole-suite checks are pending.
+
+Native controller 257 and builder 258 completed two simultaneously active
+projects from exactly four shared stone. Beta (80) owned the first survey; alpha
+was raised from20 to100 while beta was safely paused. Both computers restarted;
+beta retained that task and alpha received the next project assignment. Both
+projects reached built with2 correct blocks, all jobs completed, no supply lease,
+and the builder empty at home with3518 of its initial4000 fuel. Independent world
+inspection confirmed all four blocks and empty stock/depot/supply inventories.
+Evidence is under ignored `dist/live-project-priorities/`. This is a finite
+supplied-stock scheduling trial, not raw-material acquisition or scale acceptance.

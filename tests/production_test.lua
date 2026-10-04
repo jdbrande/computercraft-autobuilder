@@ -273,7 +273,7 @@ test('production recovers after furnaces and crafting workers become available',
   local job=q.state.jobs[r.jobIds[1]]; eq(job.furnaceLane,'furnace')
   for _=1,30 do p:tick();p:step();h:smelt() end
   eq(job.status,'completed')
-  assert(r.error:find('No online crafting',1,true),tostring(r.error)); eq(r.jobId,nil)
+  assert(r.error:find('No available crafting',1,true),tostring(r.error)); eq(r.jobId,nil)
   app.state.workers['9']={id=9,online=true,telemetry={capabilities={crafting=true}}}; p:tick()
   eq(q.state.jobs[r.jobId].type,'CRAFT'); eq(r.error,nil); eq(r.status,'running')
 end)
@@ -583,4 +583,53 @@ test('failed unclaimed factory retirement restores live records and retry surviv
  for _=1,80 do p:tick();p:step();h:smelt() end
  eq(q.state.requests[high.id].status,'completed');eq(q.state.requests[low.id].status,'completed')
  eq(require('autobuilder.factory.factory').count(h.inventories.store,mc('stone')),8)
+end)
+
+test('unavailable high priority crafting leaves feasible furnace admission and claims free',function()
+ for _,mode in ipairs({'blocked','busy','lost'}) do
+  local app,p,q,config,h=productionFixture({[1]={name=mc('stone'),count=4},[2]={name=mc('cobblestone'),count=8},[3]={name=mc('coal'),count=2}})
+  q.state.projects.low={name='low',priority=20};q.state.projects.high={name='high',priority=80}
+  local w={id=9,online=true,telemetry={status='idle',capabilities={crafting=true}}};app.state.workers['9']=w
+  local low=p:request({[mc('stone')]=8},'project:low',{projectName='low'});p:tick()
+  local high=p:request({[mc('stone_bricks')]=4},'project:high',{projectName='high'})
+  if mode=='lost' then p:tick();assert(high.jobId) end
+  w.telemetry.status=mode=='blocked' and 'blocked' or 'idle';w.telemetry.task=mode~='blocked' and 'unrelated' or nil
+  for _=1,80 do p:tick();p:step();h:smelt() end
+  eq(low.status,'completed');assert(h.calls>0);eq(high.status=='completed',false)
+  for _,j in pairs(q.state.jobs) do if j.productionRequest==high.id then eq(p.ledger.state.leases[j.id],nil) end end
+  w.telemetry.status='idle';w.telemetry.task=nil;p:tick();p:syncClaims();assert(high.jobId)
+  eq(p.ledger.state.leases[high.jobId].status,'held')
+ end
+end)
+test('priority operation transition admits ready next craft before lower new smelting',function()
+ local app,p,q,config,h=productionFixture({[1]={name=mc('cobblestone'),count=8},[2]={name=mc('coal'),count=2}})
+ app.state.workers['9']={id=9,online=true,telemetry={status='idle',capabilities={crafting=true}}}
+ q.state.projects.low={name='low',priority=20};q.state.projects.high={name='high',priority=80}
+ local high=p:request({[mc('stone_bricks')]=4},'project:high',{projectName='high'});p:tick();p:syncClaims()
+ local first=q.state.jobs[high.jobIds[1]]
+ local low=p:request({[mc('stone')]=8},'project:low',{projectName='low'})
+ for _=1,80 do p:step();h:smelt();if first.status=='completed' then break end end
+ eq(first.status,'completed');p:tick();p:syncClaims()
+ eq(high.operation,2);local craft=assert(q.state.jobs[high.jobId]);eq(craft.type,'CRAFT');eq(p.ledger.state.leases[craft.id].status,'held')
+ for _,j in pairs(q.state.jobs) do if j.productionRequest==low.id and j.status~='completed' then error('lower request admitted before ready high craft') end end
+end)
+test('shared mining follows highest active consumer and survives original project pause and reboot',function()
+ local app,p,q,config,h=productionFixture();local S=require('autobuilder.core.scheduling')
+ for name,priority in pairs({low=20,medium=50,high=80}) do q.state.projects[name]={name=name,priority=priority,jobs={}} end
+ local low=p:request({[mc('raw_iron')]=4},'project:low',{projectName='low'});p:tick();local id=low.mines[mc('raw_iron')]
+ local projects=require('autobuilder.blueprint.projects').new(app,config,h,q,p)
+ projects:command({'build','pause','low'});eq(app.state.jobs[id].paused,true)
+ local medium=p:request({[mc('cobblestone')]=4},'project:medium',{projectName='medium'})
+ local high=p:request({[mc('raw_iron')]=4},'project:high',{projectName='high'});p:tick()
+ eq(high.mines[mc('raw_iron')],id);eq(S.priority(app.state,app.state.jobs[id]),80);eq(app.state.jobs[id].paused,false)
+ app.state=U.copy(app.saved);q=require('autobuilder.core.workflows').new(app.state,function() return app:save() end,function() return 0 end,1)
+ app.mining=require('autobuilder.core.mining_service').new(app,config,h,{send=function() return true end},function() return 0 end)
+ p=require('autobuilder.core.production_service').new(app,config,h,q)
+ local w=miningWorker(2,mc('raw_iron'),40);w.telemetry.miningResources={mc('raw_iron'),mc('cobblestone')};app.state.workers['2']=w
+ eq(app.mining.jobs:assign(app.state.workers,{}).id,id)
+ local j=app.state.jobs[id];local area=U.copy(j.miningArea)
+ projects=require('autobuilder.blueprint.projects').new(app,config,h,q,p)
+ projects:command({'build','resume','low'});projects:command({'build','pause','high'})
+ eq(j.paused,false);eq(S.priority(app.state,j),20);eq(j.workerId,2);eq(j.miningArea.min.x,area.min.x)
+ projects:command({'build','pause','low'});eq(j.paused,true);eq(j.workerId,2)
 end)

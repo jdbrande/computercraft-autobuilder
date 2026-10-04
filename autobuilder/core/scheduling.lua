@@ -4,6 +4,23 @@ function M.valid(n) return U.integer(n) and n>=0 and n<=100 end
 function M.urgent(j)
   return j.siteAccess and true or ({RESCUE=true,RECOVER_CARGO=true,REFUEL=true,RETURN_HOME=true})[j.type]==true
 end
+-- Mining can serve several requests without changing its physical contract.
+function M.consumers(state,job)
+  local root=job
+  for _=1,4 do if not root.parent then break end;root=(state.jobs or {})[root.parent] or root end
+  local out={}
+  for id,r in pairs((state.automation or {}).requests or {}) do
+    if id==root.consumer or (r.mines or {})[root.item]==root.id then out[#out+1]=r end
+  end
+  return out
+end
+function M.pauseSharedMine(state,job)
+  local consumers=M.consumers(state,job)
+  if #consumers==0 then return end
+  local active=false
+  for _,r in ipairs(consumers) do if r.status~='completed' and not r.paused then active=true end end
+  job.paused=not active
+end
 function M.priority(state,work)
   local a=state.automation or {};local projects=a.projects or {};local seen={}
   local function resolve(j,depth)
@@ -13,6 +30,13 @@ function M.priority(state,work)
     if not name and type(j.key)=='string' then name=j.key:match('^project:([%w_-]+)') end
     local p=name and projects[name]
     if p then assert(p.priority==nil or M.valid(p.priority),'invalid saved project priority');return p.priority or 50 end
+    if j.type=='MINE' and not j.exploration then
+      local best
+      for _,r in ipairs(M.consumers(state,j)) do if r.status~='completed' and not r.paused then
+        best=math.max(best or 0,resolve(r,depth+1))
+      end end
+      if best then return best end
+    end
     local request=j.productionRequest or j.consumer
     if not request and type(j.key)=='string' then request=j.key:match('^(request:%d+):') end
     if request and (a.requests or {})[request] then return resolve(a.requests[request],depth+1) end

@@ -27,3 +27,10 @@ checks still decide whether work is feasible; an estimate is not a measured trip
 Paused or unavailable work does not receive new claims. Existing committed work
 still obeys its physical coordination barriers. Strict priority can delay lower
 projects while higher demand continues; there is no implicit priority aging.
+
+A fixed mining job shared by several requests uses the highest active consumer's
+priority. Pausing one project leaves that shared job available for another active
+consumer; pausing every consumer stops new assignments. The saved mining owner,
+quantity and geometry remain unchanged. Unavailable or occupied crafters cannot
+claim new ingredients, and a ready next production step retains its priority at
+an operation boundary.

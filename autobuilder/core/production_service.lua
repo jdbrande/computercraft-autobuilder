@@ -82,6 +82,27 @@ function M.new(app,config,e,queue)
     end
     return {withdrawn=withdrawn,delivered={[job.item]=p.delivered or 0},sequence=p.stockSequence}
   end
+  local function craftAvailable(job)
+    if app.state.workers==nil then return true end -- legacy embedding without a registry
+    for _,w in pairs(app.state.workers) do
+      local t=w.telemetry;local caps=t and t.capabilities or {}
+      if w.online and t and (t.status==nil or t.status=='idle') and not t.task and caps.crafting
+        and (not job.preferredWorker or job.preferredWorker==w.id)
+        and (not job.privateStation or caps.isolatedCraftingV1)
+        and not Coordination.workerBusy(app.state,w.id,job.id)
+        and require('autobuilder.workers.health').eligible(t,job)
+        and require('autobuilder.resources.fuel_budget').admit(config,job,w) then return true end
+    end
+    return false
+  end
+  local function craftOperationAvailable(r)
+    if r.jobId then return craftAvailable(assert(s.jobs[r.jobId])) end
+    if #(config.craftingStations or {})==0 then return craftAvailable({type='CRAFT'}) end
+    for _,station in ipairs(config.craftingStations) do
+      if craftAvailable({type='CRAFT',preferredWorker=station.workerId,privateStation=station}) then return true end
+    end
+    return false
+  end
   local function syncClaims(allowGrant,eligible)
     local jobs={}; for _,j in pairs(s.jobs) do if j.stockInputs and not j.cancelled then jobs[#jobs+1]=j end end
     table.sort(jobs,function(a,b) return Scheduling.before(app.state,a,b) end)
@@ -104,7 +125,7 @@ function M.new(app,config,e,queue)
       end
     end
     if allowGrant==false then return end
-    for _,j in ipairs(jobs) do if (not eligible or eligible[j.id]) and j.status~='completed' and not j.paused and j.type~='PROCESS' and not j.logistics and not j.privateStation and not j.returnManaged and not self.ledger.state.leases[j.id] then
+    for _,j in ipairs(jobs) do if (not eligible or eligible[j.id]) and j.status~='completed' and not j.paused and j.type~='PROCESS' and not j.logistics and not j.privateStation and not j.returnManaged and not self.ledger.state.leases[j.id] and (j.type~='CRAFT' or craftAvailable(j)) then
       local lease,why=self.ledger:reserve(j.id,j.stockInputs,j.stockOutputs,
         app.mining.storage.valid and app.mining.storage.counts or nil,{protected=j.type=='FUEL_STATION' and {} or config.turtleFuelReserveItems})
       if j.stockError~=why then j.stockError=why; save() end
@@ -228,6 +249,8 @@ function M.new(app,config,e,queue)
         r.mines[item]=job.id; save()
       end
       local job=app.state.jobs[r.mines[item]]
+      local linked=job;local seen={}
+      while linked and not seen[linked.id] do seen[linked.id]=true;Scheduling.pauseSharedMine(app.state,linked);linked=linked.childId and app.state.jobs[linked.childId] end
       material.jobId=job.id; material.workerId=job.workerId; material.status=job.status
       if job.status=='blocked' then return blocked(material,job.error or 'Mining job blocked: '..item) end
       if not hasWorker('mining',item) then return blocked(material,'No online mining worker eligible for '..item) end
@@ -316,7 +339,11 @@ function M.new(app,config,e,queue)
     end
     local remaining=math.max(0,op.batches-completed)
     if remaining==0 then return true end
-    if op.type=='CRAFT' and not hasWorker('crafting') then return false,'No online crafting-capable worker for '..op.item end
+    if op.type=='CRAFT' and not craftOperationAvailable(r) then
+      local why='No available crafting-capable worker for '..op.item
+      if r.jobId or r.privateCraft then replan(r,why) end
+      return false,why
+    end
     if op.type=='SMELT' and #(config.furnaces or {})==0 then return false,'No configured furnaces for '..op.item end
     local inputs={};for item,n in pairs(op.inputs) do inputs[item]=n*remaining/op.batches end
     if op.type=='SMELT' then
@@ -483,7 +510,14 @@ function M.new(app,config,e,queue)
     self:syncClaims(false)
     -- Advance each independent request against one observed stock snapshot.
     -- Existing physical jobs drain in their ordinary action/worker loops.
-    for _,r in ipairs(requests) do advanceRequest(r) end
+    for _,r in ipairs(requests) do
+      -- Finish metadata-only boundaries before lower priorities can take a claim.
+      for _=1,#(r.plan and r.plan.operations or {})+1 do
+        local plan,operation=r.plan,r.operation
+        advanceRequest(r)
+        if r.status=='completed' or r.plan~=plan or r.operation==operation then break end
+      end
+    end
     self:syncClaims(true,existing)
   end
   function self:describe(item)
