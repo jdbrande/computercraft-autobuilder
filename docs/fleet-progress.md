@@ -1532,3 +1532,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   completed, computers241/242 shut down and4 force-load tickets removed. Permanent
   candidate report validation-0.32.0.md distinguishes assisted pre-fix recovery
   from the clean retest; final complete Lua/Python gates are running.
+- Started0.34 design in `.worktrees/placement-metadata`: supported containers/signs
+  and bounded verifiable block-entity payloads through existing import/placement
+  journals.0.33 remains under its single final review with native mixed rig prepared;
+ 0.31 and0.32 complete release gates continue. No metadata implementation is claimed.
