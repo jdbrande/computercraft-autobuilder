@@ -1,6 +1,8 @@
 local U=require('autobuilder.core.util')
 local M={}
-function M.new(state,config,network,turtle,save,chunkProbe)
+function M.new(state,config,network,turtle,save,chunkProbe,environment)
+  local health=require('autobuilder.workers.health')
+  local software=environment and health.software(environment)
   local self={connected=false}; local lastRegister,lastHeartbeat,lastAck=-math.huge,-math.huge,-math.huge
   local pending={}
   state.status=state.status or 'idle'; state.position=state.position or {known=false}
@@ -28,7 +30,7 @@ function M.new(state,config,network,turtle,save,chunkProbe)
       if U.position(entry) then miningRoute={entry=U.copy(entry),fuelTarget=mining.fuelTarget} end
     end
     if task then budget,budgetError=require('autobuilder.resources.fuel_budget').mission(config,task,{fuel=current,position=p,depot=config.depot,miningRoute=miningRoute}) end
-    return {cargo=cargo,controllerBoot=state.controllerBoot,poseRecovery=require('autobuilder.core.task_messages').poseReport(state.poseRecovery or state.poseReceipt),
+    return {health=environment and health.observe(environment,software),cargo=cargo,controllerBoot=state.controllerBoot,poseRecovery=require('autobuilder.core.task_messages').poseReport(state.poseRecovery or state.poseReceipt),
       fuelBudget=budget,fuelBudgetError=budgetError,
       harvestDelivered=task and (task.type=='HARVEST' or task.type=='FARM') and not task.intent and (task.delivered or 0) or nil,
       chunkAnchor=chunkProbe and chunkProbe() or nil,fuelRequired=need,fuelLimit=limit,label=config.label or ('Turtle '..tostring(state.id or '?')),status=state.status,

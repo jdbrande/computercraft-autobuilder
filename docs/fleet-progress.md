@@ -1292,3 +1292,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   and new-work eligibility. Existing configured roles remain opt-in; owned work is
   retained. Source-copy fixtures must report unmanaged, not verified. The subsequent
   single-command onboarding flow remains required and is not declared complete.
+
+- Task61/62 health implementation passes focused hardware/software/network/runtime
+  and dispatch tests. Health is checked again after yielding coverage admission;
+  existing owners retain assignments despite later damage. A legacy coordination
+  fixture lacked the digging API its advertised mining role requires; its stub now
+  explicitly exposes that API without permitting physical test effects.
+- Native235/236 read-only checks report advanced pickaxe and normal crafting-table
+  turtles correctly. Both retain777 fuel. A test-generated managed receipt verifies,
+  detects an intentionally edited file, and verifies after restoration; source-copy
+  software reports unmanaged. This is integrity/hardware evidence, not installer
+  workflow acceptance. Final review, complete gates and integration remain.

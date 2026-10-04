@@ -237,3 +237,13 @@ test('controller drains a queued network burst in bounded turns without losing o
   end}
   local app=R.run(cfg('controller'),e);for id=2,22 do assert(app.state.workers[tostring(id)]) end
 end)
+
+test('runtime reports changing equipment without probing physical APIs or changing configured roles',function()
+  local e=env(12);local left='minecraft:diamond_pickaxe'
+  e.turtle.getEquippedLeft=function() return left and {name=left} or nil end
+  e.turtle.getEquippedRight=function() return nil end
+  local c=cfg('worker',7);local w=require('autobuilder.core.runtime').new(c,e)
+  local before=e.turtle.calls;local t=w.agent:telemetry();assert(t.health);eq(t.health.left,left);eq(t.health.software.status,'unmanaged')
+  left=nil;t=w.agent:telemetry();eq(t.health.left,'none');eq(e.turtle.calls,before)
+  eq(t.capabilities.telemetry,true)
+end)

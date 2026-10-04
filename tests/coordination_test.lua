@@ -69,7 +69,7 @@ local function environment(id,h)
       if h.crash then h.crash=false; error('lost peripheral response after transfer') end
       return n
     end}
-  e.turtle=S.turtle(); e.gps={locate=function() return 0,64,0 end}
+  e.turtle=S.turtle(); e.turtle.dig=function() error('unexpected digging in coordination fixture') end; e.gps={locate=function() return 0,64,0 end}
   return e
 end
 local function runtime()
@@ -240,4 +240,30 @@ test('queued factory prevents fresh construction supply before its first physica
   local build=queue:submit('BUILD',{blocks={block}},{})
   build.workerId=12; build.status='blocked'; build.missingItem=mc('stone'); build.missingCount=1; build.supplyId=build.id..':supply:1'
   f:smelt(); f.c:tick(); eq(f.h.transfers,0); eq(queue.state.supply,nil)
+end)
+
+test('health gates both new assignment queues restores repaired workers and retains existing owners',function()
+  for _,mining in ipairs({false,true}) do
+    local state,mine,generic,workers=queues();workers['13']=nil
+    local h=require('autobuilder.workers.health').observe({}, {status='modified',reason='changed file'})
+    workers['12'].telemetry.health=h
+    local j=mining and mine:submit(mc('raw_iron'),4,0) or generic:submit('VERIFY',{blocks={block}},{})
+    local queue=mining and mine or generic;eq(queue:assign(workers),nil);eq(j.workerId,nil)
+    h.software={status='verified',version='0.29.0'};h.movement=true;h.digging=true
+    eq(queue:assign(workers).id,j.id);eq(j.workerId,12)
+    h.software={status='modified',reason='changed file'};h.movement=false
+    eq(queue:assign(workers).id,j.id);eq(j.workerId,12)
+  end
+end)
+
+test('health admission is rechecked after yielding coverage without leaking new ownership',function()
+  for _,mining in ipairs({false,true}) do
+    local state,_,_,workers=queues();workers['13']=nil
+    local h=require('autobuilder.workers.health').observe({}, {status='unmanaged'});h.movement=true;h.digging=true
+    workers['12'].telemetry.health=h
+    local chunks={reserve=function() h.software={status='modified',reason='changed while observing coverage'};return {status='disabled'} end}
+    local q=mining and Jobs.new(state,function() return true end,function() return 1 end,7,nil,chunks) or Workflows.new(state,function() return true end,function() return 1 end,7,chunks)
+    local j=mining and q:submit(mc('raw_iron'),4,0) or q:submit('VERIFY',{blocks={block}})
+    eq(q:assign(workers),nil);eq(j.workerId,nil)
+  end
 end)

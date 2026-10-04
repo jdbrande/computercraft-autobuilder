@@ -1222,16 +1222,16 @@ and integration decisions. Preserve queued ownership and legacy protocol support
 
 ### Task61: Read-only hardware and managed software evidence
 
-- [ ] Add failing tests for equipped tools/peripherals/API capabilities and missing
+- [x] Add failing tests for equipped tools/peripherals/API capabilities and missing
   legacy APIs without movement, crafting, digging or equipment swapping.
-- [ ] Reuse installation receipts/hashes for bounded startup integrity reporting,
+- [x] Reuse installation receipts/hashes for bounded startup integrity reporting,
   preserving supported custom startup/settings and reporting unmanaged copies.
-- [ ] Validate/clean optional telemetry health; reject malformed fields and expose
+- [x] Validate/clean optional telemetry health; reject malformed fields and expose
   worker equipment/version/status in the existing worker view.
 
 ### Task62: Evidence-based eligibility and acceptance
 
-- [ ] Gate new role assignments on known hardware/software failures, restore idle
+- [x] Gate new role assignments on known hardware/software failures, restore idle
   eligibility after repair, and retain active owners and recovery pathways.
 - [ ] Run actual runtime and native read-only checks, one final review/consolidated
   fixes, complete Lua/Python/release checks and permanent documentation.

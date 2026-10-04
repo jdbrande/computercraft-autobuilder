@@ -78,7 +78,7 @@ function M.new(config,e)
     self.navigation=require('autobuilder.core.navigation').new(e.turtle,state.position,config,function() return self:save() end)
     self.navigation.coverageGuard=function(from,target) return require('autobuilder.core.chunks').guard(config,state,from,target) end
     self.fuelRecovery=require('autobuilder.workers.fuel_recovery').new(self,config,e)
-    self.agent=require('autobuilder.workers.agent').new(state,config,network,e.turtle,function() return self:save() end,function() return require('autobuilder.core.chunks').probe(e,state,config) end)
+    self.agent=require('autobuilder.workers.agent').new(state,config,network,e.turtle,function() return self:save() end,function() return require('autobuilder.core.chunks').probe(e,state,config) end,e)
   end
   self:save() -- Persist boot generation before producing any message IDs.
   self:report('INFO','Started '..config.role..' '..id..' boot '..state.boot..' from '..source)
