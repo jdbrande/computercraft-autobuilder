@@ -1024,13 +1024,13 @@ operator docs and progress ledger.
 
 ### Task49: Native scaling acceptance and integration
 
-- [ ] Run a loaded mixed-material terrain/build fixture large enough for several
+- [x] Run a loaded mixed-material terrain/build fixture large enough for several
   miners, clearers and builders to join automatically. Start with one worker and
   register additional eligible workers while the project runs; do not assign jobs
   manually. Record role targets, actual ownership, throughput and bottlenecks.
-- [ ] Independently inspect final structure, ground and inventory; reconcile workers,
+- [x] Independently inspect final structure, ground and inventory; reconcile workers,
   finite fuel, production, cargo and leases. Retain setup/restart/cleanup evidence.
-- [ ] Perform one final whole-branch review and one consolidated regression-backed
+- [x] Perform one final whole-branch review and one consolidated regression-backed
   fix pass. Run complete Lua/Python/release/diff gates, update progress and permanent
   acceptance documentation, integrate/push, then continue every remaining requirement.
 
@@ -1083,7 +1083,7 @@ prior delivery and hazard costs; `E.plan` consumes bounded known route obstacles
 
 - [x] Run staged loaded hazard/alternative-resource native acquisition with finite fuel;
   verify automatic useful selection, observed diagnostics and actual deposited stock.
-- [ ] Add regressions for discovered bugs, preserve cleanup/restart evidence and update
+- [x] Add regressions for discovered bugs, preserve cleanup/restart evidence and update
   permanent acceptance/progress documentation. Run one final review/fix pass and the
   complete Lua/Python/release/diff checks, integrate/push and continue all remaining work.
 
@@ -1138,7 +1138,7 @@ its concrete task budget; station target uses the same requirement.
 - [x] Exercise an above-low worker whose queued mission requires additional fuel;
   verify automatic stock acquisition/refill, refuel-before-dispatch and completed
   physical work across restart in runtime tests and a native fixture.
-- [ ] Run one final review and consolidated regression-backed fix pass. Complete
+- [x] Run one final review and consolidated regression-backed fix pass. Complete
   Lua/Python/release/diff gates, record permanent evidence, integrate/push and
   continue all unfinished requirements.
 
@@ -1178,9 +1178,9 @@ ordered integration of accepted0.24–0.26. Reuse production and inventory journ
 
 ### Task58: Acceptance and integration
 
-- [ ] Run useful native early-replenishment acceptance; inspect final blocks, stock,
+- [x] Run useful native early-replenishment acceptance; inspect final blocks, stock,
   fuel, cargo and ownership independently. Preserve restart and cleanup evidence.
-- [ ] Run one final review and consolidated regression-backed fixes, full Lua/Python/
+- [x] Run one final review and consolidated regression-backed fixes, full Lua/Python/
   release/diff gates. Update permanent acceptance/progress, integrate/push, then
   continue the initial production/construction pipeline and remaining requirements.
 
