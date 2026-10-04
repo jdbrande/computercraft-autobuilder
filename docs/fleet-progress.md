@@ -998,3 +998,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Full implementation remains incomplete. Next work continues through software and
   equipment negotiation, processor/provider coverage, placement adapters, inventory
   rescue, scheduling and fleet monitoring, plus larger integrated acceptance.
+
+
+- Review correction: the0.28 overlap test passed, but its cumulative-placement
+  assertion did not prove a placement event concurrent with production. That
+  concurrency claim is withdrawn pending stronger event-timed evidence. Final
+  review also reproduced streaming supply acquisition continuing after project
+  pause and a stale stockOnly flag disabling new-run acquisition. These remain
+  release blockers for the consolidated regression-backed correction pass.
