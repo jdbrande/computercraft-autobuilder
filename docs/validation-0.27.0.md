@@ -1,9 +1,11 @@
 # Material forecast and early replenishment acceptance
 
-Candidate0.27.0, implementation `c755627`. Complete Lua gate is still running;
-this report does not declare integration or full fleet completion.
+Accepted0.27.0, implementation `c755627`. Complete release gates and native
+acceptance passed. The full fleet roadmap remains in progress.
 
 ## Automated evidence
+
+-846 Lua tests passed on the final source (`/tmp/fleet-027-final-full.log`).
 
 -18 Python tests passed with the repository virtual environment.
 - Release generation, `python3 tools/release.py --check` and `git diff --check` pass.

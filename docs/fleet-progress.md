@@ -51,8 +51,17 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   regions and bounded supply production. Empty-stock, legacy ownership and actual
   two-builder/miner/factory overlap regressions pass across restarts. Final review,
   complete release gates and native acceptance remain pending.
-  Integrated and pushed at`71b21ed`. Dynamic scaling0.24 continues in the isolated
-  `.worktrees/fleet-scaling` checkout, including final0.23 documentation.
+  Integrated and pushed at`71b21ed`.
+- Dynamic scaling0.24 accepted/pushed at`5ec2f40`:788 Lua/18 Python tests and
+  native four-builder/two-miner ramp-up,48 verified blocks and final idle drain.
+- Mining intelligence0.25 accepted/pushed at`29a3879`:804 Lua/18 Python tests
+  and native hazard/retry/observed-yield acceptance.
+- Mission fuel forecasts0.26 accepted/pushed at`c77a1a5`:829 Lua/18 Python
+  tests and finite-fuel native proactive-refill acceptance.
+- Material forecasts/early supply0.27 accepted:846 Lua/18 Python tests, two
+  native replacement-acquisition trials including controller/builder reboot.
+- Continuous pipeline0.28 final gate/native retest,0.29 health review corrections,
+  and0.30 single-command enrollment implementation are in progress.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -75,11 +84,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 7: recursive dependency graph | Aggregated nodes, shared stock/surplus, operation edges, bounded expansion; 417 Lua tests | Accepted 0.13.0; preserve during later integration |
 | 8: provider registry | Deterministic candidates, availability/preferences, durable acquisition selection | Accepted 0.13.0; preserve during later integration |
 | 9: autonomous mining | Accepted 0.12.0 with four live explorers | Preserve during later pipeline integration |
-| 10: mining intelligence | Surveys, observed resources, protection, routes and exhaustion | Persist hazard/inaccessibility/density evidence and apply ranking |
+| 10: mining intelligence | Persistent bounded hazards, density, outcomes, retries and native acceptance0.25 | Accepted; preserve during integration |
 | 11: fuel management | Configurable fuels, durable stations, automatic refuel and native rescue accepted; budgets deny unsafe trips | Per-mission budget presentation for every role and fleet-wide predictive fuel forecasting |
 | 12: logistics network | Registered nodes, reserved parallel couriers, automatic targets/production and native restocking accepted0.19 | Continuous builder/fuel supply integration and broader physical network routing |
 | 13: storage abstraction | Durable count claims and physical/available/reserved/transit/expected/project views accepted in 0.14.0 | Native slot capacity and private station ownership accepted in0.16; managed courier integration accepted0.19 |
-| 14: continuous forecasting | Acquisition targets and shortages | Proactive per-project coverage of all physical/expected states |
+| 14: continuous forecasting | Per-project physical/reserved/transit/provider forecasts and actual renewable delivery evidence accepted0.27 | Preserve accounting through later provider additions |
 | 15: parallel crafting | Two native private Crafty stations with input/output leases, finite batches and restart acceptance | Capacity-based batch sizing accepted0.21; cross-role pipeline integration remains |
 | 16: processing network | Furnace lanes and fuel partitioning | Generic machine providers, timing/capacity forecasts and supported processors |
 | 17: renewables | Managed trees, crops, column farms with replant/return journals | Provider coverage/reserve policies for registered additional farms |
@@ -1339,3 +1348,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Accepted0.26 mission fuel forecasts:829 Lua/18 Python, release/diff checks,
   single final review fixes, native above-low refuel/restart/home return and cleanup
   complete. Accepted0.24/0.25 documentation merged with tested source unchanged.
+
+- Final0.27 gate passed846 Lua tests and18 Python tests, with release/diff checks.
+  Accepted0.26 documentation merged without changing tested implementation files.
+  Permanent0.27 report includes both completed native trials and confirmed cleanup.

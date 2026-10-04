@@ -1178,9 +1178,9 @@ ordered integration of accepted0.24–0.26. Reuse production and inventory journ
 
 ### Task58: Acceptance and integration
 
-- [ ] Run useful native early-replenishment acceptance; inspect final blocks, stock,
+- [x] Run useful native early-replenishment acceptance; inspect final blocks, stock,
   fuel, cargo and ownership independently. Preserve restart and cleanup evidence.
-- [ ] Run one final review and consolidated regression-backed fixes, full Lua/Python/
+- [x] Run one final review and consolidated regression-backed fixes, full Lua/Python/
   release/diff gates. Update permanent acceptance/progress, integrate/push, then
   continue the initial production/construction pipeline and remaining requirements.
 
