@@ -26,7 +26,10 @@ function M.software(e)
     for path,f in pairs(r.files) do
       count=count+1;assert(count<=256 and Manifest.path(path) and type(f)=='table','invalid receipt files')
     end
-    local selected=Manifest.select(m,r.role);assert(#selected>0,'empty installed role')
+    local selected=Manifest.select(m,r.role);local paths={}
+    for _,f in ipairs(selected) do paths[f.path]=true end
+    for _,path in ipairs(Manifest.required) do assert(paths[path],'manifest missing required file: '..path) end
+    for path in pairs(r.files) do assert(paths[path],'receipt file omitted from manifest: '..path) end
     for _,f in ipairs(selected) do
       -- The installer explicitly preserves operator-owned root startup scripts.
       if f.path~='startup.lua' then
@@ -51,7 +54,9 @@ function M.observe(e,software)
   local t=e.turtle or {};local h={kind='unknown',left=equipped(t,'Left'),right=equipped(t,'Right'),
     movement=true,placing=type(t.place)=='function',digging=type(t.dig)=='function',crafting=type(t.craft)=='function',scanner=false,peripherals={},software=software}
   for _,name in ipairs({'forward','up','down','turnLeft','turnRight'}) do if type(t[name])~='function' then h.movement=false end end
-  if e.term and type(e.term.isColor)=='function' then local ok,color=pcall(e.term.isColor);if ok and type(color)=='boolean' then h.kind=color and 'advanced' or 'normal' end end
+  local term=e.term
+  if term and type(term.native)=='function' then local ok,native=pcall(term.native);if ok and type(native)=='table' then term=native end end
+  if term and type(term.isColor)=='function' then local ok,color=pcall(term.isColor);if ok and type(color)=='boolean' then h.kind=color and 'advanced' or 'normal' end end
   if e.peripheral and type(e.peripheral.getNames)=='function' and type(e.peripheral.getType)=='function' then
     local ok,names=pcall(e.peripheral.getNames)
     if ok and type(names)=='table' then
@@ -95,7 +100,7 @@ function M.eligible(t,job)
   if kind=='CRAFT' then return h.crafting,'crafting table upgrade unavailable' end
   if not h.movement then return false,'movement API unavailable' end
   if (kind=='BUILD' or kind=='REPAIR' or kind=='PREPARE_REGION') and not h.placing then return false,'placement API unavailable' end
-  local mining=kind=='MINE';local digging=mining or kind=='HARVEST' or kind=='FARM' or kind=='CLEAR' or kind=='PREPARE_REGION' or kind=='PREPARE_SITE'
+  local mining=kind=='MINE';local digging=mining or kind=='REPAIR' or kind=='HARVEST' or kind=='FARM' or kind=='CLEAR' or kind=='PREPARE_REGION' or kind=='PREPARE_SITE'
   if digging then
     if not h.digging then return false,'digging API unavailable' end
     if h.left~='unknown' and h.right~='unknown' then

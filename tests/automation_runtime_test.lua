@@ -922,3 +922,22 @@ test('large private crafting demand automatically uses both stations and drains 
   eq(r.active,0);eq(r.desired,0);eq(f.c.state.fleet.metrics.crafting.units,128)
   for _,lease in pairs(f.c.state.capacityLedger.leases) do eq(lease.status,'released') end
 end)
+
+test('private crafting skips missing craft hardware before claims and rechecks after capacity observation',function()
+ local H=require('autobuilder.workers.health');local f=parallelFixture()
+ f.we.turtle.craft=nil;f:request(4);f:finish();eq(f.h.crafts,0);eq(f.other.h.crafts,1)
+ local g=parallelFixture();g.other.we.turtle.craft=nil
+ g:request(4);local call=g.ce.peripheral.call
+ g.ce.peripheral.call=function(name,method,...)
+  local v=call(name,method,...)
+  if method=='getItemLimit' then
+   g.we.turtle.craft=nil
+   for _,w in pairs(g.c.state.workers) do w.telemetry.health=H.observe({}, {status='modified',reason='changed during capacity'}) end
+  end
+  return v
+ end
+ for _=1,20 do g:step() end
+ eq(g.h.crafts,0);eq(g.other.h.crafts,0);eq(g.h:count(mc('stone')),40)
+ for _,lease in pairs(g.c.state.inventoryLedger.leases) do assert(lease.status~='held') end
+ for _,lease in pairs(g.c.state.capacityLedger.leases) do assert(lease.status~='held') end
+end)

@@ -49,7 +49,7 @@ function M.new(app,config,e,queue,production)
       if scheduled>=op.batches then break end
       local w=app.state.workers[tostring(station.workerId)]; local t=w and w.telemetry
       if w and w.online and t and t.status=='idle' and not t.task and t.capabilities and t.capabilities.isolatedCraftingV1
-        and not Q.workerBusy(app.state,w.id) then
+        and require('autobuilder.workers.health').eligible(t,{type='CRAFT'}) and not Q.workerBusy(app.state,w.id) then
         local occupied=false
         for _,j in pairs(queue.state.jobs) do
           if j.privateStation and j.status~='completed' then
@@ -105,6 +105,7 @@ function M.new(app,config,e,queue,production)
       assert(worker and worker.online and t and t.status=='idle' and not t.task
         and t.capabilities and t.capabilities.isolatedCraftingV1
         and not Q.workerBusy(app.state,job.preferredWorker,job.id),'waiting for available preferred Crafty worker')
+      local healthy,healthError=require('autobuilder.workers.health').eligible(t,job);assert(healthy,healthError)
       local allowed,why=Q.factoryCanRun(app.state,job,true);assert(allowed,why)
       allowed,why=require('autobuilder.core.scaling').canAssign(app.state,config,job,worker,app.mining.storage.counts,now());assert(allowed,why)
     end

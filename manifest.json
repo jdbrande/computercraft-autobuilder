@@ -522,7 +522,7 @@
       "version": "0.29.0"
     },
     {
-      "bytes": 17785,
+      "bytes": 17987,
       "path": "autobuilder/core/logistics_service.lua",
       "roles": [
         "controller",
@@ -532,7 +532,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "6f9487b3493372ea5d06e39aebd50ec277ce3526c37c69c4d1c450a01cf4d498",
+      "sha256": "4c804efd2a01f94ff06275057a4846588a6ae065589c3df76b423d2f508d7995",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/logistics_service.lua",
       "version": "0.29.0"
     },
@@ -702,7 +702,7 @@
       "version": "0.29.0"
     },
     {
-      "bytes": 15611,
+      "bytes": 15758,
       "path": "autobuilder/core/scaling.lua",
       "roles": [
         "controller",
@@ -712,7 +712,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "d221c3e4d637eb8a3fa8a4c6a35bc84c2bd3a7d869fb567a8a05c37ae26e5ff0",
+      "sha256": "09db3bc9bdda560fe741d5992dba6573085c416542a85fbfb11ecd81edde46c9",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/core/scaling.lua",
       "version": "0.29.0"
     },
@@ -807,7 +807,7 @@
       "version": "0.29.0"
     },
     {
-      "bytes": 17501,
+      "bytes": 17684,
       "path": "autobuilder/factory/parallel.lua",
       "roles": [
         "controller",
@@ -817,7 +817,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "16994eb90b2d8920d63de6acf3fcd3a85ca8868b74c2475b56219940a6b257b5",
+      "sha256": "669c6d3186aa36fefd1589f934755a441e9ae42950c625b9509b8abb180b7b20",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/factory/parallel.lua",
       "version": "0.29.0"
     },
@@ -912,7 +912,7 @@
       "version": "0.29.0"
     },
     {
-      "bytes": 8363,
+      "bytes": 8254,
       "path": "autobuilder/install/manager.lua",
       "roles": [
         "controller",
@@ -922,12 +922,12 @@
         "logger",
         "courier"
       ],
-      "sha256": "80859044ddcf1e29cc3d933155b969a1faf4093512a996fcb9556d7d7ef109d0",
+      "sha256": "78a720858f80970475a6d28c92862e78af92bf1273271ab8cb11008c4e52b67e",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/install/manager.lua",
       "version": "0.29.0"
     },
     {
-      "bytes": 2851,
+      "bytes": 2989,
       "path": "autobuilder/install/manifest.lua",
       "roles": [
         "controller",
@@ -937,7 +937,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "242344a47318eadf91790cf602a2816e25b81810ea948042c3b1bb7a5c7e813c",
+      "sha256": "bb882adc46f426ae375cb66ee71058e35a940e028916cd6796ee56f082db8e45",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/install/manifest.lua",
       "version": "0.29.0"
     },
@@ -1406,7 +1406,7 @@
       "version": "0.29.0"
     },
     {
-      "bytes": 6442,
+      "bytes": 6860,
       "path": "autobuilder/workers/health.lua",
       "roles": [
         "controller",
@@ -1416,7 +1416,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "08330205c8e7bcf9383103859b386166dfba574c9342b92032eed7c5ee4c4911",
+      "sha256": "f9af98f8bc57ff1a65b9e217179e3dbf033fad34ea00138ad8912932732f88e4",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/workers/health.lua",
       "version": "0.29.0"
     },
@@ -1495,7 +1495,7 @@
       "version": "0.29.0"
     },
     {
-      "bytes": 33710,
+      "bytes": 33878,
       "path": "installer.lua",
       "roles": [
         "controller",
@@ -1505,7 +1505,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "590dd56f963436bb5ed04c308d8e98bd129b7b65a65253da37f1cb4a88de21a4",
+      "sha256": "b65081b02d8f414dc862981cd18e058539213f4a4f4690da23eb95227041ba66",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/installer.lua",
       "version": "0.29.0"
     },

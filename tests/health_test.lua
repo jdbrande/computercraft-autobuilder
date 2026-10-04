@@ -12,7 +12,7 @@ local function managed()
   local body='return {}';local hash=SHA.digest(body)
   local m={schema=1,project='autobuilder',version='0.29.0',baseUrl='https://example.com/repo',roles={},files={}}
   for role in pairs(require('autobuilder.install.manifest').roles) do m.roles[role]={runtime=role=='controller' and 'controller' or 'worker'} end
-  for _,path in ipairs({'autobuilder/main.lua','startup.lua'}) do
+  for _,path in ipairs({'autobuilder/main.lua','startup.lua','installer.lua','update.lua','autobuilder/startup.lua','autobuilder/config.lua','autobuilder/core/runtime.lua'}) do
     m.files[#m.files+1]={path=path,url=m.baseUrl..'/'..path,sha256=hash,bytes=#body,version=m.version,roles={'worker'}}
     e.fs.files['/'..path]=body
   end
@@ -63,4 +63,19 @@ test('stationary crafting needs its table API while mining distinguishes pickaxe
   local h=H.observe(e,{status='unmanaged'});eq(h.kind,'normal');eq(H.eligible({health=h},{type='MINE'}),false);eq(H.eligible({health=h},{type='HARVEST'}),true)
   e.turtle={craft=function() error('physical probe forbidden') end};h=H.observe(e,{status='unmanaged'})
   eq(H.eligible({health=h},{type='CRAFT'}),true);eq(H.eligible({health=h},{type='TRANSPORT'}),false)
+end)
+
+test('repair needs digging hardware and native terminal identifies turtle despite color redirect',function()
+ local e=hardware();e.turtle.getEquippedLeft=function() return nil end;e.turtle.getEquippedRight=function() return nil end;e.turtle.dig=nil
+ e.term.native=function() return {isColor=function() return false end} end
+ local h=H.observe(e,{status='unmanaged'});eq(h.kind,'normal');eq(H.eligible({health=h},{type='REPAIR'}),false)
+ e.turtle.dig=function() error('probe forbidden') end;e.turtle.getEquippedLeft=function() return {name='minecraft:diamond_pickaxe'} end
+ eq(H.eligible({health=H.observe(e,{status='unmanaged'})},{type='REPAIR'}),true)
+end)
+test('software rejects manifest omission of a receipt managed file and startup only selection',function()
+ local e=managed();local m=e.textutils.unserializeJSON(e.fs.files['/manifest.json'])
+ table.remove(m.files,1);e.fs.files['/manifest.json']=e.textutils.serializeJSON(m);e.fs.files['/autobuilder/main.lua']='corrupt'
+ eq(H.software(e).status,'modified')
+ local r=e.textutils.unserializeJSON(e.fs.files['/autobuilder/.installation.json']);m.files={m.files[1]};e.fs.files['/manifest.json']=e.textutils.serializeJSON(m);r.files={['startup.lua']=r.files['startup.lua']};e.fs.files['/autobuilder/.installation.json']=e.textutils.serializeJSON(r)
+ eq(H.software(e).status,'modified')
 end)

@@ -1303,3 +1303,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   detects an intentionally edited file, and verifies after restoration; source-copy
   software reports unmanaged. This is integrity/hardware evidence, not installer
   workflow acceptance. Final review, complete gates and integration remain.
+
+- The single final0.29 review identified four important integration bugs and one
+  hardware-reporting issue. Consolidated red/green regressions cover unhealthy
+  courier/private-crafter selection before staging, health changes during capacity
+  observations, impossible competing mining roles, repair digging requirements,
+  incomplete manifest/receipt agreement and redirected terminal color. New stock
+  claims now check health before ownership; owned journals still drain unchanged.
+  Installer required-file invariants are shared with integrity verification.
+- Focused health/network/runtime/coordination/logistics/scaling/install checks and
+  actual private-crafting regression pass. Complete0.29 gates are starting; native
+  integrity checks will be repeated on the final correction. No second review.
