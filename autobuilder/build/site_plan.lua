@@ -90,7 +90,9 @@ function M.new(source,transform,sourceHash,options)
       local x=r.bounds.min.x+(index-1)%w;local z=r.bounds.min.z+math.floor((index-1)/w)
       local inside=x>=origin.x and x<origin.x+width and z>=origin.z and z<origin.z+depth
       local foundation=inside and (overrides[x..','..z] or hasStructure and origin.y-1) or nil
-      columns[#columns+1]={x=x,z=z,foundationY=foundation,clearanceY=bounds.max.y,minY=foundation and minY or origin.y}
+      local plant=foundation and self:wanted({x=x,y=foundation+1,z=z})
+      local substrate=plant and C.family(plant.name)=='crop' and foundation or nil
+      columns[#columns+1]={x=x,z=z,foundationY=foundation,substrateY=substrate,clearanceY=bounds.max.y,minY=foundation and minY or origin.y}
     end
     return columns,last<r.columns and last+1 or nil
   end
@@ -230,6 +232,7 @@ function M.new(source,transform,sourceHash,options)
           blocks[#blocks+1]=p
         elseif not wanted or y==r.column.foundationY then
           p.name=wanted and wanted.name or fill;p.state=wanted and wanted.state or {};p.support=not wanted or nil
+          if y==r.column.substrateY then p.substrate='minecraft:farmland' end
           blocks[#blocks+1]=p
         end
         position=position+1;Cooperate.every(position)

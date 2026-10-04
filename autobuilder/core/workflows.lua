@@ -121,9 +121,13 @@ function M.new(state,save,clock,id,chunks,config)
       assert(require('autobuilder.build.site_work').validContract(j),'invalid preparation region contract')
       if j.siteAccess then j.requiredCapability='siteAccessV1' end
     end
+    if require('autobuilder.build.blockstates').requiresModern(j.blocks,j.siteSurvey) then j.requiredCapability='placementV1' end
     if j.blocks and #j.blocks>0 and j.type~='PREPARE_REGION' then
       j.bounds={min={x=math.huge,y=math.huge,z=math.huge},max={x=-math.huge,y=-math.huge,z=-math.huge}}
-      for _,b in ipairs(j.blocks) do for _,a in ipairs({'x','y','z'}) do j.bounds.min[a]=math.min(j.bounds.min[a],b[a]); j.bounds.max[a]=math.max(j.bounds.max[a],b[a]) end end
+      for _,b in ipairs(j.blocks) do
+        local plan=require('autobuilder.build.placement').plan(b)
+        for _,cell in ipairs({b,plan and plan.pair}) do for _,a in ipairs({'x','y','z'}) do j.bounds.min[a]=math.min(j.bounds.min[a],cell[a]);j.bounds.max[a]=math.max(j.bounds.max[a],cell[a]) end end
+      end
       j.bounds.max.y=j.bounds.max.y+2
     end
     s.jobs[j.id]=j; persist(); return j

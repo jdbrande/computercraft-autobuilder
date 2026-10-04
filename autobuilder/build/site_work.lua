@@ -105,6 +105,7 @@ function M.validContract(j)
     if not U.position(b) or not state(b) or not require('autobuilder.core.pathfinding').inside(b,j.bounds) or b.y>=j.clearanceY then return false end
     local key=b.x..','..b.y..','..b.z;if seen[key] then return false end;seen[key]=true
     if b.support~=nil and type(b.support)~='boolean' or b.retain~=nil and not state(b.retain) then return false end
+    if b.substrate~=nil and (b.substrate~='minecraft:farmland' or not b.support or b.retain or s.stage~='fill' and s.stage~='verify') then return false end
     local air=C.isAir(b.name)
     if access then
       local target=U.distance(b,j.siteAccess.target)==0

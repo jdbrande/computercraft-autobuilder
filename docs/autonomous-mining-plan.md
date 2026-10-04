@@ -1245,17 +1245,17 @@ Spec: [fleet install design](fleet-install-design.md). Inline execution in
 
 ### Task63: Bounded controller discovery and configuration profiles
 
-- [ ] Add failing controller/client discovery, ambiguity, nonce and malformed-data
+- [x] Add failing controller/client discovery, ambiguity, nonce and malformed-data
   tests. Add opt-in controller enrollment profiles using ordinary configuration.
-- [ ] Match an explicit worker ID or GPS berth, preserve unknown-pose restrictions,
+- [x] Match an explicit worker ID or GPS berth, preserve unknown-pose restrictions,
   and expose actionable missing-profile status without moving hardware.
 
 ### Task64: Transactional install, enrollment and acceptance
 
-- [ ] Reuse the standalone installer for `fleet install`, verified repair/update,
+- [x] Reuse the standalone installer for `fleet install`, verified repair/update,
   existing settings preservation and idle-only profile application.
-- [ ] Exercise actual runtime registration and native discovery/install/recovery.
-- [ ] Complete one final review and consolidated fixes, full gates and permanent
+- [x] Exercise actual runtime registration and native discovery/install/recovery.
+- [x] Complete one final review and consolidated fixes, full gates and permanent
   evidence; integrate in dependency order and continue remaining requirements.
 
 ## Milestone0.31: registered processing network
@@ -1265,17 +1265,17 @@ in `.worktrees/processing-network` follows0.30; propagate final enrollment fixes
 
 ### Task65: Registered process recipes and dependency/fuel planning
 
-- [ ] Add bounded machine/recipe configuration and PROCESS provider/planner tests.
-- [ ] Preserve legacy furnace/craft recipes; split registered process work across
+- [x] Add bounded machine/recipe configuration and PROCESS provider/planner tests.
+- [x] Preserve legacy furnace/craft recipes; split registered process work across
   compatible machines with explicit item fuel and expected processing time.
 
 ### Task66: Durable machine execution and acceptance
 
-- [ ] Reuse stock/capacity claims and transfer reconciliation for finite processor
+- [x] Reuse stock/capacity claims and transfer reconciliation for finite processor
   batches, output collection, unused fuel return and restart/paused recovery.
-- [ ] Test actual controller execution, multi-input simulations and useful native
+- [x] Test actual controller execution, multi-input simulations and useful native
   blast-furnace/smoker processing with exact conservation and final cleanup.
-- [ ] Complete one final review/consolidated fixes, full gates and documentation;
+- [x] Complete one final review/consolidated fixes, full gates and documentation;
   integrate in dependency order and continue renewable/provider requirements.
 
 ## Milestone0.32: renewable provider coverage and reserves

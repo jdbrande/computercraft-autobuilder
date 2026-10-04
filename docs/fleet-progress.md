@@ -5,6 +5,23 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.31 registered processors:905 Lua/18 Python tests, release/diff checks,
+  final-source parallel native processing/restart/conservation and cleanup passed.
+  Permanent evidence: [0.31 validation](validation-0.31.0.md).
+
+- Active development:0.31 registered processors completed its release gates.0.32 renewable
+  adapters passed final-source carrot/replant/reserve acceptance with both crops
+  and farmland independently checked; its complete Lua gate is running.0.33 paired/
+  attached/basic redstone placement is under its single final review; native probes
+  passed and mixed schematic analysis exposed a ceiling-support dependency cycle.
+ 0.34 container/sign metadata design and native observation probes have started.
+  Candidate evidence lives in the corresponding `.worktrees` documentation until
+  ordered integration. No unfinished candidate is treated as accepted.
+
+- Accepted0.30 enrollment:885 Lua/18 Python tests, release/diff checks and final-source
+  native HTTP install/repair/profile refresh passed; fixture shut down and tickets
+  removed. Permanent evidence: [0.30 validation](validation-0.30.0.md).
+
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
 - Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
 - Inventory ownership integrated and pushed at `e66daa5`.
@@ -72,18 +89,18 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 8: provider registry | Deterministic candidates, availability/preferences, durable acquisition selection | Accepted 0.13.0; preserve during later integration |
 | 9: autonomous mining | Accepted 0.12.0 with four live explorers | Preserve during later pipeline integration |
 | 10: mining intelligence | Persistent bounded hazards, density, outcomes, retries and native acceptance0.25 | Accepted; preserve during integration |
-| 11: fuel management | Configurable fuels, durable stations, automatic refuel and native rescue accepted; budgets deny unsafe trips | Per-mission budget presentation for every role and fleet-wide predictive fuel forecasting |
+| 11: fuel management | Accepted0.15 fuel distribution/rescue and0.26 mission budgets/predictive forecasts, with native acceptance | Preserve during later integration |
 | 12: logistics network | Registered nodes, reserved parallel couriers, automatic targets/production and native restocking accepted0.19 | Continuous builder/fuel supply integration and broader physical network routing |
 | 13: storage abstraction | Durable count claims and physical/available/reserved/transit/expected/project views accepted in 0.14.0 | Native slot capacity and private station ownership accepted in0.16; managed courier integration accepted0.19 |
 | 14: continuous forecasting | Per-project physical/reserved/transit/provider forecasts and actual renewable delivery evidence accepted0.27 | Preserve accounting through later provider additions |
 | 15: parallel crafting | Two native private Crafty stations with input/output leases, finite batches and restart acceptance | Capacity-based batch sizing accepted0.21; cross-role pipeline integration remains |
-| 16: processing network | Furnace lanes and fuel partitioning | Generic machine providers, timing/capacity forecasts and supported processors |
-| 17: renewables | Managed trees, crops, column farms with replant/return journals | Provider coverage/reserve policies for registered additional farms |
-| 18: builder fleet | Owned regions and movement reservations | Concurrent multi-builder acceptance with independent supply and dependencies |
+| 16: processing network | Furnace lanes accepted; registered multi-machine processing candidate0.31 passed native restart acceptance | Complete final Lua gate and ordered integration |
+| 17: renewables | Managed trees/crops/columns; registered definitions/reserves candidate0.32 passed native carrot acceptance | Complete final Lua gate and ordered integration |
+| 18: builder fleet | Owned regions, movement reservations and multiple native builders accepted0.24/0.28 | Larger integrated fleet acceptance |
 | 19–20: placement graph/adapters | Basic support, stairs/slabs/logs, doors, panes/fences, ladders/lanterns | Beds, signs, rails, buttons/redstone/plants and supported fluid/tile adapters; cross-region dependencies |
-| 21: builder supply | Bounded journaled supply batches | Early replenishment and automatic project logistics/direct delivery |
-| 22–23: verification/repair | Physical comparison and explicit repair jobs | Automatic bounded defect scheduling and independent repair-worker acceptance |
-| 24: worker states | Heartbeats, task/fuel/pose/errors | Equipment/software health and full recovery-state presentation |
+| 21: builder supply | Bounded journaled batches and positive-cargo replenishment accepted0.27; streaming pipeline accepted0.28 | Preserve through later adapters |
+| 22–23: verification/repair | Physical comparison and bounded automatic repair/settlement accepted0.22 | Larger integrated defect acceptance |
+| 24: worker states | Durable task/fuel/pose recovery, hardware/software health accepted0.29 | Consolidated dashboard presentation |
 | 25: rescue | Native identity-checked fuel delivery, original-task recovery, offline ownership and journal preservation | Reachable inventory recovery and broader blocked-route recovery missions |
 | 26: offline owners | Ownership survives timeout/restart | Extend to new leases and configurable recovery commands |
 | 27: chunk loading | Strict bounded coverage, durable stationary chunky claims, native cross-chunk construction and offline-loader refusal | Accepted0.18; preserve during infrastructure/scaling work |
@@ -93,7 +110,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 | 35–37: messages, duplicates, checkpoints | Existing validation, exact receipts and physical-action journals | Apply and regression-test every new message and side effect |
 | 38–39: completion and failures | Verified projects and final inventory/logistics/worker settlement accepted0.22 | Broader bounded automatic retries and actionable project errors |
 | 41–42: dependency-ordered milestones | Exploration, dependency/provider graph and count ownership integrated | Implement remaining milestones using existing controller/executor boundaries |
-| 44: dynamic fleet scaling | Shared-material explorers and capability-based queues provide partial foundations | Demand/yield/travel/rate allocation, role minimum/maximum counts, bottleneck response, safe idle reassignment and scale-down; simulation and live miners/clearers/builders ramp-up |
+| 44: dynamic fleet scaling | Demand/cost/rate allocation, limits, idle reassignment and scale-down accepted0.24 with native ramp-up | Larger integrated fleet and message-load acceptance |
 | 45: automatic site preparation and leveling | Accepted0.23:748 Lua/18 Python tests, native terrain/fluids/support/access/containment; see validation-0.23.0.md | Preserve during scaling and later integrated acceptance |
 
 ## Evidence and discovered bugs
@@ -1536,3 +1553,22 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   and bounded verifiable block-entity payloads through existing import/placement
   journals.0.33 remains under its single final review with native mixed rig prepared;
  0.31 and0.32 complete release gates continue. No metadata implementation is claimed.
+-0.33 single final review found unsafe destructive bed repair plus six integration
+  defects. Consolidated regressions/fixes refuse paired bed removal, remove ceiling
+  support cycles, separate bed floors from pair regions, include generated cells in
+  ownership/coverage, count one reactive supply item, preserve existing farmland
+  through side inspection, and negotiate new placement capabilities. Ordinary crop
+  project preparation/build/restart passes without trampling or replacing soil.
+  The actual bed supply regression additionally exposed preflight cache invalidation
+  before a mutation grant, which repeatedly discarded the grant through navigation.
+  Invalidation now checkpoints with the placement intent; one stocked bed completes
+  both halves after interrupted supply and controller/worker restart. Focused
+  consolidated suites pass; native mixed-project retest and full gates follow.
+-0.31 final-source native acceptance passed on controller240: two real blast
+  furnaces produced10+10 iron across controller restart and a smoker produced2
+  cooked beef. Independent world reads match20 iron/2 beef/16 remaining coal from
+  20 raw iron/2 raw beef/22 initial coal. All three machines empty, three jobs and
+  two requests completed, all stock/capacity leases released, no mining jobs.
+  Controller240 shut down and both temporary tickets removed;239 was shut down
+  before the reset. Permanent candidate report records failed pre-fix evidence,
+  final successful run, exact conservation and limits. Complete Lua gate remains.
