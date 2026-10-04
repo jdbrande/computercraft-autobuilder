@@ -1754,3 +1754,13 @@ and the builder empty at home with3518 of its initial4000 fuel. Independent worl
 inspection confirmed all four blocks and empty stock/depot/supply inventories.
 Evidence is under ignored `dist/live-project-priorities/`. This is a finite
 supplied-stock scheduling trial, not raw-material acquisition or scale acceptance.
+
+### 0.37 started — inventory infrastructure protection
+
+0.36 final source gates continue in its isolated branch. The next dependency is
+requirement28: factory/storage inventory physical bounds. The implementation
+uses a single controller map and existing mutation grants, preserving saved
+inventory contracts and offline ownership. Design and validation plan:
+`infrastructure-protection-design.md`. Remaining work after this includes traffic
+acceptance, structured events/operator commands, monitor dashboard, sustained
+load and final unassisted combined fleet acceptance.
