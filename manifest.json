@@ -1586,7 +1586,7 @@
       "version": "0.33.0"
     },
     {
-      "bytes": 10987,
+      "bytes": 11505,
       "path": "autobuilder/workers/resupply.lua",
       "roles": [
         "controller",
@@ -1596,7 +1596,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "3a22b3e7e18ca200ada43d65a8497ef32eaf7305cee8929c455dbce1c9b4f140",
+      "sha256": "459e92c7f23d5f0b3df60efa620e34f3e9a615ad7815a2ded5eecb18fa1724cf",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/workers/resupply.lua",
       "version": "0.33.0"
     },

@@ -1573,3 +1573,15 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   pre-fix soil repair from the clean final-source untouched plot run. Accepted0.31
   documentation merge did not change tested code/tests/tools/artifacts. Integrating
   and pushing before continuing placement, metadata and inventory recovery work.
+
+### 0.33 live supply-ascent correction
+
+The full pre-correction gate passed 939 Lua tests. Native placement then exposed a
+supply departure whose first vertical cell was empty but the next was a ceiling.
+The saved route repeatedly retried the blocked ascent. The shared travel helper now
+replans only a confirmed obstruction on its initial ascent, retaining reservation
+waits and uncertain moves. A regression failed before the fix and passes after it,
+including restart and reservation preservation; all focused logistics tests pass.
+The fixture also required a two-cell underside access opening for its low ceiling
+button. That operator intervention is separate from the routing fix and will be
+recorded in acceptance. Final-source full gates and native completion follow.
