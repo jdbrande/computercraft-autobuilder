@@ -1,12 +1,13 @@
 # 0.35.0 reachable inventory recovery validation
 
-Candidate implementation `2e70326` passed focused tests and native acceptance.
-The inherited 0.33 supply-ascent correction is included for final gates. The full
-Lua gate remains pending; this is not a release acceptance claim.
+Accepted source `391db98` passed **976 Lua tests**, **20 Python tests**, release
+and diff checks. It includes the single review's fixes and both inherited0.33
+native corrections. Both native recovery trials below passed before integration.
+Final logs: `/tmp/fleet-035-final-full-v3.log` and corresponding Python evidence.
 
 ## Automated evidence
 
-Sixteen focused recovery tests cover frozen donor ownership, wrong computer ID,
+Nineteen focused recovery tests cover frozen donor ownership, wrong computer ID,
 exact item/NBT snapshots, partial receipts, interrupted donor/deposit/collection
 transfers, unrelated inventory changes, insufficient fuel, failed checkpoints,
 private destination capacity and protocol bounds. A real controller/donor/courier
@@ -14,7 +15,7 @@ runtime simulation reboots all three after a physical donor drop, then reconcile
 both stacks, returns plain stock centrally and preserves tagged cargo and the
 courier's original fuel stack. Runtime, automation, capacity, managed logistics,
 node configuration and mission fuel regressions passed. All 20 Python tests and
-release/diff checks passed before the inherited ascent correction.
+release/diff checks passed on the final source.
 
 The successful single final review found three integration stalls and one diagnostic
 gap. The consolidated corrections add normal executor reconciliation for interrupted
@@ -93,5 +94,5 @@ All three computers were shut down and four temporary chunk tickets removed.
 Evidence is under ignored `dist/live-inventory-recovery/refuel-retest/`.
 
 This retest establishes native automatic fuel handoff between recovery trips. The
-post-deposit power-loss regression and full controller-service starvation regression
+post-deposit power-loss regression and collection-waiting regression
 are automated evidence; they were not induced as additional native crashes.

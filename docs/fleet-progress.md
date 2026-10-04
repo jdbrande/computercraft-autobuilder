@@ -5,6 +5,12 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.35 reachable inventory recovery:976 Lua/20 Python tests and final
+  release/diff checks passed. Two native trials verified exact plain/NBT cargo,
+  frozen donor ownership, restart, home refueling between trips and cleanup.
+  [Permanent evidence](validation-0.35.0.md).0.36 final gates and0.37 protection
+  implementation/native acceptance continue.
+
 - Accepted0.34 metadata/sign geometry:956 Lua/20 Python tests, release/diff checks
   and native Sponge v3 nine-cell import/build/restart/verification passed.
   [Permanent evidence](validation-0.34.0.md) distinguishes the clean repeat from
@@ -1712,3 +1718,9 @@ passed. Permanent report records the native evidence and assistance limits.
 Final-source956 Lua/20 Python tests and release/diff checks passed. The native
 container/sign project and final inventories were independently checked; fixture
 computers are off and temporary tickets removed.
+
+### 0.35 accepted — 2026-10-04
+
+Final-source976 Lua/20 Python tests, release/diff checks and both native trials
+passed. Donor quarantine, controlled courier refueling and exact inventory receipts
+retain their documented limits. No second review was performed.
