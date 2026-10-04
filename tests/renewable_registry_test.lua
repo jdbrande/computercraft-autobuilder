@@ -24,3 +24,25 @@ test('unhealthy preferred farm worker does not displace healthy alternate acquis
    ['13']={online=true,telemetry={capabilities={mining=true}}}}})
  eq(p.type,'mining');eq(p.available,true)
 end)
+
+test('renewable definitions reject executable assignment data and unsupported reserve sizes',function()
+ local R=require('autobuilder.resources.renewables')
+ local farm={kind='carrot',sites={{x=0,y=64,z=0},{x=1,y=64,z=0}},seedReserve=1}
+ eq(pcall(R.reserve,farm),false);farm.seedReserve=257;eq(pcall(R.reserve,farm),false)
+ local ok=require('autobuilder.core.task_messages').validate('task_assign',{job={id='task:7:1',type='FARM',farm={adapter={mode='crop',block='a',item='b',seed='c',age=4,callback=true}}}})
+ eq(ok,false)
+ for _,value in ipairs({true,7,'bad'}) do eq(require('autobuilder.core.task_messages').validate('task_assign',{job={id='task:7:1',type='FARM',farm=value}}),false) end
+end)
+
+test('new renewable contracts require a matching updated role while legacy plots remain compatible',function()
+ local R=require('autobuilder.resources.renewables')
+ eq(R.capability({kind='wheat'},false),'farming');eq(R.capability({kind='carrot'},false),'registeredFarmingV1')
+ eq(R.capability({kind='oak',seedReserve=3},true),'registeredLoggingV1')
+ local C=require('autobuilder.config');local c=C.load({role='worker',controllerId=7,automation={farming=true}})
+ eq(c.capabilities.registeredFarmingV1,true);eq(c.capabilities.registeredLoggingV1,nil)
+ local state={};local q=require('autobuilder.core.workflows').new(state,function() return true end,function() return 1 end,7)
+ local job=q:submit('FARM',{item='minecraft:carrot',quantity=1,farm={kind='carrot',sites={{x=1,y=64,z=0}}}},{})
+ eq(job.requiredCapability,'registeredFarmingV1')
+ local workers={['12']={id=12,online=true,telemetry={status='idle',capabilities={farming=true}}}}
+ eq(q:assign(workers),nil);workers['12'].telemetry.capabilities.registeredFarmingV1=true;eq(q:assign(workers).id,job.id)
+end)

@@ -127,7 +127,7 @@ function M.new(app,config,e,queue)
       local t=worker.telemetry
       if worker.online and t and t.capabilities and t.capabilities[capability]
         and not (capability=='mining' and t.capabilities.explorationV1)
-        and require('autobuilder.workers.health').eligible(t,{type=({logging='HARVEST',farming='FARM',crafting='CRAFT',mining='MINE',explorationV1='MINE'})[capability]}) then
+        and require('autobuilder.workers.health').eligible(t,{type=({registeredLoggingV1='HARVEST',registeredFarmingV1='FARM',logging='HARVEST',farming='FARM',crafting='CRAFT',mining='MINE',explorationV1='MINE'})[capability]}) then
         if not item or Materials.accepts(t.miningResources,item) then return true end
       end
     end
@@ -180,7 +180,7 @@ function M.new(app,config,e,queue)
     end
     if queued and queued.status=='queued' and not claimed and not queued.paused and not groupId
       and candidate and candidate.available and candidate.type~='storage' and candidate.type~=oldType
-      and not hasWorker(capability,legacy and item or nil) then
+      and not hasWorker(queued.requiredCapability or capability,legacy and item or nil) then
       -- Never-assigned work may change source. Persist retirement before creating
       -- a replacement; assigned/offline owners and their journals never expire.
       local links=legacy and r.mines or r.harvests

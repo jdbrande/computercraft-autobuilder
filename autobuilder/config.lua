@@ -112,6 +112,8 @@ function M.load(overrides)
   c.capabilities.explorationV1=c.mining.enabled and c.mining.mode=='explore' and true or nil
   for k,v in pairs(c.automation) do assert(type(v)=='boolean','invalid automation flag '..k) end
   for _,k in ipairs({'building','crafting','courier','logging','farming'}) do c.capabilities[k]=c.automation.enabled and c.automation[k] or nil end
+  c.capabilities.registeredFarmingV1=c.capabilities.farming and true or nil
+  c.capabilities.registeredLoggingV1=c.capabilities.logging and true or nil
   c.capabilities.logisticsV1=c.capabilities.courier and true or nil
   c.capabilities.sitePreparation=c.capabilities.building and true or nil
   c.capabilities.siteSurveyV1=c.capabilities.building and true or nil

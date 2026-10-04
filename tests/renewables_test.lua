@@ -28,6 +28,9 @@ local function world()
       local k=key(point(suffix)); local b=w.blocks[k]; if not b then return false end
       local item=b.name=='minecraft:wheat' and 'minecraft:wheat' or b.name
       if b.name:match('_leaves$') then item=nil end
+      if w.drops and w.drops[b.name] then
+        for name,n in pairs(w.drops[b.name]) do assert(add(name,n)) end;item=nil
+      end
       if item and not add(item,1) then return false,'full' end
       if b.name=='minecraft:wheat' then add('minecraft:wheat_seeds',1) end
       w.blocks[k]=nil; w.digs=w.digs+1
@@ -37,7 +40,7 @@ local function world()
   end
   t.placeDown=function()
     local k=key(point('Down')); local item=w.items[w.selected]; if w.blocks[k] or not item then return false end
-    local name=item.name=='minecraft:wheat_seeds' and 'minecraft:wheat' or item.name
+    local name=w.plantBlocks and w.plantBlocks[item.name] or (item.name=='minecraft:wheat_seeds' and 'minecraft:wheat' or item.name)
     w.blocks[k]={name=name,state={age=0}}; item.count=item.count-1; if item.count==0 then w.items[w.selected]=nil end; w.plants=w.plants+1
     if w.crashPlace then w.crashPlace=false; error('power cut after plant') end
     return true
@@ -198,4 +201,42 @@ test('renewable forecast follows collected cargo partial delivery and reboot wit
     w.capacity=10;assert(e:resume());run(e,task);eq(task.phase,'completed');eq(task.delivered,2)
     f=forecast();eq(f.items[task.item].held,0);eq(f.items[task.item].stored,2);eq(f.items[task.item].deficit,0)
   end
+end)
+
+test('carrot harvest retains planting reserve and delivers only replanted surplus',function()
+ local w,task,config,new=setup('carrot',2)
+ w.blocks['3,1,0']={name='minecraft:carrots',state={age=7}};w.blocks['3,0,0']={name='minecraft:farmland',state={}}
+ w.items[1]={name='minecraft:carrot',count=1};w.drops={['minecraft:carrots']={['minecraft:carrot']=3}};w.plantBlocks={['minecraft:carrot']='minecraft:carrots'}
+ local e=new();run(e,task);eq(task.phase,'completed');eq(task.delivered,2);eq(w.stock['minecraft:carrot'],2)
+ eq(w.items[1].count,1);eq(w.blocks['3,1,0'].name,'minecraft:carrots');eq(w.blocks['3,1,0'].state.age,0)
+end)
+test('beetroot maturity and interrupted custom replant preserve the selected definition',function()
+ local w,task,config,new,restart=setup('beetroot',1)
+ w.blocks['3,1,0']={name='minecraft:beetroots',state={age=2}};w.blocks['3,0,0']={name='minecraft:farmland',state={}}
+ w.items[1]={name='minecraft:beetroot_seeds',count=1};w.drops={['minecraft:beetroots']={['minecraft:beetroot']=1,['minecraft:beetroot_seeds']=1}};w.plantBlocks={['minecraft:beetroot_seeds']='minecraft:beetroots'}
+ local e=new();run(e,task);eq(task.blockedCategory,'immature');eq(w.digs,0)
+ w.blocks['3,1,0'].state.age=3;assert(e:resume());w.crashPlace=true;run(e,task);assert(task.intent and task.intent.kind=='plant')
+ local resumed,saved=restart();assert(resumed:resume());run(resumed,saved);eq(saved.phase,'completed');eq(saved.delivered,1);eq(w.plants,1)
+end)
+test('registered crop definition stays with its journal after controller configuration changes',function()
+ local w,task,config,new,restart=setup('custom',1);task.item='test:fruit'
+ config.farmAdapters={custom={mode='crop',block='test:crop',item='test:fruit',seed='test:seed',age=4}}
+ w.blocks['3,1,0']={name='test:crop',state={age=4}};w.blocks['3,0,0']={name='minecraft:farmland',state={}}
+ w.items[1]={name='test:seed',count=1};w.drops={['test:crop']={['test:fruit']=1,['test:seed']=1}};w.plantBlocks={['test:seed']='test:crop'}
+ w.crashDig=true;local e=new();run(e,task);assert(task.intent);eq(task.farm.adapter.age,4)
+ config.farmAdapters.custom={mode='column',block='test:other',item='test:other'}
+ local resumed,saved=restart();assert(resumed:resume());run(resumed,saved);eq(saved.phase,'completed');eq(saved.delivered,1);eq(w.plants,1)
+end)
+test('explicit larger planting reserve does not stop a seed-output harvest early',function()
+ local w,task,config,new=setup('carrot',3);task.farm.seedReserve=2;task.farm.sites[2]={x=5,y=1,z=0}
+ for _,x in ipairs({3,5}) do w.blocks[x..',1,0']={name='minecraft:carrots',state={age=7}};w.blocks[x..',0,0']={name='minecraft:farmland',state={}} end
+ w.items[1]={name='minecraft:carrot',count=2};w.drops={['minecraft:carrots']={['minecraft:carrot']=3}};w.plantBlocks={['minecraft:carrot']='minecraft:carrots'}
+ local e=new();run(e,task);eq(task.phase,'completed');eq(w.digs,2);eq(w.plants,2);eq(task.delivered,4);eq(w.items[1].count,2)
+end)
+
+test('registered column keeps its base with the same bounded navigation and return',function()
+ local w,task,config,new=setup('reed',2);task.item='test:reed'
+ config.farmAdapters={reed={mode='column',block='test:reed',item='test:reed'}}
+ for y=1,3 do w.blocks['3,'..y..',0']={name='test:reed',state={}} end
+ local e=new();run(e,task);eq(task.phase,'completed');eq(task.delivered,2);eq(w.digs,2);eq(w.blocks['3,1,0'].name,'test:reed')
 end)

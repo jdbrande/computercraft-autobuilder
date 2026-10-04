@@ -116,6 +116,7 @@ function M.new(state,save,clock,id,chunks,config)
     local j=U.copy(payload or {}); j.id='task:'..id..':'..s.sequence; j.type=kind
     j.key=dedup; j.status='queued'; j.progress=0; j.dependencies=U.copy(deps or {}); j.retryCount=0
     j.created=clock(); j.requiredCapability=caps[kind]
+    if (j.type=='FARM' or j.type=='HARVEST') and j.farm then j.requiredCapability=require('autobuilder.resources.renewables').capability(j.farm,j.type=='HARVEST') end
     if j.type=='PREPARE_REGION' then
       assert(require('autobuilder.build.site_work').validContract(j),'invalid preparation region contract')
       if j.siteAccess then j.requiredCapability='siteAccessV1' end

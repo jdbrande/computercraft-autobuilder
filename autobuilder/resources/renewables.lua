@@ -42,6 +42,13 @@ function M.reserve(farm,spec)
  assert(U.integer(n) and n>=math.max(1,sites) and n<=256,'seedReserve must cover all sites and be at most256')
  return n
 end
+function M.capability(farm,tree)
+ local legacy={wheat=true,bamboo=true,cactus=true,sugar_cane=true,oak=true,birch=true,spruce=true}
+ local modern=farm.seedReserve~=nil or farm.kind and not legacy[farm.kind]
+ if farm.adapter and not require('autobuilder.factory.factory').equal(farm.adapter,defaults[farm.kind]) then modern=true end
+ if modern then return tree and 'registeredLoggingV1' or 'registeredFarmingV1' end
+ return tree and 'logging' or 'farming'
+end
 function M.freeze(farm,config)
  local copy=U.copy(farm);local s=M.forFarm(copy,config)
  if s then copy.adapter=s;M.reserve(copy,s) end

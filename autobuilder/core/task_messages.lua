@@ -51,6 +51,8 @@ function M.validate(kind,p)
       or not U.integer(j.targetWorker) or j.targetWorker<0 or not U.integer(j.quantity) or j.quantity<1 or j.quantity>64) then return false,'invalid rescue assignment' end
     if j.managedFuel and (j.type~='REFUEL' or type(j.station)~='table' or not U.position(j.station.position)
       or not U.integer(j.fuelTarget) or j.fuelTarget<1 or j.fuelTarget>100000000) then return false,'invalid managed fuel assignment' end
+    if j.farm~=nil and (type(j.farm)~='table' or j.type~='FARM' and j.type~='HARVEST') then return false,'invalid renewable farm' end
+    if j.farm and j.farm.adapter and not pcall(require('autobuilder.resources.renewables').definition,j.farm.adapter) then return false,'invalid renewable adapter' end
     if j.type=='FUEL_STATION' or j.type=='PROCESS' then return false,'controller-only task' end
     if (j.siteWork~=nil or j.siteAccess~=nil) and j.type~='PREPARE_REGION' or j.siteSurvey~=nil and j.type~='SURVEY_SITE' then return false,'site metadata requires its matching task type' end
     if j.type=='SURVEY_SITE' and not require('autobuilder.build.site_survey').validContract(j) then return false,'invalid site survey assignment' end

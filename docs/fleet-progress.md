@@ -1488,3 +1488,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   final review fixes and final-source native hardware/integrity checks complete.
   Accepted0.28 merged with tested implementation unchanged; ordered integration
   proceeds while enrollment and processor milestones continue independently.
+
+-0.32 actual actor regressions now cover carrot seed-as-output surplus, beetroot
+  maturity, interrupted replanting, immutable custom definitions, retained reserves,
+  custom column bases, forecast exclusion and versioned worker eligibility. Focused
+  registry/actor/fuel/forecast/provider/runtime suites pass; native controller241 and
+  farmer242 are starting a two-plot carrot/replant/reserve acceptance run.

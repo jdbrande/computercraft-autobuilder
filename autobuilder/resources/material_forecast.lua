@@ -68,6 +68,10 @@ function M.build(state,stock,scopes)
           seenCargo[j.workerId]=true
           if t then
             for name,n in pairs(t.cargo.items or {}) do if f.items[name] and (current[id] or name==item) then
+              if kind=='harvesting' and j.farm then
+                local R=require('autobuilder.resources.renewables');local spec=R.forFarm(j.farm,{})
+                if spec and name==spec.seed then n=math.max(0,n-R.reserve(j.farm,spec)) end
+              end
               f.items[name].held=f.items[name].held+n
               if name==item then held=n end
             end end
