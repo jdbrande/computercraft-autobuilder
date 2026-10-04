@@ -1325,14 +1325,14 @@ in `.worktrees/placement-metadata`, following0.33 final placement corrections.
 
 ### Task71: Bounded metadata and placement contracts
 
-- [ ] Test native empty-container/sign placement and available observations.
-- [ ] Add only verifiable empty metadata normalization and matching adapters,
+- [x] Test native empty-container/sign placement and available observations.
+- [x] Add only verifiable empty metadata normalization and matching adapters,
   retaining explicit errors for unsupported payloads and states.
-- [ ] Preserve aliases, dependency ordering, inventory identity and recovery.
+- [x] Preserve aliases, dependency ordering, inventory identity and recovery.
 
 ### Task72: Native metadata acceptance and integration
 
-- [ ] Exercise ordinary import/build/verify and interrupted placement with real
+- [x] Exercise ordinary import/build/verify and interrupted placement with real
   hardware; independently inspect world data and preserve exact limitations.
-- [ ] Complete one final review, consolidated fixes, full gates, permanent evidence
+- [x] Complete one final review, consolidated fixes, full gates, permanent evidence
   and ordered integration; continue every remaining fleet requirement.

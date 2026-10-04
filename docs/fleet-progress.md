@@ -5,6 +5,11 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.34 metadata/sign geometry:956 Lua/20 Python tests, release/diff checks
+  and native Sponge v3 nine-cell import/build/restart/verification passed.
+  [Permanent evidence](validation-0.34.0.md) distinguishes the clean repeat from
+  the assisted first trial.0.35–0.37 remain separate candidates.
+
 - Accepted0.33 deterministic placement:940 Lua/18 Python tests and final release/
   diff checks passed. Native140-cell mixed adapters verified independently; ascent
   and paired-checkpoint bugs are regression-covered. Its underside-access fixture
@@ -1636,3 +1641,9 @@ access cut is explicitly assisted evidence. Permanent candidate report is
 
 Final source940 Lua/18 Python tests, generated release verification and clean diff
 passed. Permanent report records the native evidence and assistance limits.
+
+### 0.34 accepted — 2026-10-04
+
+Final-source956 Lua/20 Python tests and release/diff checks passed. The native
+container/sign project and final inventories were independently checked; fixture
+computers are off and temporary tickets removed.
