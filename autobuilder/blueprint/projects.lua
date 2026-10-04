@@ -309,7 +309,12 @@ function M.new(app,config,e,queue,production)
     if action=='forecast' then
       self:forecast(p.name);app.state.view='forecast';save();return true,table.concat(app.state.forecastLines,'; ')
     end
-    if action=='status' then return true,p.name..': '..p.phase..' '..(p.completed or 0)..'/'..(p.total or 0)..' positions'..(p.error and '; '..p.error or '') end
+    if action=='priority' then
+      assert(#args==4,'Usage: build priority <name> <0..100>')
+      local n=require('autobuilder.core.scheduling').set(app.state,p.name,tonumber(args[4]),save)
+      return true,p.name..' priority='..n
+    end
+    if action=='status' then return true,p.name..' priority='..(p.priority or 50)..': '..p.phase..' '..(p.completed or 0)..'/'..(p.total or 0)..' positions'..(p.error and '; '..p.error or '') end
     if action=='pause' then
       p.paused=true
       pauseProduction(p,true)
@@ -400,7 +405,9 @@ function M.new(app,config,e,queue,production)
       for _,path in ipairs(s.retiredBlueprints) do if e.fs.exists(path) then e.fs.delete(path) end end
       s.retiredBlueprints=nil; save()
     end
-    for _,p in pairs(s.projects) do
+    local projects={};for _,p in pairs(s.projects) do projects[#projects+1]=p end
+    table.sort(projects,function(a,b) return require('autobuilder.core.scheduling').before(app.state,a,b) end)
+    for _,p in ipairs(projects) do
       local work,requests=linked(p);actors(p,work)
       if p.site and (p.site.status=='surveying' or p.phase=='surveying') then siteService:tick(p,sitePlan(p)) end
       if p.levelAfterSurvey and not p.paused and p.site and p.site.completed==sitePlan(p).regionCount and not next(p.site.active) then

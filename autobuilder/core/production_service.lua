@@ -3,6 +3,7 @@ local Coordination=require('autobuilder.core.workflows')
 local Materials=require('autobuilder.resources.materials')
 local Providers=require('autobuilder.resources.providers')
 local M={}
+local Scheduling=require('autobuilder.core.scheduling')
 function M.new(app,config,e,queue)
   local s=queue.state; s.requestSequence=s.requestSequence or 0
   local self={machines={},laneCursor=0}; local save=function() return app:save() end
@@ -18,7 +19,7 @@ function M.new(app,config,e,queue)
     local project=options.projectName and assert(s.projects[options.projectName],'Preparation project missing')
     for _,r in pairs(s.requests) do if key and r.key==key and r.status~='completed' then return r end end
     s.requestSequence=s.requestSequence+1
-    local r={id='request:'..s.requestSequence,key=key,requirements=U.copy(requirements),status='queued',operation=1,mines={},harvests={},stockOnly=options.stockOnly==true}
+    local r={id='request:'..s.requestSequence,key=key,project=options.projectName,requirements=U.copy(requirements),status='queued',operation=1,mines={},harvests={},stockOnly=options.stockOnly==true}
     s.requests[r.id]=r
     local previous
     if project then
@@ -83,7 +84,7 @@ function M.new(app,config,e,queue)
   end
   local function syncClaims(allowGrant)
     local jobs={}; for _,j in pairs(s.jobs) do if j.stockInputs and not j.cancelled then jobs[#jobs+1]=j end end
-    table.sort(jobs,function(a,b) return a.id<b.id end)
+    table.sort(jobs,function(a,b) return Scheduling.before(app.state,a,b) end)
     for _,j in ipairs(jobs) do
       local lease=self.ledger.state.leases[j.id]
       if lease and lease.status=='held' then
@@ -103,7 +104,7 @@ function M.new(app,config,e,queue)
       end
     end
     if allowGrant==false then return end
-    for _,j in ipairs(jobs) do if j.status~='completed' and j.type~='PROCESS' and not j.logistics and not j.privateStation and not j.returnManaged and not self.ledger.state.leases[j.id] then
+    for _,j in ipairs(jobs) do if j.status~='completed' and not j.paused and j.type~='PROCESS' and not j.logistics and not j.privateStation and not j.returnManaged and not self.ledger.state.leases[j.id] then
       local lease,why=self.ledger:reserve(j.id,j.stockInputs,j.stockOutputs,
         app.mining.storage.valid and app.mining.storage.counts or nil,{protected=j.type=='FUEL_STATION' and {} or config.turtleFuelReserveItems})
       if j.stockError~=why then j.stockError=why; save() end
@@ -237,7 +238,7 @@ function M.new(app,config,e,queue)
     if farm then
       local prior=r.harvests[item] and s.jobs[r.harvests[item]]
       if not prior or prior.status=='completed' then
-        local job=queue:submit(kind,{item=item,quantity=target-count,farm=U.copy(farm)},{},r.id..':'..item..':'..(prior and prior.id or 'first'))
+        local job=queue:submit(kind,{item=item,quantity=target-count,farm=U.copy(farm),productionRequest=r.id},{},r.id..':'..item..':'..(prior and prior.id or 'first'))
         r.harvests[item]=job.id; save()
       end
       local job=s.jobs[r.harvests[item]]
@@ -255,18 +256,7 @@ function M.new(app,config,e,queue)
     table.sort(errors); table.sort(waiting)
     return table.concat(#errors>0 and errors or waiting,'; ')
   end
-  function self:tick()
-    if self.working then return end
-    local active
-    for _,r in pairs(s.requests) do if r.status=='running' or r.status=='blocked' then active=r; break end end
-    if not active then
-      local list={}; for _,r in pairs(s.requests) do if r.status=='queued' then list[#list+1]=r end end
-      table.sort(list,function(a,b) return tonumber(a.id:match('%d+'))<tonumber(b.id:match('%d+')) end); active=list[1]
-    end
-    if not active or active.paused then self:refresh(); self:syncClaims(); return end
-    local r=active; local ok,err=self:refresh()
-    if not ok then r.status='blocked'; r.error=err; return end
-    self:syncClaims()
+  local function advanceRequest(r)
     if r.stockOnly then
       -- The beginner test is supplied by the user. It must not queue mining,
       -- crafting, or a global fuel-stock replenishment as a side effect.
@@ -366,7 +356,7 @@ function M.new(app,config,e,queue)
         end
         r.status='running'; r.error=nil
         if not job then
-          job=queue:submit(op.type,{item=op.item,quantity=op.quantity,batches=op.batches,
+          job=queue:submit(op.type,{item=op.item,quantity=op.quantity,batches=op.batches,productionRequest=r.id,
             stockInputs=U.copy(op.inputs),stockOutputs={[op.item]=op.quantity}},{},r.id..':op:'..r.operation..(r.replans and ':replan:'..r.replans or ''))
           r.jobId=job.id; save()
         elseif job.status=='completed' then r.operation=r.operation+1; r.jobId=nil; r.error=nil; save()
@@ -382,6 +372,21 @@ function M.new(app,config,e,queue)
       end
       r.status='completed'; r.error=nil; save()
     end
+  end
+  function self:tick()
+    if self.working then return end
+    local requests={}
+    for _,r in pairs(s.requests) do if r.status~='completed' and not r.paused then requests[#requests+1]=r end end
+    table.sort(requests,function(a,b) return Scheduling.before(app.state,a,b) end)
+    local ok,err=self:refresh()
+    if not ok then
+      for _,r in ipairs(requests) do r.status='blocked';r.error=err end
+      return
+    end
+    self:syncClaims()
+    -- Advance each independent request against one observed stock snapshot.
+    -- Existing physical jobs drain in their ordinary action/worker loops.
+    for _,r in ipairs(requests) do advanceRequest(r) end
   end
   function self:describe(item)
     assert(U.shortString(item,128),'Usage: resource <namespaced-item>')

@@ -32,10 +32,10 @@ function M.build(state,stock,scopes)
   end end
   if stock then for item,n in pairs(stock) do pool[item]=math.max(0,n-(reserved[item] or 0)) end end
   local ordered={};for _,scope in ipairs(scopes) do ordered[#ordered+1]=scope end
-  table.sort(ordered,function(a,b) return a.project.name<b.project.name end)
+  table.sort(ordered,function(a,b) return require('autobuilder.core.scheduling').before(state,a.project,b.project) end)
   local result,seenJobs,seenCargo={}, {}, {}
   for _,scope in ipairs(ordered) do
-    local p=scope.project;local f={name=p.name,phase=p.phase,items={},materialUnknown=false};result[p.name]=f
+    local p=scope.project;local f={name=p.name,priority=p.priority or 50,phase=p.phase,items={},materialUnknown=false};result[p.name]=f
     for item,n in pairs(p.requirements or {}) do
       f.items[item]={required=n,placed=0,held=0,inTransit=0,reserved=0,mining=0,harvesting=0,crafting=0,processing=0,
         sharedPhysical=stock and (stock[item] or 0),sharedReserved=reserved[item] or 0}
@@ -110,7 +110,7 @@ function M.build(state,stock,scopes)
   return result
 end
 function M.describe(f)
-  local lines={f.name..': material forecast (shared stock allocated by project name; estimates do not reserve items)'}
+  local lines={f.name..' priority='..(f.priority or 50)..': material forecast (shared stock allocated by priority; estimates do not reserve items)'}
   if f.materialUnknown then lines[#lines+1]='Some material progress or owned cargo is unknown; deficits are estimates.' end
   local items={};for item in pairs(f.items) do items[#items+1]=item end;table.sort(items)
   local function v(n) return n==nil and 'unknown' or tostring(n) end

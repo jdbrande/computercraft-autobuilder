@@ -1669,3 +1669,31 @@ recorded in acceptance. Final-source full gates and native completion follow.
 - The delegated final review failed with a service usage-limit error and supplied
   no findings or verdict. This is recorded as pending, not a completed review.
   Independent remaining implementation and final test gates continue.
+
+### Requirements audit — 2026-10-04
+
+The read-only audit identifies the remaining work after candidate milestones
+0.33–0.36: register physical factory infrastructure in global protection; prove
+bounded mixed-role traffic progress or actionable durable failures; finish a
+coherent scriptable operator interface and structured significant-event logs;
+add the ComputerCraft monitor dashboard; measure sustained native fleet load and
+operator input; and run one integrated unassisted mixed-material acceptance.
+The final gate must include automatic workspace access: the manually opened
+underside access in the 0.33 fixture is assisted evidence only.
+
+Existing safe stops satisfy the blocked-return requirement; blind excavation
+rescue is not required. Unsupported fluids, arbitrary NBT, sign text and populated
+containers remain explicit adapter limits where the requirements allow unsupported
+blocks/metadata. Fluid site preparation has separate accepted evidence. Exact
+example command verbs and a mandatory one-second heartbeat are not requirements.
+The historical coverage table will be reconciled with accepted evidence at the
+final gate; candidate work is not marked accepted early.
+
+0.36 implementation in progress: persisted project priority and task/request
+lineage now order ordinary dispatch, unclaimed stock, project expansion, supply
+offers, exploration demand and material/fuel forecasts. Mission budget precedes
+role specialization for worker choice, and cross-role arbitration respects project
+priority. Focused priority/scaling/production/coordination checks pass. Concurrent
+factory request advancement is still under development: it must not duplicate
+furnace ownership or strand ungranted batches after competing inputs are consumed.
+This branch is not accepted or integrated.

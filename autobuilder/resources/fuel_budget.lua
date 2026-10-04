@@ -125,7 +125,7 @@ function M.forecast(state,config)
   end
   for id in pairs(state.workers or {}) do ids[#ids+1]=id end
   table.sort(ids,function(a,b) return tonumber(a)<tonumber(b) end)
-  table.sort(jobs,function(a,b) return (a.created or 0)<(b.created or 0) or (a.created or 0)==(b.created or 0) and a.id<b.id end)
+  table.sort(jobs,function(a,b) return require('autobuilder.core.scheduling').before(state,a,b) end)
   local function owned(j)
     return j.workerId or (j.managedFuel or j.returnManaged and j.returnReady or j.privateStation and j.factoryFlow or j.logistics and j.logisticsFlow) and j.preferredWorker
   end
@@ -190,7 +190,7 @@ function M.forecast(state,config)
       if not g.paused and g.status~='completed' then groups[#groups+1]=g end
     end
   end
-  table.sort(groups,function(a,b) return a.id<b.id end)
+  table.sort(groups,function(a,b) return require('autobuilder.core.scheduling').before(state,a,b) end)
   for _,g in ipairs(groups) do
     local chosen,best
     for _,id in ipairs(ids) do

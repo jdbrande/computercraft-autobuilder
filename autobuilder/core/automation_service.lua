@@ -166,7 +166,9 @@ function M.new(app,config,e,network,clock)
     production:syncClaims()
     if clock()-last<config.heartbeatInterval then return true end
     last=clock()
-    for _,j in pairs(queue.state.jobs) do
+    local jobs={};for _,j in pairs(queue.state.jobs) do jobs[#jobs+1]=j end
+    table.sort(jobs,function(a,b) return require('autobuilder.core.scheduling').before(app.state,a,b) end)
+    for _,j in ipairs(jobs) do
       if j.workerId and j.status~='completed' and not j.workerFinished then
         if j.paused then send(j.workerId,'task_pause',{jobId=j.id})
         elseif j.status=='paused' or j.resumeRequested then send(j.workerId,'task_resume',{jobId=j.id}) end
