@@ -158,6 +158,30 @@ class ReleaseTests(unittest.TestCase):
             recover()
             self.assertEqual(env.fs.files['/installer.lua'], 'return "old bootstrap"')
             self.assertFalse(env.fs.exists('/.autobuilder-install/transaction'))
+            # The fleet entry is also standalone: discovery and installation run
+            # without the installed require implementation. Profile execution is
+            # a separate shell program, verified by Lua/native setup tests.
+            env.fs = lua.execute("return require('tests.install_support').fs()")
+            env.http = lua.eval("function(r) return {get=function(url) return {readAll=function() return assert(r[url]) end,close=function() end} end} end")(responses)
+            lua.eval("""function(e)
+              local request;local now=0
+              e.os={getComputerID=function() return 12 end,epoch=function() return now end}
+              e.peripheral={getNames=function() return {'right'} end,getType=function() return 'modem' end,call=function() return true end}
+              e.rednet={isOpen=function() return true end,broadcast=function(m) request=m end,
+                receive=function(_,timeout) now=now+timeout*1000;return 11,{version=1,type='fleet_offer',requestId=request.requestId,
+                  controllerId=11,release='0.2.1',baseUrl='""" + BASE + """',profile={role='worker',controllerId=11}} end}
+              e.shell={run=function(path,arg)
+                assert(path=='/autobuilder/fleet_apply.lua' and e.fs.exists(path))
+                e.appliedController=e.textutils.unserializeJSON(e.fs.files[arg]).controllerId
+                return true
+              end}
+            end""")(env)
+            fleet = lua.eval('function(code,env) return assert(load(code,"@fleet.lua","t",env)) end')(
+                (root / 'fleet.lua').read_text(), env)
+            fleet('install', '--no-reboot')
+            self.assertEqual(env.appliedController, 11)
+            self.assertEqual(json.loads(env.fs.files['/autobuilder/.installation.json'])['role'], 'worker')
+            self.assertFalse(env.fs.exists('/.autobuilder-fleet-profile.json'))
 
 
 if __name__ == '__main__':
