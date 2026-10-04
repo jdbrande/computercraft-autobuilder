@@ -5,27 +5,22 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
-- Accepted and pushed through0.35: enrollment, registered processing, renewable
-  providers, deterministic placement/metadata and reachable inventory recovery.
-  Main remains at6c088c1 until candidate gates finish.
-- 0.36 priorities: native two-project handover/restart passed. The first full gate
-  found a finite supply handoff regression;42b2a62 corrects it with focused/runtime
-  regressions. The repeated complete gate is running;20 Python tests passed.
-  [Candidate report](validation-0.36.0.md).
-- 0.37 inventory protection: native protected furnace/private station and missing-
-  geometry migration checks passed; the full gate includes the inherited handoff
-  correction.20 Python tests passed. [Candidate report](validation-0.37.0.md).
-- 0.38 observability: the single review's four regressions and final-source native
-  input-overflow/monitor recovery checks passed.23 Python tests passed; complete
-  Lua gate is running. [Candidate report](validation-0.38.0.md).
-- 0.39 traffic: four-role shared-world intersection, roofed-corridor restart and
-  offline-owner recovery scenarios passed. The single review's display correction
-  is regression-backed. Complete Lua gate and native mixed-role trial are active.
-- Remaining acceptance: sustained16-worker work at shipped telemetry settings,
-  measured disk/history growth, and the final combined unassisted schematic build
-  with automatic underside access and an induced recoverable defect.
-- Candidates remain unaccepted until all their gates pass. No external blocker is
-  established; continue independent work while gates and native trials run.
+- Accepted through0.39 (ordered push follows final checks): complete gates and native evidence for priorities,
+  inventory protection and observability, following the earlier fleet milestones.
+  [0.36](validation-0.36.0.md), [0.37](validation-0.37.0.md), [0.38](validation-0.38.0.md).
+-0.39 traffic native acceptance,1,039 Lua tests and23 Python tests passed.
+  Final-source evidence is in [the report](validation-0.39.0.md).
+-0.40 sustained16-worker acceptance is active. Native load exposed early backlog
+  scheduler ticks and empty claim scans; regressions and fixes are committed in
+  d14a330. The corrected controller is running with fresh complete gates. A host
+  sampling race with atomic checkpoint renames was corrected; its continuous
+  measured30-minute window restarted separately from the initial saturated run.
+-0.41 automatic underside workspace is under implementation in an isolated branch.
+  The intact-floor ceiling-attachment regression reproduces the remaining manual
+  access qualification. Final combined unassisted binary-schematic acceptance,
+  induced defect repair and exact final settlement remain required.
+- No external blocker is established. Continue gates, native trials, implementation
+  and ordered integration without stopping at milestone boundaries.
 
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
 - Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
@@ -1933,3 +1928,19 @@ boundary blocks intact. Explicit operator-opened side bays let both verifies dra
 The rejected initial corridor startup is documented separately. Independent final
 world/cargo/OFF reads and15ticket cleanup passed.23 Python tests passed; full Lua
 remains active. [Permanent candidate evidence](validation-0.39.0.md).
+-0.36 accepted after the repeated clean-source gate passed1,003/1,003 Lua tests
+  with20/20 Python tests and release/diff checks. No unintended tracked or untracked
+  files were present; ignored native audit artifacts remain local.
+
+-0.37 final full gate passed1,015/1,015 Lua tests and20/20 Python tests. Merging
+accepted0.36 documentation changed no implementation/test/release files relative
+to the tested source. Final release/diff checks passed and status was clean.
+
+-0.38 accepted: the final implementation passed1,032/1,032 Lua and23/23 Python
+  tests. Final-source native input/monitor recovery, release generation/check and
+  whitespace checks passed. Accepted0.37 documentation merged without source changes.
+
+-0.39 accepted after1,039/1,039 Lua tests,23/23 Python tests, unchanged-source
+  comparison against32e3cfc and final release/diff gates. Native mixed-role
+  intersections, explicit corridor blockage/bays, restart/offline ownership, exact
+  cargo/world checks and cleanup are permanently documented.

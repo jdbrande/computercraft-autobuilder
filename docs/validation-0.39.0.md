@@ -1,8 +1,9 @@
-#0.39.0 shared traffic acceptance candidate
+# 0.39.0 shared traffic acceptance
 
-Final implementation32e3cfc. The complete Lua gate is running;23 Python tests,
-focused shared-world/queue/dashboard regressions and native acceptance passed.
-This candidate remains unaccepted until its complete gates and ordered integration.
+Accepted implementation32e3cfc:1,039 Lua tests and23 Python tests passed.
+Focused shared-world/queue/dashboard regressions, native acceptance, release
+artifact checks and `git diff --check` passed. Merging accepted0.38 documentation
+changed no tested implementation, test or release files.
 
 ## Automated evidence
 

@@ -1369,28 +1369,28 @@ production request lineage, generic/mining queues, scaling worker preference,
 factory/processor new-claim ordering and supply selection. Add
 `tests/project_priorities_test.lua` and register it in `tests/run.lua`.
 
-- [ ] Add failing tests for default 50, integer bounds 0–100, durable priority
+- [x] Add failing tests for default 50, integer bounds 0–100, durable priority
   command rollback/reboot, and project lineage through production/acquisition work.
-- [ ] Implement `scheduling.priority(state, work)` and deterministic
+- [x] Implement `scheduling.priority(state, work)` and deterministic
   `scheduling.before(state, a, b)` using saved project/request relationships.
-- [ ] Add failing queue/service tests: priority 80 beats 50 for unclaimed scarce
+- [x] Add failing queue/service tests: priority 80 beats 50 for unclaimed scarce
   stock and idle workers, while already committed lower-priority work drains;
   paused/blocked high-priority work permits unrelated runnable work.
-- [ ] Apply the policy at existing admission/claim boundaries. Add nearest feasible
+- [x] Apply the policy at existing admission/claim boundaries. Add nearest feasible
   mission-budget worker ordering, preserving capability/fuel/chunk/protection and
   role limit checks, with regressions for distant/unfueled/unknown-pose workers.
-- [ ] Run focused tests, fix failures and commit the complete scheduling change.
+- [x] Run focused tests, fix failures and commit the complete scheduling change.
 
 ### Task 76: Concurrent project acceptance
 
-- [ ] Add an actual concurrent project simulation with shared scarce inputs,
+- [x] Add an actual concurrent project simulation with shared scarce inputs,
   priority change, controller/worker restart and exact final inventories/ownership.
-- [ ] Run useful native two-project acceptance and independently verify world
+- [x] Run useful native two-project acceptance and independently verify world
   blocks, ordering and final settlement. Document limitations without overstating
   throughput or natural-world coverage.
-- [ ] Complete one final read-only review and consolidated regression fixes;
+- [x] Complete one final read-only review and consolidated regression fixes;
   run full Lua/Python/release/diff gates and add the permanent acceptance report.
-- [ ] Integrate in milestone order, update progress and continue dashboard,
+- [x] Integrate in milestone order, update progress and continue dashboard,
   commands/logging, network load and final integrated fleet acceptance.
 
 ## Milestone0.37: registered inventory infrastructure geometry
@@ -1399,17 +1399,17 @@ Spec: [inventory protection design](infrastructure-protection-design.md).
 
 ### Task77: Durable spatial registration and migration
 
-- [ ] Add named inventory bounds, reuse existing endpoint identities, preserve
+- [x] Add named inventory bounds, reuse existing endpoint identities, preserve
   offline/held ownership, and block incomplete destructive admission/grants.
-- [ ] Collect missing bounds transactionally in controller/factory setup and
+- [x] Collect missing bounds transactionally in controller/factory setup and
   carry worker-local crafting endpoint names through bounded telemetry.
 
 ### Task78: Protection acceptance
 
-- [ ] Cover migration, restart, yielded admission, factory contracts, double
+- [x] Cover migration, restart, yielded admission, factory contracts, double
   chests, bounded exploration payloads and meaningful native protected inventory
   overlap with independent progress.
-- [ ] Complete one final review/fix pass, full gates, report and integration;
+- [x] Complete one final review/fix pass, full gates, report and integration;
   continue operator observability, traffic and combined fleet acceptance.
 
 
@@ -1428,8 +1428,8 @@ Spec: [operator observability](operator-observability-design.md).
 
 ### Task 80: Operator acceptance and integration
 
-- [ ] Run native monitor/input/logging acceptance during useful inventory traffic.
-- [ ] Complete one whole-branch review and consolidated regression fixes, full
+- [x] Run native monitor/input/logging acceptance during useful inventory traffic.
+- [x] Complete one whole-branch review and consolidated regression fixes, full
   tests/release/diff gates, permanent report and ordered integration.
 - [ ] Continue mixed-role traffic, sustained load at shipped telemetry defaults
   and final unassisted combined-fleet acceptance.
@@ -1441,14 +1441,14 @@ cell ownership and bounded detours; implement only evidence-backed corrections.
 
 ### Task81: Mixed-role physical contention
 
-- [ ] Shared-world intersection across construction, courier, return and mining.
-- [ ] Roofed narrow passage: bounded completion or durable actionable blockage.
-- [ ] Offline/busy destination ownership, independent progress and reconnect.
-- [ ] Restart/failure regressions for any bugs these scenarios expose.
+- [x] Shared-world intersection across construction, courier, return and mining.
+- [x] Roofed narrow passage: bounded completion or durable actionable blockage.
+- [x] Offline/busy destination ownership, independent progress and reconnect.
+- [x] Restart/failure regressions for any bugs these scenarios expose.
 
 ### Task82: Native traffic and integration
 
-- [ ] Small native mixed-role rig with real shared travel cells and shipped rates.
-- [ ] Independent world/cargo inspection and force-load/worker cleanup.
-- [ ] One final review, consolidated fixes, full tests and release checks.
-- [ ] Permanent evidence, integrate/push, continue sustained fleet load acceptance.
+- [x] Small native mixed-role rig with real shared travel cells and shipped rates.
+- [x] Independent world/cargo inspection and force-load/worker cleanup.
+- [x] One final review, consolidated fixes, full tests and release checks.
+- [x] Permanent evidence, integrate/push, continue sustained fleet load acceptance.
