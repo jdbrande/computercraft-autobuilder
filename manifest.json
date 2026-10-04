@@ -182,7 +182,7 @@
       "version": "0.33.0"
     },
     {
-      "bytes": 26065,
+      "bytes": 26073,
       "path": "autobuilder/build/builder.lua",
       "roles": [
         "controller",
@@ -192,7 +192,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "ce5a8cd85b88bbd9ffa2f361fa0e3010cb5e6b4e1f7c0daa1f68efd237f9f489",
+      "sha256": "d125fb71aab5baf711de17bcda8c4d949f5451d195e22ce8b47e4d10c116b98a",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/build/builder.lua",
       "version": "0.33.0"
     },

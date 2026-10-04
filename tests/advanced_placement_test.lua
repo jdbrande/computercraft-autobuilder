@@ -65,7 +65,16 @@ local function fixture(blocks)
   local task={blocks=blocks}; local saved
   local function create(existing,config,mode)
     task=existing or task; config=config or {minimumFuelReserve=0}
-    local function save() saved=U.copy(task); return true end
+    local function save()
+      -- CraftOS rejects repeated table references, even without a cycle.
+      local seen={}
+      local function check(value)
+        if type(value)~='table' then return end
+        assert(not seen[value],'Cannot serialize table with repeated entries')
+        seen[value]=true;for k,v in pairs(value) do check(k);check(v) end
+      end
+      check(task);saved=U.copy(task);return true
+    end
     local nav=require('autobuilder.core.navigation').new(t,U.copy(w.pose),config,save)
     nav.workGuard=function() return true end
     if w.gated then nav.guard=function() if (w.allowance or 0)<1 then return false,'movement reservation pending' end; w.allowance=w.allowance-1; return true end end
