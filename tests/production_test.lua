@@ -494,3 +494,27 @@ test('inventory grants cannot race a yielding storage snapshot against a furnace
   end
   p:tick(); assert(yielded); eq(app.state.inventoryLedger.leases[b.id],nil)
 end)
+
+test('satisfied unowned mining and harvest demand retires durably before stock is spent',function()
+ for _,farm in ipairs({false,true}) do
+  local app,p,q,config,h=productionFixture();local item=farm and mc('oak_log') or mc('raw_iron')
+  if farm then config.treeFarms={{item=item,base={x=2,y=0,z=0}}} end
+  local r=p:request({[item]=4});p:tick();local id=(farm and r.harvests or r.mines)[item];local j=(farm and q.state.jobs or app.state.jobs)[id]
+  h.inventories.store[1]={name=item,count=4};p:tick();eq(r.status,'completed');eq(j.status,'completed');eq(j.cancelled,true)
+  local saved=farm and app.saved.automation.jobs[id] or app.saved.jobs[id];eq(saved.cancelled,true)
+  h.inventories.store={};app.state.workers['2']=miningWorker(2,item,20);app.mining:tick();eq(j.workerId,nil)
+ end
+end)
+test('obsolete acquisition retirement rolls back on failed persistence and preserves possible owners',function()
+ local app,p,q,config,h=productionFixture();local item=mc('raw_iron');local r=p:request({[item]=4});p:tick();local j=app.state.jobs[r.mines[item]]
+ h.inventories.store[1]={name=item,count=4};local save=app.save;app.save=function() return false,'disk full' end
+ eq(pcall(p.tick,p),false);eq(j.status,'queued');eq(j.cancelled,nil);eq(r.acquired,nil)
+ app.save=save;app.state.workers['2']={id=2,online=false,telemetry={task=j.id}};p:tick();eq(j.status,'queued');eq(j.cancelled,nil)
+ local a,service,queue,c,hardware=productionFixture();local req=service:request({[item]=4});service:tick();local job=a.state.jobs[req.mines[item]]
+ job.intent={action='owned'};hardware.inventories.store[1]={name=item,count=4};service:tick();eq(job.status,'queued');eq(job.cancelled,nil)
+end)
+test('satisfied acquisition does not retire demand shared with another unfinished consumer',function()
+ local app,p,q,config,h=productionFixture();local item=mc('raw_iron');local r=p:request({[item]=4});p:tick();local id=r.mines[item]
+ local other=p:request({[item]=8});other.mines[item]=id
+ h.inventories.store[1]={name=item,count=4};p:tick();eq(app.state.jobs[id].status,'queued');eq(app.state.jobs[id].cancelled,nil)
+end)

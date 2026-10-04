@@ -45,3 +45,13 @@ its own destination-capacity tranche and measured `fuelReturned` journal counter
 It is not promised output and does not alter the stock lease's exact product-output
 contract: withdrawn fuel remains gross withdrawal, while physically returned fuel
 reappears in the next ordinary stock observation. Never infer residual burn as fuel.
+
+
+Final-review/native findings refine the implementation: machine quotas balance
+before64-batch splitting; output capacity can span multiple registered inventories;
+an optional declared product stack limit breaks first-output sample deadlocks.
+Physical collection always measures the actual item/slot limits. Native blast
+furnace burn expired during streamed gaps/restart, so budget one fuel item per
+independent batch and retain nominal batches-per-item only as an estimate. Obsolete
+acquisition jobs are retired only when never assigned, uniquely owned by the
+satisfied request and free of physical/recovery/telemetry/ledger ownership evidence.

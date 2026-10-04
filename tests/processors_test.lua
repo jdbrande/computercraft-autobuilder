@@ -5,10 +5,10 @@ local function settings()
 end
 test('registered processors expand finite lanes exact fuel and shared ingredient dependencies',function()
  local c=C.load(settings());local p=require('autobuilder.blueprint.planner').expand({['test:alloy']=260},{},c)
- eq(p.missing['test:iron'],260);eq(p.missing['test:copper'],130);eq(p.missing['minecraft:coal'],17)
- local op=p.operations[1];eq(op.type,'PROCESS');eq(op.quantity,260);eq(op.inputs['minecraft:coal'],17)
- eq(#op.lanes,3);eq(op.lanes[1].batches,64);eq(op.lanes[2].batches,64);eq(op.lanes[3].batches,2)
- eq(op.lanes[1].machineId,'a');eq(op.lanes[2].machineId,'b');eq(op.lanes[3].machineId,'a')
+ eq(p.missing['test:iron'],260);eq(p.missing['test:copper'],130);eq(p.missing['minecraft:coal'],130)
+ local op=p.operations[1];eq(op.type,'PROCESS');eq(op.quantity,260);eq(op.inputs['minecraft:coal'],130)
+ eq(#op.lanes,4);eq(op.lanes[1].batches,64);eq(op.lanes[2].batches,1);eq(op.lanes[3].batches,64);eq(op.lanes[4].batches,1)
+ eq(op.lanes[1].machineId,'a');eq(op.lanes[2].machineId,'a');eq(op.lanes[3].machineId,'b')
  local provider=require('autobuilder.resources.providers').select('test:alloy',c,{available=0,required=1,workers={}})
  eq(provider.type,'processing');eq(provider.available,true)
 end)
@@ -30,4 +30,11 @@ test('configured processor recipe overrides vanilla recipe without mutating reci
  local c=settings();c.processors.recipes['minecraft:stone']=c.processors.recipes['test:alloy'];c=C.load(c)
  local p=require('autobuilder.blueprint.planner').expand({['minecraft:stone']=2},{},c);eq(p.operations[1].type,'PROCESS')
  eq(require('autobuilder.factory.recipes').get('minecraft:stone').kind,'smelt')
+end)
+
+test('processor work balances per-machine quotas before splitting finite job waves',function()
+ local r=require('autobuilder.factory.processors').recipe(C.load(settings()),'test:alloy')
+ local lanes=require('autobuilder.factory.processors').lanes(r,192);local counts={a=0,b=0}
+ for _,lane in ipairs(lanes) do assert(lane.batches<=64);counts[lane.machineId]=counts[lane.machineId]+lane.batches end
+ eq(counts.a,96);eq(counts.b,96)
 end)

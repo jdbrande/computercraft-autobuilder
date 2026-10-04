@@ -1475,3 +1475,16 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   recipes, release crashes, failed claims, disconnects and contamination. Native
   controller239 with two blast furnaces and a smoker is prepared; acceptance,
   final review and full gates remain pending.
+
+-0.31 single final review and native trial found four Important issues plus uneven
+  multi-wave lane balance. Regressions reproduced nominal-fuel exhaustion after
+  streamed burn loss, obsolete acquisition dispatch after external supply, output
+  capacity stranded across chests, and first-product stack-bound deadlock. Fixes
+  reserve conservative per-batch fuel, retire only provably unowned unique demand,
+  combine destination claims, support declared/measured output stack limits and
+  balance machine quotas before finite splitting. Focused consolidated suites pass.
+  The initial native run produced4 iron and2 cooked beef; the restart retest stalled
+  at19/20 iron, independently confirming expired burn and one retained raw input.
+  Fixture staging had removed the first4 ingots and was corrected with additional
+  raw ingredients, never finished outputs. The stalled candidate is preserved in
+  local audit records and its rig is reset for final-source acceptance.

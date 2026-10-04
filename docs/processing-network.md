@@ -13,7 +13,7 @@ processors = {
   recipes = {
     ['minecraft:iron_ingot'] = {
       yield=1, inputs={['minecraft:raw_iron']={count=1,slot=1}},
-      outputSlot=3, seconds=5, machines={'blast-a','blast-b'},
+      outputSlot=3, outputStackLimit=64, seconds=5, machines={'blast-a','blast-b'},
       fuel={item='minecraft:coal',slot=2,batchesPerItem=8},
     },
   },
@@ -32,7 +32,12 @@ process recipes. `resource <item>` shows the processing provider. Work splits ac
 compatible machines, with at most64 recipe batches per durable job. Machines stream
 one recipe batch at a time and reserve destination capacity before loading inputs.
 This supports multi-input recipes and outputs with smaller stack limits without
-requiring an entire job to fit in storage at once. Observed output counts, rather
+requiring an entire job to fit in storage at once. A batch can span multiple
+registered destination inventories. `outputStackLimit` is the real maximum stack
+size for the product (1..64); a measured stored sample takes precedence. Without
+either, empty slots conservatively hold one item and an insufficient allocation
+reports the unknown stack bound explicitly. Incorrect declared limits can block
+collection; physical transfers still obey measured item and slot limits. Observed output counts, rather
 than elapsed time, establish completion.
 
 Ingredient/fuel claims and whole-machine ownership survive restart. Shared storage
@@ -42,7 +47,11 @@ then retain their claims. Missing power, disconnected inventories, foreign items
 full output storage or incompatible slots report a blocker while preserving ownership.
 No guessed replacement batch is issued after an uncertain transfer.
 
-Fuel budgets round independently for each finite machine job. Residual burn energy
+Fuel budgets reserve one fresh item per independently streamed recipe batch.
+`batchesPerItem` is nominal efficiency for diagnostics, not a promise that residual
+burn survives idle gaps or restarts. Actual withdrawal can be much lower; unused
+unwithdrawn reservations are released. Repeated interruptions can exhaust even
+this finite budget; the job reports that blocker and retains its inputs/ownership. Residual burn energy
 is never counted as stock. Unused physical item fuel is measured and returned to
 reserved storage capacity before releasing the machine; it is not promised product
 output. Recipe inputs, item fuel and output must have distinct item identities and

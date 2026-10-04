@@ -86,7 +86,7 @@ function M.expand(requirements,stock,options)
     local batches=math.ceil(n/r.yield); local inputs={}
     local before={};local lanes=r.kind=='process' and Processors.lanes(r,batches) or nil
     if r.fuel then
-      local fuel=0;for _,lane in ipairs(lanes) do fuel=fuel+math.ceil(lane.batches/r.fuel.batchesPerItem) end
+      local fuel=batches -- Streaming and outages cannot promise residual burn between batches.
       inputs[r.fuel.item]=fuel;node.inputs[r.fuel.item]=(node.inputs[r.fuel.item] or 0)+fuel
       for id in pairs(need(r.fuel.item,fuel)) do before[id]=true end
     end

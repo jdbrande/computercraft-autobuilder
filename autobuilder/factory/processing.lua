@@ -11,18 +11,29 @@ function M.new(task,e,config,save,capacity)
   if old then assert(old.status=='held','processor output tranche already released');return old end
   local limits={};local sources=F.sources(e,config,item)
   if sources[1] then local detail=e.peripheral.call(sources[1].name,'getItemDetail',sources[1].slot);limits[item]=detail and detail.maxCount end
-  local reason='no processor output storage'
+  if item==task.item and not limits[item] then limits[item]=r.outputStackLimit end
+  local observed=require('autobuilder.storage.capacity').observe(e)
+  local requests,left={},n
   for _,name in ipairs(config.storageInventories) do
-   local lease,why=capacity:reserve(id,{{inventory=name,items={[item]=n},limits=limits}},e)
-   if lease then return lease end;reason=why
+   if #requests>=128 then break end
+   local low,high,best=1,left,0
+   while low<=high do
+    local amount=math.floor((low+high)/2);local trial=U.copy(requests)
+    trial[#trial+1]={inventory=name,items={[item]=amount},limits=limits}
+    if capacity:preview(id,trial,observed) then best=amount;low=amount+1 else high=amount-1 end
+   end
+   if best>0 then requests[#requests+1]={inventory=name,items={[item]=best},limits=limits};left=left-best end
+   if left==0 then return assert(capacity:reserve(id,requests,observed)) end
   end
-  error(reason,0)
+  error(not limits[item] and 'processor output stack limit unknown; configure outputStackLimit or provide a measured sample/more storage' or 'insufficient combined processor output capacity',0)
  end
  local function collect(slot,item,left,lease,counter,offset)
-  local destination=lease.contract[1].inventory;local inv=F.list(e,machine);local stack=assert(inv[slot],'processor output disappeared')
+  local inv=F.list(e,machine);local stack=assert(inv[slot],'processor output disappeared')
   local detail=e.peripheral.call(machine,'getItemDetail',slot)
   assert(detail and U.integer(detail.maxCount) and detail.maxCount>0,'processor output stack limit unavailable')
-  for _,a in ipairs(lease.nodes[destination].allocations) do
+  for _,request in ipairs(lease.contract) do
+   local destination=request.inventory
+   for _,a in ipairs(lease.nodes[destination].allocations) do
    if offset<a.count then
     local target=F.list(e,destination)[a.slot]
     assert(not target or target.name==item and not target.nbt,'processor destination contaminated')
@@ -32,6 +43,7 @@ function M.new(task,e,config,save,capacity)
     return F.transfer(s,e,save,machine,slot,destination,a.slot,item,math.min(left,stack.count,a.count-offset,room),destination,1,counter)
    end
    offset=offset-a.count
+   end
   end
   error('processor delivery exceeds reserved capacity')
  end
@@ -88,9 +100,12 @@ function M.new(task,e,config,save,capacity)
    assert(not task.paused,'processor paused during observation')
    return F.transfer(s,e,save,source.name,source.slot,machine,r.fuel.slot,r.fuel.item,1,source.name,-1,nil,nil,true)
   end
+  if r.fuel and not inv[r.fuel.slot] and (withdrawn[r.fuel.item] or 0)>=task.stockInputs[r.fuel.item] and (s.waits or 0)>=config.smeltingWaitSteps then
+   error('processor item fuel budget exhausted; preserve owned inputs and inspect interrupted processing',0)
+  end
   F.commit(s,save,function() s.waits=(s.waits or 0)+1 end)
   assert(s.waits<=config.smeltingWaitSteps,'processor stalled; check power, fuel, recipe and loaded chunks')
-  return 'waiting','processor running; expected '..r.seconds..' seconds per batch'
+  return 'waiting','processor running; expected '..r.seconds..' seconds per batch'..(r.fuel and '; nominal '..r.fuel.batchesPerItem..' batches/fuel item, conservative budget '..task.stockInputs[r.fuel.item] or '')
  end
  function self:step() return F.protect(advance) end
  return self

@@ -12,7 +12,7 @@ function M.new(app,config,e,queue,production)
   for i,lane in ipairs(op.lanes) do if not r.jobIds[i] then
    local recipe=op.processRecipe;local inputs={}
    for item,input in pairs(recipe.inputs) do inputs[item]=input.count*lane.batches end
-   if recipe.fuel then inputs[recipe.fuel.item]=math.ceil(lane.batches/recipe.fuel.batchesPerItem) end
+   if recipe.fuel then inputs[recipe.fuel.item]=lane.batches end
    local machine=assert(Registry.machine(config,lane.machineId),'planned processor removed')
    local j=queue:submit('PROCESS',{item=op.item,batches=lane.batches,quantity=lane.batches*recipe.yield,
     machineId=lane.machineId,processor=U.copy(machine),processRecipe=U.copy(recipe),stockInputs=inputs,stockOutputs={[op.item]=lane.batches*recipe.yield},

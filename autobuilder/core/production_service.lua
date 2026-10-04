@@ -141,6 +141,26 @@ function M.new(app,config,e,queue)
   local function blocked(material,reason)
     material.status='blocked'; material.error=reason; return false
   end
+  local function retireSatisfied(r,j)
+    if not j or j.status~='queued' or j.workerId or j.assignedAt or j.intent or j.production or j.childId or j.parent
+      or j.miningArea or (j.retryCount or 0)>0 or app.state.assignmentRecovery then return end
+    local progress=j.progress
+    if type(progress)=='table' then
+      if (progress.delivered or 0)>0 or (progress.held or 0)>0 or progress.phase then return end
+    elseif (progress or 0)>0 then return end
+    if j.type=='MINE' then if j.consumer~=r.id then return end
+    elseif not j.key or j.key:sub(1,#r.id+1)~=r.id..':' then return end
+    for _,w in pairs(app.state.workers or {}) do if w.telemetry and w.telemetry.task==j.id then return end end
+    for _,other in pairs(s.requests) do if other.id~=r.id and other.status~='completed' then
+      for _,links in ipairs({other.mines or {},other.harvests or {}}) do for _,id in pairs(links) do if id==j.id then return end end end
+    end end
+    for _,ledger in ipairs({app.state.inventoryLedger or {},app.state.capacityLedger or {}}) do
+      local lease=ledger.leases and ledger.leases[j.id];if lease and lease.status=='held' then return end
+    end
+    require('autobuilder.factory.factory').commit(j,save,function()
+      j.status='completed';j.cancelled=true;j.error=nil;j.retiredReason='demand satisfied before assignment'
+    end)
+  end
   local function acquire(r,item,target)
     local material=progress(r,item,target); local count=material.count
     r.acquisitions=r.acquisitions or {}
@@ -195,7 +215,10 @@ function M.new(app,config,e,queue)
       if not hasWorker('explorationV1',item) then return blocked(material,'No online exploration-capable worker for '..item) end
       material.error=group.error; return false
     end
-    if count>=target then material.status='ready'; return true end
+    if count>=target then
+      retireSatisfied(r,legacy);retireSatisfied(r,harvest)
+      material.status='ready'; return true
+    end
     if provider and provider.type=='mining' then
       local id=r.mines[item]; local existing=id and app.state.jobs[id]
       if not existing or existing.status=='completed' then
