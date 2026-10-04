@@ -36,22 +36,6 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 - Accepted0.24:788 Lua/18 Python tests, native48/48 verified, six workers home
   empty, stock/foundation/workspace reconciliation and cleanup complete.
   High-rate network overload remains documented for later performance work.
-- Active0.25 (`.worktrees/mining-intelligence`): native hazard/route/outcome learning
-  and restart acceptance complete. Earlier802-test gate passed; final rerun includes
-  the shared navigation fix. Integration follows0.24.
-- Active0.26 (`.worktrees/fuel-forecast`): native proactive refuel and home return
-  accepted, including measured finite fuel and coal conservation. Final Lua rerun
-  includes the shared navigation fix. Integration follows0.25.
-- Active0.27 (`.worktrees/supply-forecast`, `c755627`): material forecasts and early
-  capacity-bounded supply. Single final review fixes have regressions.18 Python tests
-  and release checks pass; complete Lua suite runs. Native two-block trial passed:
-  mining began while the builder held its last cobblestone, before placement;
-  independent world checks passed and workers returned empty. Restart retest runs.
-- Active0.28 (`.worktrees/continuous-pipeline`): automatic builds now use verified
-  regions and bounded supply production. Empty-stock, legacy ownership and actual
-  two-builder/miner/factory overlap regressions pass across restarts. Final review,
-  complete release gates and native acceptance remain pending.
-  Integrated and pushed at`71b21ed`.
 - Dynamic scaling0.24 accepted/pushed at`5ec2f40`:788 Lua/18 Python tests and
   native four-builder/two-miner ramp-up,48 verified blocks and final idle drain.
 - Mining intelligence0.25 accepted/pushed at`29a3879`:804 Lua/18 Python tests
@@ -62,8 +46,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   native replacement-acquisition trials including controller/builder reboot.
 - Continuous pipeline0.28 accepted:853 Lua/18 Python tests and native overlapping
   placement/acquisition through controller/builder restart and final conservation.
-- Worker health0.29 final gate and0.30 single-command enrollment implementation
-  and native HTTP installation acceptance are in progress.
+- Worker health0.29 accepted:868 Lua/18 Python tests, final review corrections and
+  native read-only hardware/software checks.0.30 single-command enrollment remains
+  under its complete gate; native HTTP installation and final-source repair passed.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -1480,3 +1465,26 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   renewable actor through registered plant definitions, explicit planting reserves,
   seed-as-output accounting and health-aware acquisition choices. Processor0.31
   remains under its single final review/native acceptance; earlier gates continue.
+-0.31 single final review and native trial found four Important issues plus uneven
+  multi-wave lane balance. Regressions reproduced nominal-fuel exhaustion after
+  streamed burn loss, obsolete acquisition dispatch after external supply, output
+  capacity stranded across chests, and first-product stack-bound deadlock. Fixes
+  reserve conservative per-batch fuel, retire only provably unowned unique demand,
+  combine destination claims, support declared/measured output stack limits and
+  balance machine quotas before finite splitting. Focused consolidated suites pass.
+  The initial native run produced4 iron and2 cooked beef; the restart retest stalled
+  at19/20 iron, independently confirming expired burn and one retained raw input.
+  Fixture staging had removed the first4 ingots and was corrected with additional
+  raw ingredients, never finished outputs. The stalled candidate is preserved in
+  local audit records and its rig is reset for final-source acceptance.
+-0.30 final-source native retest passed: real HTTP software repair preserved local
+  settings and checkpoint bytes; partial profile refresh retained supply inventory,
+  side and west heading, changed batch2→1 and consumed no fuel(1,188 unchanged).
+  Worker registered idle with verified0.30.0 software. Computers237/238 shut down
+  and all four temporary tickets removed with confirmed cleanup receipt. Permanent
+  candidate report validation-0.30.0.md records automated/native evidence and limits;
+  complete Lua gate is still running and acceptance is not yet claimed.
+- Accepted0.29 worker health:868 Lua/18 Python tests, release/diff checks, single
+  final review fixes and final-source native hardware/integrity checks complete.
+  Accepted0.28 merged with tested implementation unchanged; ordered integration
+  proceeds while enrollment and processor milestones continue independently.

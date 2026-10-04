@@ -20,10 +20,13 @@ function M.recipe(config,item)
  return out
 end
 function M.lanes(r,batches)
- local out={};local left=batches;local size=math.min(64,math.ceil(batches/#r.machines))
- while left>0 do
-  assert(#out<4096,'processor lane limit exceeded')
-  local n=math.min(size,left);out[#out+1]={machineId=r.machines[#out%#r.machines+1],batches=n};left=left-n
+ local out={}
+ for index,id in ipairs(r.machines) do
+  local left=math.floor(batches/#r.machines)+(index<=batches%#r.machines and 1 or 0)
+  while left>0 do
+   assert(#out<4096,'processor lane limit exceeded')
+   local n=math.min(64,left);out[#out+1]={machineId=id,batches=n};left=left-n
+  end
  end
  return out
 end
@@ -44,8 +47,9 @@ function M.validate(config)
  assert(type(p.recipes)=='table','processor recipes must be a map');local count=0
  for item,r in pairs(p.recipes) do
   count=count+1;assert(count<=4096 and U.shortString(item,128),'invalid processor recipe item')
-  fields(r,{yield=true,inputs=true,outputSlot=true,seconds=true,machines=true,fuel=true})
+  fields(r,{yield=true,inputs=true,outputSlot=true,outputStackLimit=true,seconds=true,machines=true,fuel=true})
   assert(positive(r.yield,64) and positive(r.outputSlot,256) and U.finite(r.seconds) and r.seconds>0 and r.seconds<=86400,'invalid processor output or duration')
+  assert(r.outputStackLimit==nil or positive(r.outputStackLimit,64),'invalid processor output stack limit')
   list(r.machines,1,128);local seen={}
   for _,id in ipairs(r.machines) do assert(ids[id] and not seen[id],'unknown or repeated processor machine');seen[id]=true end
   assert(type(r.inputs)=='table','processor inputs required');local slots={[r.outputSlot]=true};local n=0
