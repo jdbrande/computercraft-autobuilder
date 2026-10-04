@@ -1627,3 +1627,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   automation, fuel budget, managed logistics and capacity regressions pass.
 - Native adjacent-turtle feasibility probes passed; complete native acceptance,
   final review and full release gates remain pending. No acceptance claim yet.
+
+### 0.36 scheduling design started
+
+The next incomplete dependency is project priority and travel-aware scheduling
+(requirements 30–31). Design selects durable 0–100 project priorities, shared ordering
+at existing new-work/stock boundaries, and conservative travel/fuel worker ranking.
+Committed lower-priority work keeps its contracts and owners. Native inline execution
+will follow Tasks 75–76; 0.35 review/native acceptance and 0.33/0.34 gates continue.
