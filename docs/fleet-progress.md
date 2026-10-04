@@ -1145,3 +1145,7 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 
 - Propagated0.24 physical-detour correction after the earlier802-test pass. The
   complete0.25 gate is restarting on the merged source before integration.
+
+- Final0.25.0 complete Lua gate passed804 tests, with18 Python tests and
+  release/whitespace checks. Log: /tmp/fleet-025-final-full-v2.log. Ordered integration
+  waits for0.24 native worker settlement; no feature gate is waived.

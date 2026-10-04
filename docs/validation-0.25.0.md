@@ -80,3 +80,7 @@ is retained ahead of clear travel; a bounded cache can still evict older negativ
 when all 64 entries are negative. Operators can inspect and explicitly retry an
 unowned changed sector. The native trial covers staged loaded inspection terrain;
 scanner learning is simulation-tested, not claimed as native acceptance here.
+
+Final gate after the shared physical-detour correction:804 Lua tests and18 Python
+tests pass on5abdf70. Release generation/check and whitespace verification pass.
+Ordered integration still follows the active0.24 native settlement.
