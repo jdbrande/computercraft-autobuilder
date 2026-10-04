@@ -221,3 +221,20 @@ test('registered supply configuration rejects aliases duplicate owners and missi
   local cfg={supplyStations={U.copy(station)}};change(cfg);assert(not pcall(C.load,cfg),'unsafe supply station configuration accepted')
  end
 end)
+
+test('supply ascent replans after reaching a ceiling beyond the first inspected cell',function()
+ local U=require('autobuilder.core.util');local R=require('autobuilder.workers.resupply')
+ local nav={pose={x=4,y=0,z=0,heading='north',known=true}};local saved;local moves=0
+ local t={inspectUp=function() return nav.pose.x==4 and nav.pose.y==1,{name='minecraft:stone'} end,inspect=function() return false end}
+ function nav:face(h) self.pose.heading=h;return true end
+ function nav:goTo(p)
+  if self.pose.x==4 and p.x==4 and p.y>1 then self.pose.y=1;return false,'Movement obstructed: minecraft:stone' end
+  self.pose.x,self.pose.y,self.pose.z=p.x,p.y,p.z;moves=moves+1;return true
+ end
+ local s={};local task={type='BUILD',clearanceY=4};local home={x=0,y=0,z=0}
+ local function save() saved=U.copy(s);return true end
+ assert(not R.travel(s,task,nav,home,save,t,{}));eq(nav.pose.y,1);eq(s.route,nil)
+ s=U.copy(saved);assert(R.travel(s,task,nav,home,save,t,{}));eq(nav.pose.x,0);eq(nav.pose.y,0);assert(moves>0)
+ local waiting={route={index=1,points={{x=0,y=4,z=0}}}};nav.goTo=function() return false,'movement reservation pending' end
+ assert(not R.travel(waiting,task,nav,home,save,t,{}));assert(waiting.route,'reservation waits retain their durable route')
+end)
