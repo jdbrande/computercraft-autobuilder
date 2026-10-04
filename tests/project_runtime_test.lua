@@ -319,12 +319,12 @@ test('native schematic shorthand resumes one automatic project across repeated c
   local w,ce,we,c,b,step,reboot=fixture(); local N=require('tests.native_support')
   ce.fs.files['/native.schem']=N.fixture({width=2,length=1,palette={{'minecraft:stone',0}},data='\0\0'})
   local ok,why=c:command('build /native.schem'); assert(ok,why)
-  assert(c:command('build /native.schem')); eq(c.state.automation.requestSequence,1)
-  c,b=reboot(); assert(c:command('build /native.schem')); eq(c.state.automation.requestSequence,1)
+  assert(c:command('build /native.schem')); eq(c.state.automation.requestSequence,0)
+  c,b=reboot(); assert(c:command('build /native.schem')); eq(c.state.automation.requestSequence,0)
   for _=1,1500 do step(); if c.state.automation.projects.native.phase=='built' and not b.state.currentTask then break end end
   eq(c.state.automation.projects.native.phase,'built'); eq(w.places,2)
   local seq=c.state.automation.sequence
-  assert(c:command('build /native.schem')); eq(c.state.automation.sequence,seq); eq(c.state.automation.requestSequence,1)
+  assert(c:command('build /native.schem')); eq(c.state.automation.sequence,seq); eq(c.state.automation.requestSequence,0)
   ce.fs.files['/native.schem']=N.fixture({width=3,length=1,palette={{'minecraft:stone',0}},data='\0\0\0'})
   local accepted,reason=c:command('build /native.schem')
   assert(not accepted and reason:find('changed',1,true),reason); eq(c.state.automation.sequence,seq)
@@ -801,4 +801,47 @@ test('explicit preparation and saved automatic requests retain their whole-stock
   assert(c:command('build auto legacy'));eq(p.requestId,rid);assert(not p.streaming)
   local n=0;for _ in pairs(c.state.automation.requests) do n=n+1 end;eq(n,1)
   assert(c:command('build pause legacy'));eq(c.state.automation.requests[rid].paused,true)
+end)
+
+test('streaming project pause stops queued supply acquisition across reboot',function()
+  local w,ce,we,c,b,step,reboot=fixture({stock={}});w.items={}
+  assert(c:command('build import /example.json paused_stream'));assert(c:command('build auto paused_stream'))
+  local request
+  for _=1,1500 do step();for _,r in pairs(c.state.automation.requests) do if r.key:sub(1,7)=='supply:' then request=r end end;if request then break end end
+  assert(request);assert(c:command('build pause paused_stream'));eq(request.paused,true)
+  local id=request.id;local count=0;for _ in pairs(c.state.jobs) do count=count+1 end
+  c,b=reboot();for _=1,15 do step() end
+  eq(c.state.automation.requests[id].paused,true);local after=0;for _ in pairs(c.state.jobs) do after=after+1 end;eq(after,count)
+  assert(c:command('build resume paused_stream'));eq(c.state.automation.requests[id].paused,false)
+  for _=1,10 do step() end;assert(next(c.state.jobs),'resumed request did not acquire inputs');eq(c.state.automation.requestSequence,1)
+end)
+
+test('fresh ordinary automatic run clears completed stock-only policy but preserves active ownership',function()
+  local w,ce,we,c,b,step,reboot=fixture({stock={}});w.items={}
+  assert(c:command('build import /example.json renewed'));local p=c.state.automation.projects.renewed
+  p.phase='built';p.run=0;p.stockOnly=true;assert(c:save());c,b=reboot()
+  assert(c:command('build auto renewed'));p=c.state.automation.projects.renewed;eq(p.run,1);eq(p.stockOnly,false)
+  for _=1,1500 do step();if next(c.state.automation.requests) then break end end
+  local _,r=next(c.state.automation.requests);assert(r);eq(r.stockOnly,false)
+  w,ce,we,c,b,step,reboot=fixture({stock={}})
+  assert(c:command('build import /example.json active'));assert(c:command('build prepare active'))
+  p=c.state.automation.projects.active;p.stockOnly=true;c.state.automation.requests[p.requestId].stockOnly=true
+  assert(c:save());c,b=reboot();assert(c:command('build auto active'));p=c.state.automation.projects.active
+  eq(p.stockOnly,true);assert(not p.streaming);eq(c.state.automation.requests[p.requestId].stockOnly,true)
+end)
+
+test('automatic streaming bootstrap survives interruption at its first site checkpoint',function()
+  local w,ce,we,c,b,step,reboot=fixture()
+  assert(c:command('build import /example.json bootstrap'))
+  local save=c.save;local cut=false
+  c.save=function(self)
+    local ok,why=save(self)
+    local p=self.state.automation.projects.bootstrap
+    if ok and not cut and p.autoStart and p.site then cut=true;error('power loss after first site checkpoint') end
+    return ok,why
+  end
+  assert(not c:command('build auto bootstrap'));assert(cut)
+  c,b=reboot();eq(c.state.automation.projects.bootstrap.streaming,true)
+  for _=1,1500 do step();if c.state.automation.projects.bootstrap.phase=='built' and not b.state.currentTask then break end end
+  eq(c.state.automation.projects.bootstrap.phase,'built');eq(w.places,2)
 end)

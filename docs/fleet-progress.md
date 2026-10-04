@@ -1264,3 +1264,25 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   1 glass,4 crafted bricks,3 placements and2 surplus bricks. Both builders return
   empty with finite fuel; requests complete and staging/ownership drain.
   Full regressions, native acceptance and final review remain pending.
+
+
+- Review correction: the0.28 overlap test passed, but its cumulative-placement
+  assertion did not prove a placement event concurrent with production. That
+  concurrency claim is withdrawn pending stronger event-timed evidence. Final
+  review also reproduced streaming supply acquisition continuing after project
+  pause and a stale stockOnly flag disabling new-run acquisition. These remain
+  release blockers for the consolidated regression-backed correction pass.
+
+- Consolidated0.28 review correction passes targeted regressions: queued supply
+  pause and active exploration pause survive restart without new acquisition;
+  resume keeps request identities. A fresh ordinary run clears stale stockOnly,
+  while active stock-only ownership remains. Shorthand idempotence reflects zero
+  upfront project requests. An inherited first-site checkpoint interruption also
+  has a red/green recovery fix through completed construction.
+- Corrected overlap evidence now passes at the actual placement call while another
+  miner is away on an active acquisition. Independent regions are separated beyond
+  traffic exclusion and physically prepared first; adjacent regions correctly
+  serialize. Controller/builders restart after that event;7 positions verify
+  (3 material blocks plus4 required air), with exact material counts and idle drain.
+  This replaces the withdrawn cumulative-placement claim. No second review is
+  planned; complete release gates and native acceptance remain.

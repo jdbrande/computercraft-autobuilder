@@ -38,3 +38,24 @@ observe placement before remaining production completes, restart participants,
 and reconcile measured material flows and final ownership. Native acceptance is
 useful after deterministic evidence passes. One final review/fix pass, full tests,
 release checks and permanent documentation precede integration.
+
+## Final review corrections
+
+Pause/resume now follows every project-linked finite request, including supply
+acquisition groups and provider jobs. New ordinary automatic runs clear a completed
+stock-only policy; active saved stock-only requests retain it. The shorthand command
+regression checks idempotence without expecting a whole-project request.
+
+The first overlap assertion was inadequate: it combined historical placement with
+a later pending request. It has been replaced by an assertion at the actual successful
+placement call while another miner is away from its depot on an active physical
+acquisition. The fixture uses independently prepared regions separated beyond the
+traffic exclusion margin. Adjacent regions are deliberately serialized by ownership.
+The strengthened regression failed the original timing scenario and passes the
+independently eligible one, including restart and exact material conservation.
+
+Review also exposed an inherited interruption window during the first site save.
+Acquisition policy and automatic survey-to-preparation continuation now precede
+that checkpoint. A power-cut regression fails without both durable flags and
+passes through final construction after reboot. This closes an observed recovery
+bug rather than deferring it solely because it predates this milestone.

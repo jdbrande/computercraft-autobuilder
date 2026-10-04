@@ -48,7 +48,7 @@ local function fixture(options)
     f.inventories.stage2={}
     cc.supply={inventory='',batch=2}
     cc.supplyStations={{workerId=25,inventory='stage',position={x=0,y=2,z=0},side='down'},
-      {workerId=28,inventory='stage2',position={x=8,y=2,z=0},side='down'}}
+      {workerId=28,inventory='stage2',position={x=12,y=2,z=0},side='down'}}
   end
   cc.scaling={roles={mining={min=options.scaling and 0 or (options.exploration and 4 or 3)}}}
   if options.parallelBuilders then cc.scaling.roles.building={min=2};cc.scaling.roles.clearing={min=2} end
@@ -103,10 +103,11 @@ local function fixture(options)
   local builderBlocks={['0,1,0']={name=mc('chest'),state={}}}
   -- Solid prepared support; terrain mutations have separate exact-yield fixtures.
   for x=2,4 do builderBlocks[x..','..(options.fill and x==3 and -2 or -1)..',0']={name=mc('stone'),state={}} end
+  if options.parallelBuilders then for x=1,9 do for z=-1,1 do builderBlocks[x..',-1,'..z]={name=mc('stone'),state={}} end end end
   f.builders={}
   for _,id in ipairs(options.parallelBuilders and {25,28} or {25}) do
     local w=require('tests.build_world').new();w.blocks=builderBlocks
-    local home={x=id==25 and 0 or 8,y=2,z=0,heading='north'};w.pose=U.copy(home);w.pose.known=true
+    local home={x=id==25 and 0 or 12,y=2,z=0,heading='north'};w.pose=U.copy(home);w.pose.known=true
     local inventory=id==25 and 'stage' or 'stage2';builderBlocks[home.x..',1,0']={name=mc('chest'),state={}}
     w.turtle.getItemSpace=function(slot) return 64-w.turtle.getItemCount(slot) end
     w.turtle.suckDown=function(n)
@@ -118,6 +119,18 @@ local function fixture(options)
       return false
     end
     if options.parallelBuilders then
+      for _,action in ipairs({'place','placeUp','placeDown'}) do local original=w.turtle[action];w.turtle[action]=function(...)
+        local ok,why=original(...)
+        if ok then
+          for _,miner in ipairs(f.miners) do
+            local task=miner.runtime.state.currentTask
+            if task and task.phase~='completed' and not task.paused and U.distance(miner.world.pose,miner.config.depot)>0 then
+              f.stats.overlapPlacement={builder=id,miner=miner.id,task=task.id,at=f.now}
+            end
+          end
+        end
+        return ok,why
+      end end
       w.fuel=8000;w.turtle.getFuelLevel=function() return w.fuel end
       for _,action in ipairs({'forward','up','down'}) do local original=w.turtle[action];w.turtle[action]=function()
         if w.fuel==0 then return false,'out of fuel' end
@@ -136,6 +149,10 @@ local function fixture(options)
   end
   local bp={schema=1,size={x=3,y=1,z=1},palette={{name=mc('stone_bricks'),state={}},{name=mc('glass'),state={}}},
     runs={{id=1,count=2},{id=2,count=1}},metadata={},requirements={[mc('stone_bricks')]=2,[mc('glass')]=1}}
+  if options.parallelBuilders then
+    -- Independent building regions have a real gap beyond traffic exclusion.
+    bp.size.x=7;bp.palette[3]={name=mc('air'),state={}};bp.runs={{id=1,count=2},{id=3,count=4},{id=2,count=1}}
+  end
   f.controller.e.fs.files['/chain.json']=f.controller.e.textutils.serialize(bp)
   function f:pump()
     for _=1,15 do
@@ -335,16 +352,19 @@ end)
 
 test('automatic pipeline overlaps finite production with multiple prepared-region builders across restart',function()
   local f=fixture({parallelBuilders=true,finiteFuel=true});local c=f.controller.runtime
-  assert(c:command('build import /chain.json pipeline'));assert(c:command('build auto pipeline'))
+  assert(c:command('build import /chain.json pipeline'))
+  -- Make both independent regions eligible before measuring production overlap.
+  -- Ordinary automatic terrain admission is covered by the other runtime cases.
+  assert(c:command('build level pipeline'))
+  for _=1,2000 do f:step();if c.state.automation.projects.pipeline.phase=='site_ready' then break end end
+  eq(c.state.automation.projects.pipeline.phase,'site_ready');eq(next(f.inventories.stock),nil)
+  assert(c:command('build auto pipeline'))
   eq(c.state.automation.projects.pipeline.requestId,nil)
   local overlap,restarted=false,false;local buildOwners={}
   for _=1,5000 do
     f:step()
-    local placed=0;for _,b in ipairs(f.builders) do placed=placed+b.world.places end
-    local pending=false
-    for _,r in pairs(f.controller.runtime.state.automation.requests) do if r.status~='completed' then pending=true end end
     for _,b in ipairs(f.builders) do local t=b.runtime.state.currentTask;if t and t.type=='BUILD' then buildOwners[b.id]=true end end
-    if placed>0 and placed<3 and pending then
+    if f.stats.overlapPlacement then
       overlap=true
       if not restarted then f:reboot(f.controller);for _,b in ipairs(f.builders) do f:reboot(b) end;restarted=true end
     end
@@ -354,7 +374,7 @@ test('automatic pipeline overlaps finite production with multiple prepared-regio
   local s=f.controller.runtime.state;local p=s.automation.projects.pipeline
   assert(overlap,'no measured placement while later production remained active');assert(restarted)
   assert(buildOwners[25] and buildOwners[28],'construction did not use both builders')
-  assert(p.phase=='built',p.phase..':'..tostring(p.error));eq(p.report.counts.correct,3)
+  assert(p.phase=='built',p.phase..':'..tostring(p.error));eq(p.report.counts.correct,7)
   for _,b in ipairs(f.builders) do eq(b.runtime.state.currentTask,nil);eq(next(b.world.items),nil);eq(U.distance(b.world.pose,b.config.depot),0);assert(b.world.fuel>0 and b.world.fuel<8000) end
   for _,a in ipairs(f.miners) do eq(a.runtime.state.currentTask,nil);eq(a.world.pose.x,a.source.x) end
   for _,r in pairs(s.automation.requests) do eq(r.status,'completed');assert(r.key:sub(1,8)~='project:') end
@@ -362,4 +382,26 @@ test('automatic pipeline overlaps finite production with multiple prepared-regio
   eq(f.stats.crafts,1);eq(f.stats.smelted[mc('stone')],4);eq(f.stats.smelted[mc('glass')],1)
   eq(f.stats.deposited[mc('cobblestone')],4);eq(f.stats.deposited[mc('sand')],1)
   eq(f.stats.pulled[mc('stone_bricks')],2);eq(f.stats.pulled[mc('glass')],1);eq(f:count('stone_bricks'),2)
+end)
+
+test('streaming project pause retains active exploration groups across restart and resumes same demand',function()
+  local f=fixture({exploration=true,scanner=false,finiteFuel=true});local c=f.controller.runtime
+  assert(c:command('build import /chain.json paused_pipeline'));assert(c:command('build auto paused_pipeline'))
+  local request,group
+  for _=1,2000 do
+    f:step()
+    for _,r in pairs(c.state.automation.requests) do for _,id in pairs(r.acquisitions or {}) do
+      local g=c.state.exploration.groups[id]
+      if g and #g.tripIds>0 then request=r;group=g end
+    end end
+    if group then break end
+  end
+  assert(group);local rid,gid=request.id,group.id;local sequence=c.state.jobSequence
+  assert(c:command('build pause paused_pipeline'));eq(request.paused,true);eq(group.paused,true)
+  f:reboot(f.controller);c=f.controller.runtime
+  for _=1,50 do f:step() end
+  eq(c.state.exploration.groups[gid].paused,true);eq(c.state.jobSequence,sequence)
+  eq(c.state.automation.requests[rid].paused,true);eq(f.builder.world.places,0)
+  for _,j in pairs(c.state.automation.jobs) do assert(j.type~='CRAFT' and j.type~='SMELT','paused acquisition created factory work') end
+  assert(c:command('build resume paused_pipeline'));eq(c.state.exploration.groups[gid].paused,false);eq(c.state.automation.requests[rid].paused,false)
 end)

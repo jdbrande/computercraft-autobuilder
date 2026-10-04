@@ -107,7 +107,7 @@
       "version": "0.28.0"
     },
     {
-      "bytes": 30933,
+      "bytes": 31209,
       "path": "autobuilder/blueprint/projects.lua",
       "roles": [
         "controller",
@@ -117,7 +117,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "c9443542cfd95f777fe4d6d4ff0e91f9fcb4e39e8d4583b6bdc4c35a150daa4c",
+      "sha256": "d3867af12669af5b28d222ac58392a34a51f227d4a95f7c2ea42704f353ed51e",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/blueprint/projects.lua",
       "version": "0.28.0"
     },
