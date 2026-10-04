@@ -1,7 +1,9 @@
 # 0.30.0 fleet enrollment validation
 
-Candidate source: `b39fc58`, on `milestone/0.30.0`. Full Lua gate is running;
-this report does not claim acceptance until that gate passes.
+Accepted source: `b39fc58`, with accepted0.29 documentation merged at `b3b68e0`.
+The tested implementation is unchanged by that documentation merge. The complete
+Lua suite passed all885 tests; Python passed all18 tests. Release generation,
+release verification and `git diff --check` passed.
 
 The generated standalone `fleet.lua` discovers an enabled controller, installs
 through the existing verified transaction, applies an explicit worker profile and

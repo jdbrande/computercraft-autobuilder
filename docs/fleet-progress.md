@@ -5,6 +5,10 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.30 enrollment:885 Lua/18 Python tests, release/diff checks and final-source
+  native HTTP install/repair/profile refresh passed; fixture shut down and tickets
+  removed. Permanent evidence: [0.30 validation](validation-0.30.0.md).
+
 - Released 0.12.0: remote `main` and annotated `v0.12.0` resolve to `fc15407`.
 - Resource dependency/provider milestone integrated at `49dcd9d` and pushed.
 - Inventory ownership integrated and pushed at `e66daa5`.
