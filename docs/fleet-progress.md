@@ -1925,3 +1925,11 @@ workers settled, computers265–267 shut down and6 force-load tickets removed.
 [Candidate report](validation-0.38.0.md) records fixture corrections, metrics and
 the distinction between automated resize evidence and native monitor recovery.
 Complete gates remain active; the candidate is not yet accepted.
+
+-0.39 final-source native traffic passed: four-role intersection, controller restart,
+owned offline courier/reconnect and exact dirt/cobblestone receipts; then separate
+roofed corridor retained both owners and detailed remedies through restart with76
+boundary blocks intact. Explicit operator-opened side bays let both verifies drain.
+The rejected initial corridor startup is documented separately. Independent final
+world/cargo/OFF reads and15ticket cleanup passed.23 Python tests passed; full Lua
+remains active. [Permanent candidate evidence](validation-0.39.0.md).
