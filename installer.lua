@@ -612,6 +612,7 @@ function M.idle(e,config,preparation)
   if state then
     assert(state.schema==1 and state.id==e.os.getComputerID() and state.role==config.role
       and U.integer(state.boot) and type(state.phase)=='string','Invalid or foreign checkpoint')
+    assert(not state.inventoryRecovery,'Quarantined inventory recovery owner cannot change setup')
     assert(not state.fuelRecovery and not state.fuelResume,'Finish fuel recovery before setup')
     assert(not state.assignmentRecovery and not state.currentTask and not state.motionReservation
       and not next(state.pendingSupplyAcks or {}),'Finish current jobs and acknowledgements before setup')
@@ -621,6 +622,7 @@ function M.idle(e,config,preparation)
       assert(not state.position.pending and not state.position.uncertain,'Recover uncertain movement with /autobuilder/pose.lua before setup')
     end
     local a=state.automation or {}
+    for _,r in pairs(a.inventoryRecoveries or {}) do assert(r.status=='completed','Finish inventory recovery before setup') end
     assert(not a.supply,'Finish the outstanding supply batch before setup')
     for _,jobs in ipairs({state.jobs or {},a.jobs or {},preparation and {} or a.requests or {}}) do
       for _,job in pairs(jobs) do

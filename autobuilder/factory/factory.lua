@@ -5,8 +5,8 @@ function M.new(task,environment,config,save)
   assert(r,'no recipe for '..tostring(task.item))
   return require('autobuilder.factory.'..(r.kind=='smelt' and 'smelting' or 'crafting')).new(task,environment,config,save)
 end
-function M.count(items,name)
-  local n=0; for _,item in pairs(items) do if item.name==name then n=n+item.count end end; return n
+function M.count(items,name,plainOnly)
+  local n=0; for _,item in pairs(items) do if item.name==name and (not plainOnly or not item.nbt) then n=n+item.count end end; return n
 end
 function M.list(e,name)
   assert(type(name)=='string' and name~='','inventory is not configured')
@@ -56,13 +56,13 @@ function M.reconcileTransfer(state,e,save)
   local i=assert(state.intent); assert(i.action=='transfer','unexpected transfer journal')
   M.list(e,i.from); M.list(e,i.to) -- A disconnected endpoint cannot be reconciled safely.
   local current=M.list(e,i.observe)
-  local delta=M.count(current,i.item)-i.beforeCount
+  local delta=M.count(current,i.item,i.plainOnly)-i.beforeCount
   local moved=i.sign*delta
   assert(U.integer(moved) and moved>=0 and moved<=i.limit,'ambiguous transfer; preserve inventories and journal')
   -- Changes to other item types indicate a broken exclusive inventory lease.
   local before=U.copy(i.before); local after=U.copy(current)
-  for slot,item in pairs(before) do if item.name==i.item then before[slot]=nil end end
-  for slot,item in pairs(after) do if item.name==i.item then after[slot]=nil end end
+  for slot,item in pairs(before) do if item.name==i.item and (not i.plainOnly or not item.nbt) then before[slot]=nil end end
+  for slot,item in pairs(after) do if item.name==i.item and (not i.plainOnly or not item.nbt) then after[slot]=nil end end
   assert(M.equal(before,after),'inventory changed during transfer; operator reconciliation required')
   M.commit(state,save,function()
     if moved>0 then state.waits=0 end
@@ -77,11 +77,11 @@ function M.reconcileTransfer(state,e,save)
   if moved==0 then return 'blocked','inventory transfer made no progress; check capacity and supply' end
   return 'running'
 end
-function M.transfer(state,e,save,from,slot,to,target,item,limit,observe,sign,counter,patch,withdrawal)
+function M.transfer(state,e,save,from,slot,to,target,item,limit,observe,sign,counter,patch,withdrawal,plainOnly)
   assert(from~=to,'source and destination inventory must differ')
   local before=M.list(e,observe)
   M.commit(state,save,function() state.intent={action='transfer',from=from,slot=slot,to=to,target=target,item=item,
-    limit=limit,observe=observe,sign=sign,before=before,beforeCount=M.count(before,item),counter=counter,patch=patch,withdrawal=withdrawal} end)
+    limit=limit,observe=observe,sign=sign,before=before,beforeCount=M.count(before,item,plainOnly),plainOnly=plainOnly,counter=counter,patch=patch,withdrawal=withdrawal} end)
   local moved=e.peripheral.call(from,'pushItems',to,slot,limit,target)
   assert(U.integer(moved) and moved>=0 and moved<=limit,'invalid transfer result; reconcile journal')
   return M.reconcileTransfer(state,e,save)

@@ -61,6 +61,9 @@ function M.validate(config)
   end
 end
 local function owned(state,visit)
+  for _,r in pairs((state.automation or {}).inventoryRecoveries or {}) do
+    if r.buffer then visit({source=r.node,destination=r.node,pickup=r.buffer,drop=r.buffer}) end
+  end
   for _,job in pairs((state.automation or {}).jobs or {}) do
     local lease=(state.capacityLedger or {}).leases and state.capacityLedger.leases[job.id]
     if job.returning and (job.status~='completed' or lease and lease.status=='held') then
@@ -83,10 +86,11 @@ function M.validateSaved(config,state)
   for _,node in ipairs(config.logistics.nodes) do for _,buffer in ipairs(node.buffers) do reserved[buffer.inventory]=true end end
   for id,lease in pairs((state.capacityLedger or {}).leases or {}) do
     if lease.status=='held' then
+      local recovery=((state.automation or {}).inventoryRecoveries or {})[id]
       local job=(state.automation or {}).jobs and state.automation.jobs[id]
       for name,node in pairs(lease.nodes) do
         if node.exclusive and reserved[name] then
-          assert(job and (job.logistics and (job.logistics.pickup.inventory==name or job.logistics.drop.inventory==name) or job.returning and job.returning.buffer.inventory==name),
+          assert(recovery and recovery.buffer and recovery.buffer.inventory==name or job and (job.logistics and (job.logistics.pickup.inventory==name or job.logistics.drop.inventory==name) or job.returning and job.returning.buffer.inventory==name),
             'owned private inventory cannot become logistics buffer: '..name)
         end
       end

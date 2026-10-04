@@ -5,6 +5,12 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.35 reachable inventory recovery:976 Lua/20 Python tests and final
+  release/diff checks passed. Two native trials verified exact plain/NBT cargo,
+  frozen donor ownership, restart, home refueling between trips and cleanup.
+  [Permanent evidence](validation-0.35.0.md).0.36 final gates and0.37 protection
+  implementation/native acceptance continue.
+
 - Accepted0.34 metadata/sign geometry:956 Lua/20 Python tests, release/diff checks
   and native Sponge v3 nine-cell import/build/restart/verification passed.
   [Permanent evidence](validation-0.34.0.md) distinguishes the clean repeat from
@@ -1585,6 +1591,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   runtime test builds through preparation/supply/restart and reports subsequently
   added contents without removing them. Native controller247/builder248 rig prepared;
   final review and complete gates remain before acceptance.
+- Started0.35 reachable inventory recovery design while0.34 undergoes its single
+  final review and native acceptance. The design retains the unrecoverable donor's
+  original task/territory and quarantines it before measured identity-checked cargo
+  transfer. Offline timeout alone never authorizes extraction. Implementation has
+  not begun; no recovery acceptance is claimed.
 -0.34 single final review found unsafe destructive sign repair, grass support
   rejection, the trapped-chest entity ID omission, Python/NBT tag-kind divergence,
   and omitted optional v3 Data rejection. Consolidated corrections preserve existing
@@ -1598,6 +1609,33 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   pre-fix soil repair from the clean final-source untouched plot run. Accepted0.31
   documentation merge did not change tested code/tests/tools/artifacts. Integrating
   and pushing before continuing placement, metadata and inventory recovery work.
+-0.35 initial donor/courier actors and exclusive empty-slot capacity contracts are
+  implemented in isolation. Regressions cover tagged identities, partial transfer,
+  after-effect restart, unchanged local cargo, wrong adjacent computer ID, uncertain
+  pose, outstanding journals and failed checkpoints. Native feasibility probes249/250
+  transferred a damaged pickaxe with its unchanged NBT hash and2/5 cobblestone;
+  independent world inventories agree. Both probes are shut down and their one
+  temporary force-load ticket removed. Controller integration, quarantine controls,
+  end-to-end recovery acceptance and complete milestone gates remain unfinished.
+
+### 0.35 reachable inventory recovery implementation
+
+- Implemented donor quarantine and exact stack/NBT snapshots, courier transfer and
+  deposit journals, validated custody messages, controller requests, durable private
+  buffer capacity, worker ownership and normal queue/fuel/chunk admission.
+- `worker recover <id>` explicitly classifies a blocked worker for cargo recovery;
+  `recoveries` reports progress. Offline timeout never authorizes collection. The
+  donor retains its original task and territory, and remains quarantined afterward.
+- Actual runtime simulation passes with a physical donor drop interrupted by reboot
+  of all three computers. Exact tagged cargo survives; the courier keeps its own
+  fuel stack. Plain recovered items reach central stock only after measured storage
+  delivery; tagged items remain in the private recovery buffer.
+- Partial transfers, wrong identity, changed receipts, unrelated inventory changes,
+  insufficient fuel, failed reservation checkpoints, pending supply acknowledgements
+  and collection restart have focused regression coverage. Ordinary runtime,
+  automation, fuel budget, managed logistics and capacity regressions pass.
+- Native adjacent-turtle feasibility probes passed; complete native acceptance,
+  final review and full release gates remain pending. No acceptance claim yet.
 
 ###0.34 final-source native acceptance completed
 
@@ -1621,6 +1659,30 @@ The fixture also required a two-cell underside access opening for its low ceilin
 button. That operator intervention is separate from the routing fix and will be
 recorded in acceptance. Final-source full gates and native completion follow.
 
+### 0.35 native cargo recovery passed; review service unavailable
+
+- A real transport worker picked up five stone and stopped at native bedrock.
+  `worker recover 252` froze it; courier 253 recovered both that stack and a tagged
+  damaged pickaxe through two capacity-owned jobs. A settled three-computer restart
+  preserved custody. Independent world data confirmed five central stone, unchanged
+  tagged tool in the recovery buffer, original courier fuel items, empty quarantined
+  donor, intact obstruction and released recovery capacity. Fixture shut down and
+  four temporary tickets removed. See [0.35 validation](validation-0.35.0.md).
+- The delegated final review failed with a service usage-limit error and supplied
+  no findings or verdict. This is recorded as pending, not a completed review.
+  Independent remaining implementation and final test gates continue.
+
+0.35 final review and consolidated corrections — 2026-10-04: the successful
+review identified courier deposit-journal replay missing from the executor,
+refueling blocked by the recovery-wide courier reservation, collection waiting
+that starved other controller actions, and missing child-job diagnostics.
+Regression tests reproduced each issue. The fixes reconcile courier journals in
+the normal action loop, permit only registered home refueling before an unassigned
+trip, preserve the exclusive courier across the between-trip gap, yield blocked
+collection without a journal, and expose the child error/task. Focused recovery
+and fuel tests pass; broader integration and final full gates remain pending.
+The earlier service-limit error was not a review; this is the one completed review,
+with no rereview. A native refueling retest is next.
 Native paired-placement checkpoint correction — 2026-10-04: bed recovery
 reused one inspection table under both `pairResults.recover` and `.existing`.
 CraftOS rejects repeated table references; the simulation fixture's deep-copy
@@ -1630,6 +1692,15 @@ copy and all advanced placement tests pass afterward. This is a new runtime bug,
 not a second branch review. The final full gate is superseded and will rerun on
 the corrected source; native recovery retains the original physical contract.
 
+0.35 final-source native refueling passed — 2026-10-04: courier256 started at68fuel,
+completed its first pickup, automatically refueled at its registered home station
+while retaining the recovery, then completed the second pickup. The controller
+replenished three station coal from registered central stock. Independent data
+confirmed five central stone, unchanged tagged pickaxe,16station coal, empty idle
+courier home at228fuel, empty quarantined donor and intact obstruction. All recovery,
+fuel and collection jobs settled; computers254–256off and fourtickets removed.
+Fixture inventory names were corrected before the first trip. Final full gates are
+running on391db98; see the permanent0.35report and ignored native audit records.
 0.33 native placement completed — 2026-10-04: `mixed_adapters` reached built with
 140 correct cells. Independent observer 90 matched all 140 names/states; depot and
 supply were empty, all jobs completed and builder245 was idle home with 12,348 fuel.
@@ -1647,3 +1718,9 @@ passed. Permanent report records the native evidence and assistance limits.
 Final-source956 Lua/20 Python tests and release/diff checks passed. The native
 container/sign project and final inventories were independently checked; fixture
 computers are off and temporary tickets removed.
+
+### 0.35 accepted — 2026-10-04
+
+Final-source976 Lua/20 Python tests, release/diff checks and both native trials
+passed. Donor quarantine, controlled courier refueling and exact inventory receipts
+retain their documented limits. No second review was performed.

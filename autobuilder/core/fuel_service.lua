@@ -25,6 +25,11 @@ function M.new(app,config,e,queue,production,clock)
     if refuel and refuel.workerId then return end
     local worker=app.state.workers[tostring(station.workerId)]; local t=worker and worker.telemetry
     local mission=forecast.workers[tostring(station.workerId)]
+    local nextTrip=Q.recoveryFuelJob(app.state,station.workerId)
+    if nextTrip and t then
+      local budget=Budget.mission(config,nextTrip,t)
+      if budget then mission={taskId=nextTrip.id,budget=budget} end
+    end
     local required=mission and mission.budget and mission.budget.required or 0
     if t and t.fuelLimit and required>t.fuelLimit then error('Mission '..mission.taskId..' requires '..required..'; native fuel limit is '..t.fuelLimit,0) end
     local goal=math.max(config.fuel.target,required,row.goal or 0)
@@ -33,8 +38,12 @@ function M.new(app,config,e,queue,production,clock)
     if not refuel and worker and worker.online and t and t.status=='idle' and not t.task
       and t.capabilities and t.capabilities.fuelV1 and type(t.fuel)=='number' and t.fuel<math.max(row.goal or config.fuel.low,required)
       and t.fuel<goal
-      and not Q.workerBusy(app.state,worker.id) then
+      and not Q.workerBusy(app.state,worker.id,nextTrip and nextTrip.id) then
       assert(t.position and t.position.known and U.position(t.depot),'fuel worker needs a known position and depot')
+      if nextTrip then
+        assert(not t.position.pending and not t.position.uncertain and U.distance(t.position,nextTrip.home)==0,
+          'recovery fuel handoff requires settled courier at home')
+      end
       assert(U.distance(t.depot,station.position)==0,'fuel station does not match worker depot')
       local distance=U.distance(t.position,station.position)
       -- The normal station route ascends two blocks, may step sideways out

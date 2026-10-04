@@ -63,6 +63,11 @@ function M.mission(config,task,telemetry)
       reserve=math.max(reserve,target-outward-returning-2)
     end
     return result(task,current,outward,back and 0 or 2,returning,reserve)
+  elseif task.type=='RECOVER_CARGO' then
+    if not U.position(task.source) or not U.position(task.home) then return nil,'Recovery pickup and home geometry unavailable' end
+    local stage=task.recoveryCargo and task.recoveryCargo.stage or 'source'
+    if stage=='home' then return result(task,current,0,0,leg(pose,task.home),reserve,'mission') end
+    return result(task,current,leg(pose,task.source),0,leg(task.source,task.home),reserve,'mission')
   elseif task.type=='TRANSPORT' or task.type=='RESCUE' then
     if not U.position(task.source) or not U.position(task.destination) then return nil,'Pickup and delivery geometry unavailable' end
     home=task.home or home

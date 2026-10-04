@@ -99,3 +99,16 @@ test('capacity preview shares allocation rules without claims or repeated periph
   eq(f.capacity:reserve('new',{request('a',{lava=2})},f.h),nil)
   eq(f.state.capacityLedger.leases.new,nil)
 end)
+
+test('exclusive recovery capacity reserves whole empty slots without merging tagged identities',function()
+ local f=fixture();local request={inventory='a',emptySlots=2,minimumSlotLimit=64,exclusive=true}
+ f.h.inventories.a[1]={name='coal',count=1,nbt='unrelated'}
+ local lease=assert(f.capacity:reserve('recovery',{request},f.h));eq(#lease.nodes.a.allocations,2)
+ eq(lease.nodes.a.allocations[1].slot,2);eq(lease.nodes.a.allocations[2].slot,3)
+ eq(f.capacity:reserve('other',{{inventory='a',items={coal=1}}},f.h),nil)
+ f.state=U.copy(f.saved);f:boot();assert(f.capacity:reserve('recovery',{request},f.h));f.capacity:release('recovery')
+ request.emptySlots=3;eq(f.capacity:reserve('full',{request},f.h),nil)
+ request.emptySlots=2;f.h.limits['a:2']=16;eq(f.capacity:reserve('small',{request},f.h),nil)
+ request.exclusive=false;assert(not pcall(f.capacity.reserve,f.capacity,'shared',{request},f.h))
+ request.exclusive=true;request.items={coal=1};assert(not pcall(f.capacity.reserve,f.capacity,'mixed',{request},f.h))
+end)

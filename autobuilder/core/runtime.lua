@@ -82,6 +82,8 @@ function M.new(config,e)
     state.gpsError='awaiting GPS'
     self.navigation=require('autobuilder.core.navigation').new(e.turtle,state.position,config,function() return self:save() end)
     self.navigation.coverageGuard=function(from,target) return require('autobuilder.core.chunks').guard(config,state,from,target) end
+    self.inventoryDonor=require('autobuilder.workers.inventory_donor').new(self,e)
+    if state.inventoryRecovery then state.status='quarantined' end
     self.fuelRecovery=require('autobuilder.workers.fuel_recovery').new(self,config,e)
     self.agent=require('autobuilder.workers.agent').new(state,config,network,e.turtle,function() return self:save() end,function() return require('autobuilder.core.chunks').probe(e,state,config) end,e)
   end
@@ -105,6 +107,7 @@ function M.new(config,e)
     end
   end
   function self:poseRecovered()
+    if state.inventoryRecovery then state.status='quarantined';return self:save() end
     restoreCoverage()
     if self.mining.poseRecovered then self.mining:poseRecovered() end
     if self.automation.poseRecovered then self.automation:poseRecovered() end
@@ -114,6 +117,7 @@ function M.new(config,e)
     return self:save()
   end
   function self:confirmPose(fix,heading)
+    if state.inventoryRecovery then return false,'quarantined inventory donor pose cannot be changed' end
     if not self.navigation or not U.heading(heading) then return false,'worker and explicit heading required' end
     if state.poseRecovery then return false,'automatic pose probe owns movement; restore GPS and settle its origin first' end
     local ok,err=self.navigation:reconcile(fix,heading); if not ok then return false,err end
@@ -200,6 +204,13 @@ function M.new(config,e)
   function self:workStep()
     if self.busy or self.gpsRequested or self.quitRequested then return true end
     if not self.agent then return self.automation:step() end
+    if self.inventoryDonor and self.inventoryDonor:active() then
+      self.busy=true
+      local ok,result,err=pcall(self.inventoryDonor.step,self.inventoryDonor)
+      self.busy=false;state.status='quarantined'
+      if not ok then error(result,0) end
+      return result,err
+    end
     local task=state.currentTask
     if task and task.type and task.type~='MINE' and not config.automation.enabled then return true end
     if self.poseRecovery:needed() then

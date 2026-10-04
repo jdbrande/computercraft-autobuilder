@@ -114,6 +114,7 @@ function M.load(overrides)
   for _,k in ipairs({'building','crafting','courier','logging','farming'}) do c.capabilities[k]=c.automation.enabled and c.automation[k] or nil end
   c.capabilities.registeredFarmingV1=c.capabilities.farming and true or nil
   c.capabilities.registeredLoggingV1=c.capabilities.logging and true or nil
+  c.capabilities.inventoryRecoveryV1=(c.automation.enabled or c.mining.enabled) and true or nil
   c.capabilities.logisticsV1=c.capabilities.courier and true or nil
   c.capabilities.metadataV1=c.capabilities.building and true or nil
   c.capabilities.placementV1=c.capabilities.building and true or nil
