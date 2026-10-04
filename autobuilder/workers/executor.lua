@@ -329,6 +329,9 @@ function M.new(app,config,e,network,clock)
       if t.type=='RESCUE' and t.cargo and t.cargo.intent then
         engine():step(); s.status=t.phase; save(); return true
       end
+      if t.type=='RECOVER_CARGO' and t.recoveryCargo and t.recoveryCargo.intent then
+        engine():step(); s.status=t.phase; save(); return true
+      end
       if t.error and tostring(t.error):find('movement reservation pending',1,true) and s.motionReservation
         and (s.motionReservation.granted or app.navigation.trafficObstacle() or t.siteWork and s.motionReservation.work and s.motionReservation.reason) then resumeTask()
       elseif (t.logisticsRetryable or t.homeRetryable) and clock()-(t.lastLogisticsRetry or 0)>=config.heartbeatInterval then

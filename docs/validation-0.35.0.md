@@ -2,7 +2,7 @@
 
 Candidate implementation `2e70326` passed focused tests and native acceptance.
 The inherited 0.33 supply-ascent correction is included for final gates. The full
-Lua gate and final review remain pending; this is not a release acceptance claim.
+Lua gate remains pending; this is not a release acceptance claim.
 
 ## Automated evidence
 
@@ -16,9 +16,14 @@ courier's original fuel stack. Runtime, automation, capacity, managed logistics,
 node configuration and mission fuel regressions passed. All 20 Python tests and
 release/diff checks passed before the inherited ascent correction.
 
-The delegated final review returned a service usage-limit error without a review.
-No independent review verdict exists for this milestone. Development continues on
-other requirements while this limitation is recorded rather than treated as a pass.
+The successful single final review found three integration stalls and one diagnostic
+gap. The consolidated corrections add normal executor reconciliation for interrupted
+courier deposits, a controlled station-refuel handoff for unassigned recovery trips,
+and yielding when collection is waiting without a transfer journal. Recovery status
+now includes the courier task and its error/admission failure. Tests reproduced the
+three stalls before the fixes. An additional regression preserves the exclusive
+courier reservation during the settled gap between trips. Donor ownership and
+private buffer capacity remain held throughout refueling. No second review was run.
 
 ## Native Minecraft acceptance — 2026-10-03–04
 

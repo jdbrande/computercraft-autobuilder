@@ -12,9 +12,22 @@ end
 -- still say idle immediately after either queue has saved an assignment.
 local storageWorkers={HARVEST=true,FARM=true,TRANSPORT=true,REFUEL=true}
 local function factory(job) return job.type=='PROCESS' or job.type=='SMELT' or job.type=='CRAFT' end
+function M.recoveryFuelJob(state,owner)
+  local a=state.automation or {}
+  for _,r in pairs(a.inventoryRecoveries or {}) do
+    local j=r.jobId and (a.jobs or {})[r.jobId]
+    if r.courier==owner and r.status=='running' and not r.grant and not r.before
+      and j and j.status=='queued' and not j.workerId and not j.recoveryReceipt then return j end
+  end
+end
 function M.workerBusy(state,owner,exceptId)
+  local nextTrip=M.recoveryFuelJob(state,owner)
   for _,r in pairs((state.automation or {}).inventoryRecoveries or {}) do
-    if r.owner==owner or r.status~='completed' and r.courier==owner and r.jobId~=exceptId then return true end
+    local j=exceptId and ((state.automation or {}).jobs or {})[exceptId]
+    local refueling=j and j.type=='REFUEL' and j.managedFuel and j.preferredWorker==owner
+      and nextTrip and nextTrip.id==r.jobId and j.station and U.position(j.station.position)
+      and U.distance(j.station.position,nextTrip.home)==0
+    if r.owner==owner or r.status~='completed' and r.courier==owner and (not exceptId or r.jobId~=exceptId) and not refueling then return true end
   end
   if require('autobuilder.core.chunks').holdsAnchor(state,owner) then return true end
   for _,job in pairs(state.jobs or {}) do

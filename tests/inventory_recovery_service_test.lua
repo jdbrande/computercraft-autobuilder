@@ -42,6 +42,7 @@ test('inventory recovery reconciles partial custody and keeps donor quarantined 
  assert(f.recovery:handle(12,f:status(r,'frozen',1,inv,grant,2)))
  assert(progress('home',5,2,2,'completed'));eq(j.status,'collecting');f.recovery:tick();assert(r.error);eq(j.status,'collecting')
  f.inventories.b[1]={name='minecraft:stone',count=2};f.recovery:tick();eq(j.status,'completed');eq(r.jobId,nil)
+ assert(require('autobuilder.core.workflows').workerBusy(f.app.state,13),'settled gap must retain the courier')
  f.recovery:tick();j=f.queue.state.jobs[r.jobId];eq(j.quantity,3);eq(j.recoverySequence,2);j.workerId=13
  assert(progress('receiving',3,0,0));f.recovery:tick();grant=U.copy(r.grant)
  inv={};assert(f.recovery:handle(12,f:status(r,'sent',2,inv,grant,3)));assert(progress('home',3,3,0));f.recovery:tick()
@@ -70,4 +71,35 @@ test('recovery reservation rollback retains live state references and can retry 
  local save=f.app.save;f.app.save=function(self) if r.buffer then return false,'disk full' end;return save(self) end
  f.recovery:tick();eq(r.buffer,nil);eq(r.jobId,nil);eq(f.app.state.capacityLedger.leases[r.id],nil)
  f.app.save=save;f.recovery:tick();assert(r.jobId);assert(f.queue.state.inventoryRecoveries[r.id]==r)
+end)
+
+test('settled recovery courier can refuel for its next trip without releasing its exclusive ownership',function()
+ local f=fixture();local r=f.recovery:request(12);local inv={[1]={name='minecraft:stone',count=5},[2]={name='minecraft:dirt',count=1}}
+ assert(f.recovery:handle(12,f:status(r,'frozen',0,inv)));f.recovery:tick()
+ local j=f.queue.state.jobs[r.jobId];local w=f.app.state.workers['13'];local t=w.telemetry
+ t.position=U.copy(t.depot);t.position.known=true;t.fuel=108;t.capabilities.fuelV1=true;t.capabilities.telemetry=true
+ f.config.fuel.enabled=true;f.config.fuel.low=100;f.config.fuel.target=300
+ f.config.fuel.stations={{id='home',workerId=13,inventory='fuel',position=U.copy(t.depot),side='front',targetItems=16}}
+ f.inventories.fuel={[1]={name='minecraft:coal',count=16}}
+ f.queue=require('autobuilder.core.workflows').new(f.app.state,function() return f.app:save() end,function() return f.now end,7,nil,f.config)
+ eq(f.queue:assign(f.app.state.workers),nil);assert(j.admissionError or j.coverageError)
+ local fuel=require('autobuilder.core.fuel_service').new(f.app,f.config,f.e,f.queue,f.production,function() return f.now end)
+ fuel:tick();local refuel=f.queue.state.jobs[f.app.state.fuel.stations.home.refuel];assert(refuel,'no recovery refuel task')
+ eq(refuel.type,'REFUEL');eq(refuel.fuelTarget,300);eq(f.queue:assign(f.app.state.workers).id,refuel.id)
+ assert(require('autobuilder.core.workflows').workerBusy(f.app.state,13));eq(r.courier,13);eq(r.jobId,j.id)
+ r.grant={sequence=1};eq(require('autobuilder.core.workflows').recoveryFuelJob(f.app.state,13),nil)
+ assert(require('autobuilder.core.workflows').workerBusy(f.app.state,13,refuel.id));r.grant=nil
+ refuel.status='completed';t.fuel=300;f.app:save();fuel:tick()
+ eq(f.queue:assign(f.app.state.workers).id,j.id)
+end)
+test('blocked recovery collection yields to unrelated controller services and reports child failure',function()
+ local f=fixture();local r=f.recovery:request(12);local items={[1]={name='minecraft:stone',count=5}}
+ assert(f.recovery:handle(12,f:status(r,'frozen',0,items)));f.recovery:tick()
+ local j=f.queue.state.jobs[r.jobId];j.error='Movement obstructed: minecraft:bedrock'
+ local description=f.recovery:describe();assert(description:find(j.id,1,true));assert(description:find('minecraft:bedrock',1,true))
+ j.status='completed';r.jobId=nil;r.inventory={};r.sequence=1;r.deposited=U.copy(items);r.donor={phase='frozen',sequence=1};f.inventories.b=U.copy(items)
+ f.recovery:tick();eq(r.status,'collecting')
+ f.inventories.base={[1]={name='minecraft:dirt',count=64},[2]={name='minecraft:dirt',count=64},[3]={name='minecraft:dirt',count=64}}
+ for _=1,5 do eq(f.recovery:step(),false) end;assert(r.error);eq(f.transfers,0)
+ f.inventories.base={};for _=1,5 do f.recovery:step() end;eq(r.status,'completed');eq(f.inventories.base[1].count,5)
 end)

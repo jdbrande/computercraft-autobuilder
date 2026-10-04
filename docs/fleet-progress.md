@@ -1662,3 +1662,15 @@ recorded in acceptance. Final-source full gates and native completion follow.
 - The delegated final review failed with a service usage-limit error and supplied
   no findings or verdict. This is recorded as pending, not a completed review.
   Independent remaining implementation and final test gates continue.
+
+0.35 final review and consolidated corrections — 2026-10-04: the successful
+review identified courier deposit-journal replay missing from the executor,
+refueling blocked by the recovery-wide courier reservation, collection waiting
+that starved other controller actions, and missing child-job diagnostics.
+Regression tests reproduced each issue. The fixes reconcile courier journals in
+the normal action loop, permit only registered home refueling before an unassigned
+trip, preserve the exclusive courier across the between-trip gap, yield blocked
+collection without a journal, and expose the child error/task. Focused recovery
+and fuel tests pass; broader integration and final full gates remain pending.
+The earlier service-limit error was not a review; this is the one completed review,
+with no rereview. A native refueling retest is next.
