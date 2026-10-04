@@ -1309,3 +1309,13 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   worker ID/GPS berth profile supplies real station/pose configuration; discovery
   cannot invent a heading or infrastructure. Unknown profiles retain telemetry
   without enabling physical work. Implementation and acceptance remain pending.
+- The single final0.29 review identified four important integration bugs and one
+  hardware-reporting issue. Consolidated red/green regressions cover unhealthy
+  courier/private-crafter selection before staging, health changes during capacity
+  observations, impossible competing mining roles, repair digging requirements,
+  incomplete manifest/receipt agreement and redirected terminal color. New stock
+  claims now check health before ownership; owned journals still drain unchanged.
+  Installer required-file invariants are shared with integrity verification.
+- Focused health/network/runtime/coordination/logistics/scaling/install checks and
+  actual private-crafting regression pass. Complete0.29 gates are starting; native
+  integrity checks will be repeated on the final correction. No second review.

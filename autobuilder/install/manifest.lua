@@ -1,5 +1,6 @@
 local M={}
 M.roles={controller=true,worker=true,miner=true,builder=true,logger=true,courier=true}
+M.required={'installer.lua','update.lua','startup.lua','autobuilder/startup.lua','autobuilder/config.lua','autobuilder/core/runtime.lua'}
 M.receipt='/autobuilder/.installation.json'
 function M.base(url)
   assert(type(url)=='string' and url:match('^https://[%w%.%-]+/[%w%._/%-]+$'),'base URL must be an HTTPS raw repository directory, without query/fragment')

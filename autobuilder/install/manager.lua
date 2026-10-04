@@ -55,7 +55,7 @@ function M.run(e,opts)
   assert(not old or Manifest.compare(m.version,old.version)>=0,'Remote version is older than installed version; downgrade refused.')
   local files=Manifest.select(m,role); local selected={}
   for _,f in ipairs(files) do selected[f.path]=true end
-  for _,path in ipairs({'installer.lua','update.lua','startup.lua','autobuilder/startup.lua','autobuilder/config.lua','autobuilder/core/runtime.lua'}) do
+  for _,path in ipairs(Manifest.required) do
     assert(selected[path],'Manifest is missing required role file: '..path)
   end
   local newSettings
