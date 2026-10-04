@@ -341,7 +341,8 @@ function M.new(state,save,clock,controllerId,config,chunks,record)
       if p.phase=='completed' then
         assert(E.record(exploration.sectors,j,p.exploration,p.delivered)); j.physicalComplete=true; j.status='completed'; j.error=nil
       elseif p.phase=='blocked' then j.status='blocked'; j.error=p.error
-      else j.status='running' end
+      else j.status='running'; j.error=nil end
+      Coordination.updateRouteFailure(j,p)
       j.progress={delivered=p.delivered,held=p.held,phase=p.phase,exploration=E.cleanReport(p.exploration)}
       if j.physicalComplete then j.physicalCompletedAt=j.physicalCompletedAt or clock() end
       self:refreshAcquisition(j.exploration.groupId,stock or 0)
@@ -369,6 +370,7 @@ function M.new(state,save,clock,controllerId,config,chunks,record)
       else j.status='blocked'; j.error='waiting for live storage to confirm requested stock' end
     elseif p.phase=='blocked' then j.status='blocked'; j.error=p.error or 'worker blocked'
     else j.status='running'; j.error=nil end
+    Coordination.updateRouteFailure(j,p)
     if j.physicalComplete then j.physicalCompletedAt=j.physicalCompletedAt or clock() end
     persist();report();return true
   end

@@ -244,3 +244,13 @@ test('exploration demand follows project priority and changing it retains owned 
  local second=assert(jobs:assign(workers,{}));eq(second.exploration.groupId,low.id)
  assert(first.workerId~=second.workerId);eq(first.exploration.groupId,high.id)
 end)
+
+test('explorer route failure diagnostics roll back on failed checkpoints and clear after surveying resumes',function()
+ local fail=false;local jobs,state,workers=fixture(function() return not fail,'disk full' end)
+ jobs:requestAcquisition('minecraft:cobblestone',1,0,'route-diagnostic');local j=assert(jobs:assign(workers,{}))
+ local p={jobId=j.id,phase='blocked',delivered=0,held=0,error='movement reservation pending: no bounded traffic detour',exploration={cursor=1,observations={},clearedRouteCount=0}}
+ assert(jobs:progress(j.workerId,p,0));local reason=j.lastRouteFailure
+ p.error='movement reservation pending';assert(jobs:progress(j.workerId,p,0));eq(j.lastRouteFailure,reason)
+ p.phase='survey';p.error=nil;fail=true;assert(not pcall(jobs.progress,jobs,j.workerId,p,0));eq(j.lastRouteFailure,reason)
+ fail=false;assert(jobs:progress(j.workerId,p,0));eq(j.lastRouteFailure,nil);eq(j.error,nil)
+end)

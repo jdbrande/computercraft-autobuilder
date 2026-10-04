@@ -1904,3 +1904,22 @@ actual CraftOS Enter code257 (rather than28), the Crafty's accessible wired mode
 and its missing depot setting; no finished materials were injected. The monitor
 warning defect above was also observed natively. Permanent acceptance remains
 pending final-source monitor/overflow checks and complete gates.
+
+### 0.39 shared physical traffic implementation
+
+Focused scenarios passed for a four-role intersection (VERIFY, TRANSPORT,
+RETURN_HOME, MINE), roofed opposing corridor, and offline destination owner with
+independent progress/reconnect. Successful moves require matching shared grants
+and distinct physical positions; cargo and protected blocks reconcile exactly.
+
+The corridor exposed an operator diagnostic gap: an actionable detour failure
+could be replaced by a generic pending report. Both job queues now preserve the
+last detailed route failure while blocked, without treating it as a current cell
+denial, and the dashboard shows a passing-bay/alternate-route remedy. Progress
+clears the historical explanation. Queue, restart and explorer checkpoint-rollback
+regressions passed. Routing/reservation lifetime semantics are unchanged.
+
+One final review, native traffic acceptance and full gates remain. Final combined
+acceptance must explicitly exercise automatic underside access and an induced
+recoverable construction defect, then reconcile/settle. Sustained acceptance also
+records disk/history growth and the supported ComputerCraft disk quota.

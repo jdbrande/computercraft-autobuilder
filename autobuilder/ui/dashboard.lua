@@ -54,7 +54,13 @@ function M.lines(state,forecasts,now,io,workerId)
    if j.trafficWait then local w=j.trafficWait;local p=w.target
     add(id..' waiting '..math.max(0,math.floor(now-w.since))..'s at '..p.x..','..p.y..','..p.z)
     add(w.reason or 'reservation pending');add(w.remedy)
-   elseif j.error or j.stockError or j.coverageError then add(id..': '..(j.error or j.stockError or j.coverageError)) end
+   elseif j.error or j.stockError or j.coverageError then
+    add(id..': '..(j.error or j.stockError or j.coverageError))
+    if j.lastRouteFailure then
+     add('Last route failure: '..j.lastRouteFailure)
+     add('Inspect the corridor; provide a passing bay or clear alternate route, then resume. Ownership retained.')
+    end
+   end
   end
  end
  for _,id in ipairs(keys(a.requests)) do local r=a.requests[id];if r.status~='completed' and r.error then add(id..': '..r.error) end end
