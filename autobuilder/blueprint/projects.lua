@@ -393,7 +393,7 @@ function M.new(app,config,e,queue,production)
         p.completed=done
         -- Only a bounded window of region payloads lives in the checkpoint.
         if p.issuedCount==nil then p.issuedCount=0;for _ in pairs(p.regionJobs) do p.issuedCount=p.issuedCount+1 end end
-        if active<4 and p.issuedCount<#regions then
+        if active<require('autobuilder.core.scaling').window(app.state,config,p.mode=='CLEAR' and 'clearing' or 'building') and p.issuedCount<#regions then
           for _=1,math.min(32,#regions) do
             p.cursor=(p.cursor-1)%#regions+1;local region=regions[p.cursor];p.cursor=p.cursor+1
             if not p.regionJobs[region.id] then

@@ -27,7 +27,15 @@ function M.new(app,config,e,network,clock)
   end
   function self:command(line)
     local args={}; for word in line:gmatch('%S+') do args[#args+1]=word end
-    if args[1]=='fuel' then app.state.view='fuel'; return true,fuel:describe()
+    if args[1]=='fleet' then
+      local Scaling=require('autobuilder.core.scaling')
+      if args[2]=='limit' then
+        assert(#args==5,'Usage: fleet limit <role> <minimum> <maximum>')
+        Scaling.setLimits(app.state,config,args[3],tonumber(args[4]),tonumber(args[5]),function() return app:save() end)
+      else assert(#args==1 or #args==2 and args[2]=='status','Usage: fleet status | fleet limit <role> <minimum> <maximum>') end
+      app.state.view='fleet';app.state.fleetLines=Scaling.describe(app.state,config,app.mining.storage.counts,clock())
+      return true,table.concat(app.state.fleetLines,'; ')
+    elseif args[1]=='fuel' then app.state.view='fuel'; return true,fuel:describe()
     elseif args[1]=='worker' and args[2]=='return' then
       assert(#args==3,'Usage: worker return <id>');return true,production.returns:request(tonumber(args[3])).id
     elseif args[1]=='returns' then return true,production.returns:describe()
@@ -95,7 +103,16 @@ function M.new(app,config,e,network,clock)
       if ok then return send(sender,'task_pose_ack',{jobId=j.id,sequence=p.sequence,origin=U.copy(p.origin)}) end
       return false,why
     elseif m.type=='task_reserve' then
-      local granted,err=queue:reserve(sender,j.id,p.from,p.target,app.state.workers,p.work)
+      local granted,err,blocker=queue:reserve(sender,j.id,p.from,p.target,app.state.workers,p.work)
+      if not granted and not p.work and blocker then
+        local w=app.state.workers[tostring(blocker)];local t=w and w.telemetry
+        if w and w.online and t and t.status=='idle' and not t.task and not Coordination.workerBusy(app.state,w.id)
+          and (t.capabilities or {}).returnCargoV1 and t.position and t.position.known
+          and U.position(t.position) and U.position(t.depot) and U.distance(t.position,p.target)==0
+          and U.distance(t.position,t.depot)>0 then
+          production.returns:request(w.id,'traffic:'..j.id..':'..(queue.state.returnSequence+1))
+        end
+      end
       send(sender,'task_grant',{jobId=j.id,target=p.target,granted=granted==true,work=p.work,reason=err and tostring(err):sub(1,512)}); return granted,err
     elseif m.type=='task_position' then return queue:position(sender,j.id,p.from,p.target)
     elseif m.type=='task_supply_done' then
@@ -110,6 +127,12 @@ function M.new(app,config,e,network,clock)
     return false,'unexpected worker task packet'
   end
   function self:preflight()
+    for _,jobs in ipairs({app.state.jobs or {},queue.state.jobs}) do
+      for _,j in pairs(jobs) do require('autobuilder.core.scaling').record(app.state,j,function() return app:save() end,clock()) end
+    end
+    local _,events=require('autobuilder.core.scaling').update(app.state,config,app.mining.storage.counts,clock(),function() return app:save() end)
+    for _,event in ipairs(events) do app:report('INFO','Fleet role='..event.role..' target='..event.target..' active='..event.active..' reason='..event.reason) end
+    if app.state.view=='fleet' then app.state.fleetLines=require('autobuilder.core.scaling').describe(app.state,config,app.mining.storage.counts,clock()) end
     if config.automation.enabled then fuel:tick(); rescue:tick() end
   end
   function self:tick()

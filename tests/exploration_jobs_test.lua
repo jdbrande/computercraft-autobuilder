@@ -78,7 +78,7 @@ test('production requests use exploration groups and wait for physical returns',
   ps:tick(); assert(r.acquired)
 end)
 test('small exploration demands share finite quotas across eligible idle workers',function()
-  local j,s,w=fixture(); j:requestAcquisition('minecraft:cobblestone',4,0,'small')
+  local j,s,w,c=fixture();c.scaling.roles.mining.min=2; j:requestAcquisition('minecraft:cobblestone',4,0,'small')
   local a=assert(j:assign(w,{})); eq(a.quantity,2)
   local b=assert(j:assign(w,{})); eq(b.quantity,2); assert(a.workerId~=b.workerId)
 end)
@@ -104,4 +104,50 @@ test('distant infrastructure cannot exhaust exploration protection payload limit
   assert(j,'irrelevant distant protected areas prevented a local mission')
   assert(#j.exploration.protectedAreas<=128)
   for _,box in ipairs(j.exploration.protectedAreas) do assert(require('autobuilder.resources.exploration').overlaps(box,c.exploration.bounds)) end
+end)
+
+test('exploration scaling caps shared demand and splits quotas among admitted workers',function()
+  local jobs,s,workers,c=fixture();c.scaling.roles.mining={min=2,max=2}
+  local g=jobs:requestAcquisition('minecraft:coal',64,0,'scaled')
+  local first=assert(jobs:assign(workers,{}));eq(first.quantity,32);eq(first.assignedAt,1)
+  first.status='running';workers[tostring(first.workerId)].telemetry.task=first.id
+  local second=assert(jobs:assign(workers,{}));eq(second.quantity,32);assert(second.workerId~=first.workerId)
+  second.status='running';workers[tostring(second.workerId)].telemetry.task=second.id
+  c.scaling.roles.mining.max=0;c.scaling.roles.mining.min=0
+  local before=#g.tripIds;eq(jobs:assign(workers,{}),nil);eq(#g.tripIds,before)
+  eq(first.workerId,1);eq(second.workerId,2)
+end)
+
+test('exploration scaling rechecks changed capacity after loaded-area calls before claiming a trip',function()
+  local jobs,s,workers,c=fixture();c.scaling.roles.mining.max=1
+  local chunks={reserve=function() c.scaling.roles.mining.max=0;return {status='disabled'} end}
+  jobs=require('autobuilder.core.jobs').new(s,function() return true end,function() return 100 end,7,c,chunks)
+  local g=jobs:requestAcquisition('minecraft:coal',64,0,'yielding-scale')
+  eq(jobs:assign(workers,{}),nil);eq(#g.tripIds,0);eq(next(s.jobs),nil)
+end)
+
+test('exploration prefers a specialist and leaves a shared worker for ready construction',function()
+  local jobs,s,workers,c=fixture();workers['1'].telemetry.capabilities.building=true
+  local q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 1 end,1,nil,c)
+  local blocks={};for x=100,163 do blocks[#blocks+1]={x=x,y=2,z=100,name='minecraft:stone',state={}} end
+  local build=q:submit('BUILD',{blocks=blocks})
+  local g=jobs:requestAcquisition('minecraft:coal',128,0,'specialized')
+  local first=assert(jobs:assign(workers,{}));eq(first.workerId,2)
+  first.status='running';workers['2'].telemetry.task=first.id
+  jobs:assign(workers,{});eq(#g.tripIds,1)
+  eq(q:assign(workers).id,build.id);eq(build.workerId,1)
+end)
+
+
+test('an acquisition without a compatible worker cannot starve later serviceable demand',function()
+  for _,offline in ipairs({false,true}) do
+    local j,s,w=fixture()
+    for _,worker in pairs(w) do worker.telemetry.miningResources={'minecraft:cobblestone'} end
+    if offline then w['3']=require('autobuilder.core.util').copy(w['1']);w['3'].id=3;w['3'].online=false;w['3'].telemetry.miningResources={'minecraft:coal'} end
+    local coal=j:requestAcquisition('minecraft:coal',64,0,'first')
+    local stone=j:requestAcquisition('minecraft:cobblestone',64,0,'second')
+    local trip;for _=1,5 do trip=j:assign(w,{});if trip then break end end
+    assert(trip,'unserviceable first demand starved a compatible idle miner');eq(trip.item,'minecraft:cobblestone')
+    eq(#coal.tripIds,0);eq(#stone.tripIds,1)
+  end
 end)

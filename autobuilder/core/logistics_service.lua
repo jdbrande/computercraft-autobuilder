@@ -108,6 +108,11 @@ function M.new(app,config,e,queue,production)
     local telemetry=worker and worker.telemetry
     assert(worker and worker.online and telemetry and telemetry.status=='idle' and not telemetry.task
       and not Q.workerBusy(app.state,job.preferredWorker,job.id),'waiting for available preferred courier')
+    local function eligible()
+      assert(not job.paused and job.status~='completed','logistics batch paused or retired during observation')
+      local allowed,why=require('autobuilder.core.scaling').canAssign(app.state,config,job,worker,app.mining.storage.counts);assert(allowed,why)
+    end
+    eligible()
     local c=job.logistics
     assert(not next(F.list(e,c.pickup.inventory)) and not next(F.list(e,c.drop.inventory)),'logistics buffers must be empty')
     local sources=F.sources(e,{storageInventories={c.source.inventory}},job.item)
@@ -120,7 +125,7 @@ function M.new(app,config,e,queue,production)
     assert(n>0,'insufficient unreserved source stock')
     local capacityDraft=require('autobuilder.storage.capacity').new(app.state,function() return true end)
     local stockDraft=require('autobuilder.storage.ledger').new(app.state,function() return true end)
-    local before=U.copy(job)
+    local before
     local ok,lease=pcall(function()
       local claim,why
       -- At most64 finite item counts; reduce to actual destination capacity.
@@ -133,6 +138,8 @@ function M.new(app,config,e,queue,production)
         if claim then break end;n=n-1
       end
       assert(claim,why)
+      eligible() -- Native slot observations may yield before either ownership claim.
+      before=U.copy(job)
       job.quantity=n;job.stockInputs={[job.item]=n};job.stockOutputs={[job.item]=n}
       assert(stockDraft:reserve(job.id,job.stockInputs,job.stockOutputs,app.mining.storage.counts,{protected=config.turtleFuelReserveItems}))
       job.logisticsFlow={stage={},collect={}}
@@ -140,7 +147,7 @@ function M.new(app,config,e,queue,production)
     end)
     if not ok then
       capacity.state.leases[job.id]=nil;production.ledger.state.leases[job.id]=nil
-      for k in pairs(job) do job[k]=nil end;for k,v in pairs(before) do job[k]=v end
+      if before then for k in pairs(job) do job[k]=nil end;for k,v in pairs(before) do job[k]=v end end
       error(lease,0)
     end
     return lease

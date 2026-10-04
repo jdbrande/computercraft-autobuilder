@@ -244,3 +244,35 @@ test('unregistered possible factory outputs block logistics production without m
   f.config.logistics.nodes[3]={id='factory',inventory='factory_stock',position={x=40,y=0,z=0},buffers={{inventory='factory_buffer',position={x=42,y=1,z=0}}}}
   f.inventories.factory_buffer={};f:step(20);local j=assert(f:jobs()[1]);eq(j.logistics.source.id,'factory');assert(j.logisticsReady)
 end)
+
+test('hauling role limits prevent new stock staging but retain collection for already reserved cargo',function()
+  local f=fixture();f.config.scaling.roles.hauling.max=0
+  local r=f.service:request(item,16,'base','site','limited');f:step(20)
+  eq(f.transfers,0);eq(F.count(f.inventories.base,item),24)
+  f.config.scaling.roles.hauling.max=1;f:step(20)
+  local jobs=f:jobs();local staged
+  for _,j in ipairs(jobs) do if j.logisticsReady then assert(not staged);staged=j end end
+  assert(staged);eq(F.count(f.inventories.base,item),16)
+  f.config.scaling.roles.hauling.max=0;f:deliver(staged);f:step(20)
+  eq(staged.status,'completed');eq(F.count(f.inventories.site,item),8)
+  for _,j in ipairs(f:jobs()) do if j~=staged then assert(not j.logisticsFlow,'reduced cap staged new cargo') end end
+  f.config.scaling.roles.hauling.max=2;f:step(20)
+  for _,j in ipairs(f:jobs()) do if j.status~='completed' then f:deliver(j) end end
+  f:step(20);eq(r.status,'completed');eq(F.count(f.inventories.site,item),16)
+end)
+
+
+test('pause during native capacity observation preserves pause and cannot stage that batch beside ready hauling',function()
+  local f=fixture();f.service:request(item,16,'base','site','pause-observation');f:step()
+  local first=assert(f:jobs()[1]);first.paused=true;f:step();eq(#f:jobs(),2);first.paused=nil
+  local call=f.e.peripheral.call;local paused=false
+  f.e.peripheral.call=function(name,method,...)
+    if method=='getItemLimit' and not paused then paused=true;first.paused=true;assert(f.app:save()) end
+    return call(name,method,...)
+  end
+  f:step();assert(paused);assert(first.paused,'failed draft rollback discarded the newer pause')
+  eq(first.logisticsFlow,nil);eq(f.app.state.capacityLedger.leases[first.id],nil);eq(f.app.state.inventoryLedger.leases[first.id],nil)
+  eq(F.count(f.inventories[first.logistics.pickup.inventory],item),0)
+  f:step(20);local other=f:jobs()[2];assert(other.logisticsReady);f:deliver(other);f:step(20)
+  first.paused=nil;f:step(20);assert(first.logisticsReady,'resumed haul never staged')
+end)

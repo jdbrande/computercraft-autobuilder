@@ -33,9 +33,9 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   within/cross-region hidden access and external-inflow containment acceptance.
   Integrated and pushed at `71b21ed`. Later milestones remain isolated until
   their complete acceptance gates pass.
-- Active0.24 (`.worktrees/fleet-scaling`): dynamic role allocation and48-block
-  native scaling acceptance. Live fleet has reached36/48; final Lua rerun remains
-  active after a regression-backed physical detour fix. Not integrated yet.
+- Accepted0.24:788 Lua/18 Python tests, native48/48 verified, six workers home
+  empty, stock/foundation/workspace reconciliation and cleanup complete.
+  High-rate network overload remains documented for later performance work.
 - Active0.25 (`.worktrees/mining-intelligence`): native hazard/route/outcome learning
   and restart acceptance complete. Earlier802-test gate passed; final rerun includes
   the shared navigation fix. Integration follows0.24.
@@ -51,6 +51,8 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
   regions and bounded supply production. Empty-stock, legacy ownership and actual
   two-builder/miner/factory overlap regressions pass across restarts. Final review,
   complete release gates and native acceptance remain pending.
+  Integrated and pushed at`71b21ed`. Dynamic scaling0.24 continues in the isolated
+  `.worktrees/fleet-scaling` checkout, including final0.23 documentation.
 - Added required scope: dynamic fleet scaling and automatic site preparation,
   including terrain leveling, fill acquisition and verified foundation gates.
   Continue through all rows below in dependency order.
@@ -1006,3 +1008,156 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   review also reproduced streaming supply acquisition continuing after project
   pause and a stale stockOnly flag disabling new-run acquisition. These remain
   release blockers for the consolidated regression-backed correction pass.
+- Isolated next branch`milestone/0.24.0` at`.worktrees/fleet-scaling` starts
+  requirement44 while0.23 final gates run in the main checkout. Its demand model
+  validates limits for all five roles, computes active/idle/queue/work/rate views,
+  accounts for travel and zero-yield searches, and records bounded physical-delivery
+  samples with atomic rollback and restart deduplication. Seven new focused
+  regressions and existing mining/coordination checks pass. Dispatch integration,
+  diagnostics, actual-runtime/native acceptance and final review are still pending;
+  no claim that scaling is active yet.
+
+- Dynamic allocation now gates mining and workflow dispatch, splits exploration
+  quotas among admitted workers, prefers specialized candidates and rechecks limits
+  after yielding chunk calls. Ownership timestamps share the assignment checkpoint;
+  failed writes restore the job and loaded-area lease. Existing owners remain valid
+  after a reduced cap. Private crafting and hauling check limits before staging
+  stock and drain existing claims even when the corresponding maximum becomes zero.
+  Producer windows expand above their four-region lookahead floor for larger fleets.
+- Focused0.24 ownership coverage passed110 checks; producer/service coverage passed60,
+  and quota/crafting/hauling runtime coverage passed79. Regressions cover zero-cap
+  staging, cap reduction during collection, stationary unfueled crafters, haul travel
+  estimates and counting physical collection in delivery rates. Historical parallel
+  recovery fixtures explicitly request two crafting workers (and the small shared
+  mining accounting case two miners) to retain their original fault/concurrency
+  coverage under the new automatic small-work policy. General bottleneck allocation,
+  status/limit commands and native ramp/drain acceptance remain unfinished.
+
+- Dynamic allocation now prioritizes actually dispatchable competing roles, prefers
+  specialist explorers, accounts for unexpanded project/preparation backlog and
+  exposes durable `fleet status`/`fleet limit` commands. Existing ownership, staging,
+  quota-yield, runtime and exploration focused checks pass. A real-runtime miner
+  scenario registered a second explorer after an empty trip, automatically shared
+  eight cobblestone demand, survived controller restart and drained both owners.
+- The larger four-worker construction scenario exposed an incomplete detour after a
+  failed path search. A focused regression reproduced the nil-path exception; failed
+  replanning now discards the incomplete route durably and retries under normal
+  reservation checks after traffic clears. Another regression corrected private
+  crafting rates to use collected output and factory start/completion timestamps.
+  Both focused regressions pass; the larger construction rerun is still pending.
+
+- Native0.24 fixture212–218 is running a48-block mixed cobblestone/glass project on
+  uneven terrain. Only builder213 and miner217 began powered on; after each owned
+  automatic work, builders214–216 and miner218 joined through ordinary registration.
+  Two miners and multiple surveyors became active without assignment commands.
+  Initial stock contains16 glass, no cobblestone; placed stone deposits supply the
+  missing structure/foundation material. Six workers each started with20,000 finite
+  fuel. The operator explicitly loaded18 chunks and supplied separate private endpoints.
+- Native survey observations exposed underutilization from one queued neighboring
+  region per worker. A regression admitted only two of four useful builders; exposing
+  two candidates per worker (still bounded4..64) admits four separated regions while
+  retaining every existing conflict check. Scaling/site/coordination tests pass.
+  The long construction rerun was superseded by this producer-window change and is
+  now running with periodic diagnostic snapshots; its earlier interrupted run is
+  not passing evidence. Initial Python gate passed all18 tests.
+
+- Private crafting now estimates the whole current production operation beyond its
+  bounded queued batches, subtracting collected current-generation output. A focused
+  test reproduced severe undercounting; a128-brick actual-runtime request now uses
+  both private stations with default zero minimum, collects exactly128 output,
+  releases capacity and drains allocation to zero. Scaling and factory runtime
+  focused checks pass. This extends the same backlog treatment already used for
+  bounded construction/preparation queues.
+
+- The single final0.24 review found two reproducible Important issues. An unsupported
+  first acquisition exited the whole exploration pass, starving later compatible
+  demand. It now stops globally only when role capacity is exhausted; unsupported
+  and offline-only material groups no longer block other miners. A pause arriving
+  during native logistics capacity observations also permitted a new claim and
+  transfer. Final eligibility now rejects paused/retired work; rollback snapshots
+  begin after yielding observations so they preserve the newer pause. Regressions
+  failed before fixes and pass afterward, including resumption after other hauling
+  settles. No second review is planned.
+- The initial full suite exposed an older coverage-status fixture that expected a
+  second tiny build to dispatch beside an existing owner. It now explicitly requests
+  minimum two builders so it still exercises missing chunk coverage. Production
+  allocation remains unchanged. That preliminary suite was superseded by the review
+  fixes and fixture correction; it is not final passing evidence.
+- Native0.24 home returns correctly refused missing coverage for chunk64,-1 at the
+  central storage boundary. The operator added two loaded chunks and widened only
+  the controller's explicit assurance rectangle (now20 chunks), then restarted it.
+  All three pending debris returns completed; preparation and building continued
+  concurrently. This was fixture configuration, without extra stock or terrain edits.
+
+- The48-block four-worker simulation completed placement but stalled at43 verified
+  cells because idle workers remained at inspection destinations. The nil-path fix
+  prevented a crash but could not move an occupied goal. A focused actual-runtime
+  regression reproduced the stall. Denied movement now identifies the physical
+  blocker and requests an ordinary managed home return only for an online, idle,
+  unowned, capable worker away from its depot at that exact destination. Offline,
+  busy, paused and already-home workers retain their protections. One physical
+  regression and36 runtime/coordination/logistics checks pass; the large run is
+  restarting. Preliminary full-suite runs were terminated after this new finding
+  and cannot serve as final acceptance. No extra review pass was requested.
+
+- The larger scaling rerun exposed a separate movement stall: a traffic detour could
+  enter another worker's reserved preparation volume, but that denial did not resume
+  route planning. The worker now recognizes active preparation ownership as a traffic
+  obstacle. A focused actual-runtime regression fails before the fix and passes after,
+  verifying the protected volume remains unentered and its owner unchanged. Runtime,
+  navigation and coordination checks pass. The48-block rerun continues; the same fix
+  is installed on native workers213–216 with checkpointed tasks retained.
+
+- The next larger rerun revealed symmetric traffic detours: opposing workers repeatedly
+  chose the same passing lane, accumulated16 blocked cells and eventually hit terrain
+  or stayed at the detour limit. A two-worker actual-runtime regression reproduces
+  inaccessible verification after this synchronized movement. Navigation now tries a
+  right-side step before its bounded onward search, separating approaching workers.
+  Both workers verify successfully with all physical collision assertions enabled.
+  A full obstacle cache is checkpointed away to permit later traffic changes; it no
+  longer creates an absorbing blocked state. Focused navigation/runtime/coordination
+  checks pass. Native workers213–218 received the fix; larger and final suites restart.
+
+- The48-block four-worker runtime simulation now passes: late registration increases
+  preparation/build ownership, a controller restart preserves work, all48 blocks verify,
+  and all workers finish idle with empty cargo and positive finite fuel. The native run
+  separately hit CraftOS's non-yielding execution limit during a checkpoint while
+  handling network traffic. A native139,791-byte checksum benchmark took roughly15ms
+  after warmup; moving yields into checksum transactions was unnecessary and unsafe.
+  The event loop now drains at most8 packets or250ms per turn, between complete handlers,
+  with a short follow-up timer while backlog remains. A burst regression fails before
+  the change and passes after, preserving all21 packets in order. Runtime/navigation
+  checks pass. Controller212 was restarted from its saved files with this fix; no
+  worker ownership or cargo was reset. Final full-suite evidence will use this source.
+
+- Final0.24 full gate failed1/786 tests: the48-block ramp/drain fixture stalled at
+ 46 blocks. Retained state identified builder14 blocked by a chest encountered
+  inside a traffic detour. The earlier focused pass did not exercise that ordering.
+  A deterministic regression reproduced a terminal physical-obstruction error.
+  Navigation now persists the inspected cell as bounded detour evidence and retries
+  without digging. The regression passes across reboot; an actual two-worker
+  runtime with opposing routes and station chests also passes. This is a release
+  blocker corrected before restarting the full gate, not a waived flaky test.
+
+- Native0.24's accelerated1s heartbeat/3s registration fixture saturated the
+  controller inbox, with repeated dropped-message warnings and slow durable retries.
+  Restored shipped defaults5s/15s on212–218 through checkpoint-preserving reboots.
+  Source code/ownership/physical cargo were unchanged. Audit settings and logs are
+  in dist/live-scaling/default-network-timing/. High-rate overload remains a known
+  limitation for later large-fleet performance acceptance; do not claim it solved.
+
+- Final0.24.0 complete Lua gate passed788 tests, with18 Python tests and
+  release/whitespace checks. Log: /tmp/fleet-024-final-full-v5.log. Ordered integration
+  waits for0.24 native worker settlement; no feature gate is waived.
+
+
+-0.24 native acceptance complete: project built with48/48 correct; all six workers
+  home/idle/empty, both requests/groups complete, no active supply/mining/leases.
+  Independent reads confirm150 solid foundation cells and402 clear workspace cells.
+ 40 mined cobblestone =32 structure +4 foundation +4 stored surplus;8 cleared dirt
+  stored. Finite fuel reconciles. Complete gates788 Lua/18 Python pass. Permanent
+  report validation-0.24.0.md records fixes, default timing and overload limitation.
+  Computers212–218 are shut down,20 force-load tickets removed, monitor stopped.
+
+- Integrated accepted0.24 dynamic scaling on main. Source/test/release artifacts
+  match the fully tested milestone; integration only reconciles progress documents.

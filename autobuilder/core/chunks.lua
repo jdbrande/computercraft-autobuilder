@@ -167,7 +167,7 @@ function M.new(state,config,save)
     end
     if id then return {kind='anchor',workerId=id} end
   end
-  function self:reserve(job,worker,assign,preparationReady)
+  function self:reserve(job,worker,assign,preparationReady,admission,assignedAt)
     if not config.chunkLoading.enabled then return {status='disabled'} end
     assert(U.shortString(job.id,160),'invalid loaded mission ID')
     local old=s.leases[job.id];local t=worker.telemetry
@@ -193,13 +193,14 @@ function M.new(state,config,save)
         if not preparationReady then return nil,'preparation verifier is unavailable' end
         allowed,reason=preparationReady(job);if not allowed then return nil,reason end
       end
+      if admission then allowed,reason=admission(job,worker);if not allowed then return nil,reason end end
     end
     local lease={status='held',workerId=worker.id,area=area,providers=providers,origin={position=U.copy(t.position),depot=U.copy(t.depot)}}
-    local before,owner,status=job.loadedArea,job.workerId,job.status
+    local before,owner,status,started=job.loadedArea,job.workerId,job.status,job.assignedAt
     persist(function()
       s.leases[job.id]=lease;job.loadedArea=U.copy(area)
-      if assign then job.workerId=worker.id;job.status='assigned' end
-    end,function() s.leases[job.id]=nil;job.loadedArea=before;job.workerId=owner;job.status=status end)
+      if assign then job.workerId=worker.id;job.status='assigned';job.assignedAt=assignedAt end
+    end,function() s.leases[job.id]=nil;job.loadedArea=before;job.workerId=owner;job.status=status;job.assignedAt=started end)
     return U.copy(lease)
   end
   function self:allows(job,from,target)

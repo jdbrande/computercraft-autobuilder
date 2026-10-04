@@ -178,3 +178,62 @@ test('disabled worker automation retains an active return task without physical 
   local w=R.new(c,e);w.state.currentTask={id='task:7:1',type='RETURN_HOME',phase='work'};w:save()
   w:workStep();eq(e.turtle.calls,0);eq(w.state.currentTask.phase,'work')
 end)
+
+test('fleet status and limits use normal controller commands persist across reboot and draw role diagnostics',function()
+  local R=require('autobuilder.core.runtime');local e=env(7);local c=R.new(cfg('controller'),e)
+  assert(c:command('fleet limit mining 1 3'));assert(c:command('fleet status'));eq(c.state.view,'fleet')
+  c:draw();assert(table.concat(e.screen,'\n'):find('mining',1,true))
+  assert(not c:command('fleet limit mining 4 2'));assert(not c:command('fleet limit missing 0 1'))
+  c=R.new(cfg('controller'),e);eq(require('autobuilder.core.scaling').limits(c.state,c.config,'mining').max,3)
+end)
+
+test('traffic home requests never displace offline busy paused or already home workers',function()
+  for _,mode in ipairs({'idle','offline','busy','paused','home'}) do
+    local e=env(7);local c=require('autobuilder.core.runtime').new(cfg('controller'),e);c.config.chunkLoading.enabled=false
+    local target={x=1,y=1,z=0,known=true};local from={x=0,y=1,z=0,known=true}
+    c.state.workers['12']={id=12,online=true,boot=1,sequence=0,telemetry={status='work',position=from}}
+    c.state.workers['13']={id=13,online=mode~='offline',boot=2,sequence=0,telemetry={status=mode=='paused' and 'paused' or 'idle',
+      position=target,depot=mode=='home' and target or {x=5,y=1,z=0},capabilities={returnCargoV1=true}}}
+    local j=c.automation.queue:submit('VERIFY',{blocks={{x=1,y=0,z=0,name='minecraft:stone',state={}}}},{})
+    j.workerId=12;j.status='running'
+    if mode=='busy' then c.state.jobs.other={id='other',workerId=13,status='running'} end
+    local ok=c.automation:handle(12,{type='task_reserve',boot=1,sequence=1,payload={jobId=j.id,from=from,target=target}})
+    assert(not ok);local n=0;for _ in pairs(c.state.automation.returns) do n=n+1 end
+    eq(n,mode=='idle' and 1 or 0)
+  end
+end)
+
+
+test('controller drains a queued network burst in bounded turns without losing or reordering packets',function()
+  local R=require('autobuilder.core.runtime');local e=env(1);local timer=0;local blocked=false
+  local processed,turnCount={},0
+  e.os.startTimer=function() timer=timer+1;return timer end;e.os.cancelTimer=function() end
+  e.os.pullEvent=function(filter)
+    turnCount=0
+    while true do local ev={coroutine.yield(filter)};if not filter or ev[1]==filter then return table.unpack(ev) end end
+  end
+  e.sleep=function() e.os.pullEvent('sleep') end
+  e.peripheral.call=function() if blocked then blocked=false;e.os.pullEvent('task_complete') end;return true end
+  local send=e.rednet.send;e.rednet.send=function(to,m,p)
+    if m.type=='ack' then turnCount=turnCount+1;assert(turnCount<=8,'unbounded message burst exceeded CraftOS turn budget');processed[#processed+1]=to end
+    return send(to,m,p)
+  end
+  e.parallel={waitForAny=function(...)
+    local threads,filters={},{}
+    for i,fn in ipairs({...}) do threads[i]=coroutine.create(fn);local ok,f=coroutine.resume(threads[i]);assert(ok,f);filters[i]=f end
+    local function broadcast(ev)
+      for i,co in ipairs(threads) do if not filters[i] or filters[i]==ev[1] then
+        local ok,f=coroutine.resume(co,table.unpack(ev));assert(ok,f);filters[i]=f;if coroutine.status(co)=='dead' then return true end
+      end end
+    end
+    local telemetry={label='Worker',status='idle',position={known=false},fuel=1000,inventory={used=0,slots=16},capabilities={telemetry=true}}
+    local function packet(id) return {'rednet_message',id,{version=1,id=id..':1:1',sender=id,boot=1,sequence=1,type='register',payload=telemetry},'autobuilder.v1'} end
+    blocked=true;broadcast(packet(2))
+    for id=3,22 do broadcast(packet(id)) end
+    broadcast({'task_complete'})
+    for _=1,30 do if #processed==21 then break end;e.now=e.now+0.1;broadcast({'timer',timer}) end
+    eq(#processed,21);for i,id in ipairs(processed) do eq(id,i+1) end
+    assert(broadcast({'char','q'}))
+  end}
+  local app=R.run(cfg('controller'),e);for id=2,22 do assert(app.state.workers[tostring(id)]) end
+end)

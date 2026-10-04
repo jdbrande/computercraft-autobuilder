@@ -50,7 +50,10 @@ function M.new(turtle,pose,config,save)
     if success and not turn and self.afterMove then self.afterMove(target) end
     if not success then
       local inspect=action=='up' and turtle.inspectUp or action=='down' and turtle.inspectDown or action=='forward' and turtle.inspect
-      if inspect then local ok,found,block=pcall(inspect); if ok and found then reason=reason..': '..tostring(block.name) end end
+      if inspect then
+        local ok,found,block=pcall(inspect)
+        if ok and found then return false,reason..': '..tostring(block.name),{x=target.x,y=target.y,z=target.z} end
+      end
       return false,reason
     end
     return true
@@ -107,18 +110,34 @@ function M.new(turtle,pose,config,save)
     -- ponytail: 256-node detours; larger global routes need hierarchical planning.
     local P=require('autobuilder.core.pathfinding')
     if pose.detour and U.distance(pose.detour.target,target)>0 then pose.detour=nil end
-    local obstacle=self.trafficObstacle and self.trafficObstacle()
+    local obstacle=pose.detour and pose.detour.obstacle or self.trafficObstacle and self.trafficObstacle()
     if obstacle then
       local d=pose.detour or {target={x=target.x,y=target.y,z=target.z},blocked={},count=0}
+      d.obstacle=nil
       if not d.blocked[P.key(obstacle)] then
-        if d.count>=16 then return false,'movement reservation pending: traffic detour limit reached' end
+        if d.count>=16 then
+          pose.detour=nil;local ok,why=persist();if not ok then return false,why end
+          return false,'movement reservation pending: traffic detour limit reached'
+        end
         d.blocked[P.key(obstacle)]=true;d.count=d.count+1;d.path=nil
       end
       if not d.path then
         local box={min={},max={}}
         for _,axis in ipairs({'x','y','z'}) do box.min[axis]=math.min(pose[axis],target[axis])-2;box.max[axis]=math.max(pose[axis],target[axis])+2 end
-        local path=P.find(pose,target,function(p) return U.position(p) and P.inside(p,box) and not d.blocked[P.key(p)] and allowed(p) end,256)
-        if not path then return false,'movement reservation pending: no bounded traffic detour' end
+        local function passable(p) return U.position(p) and P.inside(p,box) and not d.blocked[P.key(p)] and allowed(p) end
+        -- Approaching workers step to their own right before planning onward.
+        -- Symmetric shortest paths otherwise move both workers into the same lane.
+        local side={x=pose.x-(obstacle.z-pose.z),y=pose.y,z=pose.z+(obstacle.x-pose.x)}
+        if obstacle.y~=pose.y then side.x=pose.x+(obstacle.y-pose.y) end
+        local path;local budget=256
+        if U.distance(pose,obstacle)==1 and U.distance(obstacle,target)>0 and passable(side) then
+          budget=128;path=P.find(side,target,passable,budget);if path then table.insert(path,1,side) end
+        end
+        if not path then path=P.find(pose,target,passable,budget) end
+        if not path then
+          pose.detour=nil;local ok,why=persist();if not ok then return false,why end
+          return false,'movement reservation pending: no bounded traffic detour'
+        end
         d.path=path;d.index=1
       end
       pose.detour=d;local ok,why=persist();if not ok then return false,why end
@@ -136,7 +155,17 @@ function M.new(turtle,pose,config,save)
             local heading=point.x~=pose.x and (point.x>pose.x and 'east' or 'west') or (point.z>pose.z and 'south' or 'north')
             local ok,why=self:face(heading);if not ok then return false,why end;action='forward'
           end
-          local ok,why=step(action);if not ok then return false,why end
+          local ok,why,blocked=step(action)
+          if not ok then
+            if blocked then
+              -- A traffic detour explores unobserved space. Keep physical
+              -- obstructions as bounded route evidence, never permission to dig.
+              d.obstacle=blocked;d.path=nil
+              local saved,err=persist();if not saved then return false,err end
+              return false,'movement reservation pending: traffic detour '..why
+            end
+            return false,why
+          end
         end
       end
       pose.detour=nil;local ok,why=persist();if not ok then return false,why end

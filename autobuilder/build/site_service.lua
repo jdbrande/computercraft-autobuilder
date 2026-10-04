@@ -65,7 +65,8 @@ function M.new(app,config,e,queue,production)
     end
     F.commit(p,save,function()
       p.generation=p.generation+1
-      p.site={identity=plan.identity,generation=p.generation,projectRun=p.run or 0,cursor=1,completed=0,blocked=0,active={},status='surveying'}
+      p.site={identity=plan.identity,generation=p.generation,projectRun=p.run or 0,cursor=1,completed=0,blocked=0,active={},status='surveying',
+        columnCount=plan.columnCount,regionCount=plan.regionCount,estimatedCells=plan.columnCount*(plan.bounds.max.y-plan.bounds.min.y+1)}
       p.protectedBounds=protection;p.phase='surveying';p.completed=0;p.total=plan.columnCount;p.error=nil
     end)
   end
@@ -97,7 +98,7 @@ function M.new(app,config,e,queue,production)
       end
     end
     local active=0;for _ in pairs(site.active) do active=active+1 end
-    if active<4 and site.cursor<=plan.regionCount then
+    if active<require('autobuilder.core.scaling').window(app.state,config,'clearing') and site.cursor<=plan.regionCount then
       F.commit(p,save,function()
         local region=site.cursor;site.active[tostring(region)]={region=region,attempt=1,clearanceY=plan.bounds.max.y};site.cursor=region+1
       end)
@@ -162,7 +163,7 @@ function M.new(app,config,e,queue,production)
           end
           w.status='working'
           local active=0;for _ in pairs(w.active) do active=active+1 end
-          if not w.active[tostring(region)] and active<4 then w.active[tostring(region)]={region=region,countInAudit=false} end
+          if not w.active[tostring(region)] and active<require('autobuilder.core.scaling').window(app.state,config,'clearing') then w.active[tostring(region)]={region=region,countInAudit=false} end
         end)
         return false,'preparation region '..region..' needs evidence recovery: '..tostring(record and 'unfinished backup' or why)
       end
@@ -464,7 +465,7 @@ function M.new(app,config,e,queue,production)
         end
       end
     end
-    if work.cursor<=plan.regionCount and (active<4 or work.active[tostring(work.cursor)]) then
+    if work.cursor<=plan.regionCount and (active<require('autobuilder.core.scaling').window(app.state,config,'clearing') or work.active[tostring(work.cursor)]) then
       F.commit(p,save,function()
         local key=tostring(work.cursor);work.active[key]=work.active[key] or {region=work.cursor};work.active[key].countInAudit=true;work.cursor=work.cursor+1
       end)

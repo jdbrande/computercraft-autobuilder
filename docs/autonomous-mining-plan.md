@@ -953,3 +953,89 @@ cell before closing the next. Keep root access receipts until both evidence copi
 advance, so lost sidecars can reconstruct outstanding restoration. Do not certify
 a region while access remains open or restoration is blocked. Fresh survey epochs
 never inherit old hidden-target proof.
+
+## Milestone0.24: dynamic fleet scaling
+
+Spec: [fleet scaling design](fleet-scaling-design.md), requirement44. Native inline
+execution continues. Development uses `.worktrees/fleet-scaling` while the final
+0.23 native and automated gates finish; integrate0.23 first, then merge its final
+acceptance documentation into this branch before final0.24 validation.
+
+### Task46: Bounded demand/rate allocation and role limits
+
+**Files:** new `autobuilder/core/scaling.lua`, `autobuilder/config.lua`,
+`tests/scaling_test.lua`, `tests/run.lua`.
+
+**Interfaces:** `Scaling.role(job)` returns one of mining/hauling/crafting/clearing/
+building or nil for mandatory rescue/fuel/home settlement. `Scaling.snapshot(state,
+config,counts,now)` derives bounded role diagnostics from authoritative jobs and
+acquisition demand. `Scaling.canAssign(state,config,job,worker,counts,now)` returns
+admission and a concrete reason. It never changes ownership.
+
+- [x] Add failing tests for small/heavy/drained demand, all five configurable
+  minimum/maximum limits, multi-role equipment, observed zero-yield trips, travel
+  costs and existing offline owners exceeding a reduced maximum.
+- [x] Run the focused scaling tests and confirm the missing behavior fails.
+- [x] Implement validated `scaling.roles.<role>.min/max` (default0/128, bounded by
+  the fleet limit), active/idle/queue/work/rate diagnostics and useful targets.
+  Minimums apply only to useful demand. Existing ownership always survives.
+- [x] Add capped per-role completion metrics consumed in the same saved root as
+  each job's sample marker. Count zero-yield trip duration as cost; never credit
+  undelivered held stock. Test save rollback and restart without duplicate samples.
+- [x] Run focused tests, document the estimate assumptions, and commit.
+
+### Task47: Shared dispatch and producer integration
+
+**Files:** `core/jobs.lua`, `core/workflows.lua`, `core/chunks.lua`,
+`core/automation_service.lua`, `core/mining_service.lua`, `blueprint/projects.lua`,
+`build/site_service.lua`, `factory/parallel.lua`, `core/logistics_service.lua`.
+
+**Interfaces:** Task46 admission is called before planning and again immediately
+before durable ownership, including after yielding loaded-area observations.
+`Scaling.window(state,config,role)` returns a bounded producer window (4..64), with two region candidates per worker.
+
+- [x] Add failing queue/runtime tests: configured role caps across both ownership
+  queues, shared-material exploration quota splitting, specialized-worker preference,
+  limited stock, independent build/preparation regions and simultaneous role demand.
+- [x] Replace fixed four-job producer windows with bounded eligible-capacity windows.
+  Scale private craft/haul batches through their existing stock/capacity reservations.
+  Preserve every safety/route/protection/fuel/dependency check; scaling does not
+  authorize a task those checks reject.
+- [x] Apply dispatch targets and bottleneck priority to idle workers only. Rescue,
+  fuel delivery and home/debris settlement bypass ordinary role quotas.
+- [x] Test a lease/worker/quota changing during a yielding chunk call, owner recovery,
+  failed root save, offline owners, and scale-down while cargo/return is outstanding.
+- [x] Run relevant focused regressions and commit.
+
+### Task48: Operator diagnostics and actual-runtime ramp/drain
+
+**Files:** scaling module, controller commands/UI, `tests/fleet_scaling_runtime_test.lua`,
+operator docs and progress ledger.
+
+- [x] Add `fleet status`/role-limit commands and concise role counts, queue depth,
+  estimated work, delivery rate, limiting resource and bounded scaling-decision history.
+  Reuse existing command/event logging and configuration persistence.
+- [x] Add actual controller/miner/worker runtime scenarios that start with one
+  suitable turtle, register more during heavy mixed demand, prove multiple miners,
+  clearers and builders contribute, and finish with idle settled workers.
+- [x] Include slower supply/processing, zero-yield searches, changed limits and
+  controller/worker restarts. Confirm no duplicated physical work, stock or claims.
+- [x] Run the focused/runtime checks, document supported tuning and commit.
+
+### Task49: Native scaling acceptance and integration
+
+- [x] Run a loaded mixed-material terrain/build fixture large enough for several
+  miners, clearers and builders to join automatically. Start with one worker and
+  register additional eligible workers while the project runs; do not assign jobs
+  manually. Record role targets, actual ownership, throughput and bottlenecks.
+- [x] Independently inspect final structure, ground and inventory; reconcile workers,
+  finite fuel, production, cargo and leases. Retain setup/restart/cleanup evidence.
+- [x] Perform one final whole-branch review and one consolidated regression-backed
+  fix pass. Run complete Lua/Python/release/diff gates, update progress and permanent
+  acceptance documentation, integrate/push, then continue every remaining requirement.
+
+Review focus: a reduced maximum must not strand owned cargo; zero-yield searches
+must not look infinitely productive; a yielding reservation must not admit stale
+capacity; the same turtle must not count as idle in two roles; scaling must not
+bypass existing storage/factory exclusion or starve mandatory recovery. Tasks46–48
+include direct regression cases for each condition.
