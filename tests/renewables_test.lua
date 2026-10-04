@@ -55,7 +55,10 @@ local function world()
   local headings={'north','east','south','west'}; local index={north=1,east=2,south=3,west=4}
   t.turnRight=function() w.pose.heading=headings[index[w.pose.heading]%4+1]; return true end
   t.turnLeft=function() w.pose.heading=headings[(index[w.pose.heading]+2)%4+1]; return true end
-  for action,suffix in pairs({forward='',up='Up',down='Down'}) do t[action]=function() local p=point(suffix); if w.blocks[key(p)] then return false,'blocked' end; w.pose.x,w.pose.y,w.pose.z=p.x,p.y,p.z; w.fuel=w.fuel-1; return true end end
+  for action,suffix in pairs({forward='',up='Up',down='Down'}) do t[action]=function() local p=point(suffix); if w.blocks[key(p)] then return false,'blocked' end; w.pose.x,w.pose.y,w.pose.z=p.x,p.y,p.z; w.fuel=w.fuel-1;
+    local below=w.blocks[key({x=p.x,y=p.y-1,z=p.z})]
+    if w.farmlandTicks and below and below.name=='minecraft:farmland' then below.name='minecraft:dirt' end
+    return true end end
   return w
 end
 local function setup(kind,quantity)
@@ -167,7 +170,7 @@ test('farm soil inspection and planting resume with independent movement and mut
  for _=1,600 do
   if task.phase=='blocked' then assert(task.error:find('movement reservation pending',1,true),task.error);assert(engine:resume()) end
   engine:step()
-  if task.plantSoilSite and not rebooted then engine,task=restart();rebooted=true end
+  if task.harvestedSite and not task.intent and not rebooted then engine,task=restart();rebooted=true end
   if task.phase=='completed' then break end
  end
  eq(task.phase,'completed');assert(rebooted);eq(w.digs,1);eq(w.plants,1);eq(task.delivered,1)
@@ -264,4 +267,20 @@ test('crop telemetry preserves pending planting obligation across reboot',functi
  run(e,task);eq(w.plants,1)
  local agent=require('autobuilder.workers.agent').new({id=12,position=U.copy(w.pose),currentTask=task},c,{},w.t,function() return true end)
  eq(agent:telemetry().harvestPlanting,0)
+end)
+
+test('crop replant never occupies the crop cell and native soil rejection retains ownership',function()
+ for _,missing in ipairs({false,true}) do
+  local w,task,c,new,restart=setup('carrot',2);w.farmlandTicks=true
+  w.blocks['3,1,0']={name='minecraft:carrots',state={age=7}};w.blocks['3,0,0']={name=missing and 'minecraft:dirt' or 'minecraft:farmland',state={}}
+  w.items[1]={name='minecraft:carrot',count=1};w.drops={['minecraft:carrots']={['minecraft:carrot']=3}};w.plantBlocks={['minecraft:carrot']='minecraft:carrots'}
+  local place=w.t.placeDown
+  w.t.placeDown=function() if w.blocks['3,0,0'].name~='minecraft:farmland' then return false,'Cannot plant here' end;return place() end
+  local e=new();run(e,task)
+  if missing then
+   eq(task.phase,'blocked');eq(task.delivered,0);eq(w.plants,0)
+   w.blocks['3,0,0'].name='minecraft:farmland';e,task=restart();assert(e:resume());run(e,task)
+  end
+  eq(task.phase,'completed');eq(w.plants,1);eq(w.blocks['3,0,0'].name,'minecraft:farmland');eq(task.delivered,2)
+ end
 end)

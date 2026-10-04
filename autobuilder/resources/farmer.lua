@@ -240,7 +240,9 @@ function M.new(task,e,config,nav,save,treeMode)
     if task.stage=='plant' then
       if present then return block('planting target changed before planting','ambiguous') end
       local slot,before=slotFor(spec.seed); if not slot then return missing() end
-      if task.plantSoilSite~=task.site then
+      -- A solid turtle in the empty crop cell converts farmland to dirt. Native
+      -- seed placement validates farmland without occupying or changing it.
+      if spec.tree and task.plantSoilSite~=task.site then
         -- Save the observation before the ascent: its movement grant may arrive
         -- on a later tick or after reboot. Repeating the descent would consume
         -- that grant and prevent replanting indefinitely.

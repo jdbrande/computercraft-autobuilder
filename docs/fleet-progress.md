@@ -1505,3 +1505,10 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   mutation grants, overlapping owners, registry changes/reboots, retirement save
   failure and owned/offline/journal preservation. Native initial carrot task was
   blocked before any digging; its retained owner is resumed with these fixes.
+-0.32 native acceptance then exposed a physical soil bug: descending into an
+  empty crop cell for soil inspection converts farmland to dirt under the solid
+  turtle. Crop replanting now relies on native seed-placement substrate validation
+  from above; tree soil checks remain. A world-faithful regression fails before
+  the fix and passes after, including rejected substrate, retained ownership and
+  restart. The first native owner completed after operator restoration of the
+  soil damaged by the old code; an untouched-plot final-source retest follows.

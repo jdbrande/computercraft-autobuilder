@@ -1121,7 +1121,7 @@
       "version": "0.32.0"
     },
     {
-      "bytes": 17546,
+      "bytes": 17718,
       "path": "autobuilder/resources/farmer.lua",
       "roles": [
         "controller",
@@ -1131,7 +1131,7 @@
         "logger",
         "courier"
       ],
-      "sha256": "e8df8515a08d9f5308a78511e780f725772316499c3267c6a5ea959cd783f232",
+      "sha256": "832bf241e41d7b4c15a8362c97d2fed62c511cead5e019f7e3ba9af4b51d7b0c",
       "url": "https://raw.githubusercontent.com/jdbrande/computercraft-autobuilder/main/autobuilder/resources/farmer.lua",
       "version": "0.32.0"
     },
