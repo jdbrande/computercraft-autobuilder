@@ -1237,3 +1237,23 @@ and integration decisions. Preserve queued ownership and legacy protocol support
   fixes, complete Lua/Python/release checks and permanent documentation.
 - [ ] Integrate in dependency order, then implement single-command fleet discovery,
   software verification/update and configuration using existing installer/setup.
+
+## Milestone0.30: single-command fleet enrollment
+
+Spec: [fleet install design](fleet-install-design.md). Inline execution in
+`.worktrees/fleet-install` follows0.29; propagate its final health corrections.
+
+### Task63: Bounded controller discovery and configuration profiles
+
+- [ ] Add failing controller/client discovery, ambiguity, nonce and malformed-data
+  tests. Add opt-in controller enrollment profiles using ordinary configuration.
+- [ ] Match an explicit worker ID or GPS berth, preserve unknown-pose restrictions,
+  and expose actionable missing-profile status without moving hardware.
+
+### Task64: Transactional install, enrollment and acceptance
+
+- [ ] Reuse the standalone installer for `fleet install`, verified repair/update,
+  existing settings preservation and idle-only profile application.
+- [ ] Exercise actual runtime registration and native discovery/install/recovery.
+- [ ] Complete one final review and consolidated fixes, full gates and permanent
+  evidence; integrate in dependency order and continue remaining requirements.

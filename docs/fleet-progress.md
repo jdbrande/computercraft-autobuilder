@@ -1303,3 +1303,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   detects an intentionally edited file, and verifies after restoration; source-copy
   software reports unmanaged. This is integrity/hardware evidence, not installer
   workflow acceptance. Final review, complete gates and integration remain.
+
+- Started0.30 single-command enrollment design while0.29 final review runs. Reuse
+  the installer transaction and validated setup persistence. A controller-provided
+  worker ID/GPS berth profile supplies real station/pose configuration; discovery
+  cannot invent a heading or infrastructure. Unknown profiles retain telemetry
+  without enabling physical work. Implementation and acceptance remain pending.
