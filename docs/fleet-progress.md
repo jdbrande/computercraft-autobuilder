@@ -1583,3 +1583,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   runtime test builds through preparation/supply/restart and reports subsequently
   added contents without removing them. Native controller247/builder248 rig prepared;
   final review and complete gates remain before acceptance.
+- Started0.35 reachable inventory recovery design while0.34 undergoes its single
+  final review and native acceptance. The design retains the unrecoverable donor's
+  original task/territory and quarantines it before measured identity-checked cargo
+  transfer. Offline timeout alone never authorizes extraction. Implementation has
+  not begun; no recovery acceptance is claimed.

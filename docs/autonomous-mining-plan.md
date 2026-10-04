@@ -1336,3 +1336,22 @@ in `.worktrees/placement-metadata`, following0.33 final placement corrections.
   hardware; independently inspect world data and preserve exact limitations.
 - [ ] Complete one final review, consolidated fixes, full gates, permanent evidence
   and ordered integration; continue every remaining fleet requirement.
+
+## Milestone0.35: reachable worker inventory recovery
+
+Spec: [inventory recovery design](inventory-recovery-design.md). Inline execution
+in `.worktrees/inventory-recovery`; carry final0.34 fixes before acceptance.
+
+### Task73: Quarantined donor and measured recovery contracts
+
+- [ ] Add explicit unrecoverable-worker quarantine and bounded immutable cargo
+  recovery handshake without dropping original job/pose/territory ownership.
+- [ ] Implement identity-checked donor/courier transfers, reserved destination
+  capacity, exact item/NBT receipts and failure/restart reconciliation.
+
+### Task74: Inventory recovery acceptance
+
+- [ ] Test actual controller/donor/courier flow and native reachable inventory,
+  including partial delivery, interrupted transfer and blocked safe return.
+- [ ] Complete one final review/consolidated fixes, full gates, documentation and
+  ordered integration, then continue priorities/dashboard/logging/scale acceptance.
