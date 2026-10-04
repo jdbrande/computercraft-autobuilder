@@ -1,21 +1,19 @@
 # Fleet requirements progress
 
 Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
-[autonomous mining plan](autonomous-mining-plan.md). Updated 2026-10-03.
+[autonomous mining plan](autonomous-mining-plan.md). Updated 2026-10-04.
 
 ## Current work
 
-- Accepted0.32 registered renewables:923 Lua/18 Python tests, release/diff checks,
-  final-source native carrot harvest/replant/restart/reserve acceptance and cleanup
-  passed. Permanent evidence: [0.32 validation](validation-0.32.0.md).
-
-- Active development:0.33 placement adapters completed its single review and
-  consolidated regression fixes; complete Lua and native mixed-project gates run.
- 0.34 empty-container metadata/cardinal sign adapters completed its single review;
-  consolidated regressions and native acceptance run.0.35 reachable inventory
-  recovery has a committed design and initial donor actor regressions in progress.
-  Candidate evidence lives in the corresponding `.worktrees` documentation until
-  ordered integration. No unfinished candidate is treated as accepted.
+- Accepted0.33 deterministic placement:940 Lua/18 Python tests and final release/
+  diff checks passed. Native140-cell mixed adapters verified independently; ascent
+  and paired-checkpoint bugs are regression-covered. Its underside-access fixture
+  assistance remains explicit in [0.33 validation](validation-0.33.0.md).
+- Candidates0.34 metadata and0.35 inventory recovery have completed their single
+  reviews, focused corrections and native gates; final full gates continue.0.36
+  priorities passed native two-project acceptance and its review regressions;
+  final gate continues.0.37 inventory protection is under active implementation.
+  No unfinished candidate is treated as accepted.
 
 - Accepted0.30 enrollment:885 Lua/18 Python tests, release/diff checks and final-source
   native HTTP install/repair/profile refresh passed; fixture shut down and tickets
@@ -1626,3 +1624,15 @@ graph before copying. Eight door/bed cases failed before the one-line independen
 copy and all advanced placement tests pass afterward. This is a new runtime bug,
 not a second branch review. The final full gate is superseded and will rerun on
 the corrected source; native recovery retains the original physical contract.
+
+0.33 native placement completed — 2026-10-04: `mixed_adapters` reached built with
+140 correct cells. Independent observer 90 matched all 140 names/states; depot and
+supply were empty, all jobs completed and builder245 was idle home with 12,348 fuel.
+The rig was shut down and ten temporary tickets removed. The two-cell operator
+access cut is explicitly assisted evidence. Permanent candidate report is
+`validation-0.33.0.md`; final-source full Lua gate remains running.
+
+### 0.33 accepted — 2026-10-04
+
+Final source940 Lua/18 Python tests, generated release verification and clean diff
+passed. Permanent report records the native evidence and assistance limits.
