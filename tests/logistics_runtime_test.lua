@@ -10,13 +10,13 @@ local function fixture()
     if w.pose.x==0 and w.pose.y==2 and w.pose.z==0 then return f.inventories.stage end
     if w.pose.x==6 and w.pose.y==2 and w.pose.z==0 then return f.inventories.destination end
   end
-  w.turtle.getItemSpace=function(s) return 64-w.turtle.getItemCount(s) end
+  w.turtle.getItemSpace=function(s) return (f.stackLimit or 64)-w.turtle.getItemCount(s) end
   w.turtle.suckDown=function(limit)
     local inv=lowerInventory(); if not inv then return false,'no chest' end
     local slot,item=next(inv); if not item then return false,'empty chest' end
     local held=w.items[w.selected]
     if held and held.name~=item.name then return false,'wrong stack' end
-    local moved=math.min(limit,item.count,64-(held and held.count or 0)); if moved<=0 then return false end
+    local moved=math.min(limit,f.pullLimit or limit,item.count,(f.stackLimit or 64)-(held and held.count or 0)); if moved<=0 then return false end
     w.items[w.selected]=held or {name=item.name,count=0}; w.items[w.selected].count=w.items[w.selected].count+moved
     item.count=item.count-moved; if item.count==0 then inv[slot]=nil end
     f.stats.pulled=f.stats.pulled+moved
@@ -195,13 +195,14 @@ test('runtime retains supply completion until the next shortage can obtain a fre
   local f=fixture(); f:startBuild()
   for _=1,400 do f:step(); if f.stats.pulled==1 then break end end
   eq(f.stats.pulled,1); assert(f.worker.state.currentTask.lastSupply)
-  -- Complete the first block and discover the next shortage before another heartbeat.
+  -- Early top-up can create the next batch before placing or another heartbeat.
   for _=1,160 do
     f.worker:workStep(); f:pump(f.we,f.controller); f:pump(f.ce,f.worker)
     local t=f.worker.state.currentTask
-    if t and t.supplyRequest and f.world.places==1 then break end
+    if t and t.supplyRequest then break end
   end
-  eq(f.world.places,1); assert(f.worker.state.currentTask.supplyRequest)
+  eq(f.world.places,0);local nextBatch=assert(f.worker.state.currentTask.supplyRequest)
+  local oldBatch=next(f.worker.state.pendingSupplyAcks);assert(oldBatch and oldBatch~=nextBatch.id)
   local ok,err=f:complete(400); assert(ok,err)
   eq(f.world.places,2); eq(f.stats.staged,2); eq(f.stats.pulled,2)
 end)
@@ -588,4 +589,66 @@ test('queued distant work triggers above low station refuel before assignment ac
   local home=f.controller.automation.queue:submit('RETURN_HOME',{}, {})
   for _=1,500 do f:step();if home.status=='completed' and not f.worker.state.currentTask then break end end
   eq(home.status,'completed');eq(U.distance(w.pose,f.worker.config.depot),0);eq(w.refuels,1)
+end)
+
+
+test('builder replenishes low positive cargo through existing supply ownership before placing the last held item',function()
+  local f=fixture();f.world.items[1]={name='minecraft:stone',count=1}
+  f.inventories.stock[1]={name='minecraft:stone',count=1}
+  local j=f.controller.automation.queue:submit('BUILD',{blocks={{x=2,y=0,z=0,name='minecraft:stone',state={}}, {x=3,y=0,z=0,name='minecraft:stone',state={}}},clearanceY=2},{})
+  local early,restarted=false,false
+  for _=1,500 do
+    f:step();local t=f.worker.state.currentTask
+    if t and t.supplyRequest and not early then
+      eq(f.world.places,0);eq(f.world.items[1].count,1);eq(t.supplyRequest.count,1);early=true
+      f:reboot(true,true);restarted=true
+    end
+    if j.status=='completed' or f.controller.state.automation.jobs[j.id].status=='completed' then break end
+  end
+  assert(early and restarted);eq(f.controller.state.automation.jobs[j.id].status,'completed')
+  eq(f.world.places,2);eq(f.stats.staged,1);eq(f.stats.pulled,1);eq(next(f.inventories.stock),nil)
+  for _=1,10 do f:step() end;eq(f.controller.state.automation.supply,nil)
+end)
+
+test('early builder shortage creates one durable production request while positive cargo remains',function()
+  local f=fixture();f.world.items[1]={name='minecraft:cobblestone',count=1};f.inventories.stock={}
+  local j=f.controller.automation.queue:submit('BUILD',{blocks={{x=2,y=0,z=0,name='minecraft:cobblestone',state={}}, {x=3,y=0,z=0,name='minecraft:cobblestone',state={}}},clearanceY=2},{})
+  local created=false
+  for _=1,50 do
+    f:step()
+    if next(f.controller.state.automation.requests) then created=true;break end
+  end
+  assert(created,'replacement demand was not submitted');eq(f.world.items[1].count,1);eq(f.world.places,0)
+  local requests=f.controller.state.automation.requests;local id,r=next(requests)
+  eq(r.requirements['minecraft:cobblestone'],1);eq(next(requests,id),nil)
+  f:reboot(true,true)
+  for _=1,30 do f:step() end
+  requests=f.controller.state.automation.requests;eq(next(requests),id);eq(next(requests,id),nil)
+  eq(f.world.items[1].count,1);eq(f.world.places,0);eq(f.controller.state.automation.jobs[j.id].workerId,12)
+end)
+
+
+test('early supply fits full cargo and smaller stacks across partial receipt reboot',function()
+  for _,limit in ipairs({64,16}) do
+    local f=fixture();f.stackLimit=limit;f.pullLimit=7;f.world.blocks['6,1,0']=nil
+    f.worker.config.supply.batch=64;f.controller.config.supply.batch=64
+    f.world.items[1]={name='minecraft:stone',count=1}
+    for slot=2,14 do f.world.items[slot]={name='minecraft:dirt',count=64} end
+    f.inventories.stock[1]={name='minecraft:stone',count=64}
+    local blocks={};for x=2,66 do blocks[#blocks+1]={x=x,y=0,z=0,name='minecraft:stone',state={}};f.world.blocks[x..',-1,0']={name='minecraft:stone',state={}} end
+    local j=f.controller.automation.queue:submit('BUILD',{blocks=blocks,clearanceY=2},{})
+    local early,restarted=false,false;f.crashSuck=true
+    for _=1,6000 do
+      f:step();local t=f.worker.state.currentTask
+      if t and t.supplyRequest and not early then eq(t.supplyRequest.count,limit-1);early=true end
+      if f.crashed and not restarted then
+        assert(f.stats.pulled>0 and f.stats.pulled<limit-1);f:reboot(true,true)
+        f.worker.config.supply.batch=64;f.controller.config.supply.batch=64;restarted=true
+      end
+      if f.controller.state.automation.jobs[j.id].status=='completed' then break end
+    end
+    assert(early and restarted);assert(f.controller.state.automation.jobs[j.id].status=='completed', 'limit='..limit..' places='..f.world.places..' pulled='..f.stats.pulled..' error='..tostring(f.worker.state.currentTask and f.worker.state.currentTask.error))
+    eq(f.world.places,65);eq(f.stats.pulled,64);eq(next(f.inventories.stage),nil)
+    for _=1,10 do f:step() end;eq(f.controller.state.automation.supply,nil)
+  end
 end)

@@ -3,9 +3,36 @@
 local U=require('autobuilder.core.util')
 local M={}
 local function short(v,n) return v~=nil and tostring(v):gsub('[%c]',' '):sub(1,n) or nil end
-function M.compact(report)
+function M.materialItem(block)
+  if not block or type(block.name)~='string' then return nil end
+  if block.name:match('_door$') and (block.state or {}).half=='upper' then return nil end
+  return require('autobuilder.build.blockstates').item(block)
+end
+function M.validMaterials(values)
+  if type(values)~='table' then return false end
+  local total=0
+  for item,n in pairs(values) do
+    if not U.shortString(item,128) or not U.integer(n) or n<1 or n>512 then return false end
+    total=total+n;if total>512 then return false end
+  end
+  return true
+end
+function M.materials(report)
+  if report.materials then return U.copy(report.materials) end
+  local values,correct={},0
+  for _,entry in ipairs(report.entries or {}) do if entry.status=='correct' then
+    correct=correct+1
+    if not entry.expected then return nil end
+    local item=M.materialItem(entry.expected);if item then values[item]=(values[item] or 0)+1 end
+  end end
+  -- Legacy compact reports omitted correct entries. Preserve that uncertainty.
+  if correct~=((report.counts or {}).correct or 0) then return nil end
+  return values
+end
+function M.compact(report,kind)
   if not report then return nil end
   local out={counts=U.copy(report.counts or {}),entries={},omittedEntries=report.omittedEntries or 0}
+  if kind==nil or ({BUILD=true,REPAIR=true,VERIFY=true,CLEAR=true})[kind] then out.materials=M.materials(report) end
   if report.accessChanges~=nil then out.accessChanges=U.copy(report.accessChanges) end
   for _,entry in ipairs(report.entries or {}) do
     if entry.status~='correct' then

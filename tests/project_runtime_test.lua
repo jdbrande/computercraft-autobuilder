@@ -239,9 +239,10 @@ test('project aggregation keeps exact report counts and omitted issue totals wit
   assert(c:command('build import /example.json air')); assert(c:command('build verify air')); c:tick()
   local p=c.state.automation.projects.air; local j=c.state.automation.jobs[p.jobs[1]]
   j.status='completed'; j.progress=1
-  j.report={counts={correct=1,wrong=1},entries={{status='correct',x=2,y=0,z=0},{status='wrong',x=3,y=0,z=0}},omittedEntries=7}
+  j.report={materials={['minecraft:stone']=1},counts={correct=1,wrong=1},entries={{status='correct',x=2,y=0,z=0},{status='wrong',x=3,y=0,z=0}},omittedEntries=7}
   c:tick(); eq(p.report.counts.correct,1); eq(p.report.counts.wrong,1)
   eq(#p.report.entries,1); eq(p.report.entries[1].status,'wrong'); eq(p.report.omittedEntries,7)
+  eq(p.report.materials['minecraft:stone'],1);eq(j.report,nil);eq(j.blocks,nil)
 end)
 test('project clears air columns from the top and honors project pause before scheduling',function()
   local bp={schema=1,size={x=1,y=2,z=1},palette={{name='minecraft:air',state={}}},runs={{id=1,count=2}},metadata={},requirements={}}
@@ -757,4 +758,17 @@ test('project settlement and retirement wait through gaps between retaining barr
   local ok,why=c.automation.projects:retire('boundary')
   assert(not ok and why:find('preparation',1,true),'project retired its unfinished retaining barrier')
   assert(c.state.automation.projects.boundary)
+end)
+
+
+test('build forecast exposes current shared materials without submitting production work',function()
+  local w,ce,we,c=fixture({blueprint=airBlueprint()})
+  assert(c:command('build import /example.json forecast'))
+  local before=U.copy(c.state.automation.requests)
+  assert(c:command('build forecast forecast'))
+  eq(c.state.view,'forecast');assert(c.state.forecastLines[1]:find('forecast'))
+  assert(table.concat(c.state.forecastLines,';'):find('minecraft:stone required=1'))
+  assert(require('autobuilder.factory.factory').equal(before,c.state.automation.requests))
+  c.state.automation.projects.forecast=nil;c.state.automation.currentProject=nil
+  c:tick();assert(c.state.forecastLines[1]:find('No selected project'))
 end)

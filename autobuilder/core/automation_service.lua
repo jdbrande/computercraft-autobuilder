@@ -153,6 +153,7 @@ function M.new(app,config,e,network,clock)
       if not ready then app.state.lastError='Backup recovery: waiting for every known worker to register and reconcile task ownership'; return true end
       app.state.assignmentRecovery=nil; app:save()
     end
+    if app.state.view=='forecast' then projects:forecast() end
     if app.state.view=='fuel' then fuel:describe() end
     if app.state.view=='logistics' then production.logistics:describe() end
     if app.state.view=='factory' then production.parallel:describe() end
@@ -169,11 +170,20 @@ function M.new(app,config,e,network,clock)
           self.supply=self.supply or require('autobuilder.storage.supply').new(queue.state,config,e,function() return app:save() end)
           local n,err,needsStock
           local staged=queue.state.supply
+          local pendingProduction
+          local supplyKey='supply:'..j.id..':'..j.missingItem
+          for _,request in pairs(queue.state.requests) do
+            if request.key==supplyKey and request.status~='completed' then pendingProduction=request.id;break end
+          end
           local station=require('autobuilder.storage.supply').station(config,j.workerId)
           local worker=app.state.workers[tostring(j.workerId)];local t=worker and worker.telemetry
           if station.workerId and (not t or not (t.capabilities or {}).supplyStationV1 or not U.position(t.depot)
             or U.distance(t.depot,station.position)~=0 or station.side=='front' and t.depot.heading~=station.position.heading) then
             err='registered supply station requires a matching worker depot and supplyStationV1'
+          elseif pendingProduction and not (staged and staged.jobId==j.supplyId and staged.owner==j.workerId and staged.offered) then
+            -- Deposits can arrive before their acquisition group returns. Spending
+            -- them now reopens the same stock target and mines a replacement.
+            err='waiting for supply production '..pendingProduction
           elseif not Coordination.canOfferSupply(app.state,j) then
             -- Resend a prior grant without moving shared inventory. Its worker
             -- must be able to drain staging and release the production barrier.

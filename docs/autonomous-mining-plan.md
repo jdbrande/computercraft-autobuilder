@@ -1147,3 +1147,45 @@ forecast matching must not multiply one queued job by the number of idle workers
 station refill must not chase a target above native capacity; delayed telemetry
 must not release ownership; unknown route geometry must not imply zero fuel.
 Task53 covers route/geometry/telemetry, Task54 covers matching/capacity/ownership.
+
+## Milestone0.27: project material forecasts and early replenishment
+
+Spec: [supply forecast design](supply-forecast-design.md). Native inline execution
+uses `.worktrees/supply-forecast`, based on0.26 while its final gate runs. Preserve
+ordered integration of accepted0.24–0.26. Reuse production and inventory journals.
+
+### Task56: Validated material progress and project forecasts
+
+- [x] Add failing mixed-item/door/air compact-report tests and malformed/regressing
+  owned progress cases. Implement optional per-item correct-position totals and
+  preserve them through task payload retirement and project aggregation.
+- [x] Add project forecast tests separating shared stock, held claims, actual transit,
+  worker cargo and each active provider estimate. Legacy/missing evidence is unknown,
+  never fabricated delivery. Add `build forecast [name]` and operator documentation.
+- [x] Run focused report/network/workflow/project/ledger tests, record evidence, commit.
+
+### Task57: Bounded builder lookahead and proactive production
+
+- [x] Add failing worker cases for positive-but-low cargo, next region material,
+  reserved/NBT slots, existing supplies, paused/finished work and preparation fill.
+  Calculate bounded upcoming demand at safe boundaries and enter the existing
+  supply journal before zero; no new wire message or staging owner is needed.
+- [x] Add shared-demand/controller restart/duplicate/offline/completed request tests.
+  Use existing finite supply-production requests before zero inventory, preserving
+  factory exclusion, duplicate protection and measured station journals.
+- [x] Run focused and actual-runtime replenishment tests with controller/worker
+  restart; document surplus and initial-preparation limits, commit.
+
+### Task58: Acceptance and integration
+
+- [x] Run useful native early-replenishment acceptance; inspect final blocks, stock,
+  fuel, cargo and ownership independently. Preserve restart and cleanup evidence.
+- [x] Run one final review and consolidated regression-backed fixes, full Lua/Python/
+  release/diff gates. Update permanent acceptance/progress, integrate/push, then
+  continue the initial production/construction pipeline and remaining requirements.
+
+Review focus: shared stock cannot cover multiple projects twice; per-item progress
+must survive retired block payloads; expected mining is not physical cargo; stale
+telemetry cannot revive completed work; lookahead cannot lock the only supply chest
+or make preparation mine unnecessary fill; no new request may duplicate an active
+finite request solely because a report repeats.

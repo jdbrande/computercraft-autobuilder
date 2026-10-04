@@ -217,6 +217,18 @@ function M.new(state,save,clock,id,chunks,config)
     local j=s.jobs[p.jobId]
     if not j or j.workerId~=owner then return false,'task owner mismatch' end
     if j.status=='completed' or j.workerFinished then return true end
+    local materials=p.report and p.report.materials
+    if materials~=nil then
+      local R=require('autobuilder.core.reports')
+      if not R.validMaterials(materials) or not j.blocks then return false,'invalid material progress' end
+      local limits,total={},0
+      for _,b in ipairs(j.blocks) do local item=R.materialItem(b);if item then limits[item]=(limits[item] or 0)+1 end end
+      for item,n in pairs(materials) do
+        if n>(limits[item] or 0) then return false,'material progress exceeds task blocks' end;total=total+n
+      end
+      if total>(p.progress or 0) then return false,'material progress exceeds correct positions' end
+      for item,n in pairs(j.materials or {}) do if (materials[item] or 0)<n then return false,'material progress regressed' end end
+    end
     if j.type=='PREPARE_REGION' and not require('autobuilder.build.site_work').validProgress(j,p) then return false,'preparation receipt differs from inspected work' end
     if j.type=='SURVEY_SITE' then
       local r=p.siteReport
@@ -259,6 +271,7 @@ function M.new(state,save,clock,id,chunks,config)
     if j.type=='SURVEY_SITE' then j.siteReport=U.copy(p.siteReport) end
     if j.returning then j.homeReceipt=U.copy(p.homeReceipt) end
     if j.logistics then j.transportReceipt=U.copy(p.transportReceipt) end
+    if materials then j.materials=U.copy(materials) end
     j.progress=p.progress or 0; j.phase=p.phase; j.error=p.error; j.missingItem=p.missingItem
     if j.type=='RESCUE' and p.fuelDelivered~=nil then j.fuelDelivered=p.fuelDelivered end
     j.missingCount=p.missingCount; j.supplyId=p.supplyId; j.report=U.copy(p.report)
