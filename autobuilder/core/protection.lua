@@ -2,6 +2,7 @@ local U=require('autobuilder.core.util')
 local E=require('autobuilder.resources.exploration')
 local P=require('autobuilder.core.pathfinding')
 local M={}
+function M.ready(state,config,job) return require('autobuilder.core.inventory_geometry').ready(state,config,job) end
 function M.preparation(job)
   return job and (job.siteSurvey~=nil or job.siteWork~=nil or job.type=='PREPARE_SITE')
 end
@@ -76,6 +77,7 @@ function M.farmTarget(job,target)
 end
 function M.areas(state,config,exceptProject,skipMiningBase,purpose)
   local areas=E.protectedAreas(state,config,exceptProject,skipMiningBase,purpose)
+  for _,area in ipairs(require('autobuilder.core.inventory_geometry').areas(state,config)) do areas[#areas+1]=area end
   local home=purpose and purpose.home
   local function box(p,radius,below,above)
     if not U.position(p) then return end
@@ -100,13 +102,21 @@ function M.areas(state,config,exceptProject,skipMiningBase,purpose)
   local out,seen={},{}
   for _,area in ipairs(areas) do
     local key=P.key(area.min)..':'..P.key(area.max)
-    if not seen[key] then seen[key]=true;out[#out+1]=area end
+    if not seen[key] then
+      seen[key]=true;local covered=false
+      for _,b in ipairs(out) do if P.inside(area.min,b) and P.inside(area.max,b) then covered=true;break end end
+      if not covered then
+        for i=#out,1,-1 do if P.inside(out[i].min,area) and P.inside(out[i].max,area) then table.remove(out,i) end end
+        out[#out+1]=area
+      end
+    end
   end
   return out
 end
 function M.canModify(state,config,job,target)
   if not U.position(target) or not job or not job.workerId or job.status=='completed' or job.paused
     then return false,'mutation requires active owned work bounds' end
+  local ready,why=M.ready(state,config,job);if not ready then return false,why end
   local bounds=job.type=='MINE' and job.miningArea or job.bounds
   local owned=E.box(bounds) and P.inside(target,bounds)
   local purpose={owner=job.workerId}
@@ -136,6 +146,8 @@ function M.canModify(state,config,job,target)
     if E.protected(target,g.protectedAreas) then owned=false end
   end
   if not owned then return false,'mutation requires active owned work bounds' end
+  local inventory=require('autobuilder.core.inventory_geometry').blocker(state,config,target)
+  if inventory then return false,'protected inventory '..inventory..' at '..P.key(target) end
   if E.protected(target,M.areas(state,config,job.project,job.type~='MINE',purpose)) then return false,'target is registered protected infrastructure or another project' end
   for _,w in pairs(state.workers or {}) do
     local at=w.telemetry and w.telemetry.position

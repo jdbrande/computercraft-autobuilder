@@ -5,6 +5,10 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
+- Accepted0.37 infrastructure protection:1,015 Lua/20 Python tests, final release/
+  diff checks, one review/fix pass and native protected-inventory acceptance passed.
+  [Permanent evidence](validation-0.37.0.md).0.38–0.40 candidate gates continue.
+
 - Accepted0.36 priorities:1,003 Lua/20 Python tests, final release/diff checks,
   the single final review and native two-project acceptance passed. The finite
   supply handoff correction is included in the repeated full gate.
@@ -1768,6 +1772,16 @@ and the builder empty at home with3518 of its initial4000 fuel. Independent worl
 inspection confirmed all four blocks and empty stock/depot/supply inventories.
 Evidence is under ignored `dist/live-project-priorities/`. This is a finite
 supplied-stock scheduling trial, not raw-material acquisition or scale acceptance.
+
+### 0.37 started — inventory infrastructure protection
+
+0.36 final source gates continue in its isolated branch. The next dependency is
+requirement28: factory/storage inventory physical bounds. The implementation
+uses a single controller map and existing mutation grants, preserving saved
+inventory contracts and offline ownership. Design and validation plan:
+`infrastructure-protection-design.md`. Remaining work after this includes traffic
+acceptance, structured events/operator commands, monitor dashboard, sustained
+load and final unassisted combined fleet acceptance.
 0.35 final-source native refueling passed — 2026-10-04: courier256 started at68fuel,
 completed its first pickup, automatically refueled at its registered home station
 while retaining the recovery, then completed the second pickup. The controller
@@ -1801,6 +1815,23 @@ Final-source976 Lua/20 Python tests, release/diff checks and both native trials
 passed. Donor quarantine, controlled courier refueling and exact inventory receipts
 retain their documented limits. No second review was performed.
 
+###0.37 final review correction
+
+The single final review found that512 explicit registrations plus an inferred
+container could save an oversized map and fail every subsequent startup. The
+effective map now uses the same validation before any checkpoint. A regression
+failed before the fix and verifies the512 boundary, unchanged-config restart,
+rejection without state mutation and corrected-config recovery.
+
+###0.37 native protection gate
+
+Completed missing-location migration, actual miner/builder mutation denial,
+offline Crafty endpoint protection, independent one-block construction and
+conflicting-configuration rejection/recovery. Independent world reads preserved
+both casings and all seven sentinel inventories. Five computers are off and six
+temporary tickets removed. Protected work intentionally remains paused/owned;
+its traffic wait is not reported as fleet drain. Permanent candidate evidence is
+in [0.37 validation](validation-0.37.0.md). Final-source full Lua gate continues.
 ### 0.36 final-gate correction — finite supply handoff
 
 The first full candidate run passed997/998 Lua tests; its streaming overlap case
@@ -1824,3 +1855,7 @@ assertions and exact final material accounting. Final full gates are restarting;
 -0.36 accepted after the repeated clean-source gate passed1,003/1,003 Lua tests
   with20/20 Python tests and release/diff checks. No unintended tracked or untracked
   files were present; ignored native audit artifacts remain local.
+
+-0.37 final full gate passed1,015/1,015 Lua tests and20/20 Python tests. Merging
+accepted0.36 documentation changed no implementation/test/release files relative
+to the tested source. Final release/diff checks passed and status was clean.

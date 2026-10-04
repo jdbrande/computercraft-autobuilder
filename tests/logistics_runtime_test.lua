@@ -56,6 +56,7 @@ local function fixture()
   local ce,we=env(7),env(12); we.turtle=w.turtle; f.ce,f.we=ce,we
   local C=require('tests.loaded_config')
   local common={storageInventories={'stock'},turtleFuelReserveItems={},locations=locations,depot=locations.source,supply={inventory='stage',side='down',batch=1},minimumFuelReserve=0}
+  common.inventoryAreas={stock={min={x=-4,y=1,z=0},max={x=-4,y=1,z=0}},stage={min={x=0,y=1,z=0},max={x=0,y=1,z=0}}}
   local cc=U.copy(common); cc.build={enabled=true,origin={x=2,y=0,z=0}}; cc=C.load(cc)
   local wc=U.copy(common); wc.role='worker'; wc.controllerId=7; wc.automation={building=true,courier=true}; wc.initialPosition=U.copy(w.pose); wc=C.load(wc)
   local Runtime=require('autobuilder.core.runtime')

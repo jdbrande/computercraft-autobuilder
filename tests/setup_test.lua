@@ -38,7 +38,7 @@ local function env(role,answers)
 end
 local function settings(e) return assert(load(e.fs.files['/autobuilder/settings.lua'],'settings','t',{}))() end
 test('factory wizard saves discovered furnaces while preserving a blocked material request',function()
-  local e=env('controller',{'none','yes'}); local base=e.peripheral
+  local e=env('controller',{'none','10 64 0','yes'}); local base=e.peripheral
   local oldType,oldCall=base.getType,base.call
   base.getNames=function() return {'right','left','furnace_0','stock','stage'} end
   base.getType=function(n) if n=='left' then return 'modem' elseif n=='furnace_0' then return 'minecraft:furnace' else return oldType(n) end end
@@ -49,7 +49,7 @@ test('factory wizard saves discovered furnaces while preserving a blocked materi
   eq(settings(e).furnaces[1],'furnace_0'); eq(store:load().automation.requests.r.status,'blocked')
 end)
 test('controller setup defaults to automatic site without requesting coordinates',function()
-  local e=env('controller',{'1','2','','yes'})
+  local e=env('controller',{'1','2','','10 64 0','12 64 0','yes'})
   assert(require('autobuilder.setup_wizard').run({},e))
   local c=C.load(settings(e)); eq(c.build.autoSite,true); eq(c.clearSite,false)
 end)
@@ -68,7 +68,7 @@ test('builder wizard uses GPS and controller profile and updates an existing che
   eq(e.turtle.calls,0); assert(e.fs.exists('/autobuilder/data/settings-before-setup.lua'))
 end)
 test('controller wizard selects stage and stock and preserves unrelated settings',function()
-  local e=env('controller',{'1','2','20 64 -9','yes'})
+  local e=env('controller',{'1','2','20 64 -9','10 64 0','12 64 0','yes'})
   assert(require('autobuilder.setup_wizard').run({},e))
   local c=C.load(settings(e)); eq(c.supply.inventory,'stage'); eq(c.storageInventories[1],'stock')
   eq(c.build.origin.x,20); eq(c.build.enabled,true); eq(c.clearSite,false); eq(c.label,'Keep me')
@@ -92,7 +92,7 @@ test('cancelled wizard leaves configuration and checkpoint untouched',function()
   eq(e.fs.exists('/autobuilder/data/worker.state'),false); eq(e.turtle.calls,0)
 end)
 test('failed setup promotion restores working settings',function()
-  local e=env('controller',{'1','2','20 64 -9','yes'}); local original=e.fs.files['/autobuilder/settings.lua']
+  local e=env('controller',{'1','2','20 64 -9','10 64 0','12 64 0','yes'}); local original=e.fs.files['/autobuilder/settings.lua']
   e.fs.fault.move='/autobuilder/settings.lua'
   assert(not pcall(require('autobuilder.setup_wizard').run,{},e)); eq(e.fs.files['/autobuilder/settings.lua'],original)
   assert(e.fs.exists('/autobuilder/data/settings-before-setup.lua'))
@@ -121,7 +121,7 @@ test('setup profile service only answers known workers on the configured control
 end)
 test('existing runtime fleet discovers setup profile and reconnects as a configured builder',function()
   local Setup=require('autobuilder.setup_wizard'); local Runtime=require('autobuilder.core.runtime')
-  local ce=env('controller',{'1','2','20 64 -9','yes'}); assert(Setup.run({},ce))
+  local ce=env('controller',{'1','2','20 64 -9','10 64 0','12 64 0','yes'}); assert(Setup.run({},ce))
   local controller=Runtime.new(C.load(settings(ce)),ce)
   local we=env('worker',{'east','yes','yes'}); local worker=Runtime.new(C.load(settings(we)),we)
   assert(worker:tick()); assert(controller:receive(8,we.packet.message,we.packet.protocol))
@@ -136,22 +136,22 @@ test('existing runtime fleet discovers setup profile and reconnects as a configu
   eq(t.capabilities.building,true); eq(t.position.x,12); eq(t.position.heading,'east'); eq(we.turtle.calls,0)
 end)
 test('controller offers only unambiguous chest defaults and still requires saving',function()
-  local e=env('controller',{'','','20 64 -9','yes'})
+  local e=env('controller',{'','','20 64 -9','10 64 0','12 64 0','yes'})
   assert(require('autobuilder.setup_wizard').run({},e))
   eq(settings(e).supply.inventory,'stage'); eq(settings(e).storageInventories[1],'stock')
-  e=env('controller',{'','','20 64 -9',''})
+  e=env('controller',{'','','20 64 -9','10 64 0','12 64 0',''})
   local original=e.fs.files['/autobuilder/settings.lua']
   eq(require('autobuilder.setup_wizard').run({},e),false)
   eq(e.fs.files['/autobuilder/settings.lua'],original)
 end)
 test('controller does not guess between two empty supply chests',function()
-  local e=env('controller',{'','2','1 3','20 64 -9','yes'})
+  local e=env('controller',{'','2','1 3','20 64 -9','8 64 0','10 64 0','12 64 0','yes'})
   e.peripheral.getNames=function() return {'right','stock','stage','extra'} end
   assert(require('autobuilder.setup_wizard').run({},e))
   eq(settings(e).supply.inventory,'stage'); eq(#settings(e).storageInventories,2)
 end)
 test('controller excludes crafting chests from suggested defaults',function()
-  local e=env('controller',{'','','20 64 -9','yes'})
+  local e=env('controller',{'','','20 64 -9','8 64 0','10 64 0','12 64 0','yes'})
   e.fs.files['/autobuilder/settings.lua']='return {role="controller",craftingStation={input="craft"}}'
   e.peripheral.getNames=function() return {'right','stock','stage','craft'} end
   assert(require('autobuilder.setup_wizard').run({},e))
@@ -165,7 +165,7 @@ test('wizard can detect a wireless modem attached after a failed check',function
   assert(require('autobuilder.setup_wizard').run({},e)); eq(settings(e).depot.heading,'east'); eq(e.turtle.calls,0)
 end)
 test('controller retries discovery when its empty supply chest is not yet connected',function()
-  local e=env('controller',{'retry','','','20 64 -9','yes'})
+  local e=env('controller',{'retry','','','20 64 -9','10 64 0','12 64 0','yes'})
   local names=e.peripheral.getNames; local connected=false; local read=e.read
   e.peripheral.getNames=function() return connected and names() or {'right','stock'} end
   e.read=function() connected=true; return read() end

@@ -43,6 +43,8 @@ local function fixture(options)
     craftingStation={input='input',output='output',inputSide='up',outputSide='down'},
     heartbeatInterval=1,registrationInterval=3,workerTimeout=8,gps={enabled=false},
     supply={inventory='stage',side='down',batch=64}}
+  common.inventoryAreas={stock={min={x=-8,y=0,z=0},max={x=-8,y=0,z=0}},stage={min={x=0,y=1,z=0},max={x=0,y=1,z=0}},
+    furnace={min={x=-6,y=0,z=0},max={x=-6,y=0,z=0}},input={min={x=-4,y=1,z=0},max={x=-4,y=1,z=0}},output={min={x=-4,y=-1,z=0},max={x=-4,y=-1,z=0}}}
   local cc=U.copy(common); cc.build={enabled=true,origin={x=2,y=0,z=0},regionSize=options.parallelBuilders and 2 or 8}
   if options.parallelBuilders then
     f.inventories.stage2={}

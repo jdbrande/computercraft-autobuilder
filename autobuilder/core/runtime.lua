@@ -42,6 +42,7 @@ function M.new(config,e)
     require('autobuilder.factory.stations').validateSaved(config,state)
     require('autobuilder.storage.nodes').validateSaved(config,state)
     require('autobuilder.storage.supply').validateSaved(config,state.automation or {})
+    require('autobuilder.core.inventory_geometry').initialize(state,config)
   end
   -- UTC prevents a restored older snapshot from reusing the last boot's IDs.
   state.boot=math.max(state.boot+1,math.floor(clock()*1000))
@@ -90,6 +91,7 @@ function M.new(config,e)
   self:save() -- Persist boot generation before producing any message IDs.
   self:report('INFO','Started '..config.role..' '..id..' boot '..state.boot..' from '..source)
   if source:find('backup') then self:report('WARN','Recovered '..source) end
+  if state.inventoryGeometry and state.inventoryGeometry.error then self:report('WARN',state.inventoryGeometry.error) end
   local gps=require('autobuilder.core.gps').new(e.gps,config.gps)
   self.mining=require('autobuilder.core.mining_service').new(self,config,e,network,clock)
   self.automation=require('autobuilder.core.automation_service').new(self,config,e,network,clock)

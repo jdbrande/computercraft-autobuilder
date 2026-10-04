@@ -209,6 +209,8 @@ end)
 local function productionFixture(stock)
   local h=hardware(); h.inventories.store=stock or {}
   local config=U.copy(cfg); config.treeFarms={}; config.farms={}; config.turtleFuelReserveItems={}
+  config.inventoryAreas={} -- Stationary virtual factory is outside every excavation fixture.
+  for i,name in ipairs({'store','furnace','input','output'}) do config.inventoryAreas[name]={min={x=-100-i,y=0,z=0},max={x=-100-i,y=0,z=0}} end
   config.heartbeatInterval=1; config.checkpointInterval=1
   local app={state={id=1,role='controller',jobs={},workers={}},saved=nil,now=0,packets={}}
   function app:save() self.saved=U.copy(self.state); return true end

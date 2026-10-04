@@ -32,7 +32,7 @@ test('controller factory setup discovers furnace lanes and adds stock without in
   config.storageInventories={'old_stock'}; config.supply.inventory='minecraft:chest_1'
   config.craftingStation.output='minecraft:chest_2'; config.furnaces={'detached_furnace'}
   local overrides={protocol='custom'}
-  assert(require('autobuilder.factory_setup').configure(e,overrides,config,answers({'1'})))
+  assert(require('autobuilder.factory_setup').configure(e,overrides,config,answers({'1','1 64 0','2 64 0','3 64 0','4 64 0','5 64 0','6 64 0'})))
   eq(overrides.furnaces[1],'detached_furnace'); eq(overrides.furnaces[2],'minecraft:furnace_1')
   eq(#overrides.storageInventories,2); eq(overrides.storageInventories[1],'old_stock')
   eq(overrides.storageInventories[2],'minecraft:barrel_3'); eq(overrides.protocol,'custom')
@@ -83,6 +83,21 @@ test('factory setup respects partially overridden staging and does not drop the 
   local e,config,types,inventories,answers=fixture('controller')
   config.craftingStation.output='minecraft:chest_2'
   local overrides={craftingStation={input='minecraft:chest_1'}}
-  assert(require('autobuilder.factory_setup').configure(e,overrides,config,answers({'1'})))
+  assert(require('autobuilder.factory_setup').configure(e,overrides,config,answers({'1','1 64 0','2 64 0','3 64 0','4 64 0'})))
   eq(#overrides.storageInventories,1); eq(overrides.storageInventories[1],'minecraft:barrel_3')
+end)
+
+test('controller location prompts preserve mapped bounds and cancel without partial override changes',function()
+ local e,c,types,inventories,answers=fixture('controller')
+ c.inventoryAreas={['minecraft:furnace_1']={min={x=4,y=64,z=0},max={x=4,y=64,z=0}}}
+ local overrides={protocol='keep'};local before=U.copy(overrides);local n=0
+ local ask=function(_,_,validate)
+  n=n+1;if n==1 then return assert(validate('1')) end
+  eq(validate('1 2'),nil);eq(validate('1 2 3 0 2 3'),nil);eq(validate('1.5 2 3'),nil)
+  return validate('cancel')
+ end
+ eq(require('autobuilder.factory_setup').configure(e,overrides,c,ask),nil)
+ assert(require('autobuilder.factory.factory').equal(before,overrides));eq(n,2)
+ assert(require('autobuilder.factory_setup').configure(e,overrides,c,answers({'1','10 64 0 11 64 0'})))
+ eq(overrides.inventoryAreas['minecraft:furnace_1'].min.x,4);eq(overrides.inventoryAreas['minecraft:barrel_3'].max.x,11)
 end)

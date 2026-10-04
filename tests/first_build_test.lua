@@ -54,7 +54,7 @@ local function fixture(autoSite)
     return e
   end
   local ce,we=env(1),env(8); we.turtle=world.turtle
-  local C=require('tests.loaded_config'); local cc=C.load({storageInventories={'stock'},logistics={nodes={{id='base',inventory='stock',position={x=-3,y=1,z=0},buffers={{inventory='home',position={x=0,y=2,z=0}}}}}},supply={inventory='stage'},build={enabled=true,origin={x=8,y=0,z=0}}})
+  local C=require('tests.loaded_config'); local cc=C.load({inventoryAreas={stage={min={x=0,y=2,z=-1},max={x=0,y=2,z=-1}}},storageInventories={'stock'},logistics={nodes={{id='base',inventory='stock',position={x=-3,y=1,z=0},buffers={{inventory='home',position={x=0,y=2,z=0}}}}}},supply={inventory='stage'},build={enabled=true,origin={x=8,y=0,z=0}}})
   local wc=C.load({role='worker',controllerId=1,initialPosition=U.copy(world.pose),depot=U.copy(world.pose),supply={inventory='stage'},automation={building=true}})
   local R=require('autobuilder.core.runtime'); local c,b=R.new(cc,ce),R.new(wc,we)
   local function pump(from,to)
