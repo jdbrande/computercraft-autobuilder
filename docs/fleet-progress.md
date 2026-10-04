@@ -1494,3 +1494,9 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   custom column bases, forecast exclusion and versioned worker eligibility. Focused
   registry/actor/fuel/forecast/provider/runtime suites pass; native controller241 and
   farmer242 are starting a two-plot carrot/replant/reserve acceptance run.
+
+- Started0.33 placement-adapter design in isolated `.worktrees/placement-adapters`:
+  extend existing classification/plans/journals for paired beds, attachments,
+  deterministic rail/redstone states and simple plants, with explicit analyzer
+  feature/tool diagnostics. Renewable0.32 remains in final review/native acceptance;
+  enrollment/processor complete gates continue without source changes.

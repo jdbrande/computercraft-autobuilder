@@ -1298,3 +1298,22 @@ in `.worktrees/renewable-providers` follows0.31; carry its final processor corre
   mature crop/replant/reserve/home acceptance, documenting external farm contracts.
 - [ ] Complete one final review/consolidated fixes, full Lua/Python/release gates,
   permanent evidence and ordered integration; continue every remaining requirement.
+
+## Milestone0.33: deterministic placement adapter coverage
+
+Spec: [placement adapters design](placement-adapters-design.md). Inline execution
+in `.worktrees/placement-adapters` follows0.32; propagate its final renewable fixes.
+
+### Task69: Paired and attached placement contracts
+
+- [ ] Extend finite state classification, aliases, support/dependency plans and
+  analyzer feature/tool diagnostics for beds, attachments, rails/redstone and plants.
+- [ ] Generalize paired geometry/ownership with one-item bed accounting; retain
+  specific door hinge checks and validate both bed supports/generated cells.
+
+### Task70: Native placement and recovery acceptance
+
+- [ ] Add actual builder, transform, cross-region, support and side-effect recovery
+  regressions. Verify a mixed native structure and final-state reports independently.
+- [ ] Complete one final review/consolidated fixes, full gates and permanent
+  evidence; continue supported metadata/fluid placement and remaining requirements.
