@@ -1532,3 +1532,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   completed, computers241/242 shut down and4 force-load tickets removed. Permanent
   candidate report validation-0.32.0.md distinguishes assisted pre-fix recovery
   from the clean retest; final complete Lua/Python gates are running.
+-0.33 single final review found unsafe destructive bed repair plus six integration
+  defects. Consolidated regressions/fixes refuse paired bed removal, remove ceiling
+  support cycles, separate bed floors from pair regions, include generated cells in
+  ownership/coverage, count one reactive supply item, preserve existing farmland
+  through side inspection, and negotiate new placement capabilities. Ordinary crop
+  project preparation/build/restart passes without trampling or replacing soil.
+  The actual bed supply regression additionally exposed preflight cache invalidation
+  before a mutation grant, which repeatedly discarded the grant through navigation.
+  Invalidation now checkpoints with the placement intent; one stocked bed completes
+  both halves after interrupted supply and controller/worker restart. Focused
+  consolidated suites pass; native mixed-project retest and full gates follow.

@@ -145,6 +145,15 @@ function M.classify(name,state)
   end
   return 'UNSUPPORTED','no deterministic placement strategy for this block or state'
 end
+function M.requiresModern(blocks,survey)
+  for _,column in ipairs(survey and survey.columns or {}) do if column.substrateY then return true end end
+  for _,b in ipairs(blocks or {}) do
+    local f=M.family(b.name);local retained=b.retain and M.family(b.retain.name)
+    local added={bed=true,control=true,rail=true,wire=true,repeater=true,comparator=true,redstone_torch=true,redstone_wall_torch=true,plant=true,sapling=true,crop=true}
+    if added[f] or added[retained] or b.substrate then return true end
+  end
+  return false
+end
 function M.category(name)
   local f=M.family(name)
   if f=='door' or f=='bed' then return 'paired' end

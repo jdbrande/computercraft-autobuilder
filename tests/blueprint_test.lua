@@ -70,3 +70,24 @@ test('bed foot depends on both floors before generating a cross-region head',fun
   end
  end
 end)
+
+test('ceiling attachments and cross-tile beds order supports at default region size',function()
+ local B=require('autobuilder.blueprint.blueprint')
+ for _,size in ipairs({1,8}) do
+  for _,name in ipairs({'lever','oak_button','lantern'}) do
+   local state=name=='lantern' and {hanging='true',waterlogged='false'} or {face='ceiling',facing='north',powered='false'}
+   local regions=B.regions({{x=0,y=7,z=0,name='minecraft:'..name,state=state},{x=0,y=8,z=0,name='minecraft:stone',state={}}},size)
+   eq(regions[1].blocks[1].name,'minecraft:stone')
+  end
+  for _,dir in ipairs({{1,0,'east'},{-1,0,'west'},{0,1,'south'},{0,-1,'north'}}) do
+   local x,z=dir[1]<0 and 8 or 7,dir[2]<0 and 8 or 7
+   local blocks={{x=x,y=1,z=z,name='minecraft:red_bed',state={part='foot',facing=dir[3],occupied='false'}},
+    {x=x+dir[1],y=1,z=z+dir[2],name='minecraft:red_bed',state={part='head',facing=dir[3],occupied='false'}},
+    {x=x,y=0,z=z,name='minecraft:stone',state={}},{x=x+dir[1],y=0,z=z+dir[2],name='minecraft:stone',state={}}}
+   local regions=B.regions(blocks,size);local floors,foot=0,false
+   for _,r in ipairs(regions) do for _,b in ipairs(r.blocks) do
+    if b.name=='minecraft:stone' then floors=floors+1 elseif b.state.part=='foot' then eq(floors,2);foot=true else assert(foot) end
+   end end
+  end
+ end
+end)

@@ -93,6 +93,9 @@ function M.regions(blocks,size)
   assert(type(size)=='table','invalid region size')
   for _,axis in ipairs({'x','y','z'}) do assert(type(size[axis])=='number' and size[axis]%1==0 and size[axis]>=1 and size[axis]<=256,'invalid region size') end
   assert(type(blocks)=='table' and #blocks<=S.MAX_BLOCKS,'invalid block list')
+  -- A bed can span horizontal tiles. Keep its supporting floor in an earlier
+  -- height layer so the head/foot ownership edges cannot cycle through floors.
+  for _,b in ipairs(blocks) do if b.name:match('_bed$') then size={x=size.x,y=1,z=size.z};break end end
   local nodes,cells,regions,groups={},{},{},{}
   for index,b in ipairs(blocks) do
     Cooperate.every(index)
@@ -119,7 +122,9 @@ function M.regions(blocks,size)
   for index,node in ipairs(nodes) do
     Cooperate.every(index)
     local b=node.block; local state=b.state
-    depend(node,b.x,b.y-1,b.z)
+    local below=cells[key(b.x,b.y-1,b.z)]
+    local bs=below and below.block.state or {}
+    if bs.face~='ceiling' and tostring(bs.hanging)~='true' then depend(node,b.x,b.y-1,b.z) end
     local wall=b.name:find('wall_',1,true) or b.name:match(':ladder$') or state.face=='wall' or (b.name:match(':tripwire_hook$'))
     if wall and vectors[state.facing] then
       local v=vectors[state.facing]; depend(node,b.x-v.x,b.y,b.z-v.z)

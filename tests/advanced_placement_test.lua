@@ -302,3 +302,12 @@ test('redstone final verification rejects actual powered state after successful 
  local w,task,new=fixture({b});w.powered=true;w.items[1]={name=b.name,count=1};w.blocks['3,0,0']={name='minecraft:stone',state={}}
  run(new());eq(task.phase,'blocked');eq(task.progress,0);eq(w.places,1)
 end)
+
+test('repair refuses destructive bed halves even when desired block has no pair',function()
+ for _,part in ipairs({'foot','head'}) do for _,desired in ipairs({'stone','air'}) do
+  local b=block(desired);local w,task,new=fixture({b});local foot,head=bed('east');local actual=part=='foot' and foot or head
+  w.blocks['3,1,0']={name=actual.name,state=actual.state};w.items[1]={name='minecraft:stone',count=1}
+  w.t.digDown=function() w.dugBed=true;error('must not dig a paired bed') end
+  run(new(nil,{minimumFuelReserve=0},'repair'));eq(task.phase,'blocked');eq(w.places,0);eq(w.blocks['3,1,0'].name,'minecraft:red_bed');eq(w.dugBed,nil)
+ end end
+end)

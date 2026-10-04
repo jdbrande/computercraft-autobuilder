@@ -313,3 +313,31 @@ test('frozen renewable providers retain controller mutation geometry across regi
   assert(not q:reserve(13,j.id,{x=31,y=y+1,z=0},{x=31,y=y,z=0},s.workers,true),'changed territory allowed')
  end
 end)
+
+test('paired bed ownership includes generated head and denies foreign territory and legacy workers',function()
+ local c,s=fixture();s.automation.jobs={};s.automation.sequence=0;s.automation.projects={}
+ s.workers={['13']={id=13,online=true,telemetry={status='idle',capabilities={building=true},health={software={status='verified',version='0.32.0'},movement=true,placing=true,digging=true,left='unknown',right='unknown'}}},
+ ['14']={id=14,online=true,telemetry={status='idle',capabilities={building=true,placementV1=true}}}}
+ local q=require('autobuilder.core.workflows').new(s,function() return true end,function() return 1 end,7,nil,c)
+ local b={x=60,y=1,z=1,name='minecraft:red_bed',state={part='foot',facing='east',occupied='false'}}
+ local j=q:submit('BUILD',{blocks={b}})
+ eq(j.requiredCapability,'placementV1');eq(j.bounds.max.x,61);eq(q:assign(s.workers).workerId,14)
+ assert(q:reserve(14,j.id,{x=60,y=2,z=1},b,s.workers,true))
+ s.automation.cells['61,1,1']={owner=13,jobId='foreign'}
+ assert(not q:reserve(14,j.id,{x=60,y=2,z=1},b,s.workers,true))
+ s.automation.cells={};c.restrictedAreas={{min={x=61,y=1,z=1},max={x=61,y=1,z=1}}}
+ assert(not q:reserve(14,j.id,{x=60,y=2,z=1},b,s.workers,true))
+end)
+
+test('placement capability covers new verification and substrate survey while owned recovery persists',function()
+ local state={};local q=require('autobuilder.core.workflows').new(state,function() return true end,function() return 1 end,7)
+ local b={x=15,y=1,z=0,name='minecraft:red_bed',state={part='foot',facing='east',occupied='false'}}
+ local j=q:submit('VERIFY',{blocks={b}})
+ local workers={['12']={id=12,online=true,telemetry={status='idle',capabilities={building=true}}}}
+ eq(q:assign(workers),nil);workers['12'].telemetry.capabilities.placementV1=true;eq(q:assign(workers).id,j.id)
+ workers['12'].telemetry.capabilities.placementV1=nil;eq(q:assign(workers).id,j.id)
+ local area=assert(require('autobuilder.core.chunks').area(j,{position={x=15,y=2,z=0,known=true},depot={x=15,y=2,z=0}}));assert(area.maxX>=1)
+ local c=require('autobuilder.config').load({role='worker',controllerId=7,automation={building=true}});eq(c.capabilities.placementV1,true)
+ local survey={identity=string.rep('a',64),region=1,columns={{x=0,z=0,minY=-1,foundationY=-1,substrateY=-1,clearanceY=2}}}
+ j=q:submit('SURVEY_SITE',{siteSurvey=survey,clearanceY=2,bounds={min={x=0,y=-1,z=0},max={x=0,y=2,z=0}}});eq(j.requiredCapability,'placementV1')
+end)

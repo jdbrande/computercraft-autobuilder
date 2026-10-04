@@ -19,6 +19,7 @@ function M.validContract(j)
       or c.clearanceY~=j.clearanceY or c.minY>=c.clearanceY or c.clearanceY-c.minY>4096
       or c.x<j.bounds.min.x or c.x>j.bounds.max.x or c.z<j.bounds.min.z or c.z>j.bounds.max.z
       or c.minY<j.bounds.min.y or c.clearanceY>j.bounds.max.y
+      or c.substrateY~=nil and (not U.integer(c.substrateY) or c.substrateY~=c.foundationY)
       or c.foundationY~=nil and (not U.integer(c.foundationY) or c.foundationY<c.minY or c.foundationY>=c.clearanceY) then return false end
     local key=c.x..','..c.z;if seen[key] then return false end;seen[key]=true
   end
@@ -27,8 +28,8 @@ end
 function M.validSummary(r)
   if type(r)~='table' or not hash(r.identity) or not U.integer(r.region) or r.region<1 or not dense(r.observations,64) then return false end
   for _,o in ipairs(r.observations) do
-    if not U.position(o) or not ({surface=true,empty=true,blocked=true})[o.status] then return false end
-    if o.status=='blocked' then
+    if not U.position(o) or not ({surface=true,empty=true,blocked=true,unobserved=true})[o.status] then return false end
+    if o.status=='blocked' or o.status=='unobserved' then
       if not U.shortString(o.reason,512) or o.name~=nil and not U.shortString(o.name,128) then return false end
     elseif not U.shortString(o.name,128) or o.status=='empty' and o.name~='minecraft:air' then return false end
   end
@@ -42,6 +43,8 @@ function M.validReport(j,r,complete)
     if type(o)~='table' or o.x~=c.x or o.z~=c.z or not U.integer(o.y) or o.y<c.minY or o.y>c.clearanceY then return false end
     if o.status=='blocked' then
       if not U.shortString(o.reason,512) or o.name~=nil and not U.shortString(o.name,128) then return false end
+    elseif o.status=='unobserved' then
+      if c.substrateY~=o.y or o.name~=nil or not U.shortString(o.reason,512) then return false end
     elseif o.status=='empty' then
       if o.name~='minecraft:air' or o.y~=c.minY then return false end
     elseif o.status=='surface' then
@@ -110,6 +113,9 @@ function M.new(task,e,config,nav,save)
     local ok,found,b=pcall(e.turtle.inspectDown)
     if not ok or type(found)~='boolean' or found and (type(b)~='table' or not U.shortString(b.name,128)) then return block('invalid native site inspection','inaccessible') end
     if found then return record({x=c.x,y=pose.y-1,z=c.z,status='surface',name=b.name}) end
+    if c.substrateY and pose.y==c.substrateY+2 then
+      return record({x=c.x,y=c.substrateY,z=c.z,status='unobserved',reason='plant substrate requires side inspection'})
+    end
     if pose.y-1==c.minY then return record({x=c.x,y=c.minY,z=c.z,status='empty',name='minecraft:air'}) end
     local moved,why=nav:down();if not moved then return block(why,'inaccessible') end
     return true

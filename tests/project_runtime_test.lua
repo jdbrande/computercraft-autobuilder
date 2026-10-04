@@ -852,3 +852,31 @@ test('analysis reports placement families and rejects incomplete paired schemati
  local p=c.state.automation.projects.bed;eq(p.analysis.placementFamilies.paired,1);assert(#p.issues>0);eq(p.issues[1].status,'UNSUPPORTED')
  local ok=c:command('build prepare bed');eq(ok,false);eq(w.places,0)
 end)
+
+test('ordinary seedling project preserves supplied farmland through preparation and restart',function()
+ local bp={schema=1,size={x=1,y=1,z=1},palette={{name='minecraft:wheat',state={age='0'}}},runs={{id=1,count=1}},metadata={},requirements={}}
+ local w,ce,we,c,b,step,reboot=fixture({blueprint=bp,stock={[1]={name='minecraft:wheat_seeds',count=1}},site={minY=-1,maxY=10,margin=1}})
+ w.items={};w.blocks['2,-1,0']={name='minecraft:farmland',state={moisture=7}}
+ for _,action in ipairs({'forward','up','down'}) do local original=w.turtle[action];w.turtle[action]=function(...)
+  local ok,why=original(...)
+  if ok and w.pose.x==2 and w.pose.y==0 and w.pose.z==0 then w.trampled=true;w.blocks['2,-1,0'].name='minecraft:dirt' end
+  return ok,why
+ end end
+ local place=w.turtle.placeDown;w.turtle.placeDown=function(...)
+  local item=w.items[w.selected]
+  if item and item.name=='minecraft:wheat_seeds' then
+   if w.blocks['2,-1,0'].name~='minecraft:farmland' then return false,'invalid soil' end
+   local ok,why=place(...);if ok then w.blocks['2,0,0']={name='minecraft:wheat',state={age=0}} end;return ok,why
+  end
+  return place(...)
+ end
+ assert(c:command('build import /example.json seedling'));assert(c:command('build auto seedling'))
+ local restarted=false
+ for _=1,2200 do
+  step();local p=c.state.automation.projects.seedling
+  if not restarted and p.site and p.site.work then c,b=reboot();restarted=true end
+  if p.phase=='built' and not b.state.currentTask then break end
+ end
+ eq(c.state.automation.projects.seedling.phase,'built');assert(restarted);eq(w.trampled,nil);eq(w.blocks['2,-1,0'].name,'minecraft:farmland');eq(w.blocks['2,0,0'].name,'minecraft:wheat')
+ for _,r in pairs(c.state.automation.requests) do assert(not r.requirements['minecraft:cobblestone'],'unnecessary foundation acquisition') end
+end)

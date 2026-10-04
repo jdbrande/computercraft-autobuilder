@@ -181,3 +181,18 @@ change the exact state before verification.
 project analysis, alongside resource planning and exact unsupported reasons. Fluids,
 unknown blocks and special acquisition blocks remain visible even without a placement
 adapter; metadata is never silently treated as supported.
+
+Bed-containing schematics use one-block-high construction regions so a foot can
+wait for the floor across a horizontal tile boundary without cycling through the
+head region. Generated cells are included in ownership and chunk coverage. New
+adapters and crop preparation require `placementV1`; existing owners retain their
+recovery path. Destructive repair of doors and beds is refused because removing one
+half can affect the other. Both halves must be handled by a future paired removal
+contract before automatic destructive repair can be enabled.
+
+Existing farmland beneath a seedling footprint is retained as an explicit read-only
+substrate requirement. Surveys stop above its empty crop cell and record the soil as
+unobserved; preparation then inspects it from a side or beneath using the existing
+access recovery path. Farmland is never classified as a general solid support and
+missing soil is not replaced with fill. This supports supplied farmland without
+claiming automatic creation of farmland.

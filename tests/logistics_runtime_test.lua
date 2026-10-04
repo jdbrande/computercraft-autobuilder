@@ -652,3 +652,26 @@ test('early supply fits full cargo and smaller stacks across partial receipt reb
     for _=1,10 do f:step() end;eq(f.controller.state.automation.supply,nil)
   end
 end)
+
+test('empty builder requests one bed and reconciles its sole supply item across reboot',function()
+ local f=fixture();f.world.items={};f.inventories.stock={[1]={name='minecraft:red_bed',count=1}}
+ local foot={x=2,y=0,z=0,name='minecraft:red_bed',state={part='foot',facing='east',occupied='false'}}
+ local head={x=3,y=0,z=0,name=foot.name,state={part='head',facing='east',occupied='false'}}
+ local place=f.world.turtle.placeDown
+ f.world.turtle.placeDown=function(...)
+  local ok,why=place(...)
+  if ok then f.world.blocks['2,0,0']={name=foot.name,state=U.copy(foot.state)};f.world.blocks['3,0,0']={name=head.name,state=U.copy(head.state)} end
+  return ok,why
+ end
+ f.crashSuck=true
+ local j=f.controller.automation.queue:submit('BUILD',{blocks={foot,head},clearanceY=2},{})
+ local requested,rebooted=false,false
+ for _=1,700 do
+  f:step();local t=f.worker.state.currentTask
+  if t and t.supplyRequest then eq(t.supplyRequest.count,1);requested=true end
+  if f.crashed and not rebooted then f:reboot(true,true);rebooted=true end
+  if f.controller.state.automation.jobs[j.id].status=='completed' and not f.worker.state.currentTask then break end
+ end
+ assert(requested and rebooted);assert(f.controller.state.automation.jobs[j.id].status=='completed',tostring(f.worker.state.currentTask and f.worker.state.currentTask.error))
+ eq(f.stats.staged,1);eq(f.stats.pulled,1);eq(f.world.places,1);eq(f.controller.state.automation.supply,nil)
+end)
