@@ -1805,3 +1805,11 @@ computers are off and temporary tickets removed.
 Final-source976 Lua/20 Python tests, release/diff checks and both native trials
 passed. Donor quarantine, controlled courier refueling and exact inventory receipts
 retain their documented limits. No second review was performed.
+
+### 0.38 started — operator observability
+
+The0.37 geometry review/native gates continue. The next independent implementation
+adds durable traffic waits, reliable queued operator input, correlated local script
+commands, structured significant events and a native monitor dashboard using cached
+state. Design: `operator-observability-design.md`. No routing rewrite is assumed;
+contention/load acceptance remains a later gate.
