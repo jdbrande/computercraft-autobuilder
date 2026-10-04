@@ -1314,3 +1314,8 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Focused health/network/runtime/coordination/logistics/scaling/install checks and
   actual private-crafting regression pass. Complete0.29 gates are starting; native
   integrity checks will be repeated on the final correction. No second review.
+
+- Final-source0.29 native health retest passed on `c482afa`, retaining777 fuel
+  on both turtles and correct verified/modified/restored/unmanaged reports.
+  Both computers are off and their force-load ticket removed. Python18 tests pass;
+  the complete Lua gate continues. Single-command enrollment remains in progress.
