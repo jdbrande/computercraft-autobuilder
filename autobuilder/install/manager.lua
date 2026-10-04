@@ -37,7 +37,7 @@ function M.run(e,opts)
     e.print(recovered and 'Interrupted installation recovered. Run reboot.' or 'No interrupted installation found.')
     return {recovered=recovered,changed=0}
   end
-  for _,path in ipairs({'/startup','/installer','/update'}) do
+  for _,path in ipairs({'/startup','/installer','/update','/fleet'}) do
     assert(not e.fs.exists(path),'Existing '..path..' shadows the .lua command. Back it up and rename it before installing.')
   end
   local old=receipt(e)
@@ -50,6 +50,7 @@ function M.run(e,opts)
   e.print('Checking '..base..'/manifest.json')
   local raw=I.fetch(e,base..'/manifest.json',1048576)
   local m=e.textutils.unserializeJSON(raw); Manifest.validate(m)
+  assert(not opts.requiredVersion or m.version==opts.requiredVersion,'Fleet controller and download release differ; update the controller or choose its published source')
   -- --base intentionally rebases paths: a freshly forked repository can be used
   -- before regenerating its manifest. Manifest URLs are still strictly validated.
   assert(not old or Manifest.compare(m.version,old.version)>=0,'Remote version is older than installed version; downgrade refused.')
@@ -58,6 +59,7 @@ function M.run(e,opts)
   for _,path in ipairs(Manifest.required) do
     assert(selected[path],'Manifest is missing required role file: '..path)
   end
+  for _,path in ipairs(opts.requiredPaths or {}) do assert(selected[path],'Manifest is missing fleet entry: '..path) end
   local newSettings
   if not e.fs.exists('/autobuilder/settings.lua') then
     assert(not old,'Local settings are missing. Restore /autobuilder/settings.lua from backup before updating.')

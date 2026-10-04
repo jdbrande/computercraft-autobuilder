@@ -1319,3 +1319,14 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
 - Focused health/network/runtime/coordination/logistics/scaling/install checks and
   actual private-crafting regression pass. Complete0.29 gates are starting; native
   integrity checks will be repeated on the final correction. No second review.
+
+- Task63 discovery/profile tests pass: nonce-bound bounded replies, explicit
+  controller selection, ambiguity refusal, ID/GPS berth matching, unmatched
+  telemetry-only enrollment and forbidden profile fields. Runtime supports the
+  opt-in enrollment protocol without requiring prior worker registration.
+- Task64 initial flow reuses the existing transactional installer and extracted
+  setup idle checks. Fresh enrollment applies a profile; repeats preserve settings;
+  explicit refresh preserves known saved heading. Active jobs block before HTTP,
+  failed profile application remains resumable, and release mismatch cannot enable
+  roles. Focused tests and18 Python packaging tests pass. Native HTTP enrollment,
+  final review and complete gates remain pending.

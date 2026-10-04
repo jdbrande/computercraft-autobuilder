@@ -2,6 +2,7 @@ local U=require('autobuilder.core.util')
 local M={}
 M.defaults={
   role='controller', protocol='autobuilder.v1',
+  fleet={enabled=false,profiles={}},
   heartbeatInterval=5, registrationInterval=15, workerTimeout=30,
   checkpointInterval=5, gps={enabled=true,timeout=2,interval=30},
   dataDir='/autobuilder/data', logDir='/autobuilder/logs',
@@ -39,7 +40,7 @@ local function merge(dst,src)
     assert(dst[k]~=nil or k=='controllerId' or k=='initialPosition' or k=='depot' or k=='label' or k=='entry' or k=='bounds' or k=='x' or k=='y' or k=='z' or k=='min' or k=='max', 'Unknown config key: '..tostring(k))
     if type(v)=='table' and type(dst[k])=='table' then
       -- These maps/lists are user-defined rather than schema objects.
-      if k=='nodes' or k=='areas' or k=='values' or k=='returns' or k=='stations' or k=='providerPreferences' or k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
+      if k=='profiles' or k=='nodes' or k=='areas' or k=='values' or k=='returns' or k=='stations' or k=='providerPreferences' or k=='exitRoute' or k=='resources' or k=='locations' or k=='capabilities' or k=='restrictedAreas' or k=='storageInventories' or k=='allowedMiningBlocks' or k=='protectedBlocks'
         or k=='craftingStations' or k=='supplyStations' or k=='furnaces' or k=='turtleFuelReserveItems' or k=='treeFarms' or k=='farms' or k=='depotExpansion' then dst[k]=U.copy(v)
       else merge(dst[k],v) end
     else dst[k]=U.copy(v) end
@@ -47,6 +48,7 @@ local function merge(dst,src)
 end
 function M.load(overrides)
   local c=U.copy(M.defaults); merge(c,overrides or {})
+  require('autobuilder.core.enrollment').validate(c.fleet)
   require('autobuilder.core.chunks').validate(c)
   require('autobuilder.core.scaling').validate(c.scaling)
   assert(require('autobuilder.resources.providers').validatePreferences(c.providerPreferences))

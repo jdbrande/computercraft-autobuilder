@@ -1,6 +1,7 @@
 local Manager=require('autobuilder.install.manager')
 local M={}
 function M.run(args,e,base,recovery)
+  if args[1]=='fleet' then local rest={};for i=2,#args do rest[#rest+1]=args[i] end;return require('autobuilder.install.fleet').run(rest,e,base,recovery) end
   local opts={defaultBase=base,recoverySource=recovery}; local i=1
   while i<=#args do
     local arg=args[i]

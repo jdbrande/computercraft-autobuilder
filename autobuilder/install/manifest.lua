@@ -11,7 +11,7 @@ function M.path(path)
   if type(path)~='string' or #path>200 or not path:match('^[%w_%.%/-]+$') or path:sub(1,1)=='/'
     or path:find('//',1,true) or path:sub(-1)=='/' then return false end
   for part in path:gmatch('[^/]+') do if part=='.' or part=='..' or part:sub(1,1)=='.' then return false end end
-  if path=='installer.lua' or path=='update.lua' or path=='startup.lua' then return true end
+  if path=='fleet.lua' or path=='installer.lua' or path=='update.lua' or path=='startup.lua' then return true end
   if not path:match('^autobuilder/.+%.lua$') then return false end
   if path=='autobuilder/settings.lua' or path:match('^autobuilder/data/') or path:match('^autobuilder/logs/') then return false end
   return true
