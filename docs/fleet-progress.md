@@ -5,8 +5,11 @@ Source of truth: [fleet requirements](fleet-requirements.md). Execution guide:
 
 ## Current work
 
-- Active development:0.31 registered processors passed native two-blast-furnace/
-  smoker restart acceptance; its complete Lua gate is running.0.32 renewable
+- Accepted0.31 registered processors:905 Lua/18 Python tests, release/diff checks,
+  final-source parallel native processing/restart/conservation and cleanup passed.
+  Permanent evidence: [0.31 validation](validation-0.31.0.md).
+
+- Active development:0.31 registered processors completed its release gates.0.32 renewable
   adapters passed final-source carrot/replant/reserve acceptance with both crops
   and farmland independently checked; its complete Lua gate is running.0.33 paired/
   attached/basic redstone placement is under its single final review; native probes
@@ -1454,6 +1457,11 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   Accepted0.27 documentation merged without changing the tested source. Both
   native trials, overlap/restart proof and cleanup are permanently documented.
 
+- Started0.31 registered processing design while enrollment receives its final
+  review. PROCESS operations will reuse dependency, reservation and physical
+  transfer accounting for inventory-exposed machines, with explicit slot recipes,
+  item fuel, capacity and processing-time estimates. Non-automatable hardware is
+  reported unsupported. Implementation and acceptance remain pending.
 -0.30 single final review found four Important issues; consolidated fixes preserve
   source-copy worker settings/checkpoints, separate software release discovery from
   enrollment GPS validation, reuse configuration object/collection merge semantics,
@@ -1461,6 +1469,27 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   before the changes and pass afterward; enrollment/setup/install/runtime focused
   suites pass. Full gates and final-source native repair retest follow.
 
+-0.31 registered processors now have bounded recipe/machine schemas, PROCESS
+  provider and dependency/fuel planning, balanced finite jobs, private machine
+  claims, per-batch destination capacity, exact measured transfers and unused-fuel
+  return. Initial regressions pass for concurrent multi-input machines, partial
+  transfers, power-loss/paused reconciliation, unavailable power, changed owned
+  recipes, release crashes, failed claims, disconnects and contamination. Native
+  controller239 with two blast furnaces and a smoker is prepared; acceptance,
+  final review and full gates remain pending.
+
+-0.31 single final review and native trial found four Important issues plus uneven
+  multi-wave lane balance. Regressions reproduced nominal-fuel exhaustion after
+  streamed burn loss, obsolete acquisition dispatch after external supply, output
+  capacity stranded across chests, and first-product stack-bound deadlock. Fixes
+  reserve conservative per-batch fuel, retire only provably unowned unique demand,
+  combine destination claims, support declared/measured output stack limits and
+  balance machine quotas before finite splitting. Focused consolidated suites pass.
+  The initial native run produced4 iron and2 cooked beef; the restart retest stalled
+  at19/20 iron, independently confirming expired burn and one retained raw input.
+  Fixture staging had removed the first4 ingots and was corrected with additional
+  raw ingredients, never finished outputs. The stalled candidate is preserved in
+  local audit records and its rig is reset for final-source acceptance.
 -0.30 final-source native retest passed: real HTTP software repair preserved local
   settings and checkpoint bytes; partial profile refresh retained supply inventory,
   side and west heading, changed batch2→1 and consumed no fuel(1,188 unchanged).
@@ -1472,3 +1501,12 @@ Minecraft hardware must be reported honestly rather than emulated as completion.
   final review fixes and final-source native hardware/integrity checks complete.
   Accepted0.28 merged with tested implementation unchanged; ordered integration
   proceeds while enrollment and processor milestones continue independently.
+
+-0.31 final-source native acceptance passed on controller240: two real blast
+  furnaces produced10+10 iron across controller restart and a smoker produced2
+  cooked beef. Independent world reads match20 iron/2 beef/16 remaining coal from
+  20 raw iron/2 raw beef/22 initial coal. All three machines empty, three jobs and
+  two requests completed, all stock/capacity leases released, no mining jobs.
+  Controller240 shut down and both temporary tickets removed;239 was shut down
+  before the reset. Permanent candidate report records failed pre-fix evidence,
+  final successful run, exact conservation and limits. Complete Lua gate remains.

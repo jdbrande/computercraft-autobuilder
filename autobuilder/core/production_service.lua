@@ -7,6 +7,7 @@ function M.new(app,config,e,queue)
   local s=queue.state; s.requestSequence=s.requestSequence or 0
   local self={machines={},laneCursor=0}; local save=function() return app:save() end
   self.ledger=require('autobuilder.storage.ledger').new(app.state,save)
+  self.processors=require('autobuilder.factory.process_service').new(app,config,e,queue,self)
   self.parallel=require('autobuilder.factory.parallel').new(app,config,e,queue,self)
   self.logistics=require('autobuilder.core.logistics_service').new(app,config,e,queue,self)
   self.returns=require('autobuilder.core.return_service').new(app,config,e,queue,self)
@@ -93,7 +94,7 @@ function M.new(app,config,e,queue)
           -- Older Crafty workers can acknowledge completion without counters.
           -- Their exclusive job completion already guarantees exact output.
           if not require('autobuilder.factory.factory').equal(lease.delivered,j.stockOutputs) then
-            assert(not j.privateStation and not j.logistics and not j.returning,'private output has not reached shared storage')
+            assert(j.type~='PROCESS' and not j.privateStation and not j.logistics and not j.returning,'private output has not reached shared storage')
             local withdrawn=j.type=='CRAFT' and j.stockInputs or lease.withdrawn
             self.ledger:receipt(j.id,withdrawn,j.stockOutputs,{},lease.sequence+1)
           end
@@ -102,7 +103,7 @@ function M.new(app,config,e,queue)
       end
     end
     if allowGrant==false then return end
-    for _,j in ipairs(jobs) do if j.status~='completed' and not j.logistics and not j.privateStation and not j.returnManaged and not self.ledger.state.leases[j.id] then
+    for _,j in ipairs(jobs) do if j.status~='completed' and j.type~='PROCESS' and not j.logistics and not j.privateStation and not j.returnManaged and not self.ledger.state.leases[j.id] then
       local lease,why=self.ledger:reserve(j.id,j.stockInputs,j.stockOutputs,
         app.mining.storage.valid and app.mining.storage.counts or nil,{protected=j.type=='FUEL_STATION' and {} or config.turtleFuelReserveItems})
       if j.stockError~=why then j.stockError=why; save() end
@@ -139,6 +140,26 @@ function M.new(app,config,e,queue)
   end
   local function blocked(material,reason)
     material.status='blocked'; material.error=reason; return false
+  end
+  local function retireSatisfied(r,j)
+    if not j or j.status~='queued' or j.workerId or j.assignedAt or j.intent or j.production or j.childId or j.parent
+      or j.miningArea or (j.retryCount or 0)>0 or app.state.assignmentRecovery then return end
+    local progress=j.progress
+    if type(progress)=='table' then
+      if (progress.delivered or 0)>0 or (progress.held or 0)>0 or progress.phase then return end
+    elseif (progress or 0)>0 then return end
+    if j.type=='MINE' then if j.consumer~=r.id then return end
+    elseif not j.key or j.key:sub(1,#r.id+1)~=r.id..':' then return end
+    for _,w in pairs(app.state.workers or {}) do if w.telemetry and w.telemetry.task==j.id then return end end
+    for _,other in pairs(s.requests) do if other.id~=r.id and other.status~='completed' then
+      for _,links in ipairs({other.mines or {},other.harvests or {}}) do for _,id in pairs(links) do if id==j.id then return end end end
+    end end
+    for _,ledger in ipairs({app.state.inventoryLedger or {},app.state.capacityLedger or {}}) do
+      local lease=ledger.leases and ledger.leases[j.id];if lease and lease.status=='held' then return end
+    end
+    require('autobuilder.factory.factory').commit(j,save,function()
+      j.status='completed';j.cancelled=true;j.error=nil;j.retiredReason='demand satisfied before assignment'
+    end)
   end
   local function acquire(r,item,target)
     local material=progress(r,item,target); local count=material.count
@@ -194,7 +215,10 @@ function M.new(app,config,e,queue)
       if not hasWorker('explorationV1',item) then return blocked(material,'No online exploration-capable worker for '..item) end
       material.error=group.error; return false
     end
-    if count>=target then material.status='ready'; return true end
+    if count>=target then
+      retireSatisfied(r,legacy);retireSatisfied(r,harvest)
+      material.status='ready'; return true
+    end
     if provider and provider.type=='mining' then
       local id=r.mines[item]; local existing=id and app.state.jobs[id]
       if not existing or existing.status=='completed' then
@@ -287,7 +311,9 @@ function M.new(app,config,e,queue)
       if not r.jobId and not r.jobIds and s.supply then
         r.error='waiting for outstanding supply batch '..tostring(s.supply.jobId); save(); return
       end
-      if op.type=='SMELT' then
+      if op.type=='PROCESS' then
+        self.processors:schedule(r,op)
+      elseif op.type=='SMELT' then
         if not r.jobIds and not r.jobId and #(config.furnaces or {})==0 then
           r.status='blocked'; r.error='No configured furnaces for '..op.item; save(); return
         end
@@ -408,6 +434,7 @@ function M.new(app,config,e,queue)
     if self.returns:step() then return true end
     if self.logistics:step() then return true end
     if self.parallel:step() then return true end
+    if self.processors:step() then return true end
     local all={}
     for _,job in pairs(s.jobs) do if job.type=='SMELT' then all[#all+1]=job end end
     table.sort(all,function(a,b) return a.id<b.id end)

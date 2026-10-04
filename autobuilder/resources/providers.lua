@@ -2,7 +2,7 @@ local U=require('autobuilder.core.util')
 local Materials=require('autobuilder.resources.materials')
 local Recipes=require('autobuilder.factory.recipes')
 local M={}
-local types={storage=true,exploration=true,mining=true,tree_farm=true,farm=true,crafting=true,smelting=true}
+local types={storage=true,exploration=true,mining=true,tree_farm=true,farm=true,crafting=true,smelting=true,processing=true}
 function M.validatePreferences(preferences)
   assert(type(preferences)=='table','provider preferences must be a map')
   local items=0
@@ -11,7 +11,7 @@ function M.validatePreferences(preferences)
     assert(type(order)=='table','provider preference must be a list')
     local count,seen=0,{}
     for index,kind in pairs(order) do
-      assert(U.integer(index) and index>=1 and index<=7 and types[kind] and not seen[kind],'invalid/duplicate provider type')
+      assert(U.integer(index) and index>=1 and index<=8 and types[kind] and not seen[kind],'invalid/duplicate provider type')
       seen[kind]=true; count=count+1
     end
     for index=1,count do assert(order[index],'sparse provider preference') end
@@ -26,8 +26,8 @@ function M.candidates(item,config)
     p.id=kind..':'..item..(p.index and ':'..p.index or ''); out[#out+1]=p
   end
   add('storage')
-  local recipe=(config.recipes or Recipes).get(item)
-  if recipe then add(recipe.kind=='craft' and 'crafting' or 'smelting',recipe.kind=='craft' and 'crafting' or nil,{recipe=recipe}) end
+  local recipe=require('autobuilder.factory.processors').recipe(config,item) or (config.recipes or Recipes).get(item)
+  if recipe then add(recipe.kind=='craft' and 'crafting' or recipe.kind=='process' and 'processing' or 'smelting',recipe.kind=='craft' and 'crafting' or nil,{recipe=recipe}) end
   if Materials.get(item) then
     local explore=(config.exploration or {}).enabled
     add(explore and 'exploration' or 'mining',explore and 'explorationV1' or 'mining')
@@ -38,6 +38,7 @@ function M.candidates(item,config)
 end
 local function available(p,config,context)
   if p.type=='storage' then return (context.available or 0)>=(context.required or 1) end
+  if p.type=='processing' then return #p.recipe.machines>0 end
   if p.type=='smelting' then return #(config.furnaces or {})>0 end
   if not context.workers then return true end
   for _,w in pairs(context.workers) do

@@ -1257,3 +1257,23 @@ Spec: [fleet install design](fleet-install-design.md). Inline execution in
 - [x] Exercise actual runtime registration and native discovery/install/recovery.
 - [x] Complete one final review and consolidated fixes, full gates and permanent
   evidence; integrate in dependency order and continue remaining requirements.
+
+## Milestone0.31: registered processing network
+
+Spec: [processing network design](processing-network-design.md). Inline execution
+in `.worktrees/processing-network` follows0.30; propagate final enrollment fixes.
+
+### Task65: Registered process recipes and dependency/fuel planning
+
+- [x] Add bounded machine/recipe configuration and PROCESS provider/planner tests.
+- [x] Preserve legacy furnace/craft recipes; split registered process work across
+  compatible machines with explicit item fuel and expected processing time.
+
+### Task66: Durable machine execution and acceptance
+
+- [x] Reuse stock/capacity claims and transfer reconciliation for finite processor
+  batches, output collection, unused fuel return and restart/paused recovery.
+- [x] Test actual controller execution, multi-input simulations and useful native
+  blast-furnace/smoker processing with exact conservation and final cleanup.
+- [x] Complete one final review/consolidated fixes, full gates and documentation;
+  integrate in dependency order and continue renewable/provider requirements.

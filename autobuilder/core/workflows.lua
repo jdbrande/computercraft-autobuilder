@@ -11,7 +11,7 @@ end
 -- Durable ownership is shared by the mining and generic queues. Heartbeats may
 -- still say idle immediately after either queue has saved an assignment.
 local storageWorkers={HARVEST=true,FARM=true,TRANSPORT=true,REFUEL=true}
-local function factory(job) return job.type=='SMELT' or job.type=='CRAFT' end
+local function factory(job) return job.type=='PROCESS' or job.type=='SMELT' or job.type=='CRAFT' end
 function M.workerBusy(state,owner,exceptId)
   if require('autobuilder.core.chunks').holdsAnchor(state,owner) then return true end
   for _,job in pairs(state.jobs or {}) do
@@ -47,7 +47,7 @@ function M.factoryActive(state)
   for _,job in pairs((state.automation or {}).jobs or {}) do
     local p=job.production
     if factory(job) and (job.status~='completed' or p and p.intent)
-      and (job.workerId or job.status=='running' or p and (p.furnace or p.intent or (p.loaded or 0)>0 or (p.crafted or 0)>0)) then return true end
+      and (job.workerId or job.status=='running' or p and (p.machine or p.furnace or p.intent or (p.loaded or 0)>0 or (p.crafted or 0)>0)) then return true end
   end
   return false
 end
@@ -71,7 +71,7 @@ function M.storageBusy(state,ignoreReturns)
 end
 function M.factoryCanRun(state,job,preparing)
   if job.privateStation and not job.privateReady and not preparing then return false,'waiting for staged private crafting inputs' end
-  if job.stockInputs and not (preparing and job.privateStation and not (state.capacityLedger and state.capacityLedger.leases[job.id])) then
+  if job.stockInputs and not (preparing and (job.privateStation or job.type=='PROCESS') and not (state.capacityLedger and state.capacityLedger.leases[job.id])) then
     local lease=state.inventoryLedger and state.inventoryLedger.leases[job.id]
     if not lease or lease.status~='held' then return false,job.stockError or 'waiting for durable ingredient reservation' end
   end
@@ -79,10 +79,10 @@ function M.factoryCanRun(state,job,preparing)
   for _,other in pairs((state.automation or {}).jobs or {}) do
     if other.id~=job.id and factory(other) and other.status~='completed' then
       local p=other.production
-      local active=other.workerId or other.status=='running' or p and (p.furnace or p.intent or (p.loaded or 0)>0 or (p.crafted or 0)>0)
+      local active=other.workerId or other.status=='running' or p and (p.machine or p.furnace or p.intent or (p.loaded or 0)>0 or (p.crafted or 0)>0)
       local sameBank=job.type=='SMELT' and other.type=='SMELT' and job.productionRequest
         and job.productionRequest==other.productionRequest and job.productionOperation==other.productionOperation
-      if active and not sameBank and not (job.privateStation and other.privateStation) then return false,'waiting for factory operation '..other.id end
+      if active and not (job.type=='PROCESS' and other.type=='PROCESS') and not sameBank and not (job.privateStation and other.privateStation) then return false,'waiting for factory operation '..other.id end
     end
   end
   return true

@@ -2,6 +2,7 @@ local U=require('autobuilder.core.util')
 local Recipes=require('autobuilder.factory.recipes')
 local Fuel=require('autobuilder.factory.fuel')
 local Providers=require('autobuilder.resources.providers')
+local Processors=require('autobuilder.factory.processors')
 local M={}
 local function bounded(n) assert(U.integer(n) and n>=0 and n<=100000000,'expanded item count exceeds limit'); return n end
 local function keys(t) local out={}; for k in pairs(t) do out[#out+1]=k end; table.sort(out); return out end
@@ -22,6 +23,7 @@ function M.expand(requirements,stock,options)
   end
   requirements=resolved
   local registry=options.recipes or Recipes
+  local function recipe(item) return Processors.recipe(options,item) or registry.get(item) end
   local p={raw={},operations={},missing={},reserveMissing={},available=U.copy(stock),requirements=U.copy(requirements),graph={nodes={}}}
   local visiting,visited={},{}
   local visitedCount=0
@@ -29,15 +31,16 @@ function M.expand(requirements,stock,options)
     assert(depth<=128,'recipe dependency depth exceeded'); assert(not visiting[item],'recipe cycle at '..item)
     if visited[item] then return end
     visiting[item]=true
-    local r=registry.get(item)
+    local r=recipe(item)
     visitedCount=visitedCount+1; assert(visitedCount<=4096,'recipe graph item limit exceeded')
     if r then
-      assert((r.kind=='craft' or r.kind=='smelt') and U.integer(r.yield) and r.yield>=1 and r.yield<=64,'invalid planner recipe')
+      assert((r.kind=='craft' or r.kind=='smelt' or r.kind=='process') and U.integer(r.yield) and r.yield>=1 and r.yield<=64,'invalid planner recipe')
       assert(type(r.ingredients)=='table' and next(r.ingredients),'recipe needs ingredients')
       for ingredient,n in pairs(r.ingredients) do
         assert(U.shortString(ingredient,128) and U.integer(n) and n>=1 and n<=64,'invalid planner ingredient')
       end
       for _,ingredient in ipairs(keys(r.ingredients)) do validate(ingredient,depth+1) end
+      if r.fuel then validate(r.fuel.item,depth+1) end
     end
     visiting[item]=nil; visited[item]=true
   end
@@ -66,7 +69,7 @@ function M.expand(requirements,stock,options)
     bounded(n); if n==0 then return {} end
     steps=steps+1; assert(steps<=65536,'resource expansion step limit exceeded')
     local node=demand(item,n); local dependencies={}
-    local r=registry.get(item)
+    local r=recipe(item)
     if not r then p.raw[item]=bounded((p.raw[item] or 0)+n) end
     local used=math.min(p.available[item] or 0,n)
     p.available[item]=(p.available[item] or 0)-used; n=n-used
@@ -81,7 +84,12 @@ function M.expand(requirements,stock,options)
     if n==0 then return dependencies end
     if not r then p.missing[item]=bounded((p.missing[item] or 0)+n); return dependencies end
     local batches=math.ceil(n/r.yield); local inputs={}
-    local before={}
+    local before={};local lanes=r.kind=='process' and Processors.lanes(r,batches) or nil
+    if r.fuel then
+      local fuel=batches -- Streaming and outages cannot promise residual burn between batches.
+      inputs[r.fuel.item]=fuel;node.inputs[r.fuel.item]=(node.inputs[r.fuel.item] or 0)+fuel
+      for id in pairs(need(r.fuel.item,fuel)) do before[id]=true end
+    end
     for _,ingredient in ipairs(keys(r.ingredients)) do
       inputs[ingredient]=bounded(r.ingredients[ingredient]*batches)
       node.inputs[ingredient]=bounded((node.inputs[ingredient] or 0)+inputs[ingredient])
@@ -89,8 +97,8 @@ function M.expand(requirements,stock,options)
     end
     local id=#p.operations+1; assert(id<=4096,'resource plan operation limit exceeded')
     local quantity=bounded(batches*r.yield); node.produced=bounded(node.produced+quantity)
-    p.operations[id]={id=id,dependencies=keys(before),type=r.kind=='craft' and 'CRAFT' or 'SMELT',kind=r.kind,item=item,batches=batches,
-      quantity=quantity,inputs=inputs,ingredients=U.copy(inputs)}
+    p.operations[id]={id=id,dependencies=keys(before),type=r.kind=='craft' and 'CRAFT' or r.kind=='process' and 'PROCESS' or 'SMELT',kind=r.kind,item=item,batches=batches,
+      quantity=quantity,inputs=inputs,ingredients=U.copy(inputs),lanes=lanes,processRecipe=lanes and U.copy(r) or nil}
     dependencies[id]=true; lots[item]=lots[item] or {}; lots[item][#lots[item]+1]={id=id,count=quantity-n}
     p.available[item]=(p.available[item] or 0)+batches*r.yield-n
     if r.kind=='smelt' then smelts=bounded(smelts+batches) end
